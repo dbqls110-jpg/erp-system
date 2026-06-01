@@ -1,0 +1,209 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── 사용자 ───────────────────────────────────────────────
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  emailVerified DateTime?
+  name          String?
+  image         String?
+  role          String    @default("pending") // "admin" | "user" | "pending"
+  active        Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  accounts      Account[]
+  sessions      Session[]
+  attendances   Attendance[]
+  leaveBalances LeaveBalance[]
+  leaveRequests LeaveRequest[]
+  expenses      Expense[]
+  businessCards BusinessCard[]
+
+  @@map("users")
+}
+
+// ─── NextAuth ─────────────────────────────────────────────
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+// ─── 근태 ─────────────────────────────────────────────────
+model Attendance {
+  id        String    @id @default(cuid())
+  userId    String
+  date      String    // "YYYY-MM-DD"
+  clockIn   DateTime?
+  clockOut  DateTime?
+  workHours Float?
+  note      String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
+  @@map("attendances")
+}
+
+// ─── 휴가 ─────────────────────────────────────────────────
+model LeaveBalance {
+  id          String   @id @default(cuid())
+  userId      String
+  year        Int
+  totalDays   Float    @default(15)
+  usedDays    Float    @default(0)
+  pendingDays Float    @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, year])
+  @@map("leave_balances")
+}
+
+model LeaveRequest {
+  id        String   @id @default(cuid())
+  userId    String
+  type      String   // "annual" | "half_am" | "half_pm" | "hourly"
+  startDate String   // "YYYY-MM-DD"
+  endDate   String   // "YYYY-MM-DD"
+  startTime String?
+  endTime   String?
+  days      Float
+  reason    String?
+  status    String   @default("pending") // "pending" | "approved" | "rejected"
+  adminNote String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("leave_requests")
+}
+
+// ─── 프로젝트 ─────────────────────────────────────────────
+model Project {
+  id           String   @id @default(cuid())
+  name         String
+  client       String?
+  announceDate String?
+  deadline     String?
+  status       String   @default("active") // "active" | "completed" | "on_hold"
+  progress     Float    @default(0)
+  assignee     String?
+  memo         String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  checklistItems ChecklistItem[]
+
+  @@map("projects")
+}
+
+model ChecklistItem {
+  id        String   @id @default(cuid())
+  projectId String
+  content   String
+  isDone    Boolean  @default(false)
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@map("checklist_items")
+}
+
+// ─── 재무 ─────────────────────────────────────────────────
+model Budget {
+  id        String   @id @default(cuid())
+  year      Int
+  month     Int
+  amount    Float
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([year, month])
+  @@map("budgets")
+}
+
+model Expense {
+  id        String   @id @default(cuid())
+  userId    String
+  date      String   // "YYYY-MM-DD"
+  title     String
+  category  String   // "rent" | "salary" | "telecom" | "supplies" | "food" | "other"
+  amount    Float
+  memo      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("expenses")
+}
+
+// ─── 명함 ─────────────────────────────────────────────────
+model BusinessCard {
+  id         String   @id @default(cuid())
+  userId     String
+  name       String
+  company    String?
+  jobTitle   String?
+  phone      String?
+  email      String?
+  address    String?
+  imagePath  String?
+  rawOcrText String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("business_cards")
+}

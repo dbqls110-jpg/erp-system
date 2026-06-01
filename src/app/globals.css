@@ -1,26 +1,127 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+@custom-variant dark (&:is(.dark *));
 
 @theme inline {
+  /* DESIGN.md ClickUp 디자인 시스템 토큰 */
+  --color-canvas-white: #ffffff;
+  --color-midnight-charcoal: #292d34;
+  --color-dark-onyx: #202023;
+  --color-ash-gray: #e8e8e8;
+  --color-smoke-gray: #b3b3b3;
+  --color-hint-of-sky: #e9ebf0;
+  --color-shadow-tint-blue: #edf6fd;
+  --color-deep-violet: #7b68ee;
+  --color-electric-blue: #0091ff;
+  --color-rich-plum: #514b81;
+  --color-vivid-purple: #6647f0;
+  --color-deep-space-charcoal: #090c1d;
+  --color-warm-fade: #ff5b36;
+
+  /* Shadcn 연동 토큰 */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+
+  /* Typography */
+  --font-sans: var(--font-inter);
+  --font-heading: var(--font-plus-jakarta-sans);
+  --font-mono: 'Sometype Mono', ui-monospace, monospace;
+
+  /* Radius (DESIGN.md 기준) */
+  --radius-sm: 6px;
+  --radius-md: 9px;
+  --radius-lg: 9px;
+  --radius-xl: 12px;
+  --radius-2xl: 16px;
+  --radius-3xl: 24px;
+  --radius-full: 54px;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+:root {
+  /* ClickUp 라이트 테마 */
+  --background: #ffffff;
+  --foreground: #292d34;
+  --card: #ffffff;
+  --card-foreground: #292d34;
+  --popover: #ffffff;
+  --popover-foreground: #292d34;
+  --primary: #202023;
+  --primary-foreground: #ffffff;
+  --secondary: #e9ebf0;
+  --secondary-foreground: #292d34;
+  --muted: #e9ebf0;
+  --muted-foreground: #b3b3b3;
+  --accent: #edf6fd;
+  --accent-foreground: #292d34;
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: #e8e8e8;
+  --input: #e8e8e8;
+  --ring: #7b68ee;
+  --radius: 0.5625rem;
+
+  /* Charts (ClickUp 브랜드 컬러 활용) */
+  --chart-1: #7b68ee;
+  --chart-2: #0091ff;
+  --chart-3: #6647f0;
+  --chart-4: #514b81;
+  --chart-5: #ff5b36;
+
+  /* Sidebar */
+  --sidebar: #ffffff;
+  --sidebar-foreground: #292d34;
+  --sidebar-primary: #7b68ee;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #e9ebf0;
+  --sidebar-accent-foreground: #292d34;
+  --sidebar-border: #e8e8e8;
+  --sidebar-ring: #7b68ee;
+
+  /* Shadows */
+  --shadow-subtle: rgba(0, 0, 0, 0.1) 0px 1px 3px 0px, rgba(0, 0, 0, 0.1) 0px 1px 2px -1px;
+  --shadow-sm: rgba(13, 21, 48, 0.04) 0px 4px 4px 0px;
+  --shadow-subtle-2: rgba(18, 43, 165, 0.04) 0px 1px 1px -0.5px, rgba(18, 43, 165, 0.04) 0px 3px 3px -1.5px, rgba(18, 43, 165, 0.04) 0px 6px 6px -3px, rgba(18, 43, 165, 0.04) 0px 12px 12px -6px;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
   }
-}
-
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Plus Jakarta Sans', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  }
 }
