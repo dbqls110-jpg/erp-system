@@ -143,7 +143,7 @@ export default async function DashboardPage() {
           </CardHeader>
           <CardContent>
             <ul className="space-y-2">
-              {upcomingEvents.map((p) => (
+              {upcomingEvents.map((p: { id: string; name: string; deadline: string | null }) => (
                 <li key={p.id} className="flex items-center justify-between text-sm">
                   <span className="font-medium text-midnight-charcoal">{p.name}</span>
                   <span className="text-smoke-gray text-xs">{p.deadline} 마감</span>
