@@ -12,13 +12,50 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     }),
   ],
   session: { strategy: "jwt" },
+  cookies: {
+    state: {
+      name: "next-auth.state",
+      options: {
+        httpOnly: true,
+        sameSite: "none",
+        path: "/",
+        secure: true,
+      },
+    },
+    pkceCodeVerifier: {
+      name: "next-auth.pkce.code_verifier",
+      options: {
+        httpOnly: true,
+        sameSite: "none",
+        path: "/",
+        secure: true,
+      },
+    },
+    callbackUrl: {
+      name: "next-auth.callback-url",
+      options: {
+        httpOnly: true,
+        sameSite: "none",
+        path: "/",
+        secure: true,
+      },
+    },
+    csrfToken: {
+      name: "next-auth.csrf-token",
+      options: {
+        httpOnly: true,
+        sameSite: "none",
+        path: "/",
+        secure: true,
+      },
+    },
+  },
   callbacks: {
     async jwt({ token, account, profile }) {
       if (account?.provider === "google" && profile?.email) {
         try {
           const sql = neon(process.env.DATABASE_URL!);
 
-          // 기존 유저 조회
           const users = await sql`
             SELECT id, role, name, image FROM users WHERE email = ${profile.email}
           `;
@@ -26,7 +63,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           let dbUser = users[0];
 
           if (!dbUser) {
-            // 첫 번째 유저이면 admin, 나머지는 pending
             const countResult = await sql`SELECT COUNT(*) as count FROM users`;
             const count = Number(countResult[0].count);
 
