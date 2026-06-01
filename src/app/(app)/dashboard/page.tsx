@@ -1,6 +1,5 @@
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import type { Project } from "@prisma/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Clock, FolderKanban, Banknote, Calendar } from "lucide-react";
 import { format } from "date-fns";
@@ -144,7 +143,7 @@ export default async function DashboardPage() {
           </CardHeader>
           <CardContent>
             <ul className="space-y-2">
-              {upcomingEvents.map((p: Project) => (
+              {upcomingEvents.map((p) => (
                 <li key={p.id} className="flex items-center justify-between text-sm">
                   <span className="font-medium text-midnight-charcoal">{p.name}</span>
                   <span className="text-smoke-gray text-xs">{p.deadline} 마감</span>
