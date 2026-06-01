@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { format, startOfMonth, endOfMonth } from "date-fns";
 import { ko } from "date-fns/locale";
 import { Clock } from "lucide-react";
+import { ClockButtons } from "./ClockButtons";
 
 export default async function AttendancePage() {
   const session = await getServerSession(authOptions);
@@ -37,9 +38,15 @@ export default async function AttendancePage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-deep-space-charcoal" style={{ fontFamily: "var(--font-plus-jakarta-sans)", letterSpacing: "-0.91px" }}>
-        근태 관리
-      </h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold text-deep-space-charcoal" style={{ fontFamily: "var(--font-plus-jakarta-sans)", letterSpacing: "-0.91px" }}>
+          근태 관리
+        </h1>
+        <ClockButtons
+          hasClockIn={!!todayRecord?.clockIn}
+          hasClockOut={!!todayRecord?.clockOut}
+        />
+      </div>
 
       {/* 오늘 현황 */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
