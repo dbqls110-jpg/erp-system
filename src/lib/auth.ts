@@ -1,6 +1,6 @@
 import NextAuth from "next-auth";
 import Google from "next-auth/providers/google";
-import { prisma } from "@/lib/prisma";
+import { neon } from "@neondatabase/serverless";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   trustHost: true,
@@ -16,22 +16,35 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     async jwt({ token, account, profile }) {
       if (account?.provider === "google" && profile?.email) {
         try {
-          let dbUser = await prisma.user.findUnique({
-            where: { email: profile.email },
-            select: { id: true, role: true, name: true, image: true },
-          });
+          const sql = neon(process.env.DATABASE_URL!);
+
+          // 기존 유저 조회
+          const users = await sql`
+            SELECT id, role, name, image FROM users WHERE email = ${profile.email}
+          `;
+
+          let dbUser = users[0];
 
           if (!dbUser) {
-            const count = await prisma.user.count();
-            dbUser = await prisma.user.create({
-              data: {
-                email: profile.email,
-                name: profile.name ?? null,
-                image: (profile as { picture?: string }).picture ?? null,
-                role: count === 0 ? "admin" : "pending",
-              },
-              select: { id: true, role: true, name: true, image: true },
-            });
+            // 첫 번째 유저이면 admin, 나머지는 pending
+            const countResult = await sql`SELECT COUNT(*) as count FROM users`;
+            const count = Number(countResult[0].count);
+
+            const newUsers = await sql`
+              INSERT INTO users (id, email, name, image, role, active, "createdAt", "updatedAt")
+              VALUES (
+                gen_random_uuid()::text,
+                ${profile.email},
+                ${profile.name ?? null},
+                ${(profile as { picture?: string }).picture ?? null},
+                ${count === 0 ? "admin" : "pending"},
+                true,
+                NOW(),
+                NOW()
+              )
+              RETURNING id, role, name, image
+            `;
+            dbUser = newUsers[0];
           }
 
           token.id = dbUser.id;
@@ -39,8 +52,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           token.name = dbUser.name;
           token.picture = dbUser.image;
         } catch (err) {
-          console.error("[ERP Auth Error]", JSON.stringify(err, Object.getOwnPropertyNames(err)));
-          // DB 오류시 로그인 자체는 통과, 대기 상태로 처리
+          console.error("[ERP Auth Error]", err);
           token.id = token.sub ?? "unknown";
           token.role = "pending";
         }
