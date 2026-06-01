@@ -86,6 +86,14 @@ export async function deleteChecklistItem(itemId: string, projectId: string) {
   revalidatePath(`/projects/${projectId}`);
 }
 
+export async function updateProjectMemo(id: string, memo: string) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) throw new Error("Unauthorized");
+
+  await prisma.project.update({ where: { id }, data: { memo: memo || null } });
+  revalidatePath(`/projects/${id}`);
+}
+
 async function updateProgress(projectId: string) {
   const items = await prisma.checklistItem.findMany({ where: { projectId } });
   const total = items.length;

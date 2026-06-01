@@ -5,6 +5,7 @@ import { Progress } from "@/components/ui/progress";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChecklistPanel } from "./ChecklistPanel";
 import { ProjectEditButton } from "./ProjectEditButton";
+import { MemoEditor } from "./MemoEditor";
 import { Calendar, User, Building } from "lucide-react";
 
 const statusConfig: Record<string, { label: string; class: string }> = {
@@ -68,16 +69,14 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
       </Card>
 
       {/* 메모 */}
-      {project.memo && (
-        <Card className="border-ash-gray shadow-[var(--shadow-sm)]">
-          <CardHeader>
-            <CardTitle className="text-base font-semibold text-deep-space-charcoal" style={{ fontFamily: "var(--font-plus-jakarta-sans)" }}>메모</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-midnight-charcoal whitespace-pre-wrap">{project.memo}</p>
-          </CardContent>
-        </Card>
-      )}
+      <Card className="border-ash-gray shadow-[var(--shadow-sm)]">
+        <CardHeader>
+          <CardTitle className="text-base font-semibold text-deep-space-charcoal" style={{ fontFamily: "var(--font-plus-jakarta-sans)" }}>메모</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <MemoEditor projectId={project.id} memo={project.memo} />
+        </CardContent>
+      </Card>
     </div>
   );
 }
