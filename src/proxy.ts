@@ -1,27 +1,25 @@
-import { auth } from "@/lib/auth";
+import { withAuth } from "next-auth/middleware";
 import { NextResponse } from "next/server";
 
-const PUBLIC_PATHS = ["/login", "/api/auth", "/pending"];
+export default withAuth(
+  function middleware(req) {
+    const role = req.nextauth?.token?.role as string | undefined;
+    const { pathname } = req.nextUrl;
 
-export const proxy = auth((req) => {
-  const { pathname } = req.nextUrl;
-  const isPublic = PUBLIC_PATHS.some((p) => pathname.startsWith(p));
-
-  if (!req.auth && !isPublic) {
-    return NextResponse.redirect(new URL("/login", req.url));
+    if (role === "pending" && !pathname.startsWith("/pending")) {
+      return NextResponse.redirect(new URL("/pending", req.url));
+    }
+    return NextResponse.next();
+  },
+  {
+    callbacks: {
+      authorized: ({ token }) => !!token,
+    },
+    pages: {
+      signIn: "/login",
+    },
   }
-
-  if (
-    req.auth &&
-    (req.auth as { user?: { role?: string } }).user?.role === "pending" &&
-    !pathname.startsWith("/pending") &&
-    !pathname.startsWith("/api/auth")
-  ) {
-    return NextResponse.redirect(new URL("/pending", req.url));
-  }
-
-  return NextResponse.next();
-});
+);
 
 export const config = {
   matcher: ["/((?!api/auth|_next/static|_next/image|favicon.ico|public/).*)"],
