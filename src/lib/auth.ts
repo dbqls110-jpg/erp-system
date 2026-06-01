@@ -13,30 +13,36 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   session: { strategy: "jwt" },
   callbacks: {
     async jwt({ token, account, profile }) {
-      // Google 로그인 시점에만 실행
       if (account?.provider === "google" && profile?.email) {
-        let dbUser = await prisma.user.findUnique({
-          where: { email: profile.email },
-          select: { id: true, role: true, name: true, image: true },
-        });
-
-        if (!dbUser) {
-          const count = await prisma.user.count();
-          dbUser = await prisma.user.create({
-            data: {
-              email: profile.email,
-              name: profile.name ?? null,
-              image: (profile as { picture?: string }).picture ?? null,
-              role: count === 0 ? "admin" : "pending",
-            },
+        try {
+          let dbUser = await prisma.user.findUnique({
+            where: { email: profile.email },
             select: { id: true, role: true, name: true, image: true },
           });
-        }
 
-        token.id = dbUser.id;
-        token.role = dbUser.role;
-        token.name = dbUser.name;
-        token.picture = dbUser.image;
+          if (!dbUser) {
+            const count = await prisma.user.count();
+            dbUser = await prisma.user.create({
+              data: {
+                email: profile.email,
+                name: profile.name ?? null,
+                image: (profile as { picture?: string }).picture ?? null,
+                role: count === 0 ? "admin" : "pending",
+              },
+              select: { id: true, role: true, name: true, image: true },
+            });
+          }
+
+          token.id = dbUser.id;
+          token.role = dbUser.role;
+          token.name = dbUser.name;
+          token.picture = dbUser.image;
+        } catch (err) {
+          console.error("[ERP Auth Error]", JSON.stringify(err, Object.getOwnPropertyNames(err)));
+          // DB 오류시 로그인 자체는 통과, 대기 상태로 처리
+          token.id = token.sub ?? "unknown";
+          token.role = "pending";
+        }
       }
       return token;
     },
