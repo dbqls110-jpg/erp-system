@@ -38,6 +38,16 @@ export const authOptions: NextAuthOptions = {
           token.role = dbUser.role;
           token.name = dbUser.name;
           token.picture = dbUser.image;
+
+          // 출근 자동 기록 (당일 첫 로그인만)
+          if (dbUser.role !== "pending") {
+            const today = new Date().toISOString().split("T")[0];
+            await sql`
+              INSERT INTO attendances (id, "userId", date, "clockIn", "createdAt", "updatedAt")
+              VALUES (gen_random_uuid()::text, ${dbUser.id}, ${today}, NOW(), NOW(), NOW())
+              ON CONFLICT ("userId", date) DO NOTHING
+            `;
+          }
         } catch (err) {
           console.error("[ERP Auth Error]", err);
           token.id = token.sub ?? "unknown";

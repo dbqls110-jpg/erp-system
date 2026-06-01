@@ -11,7 +11,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
-import { LogOut, User } from "lucide-react";
+import { LogOut } from "lucide-react";
+import { clockOut } from "@/app/actions/attendance";
 
 interface HeaderProps {
   user: {
@@ -35,14 +36,16 @@ export function Header({ user }: HeaderProps) {
 
   const role = roleLabel[user.role] ?? roleLabel.pending;
 
+  const handleLogout = async () => {
+    await clockOut();
+    signOut({ callbackUrl: "/login" });
+  };
+
   return (
     <header className="h-16 flex items-center justify-between px-6 border-b border-ash-gray bg-canvas-white shrink-0">
       <div />
       <div className="flex items-center gap-3">
-        <Badge variant="outline" className={role.class}>
-          {role.label}
-        </Badge>
-
+        <Badge variant="outline" className={role.class}>{role.label}</Badge>
         <DropdownMenu>
           <DropdownMenuTrigger className="flex items-center gap-2 rounded-full outline-none focus-visible:ring-2 focus-visible:ring-deep-violet">
             <Avatar className="h-8 w-8">
@@ -61,17 +64,12 @@ export function Header({ user }: HeaderProps) {
               <p className="text-xs text-smoke-gray truncate">{user.email}</p>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="gap-2 cursor-pointer">
-              <User size={14} />
-              프로필
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
             <DropdownMenuItem
               className="gap-2 cursor-pointer text-destructive focus:text-destructive"
-              onClick={() => signOut({ callbackUrl: "/login" })}
+              onClick={handleLogout}
             >
               <LogOut size={14} />
-              로그아웃
+              로그아웃 (퇴근 처리)
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
