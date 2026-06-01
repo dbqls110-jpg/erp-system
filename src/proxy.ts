@@ -11,10 +11,9 @@ export const proxy = auth((req) => {
     return NextResponse.redirect(new URL("/login", req.url));
   }
 
-  // pending 상태 사용자 — /pending 페이지로 이동
   if (
     req.auth &&
-    req.auth.user?.role === "pending" &&
+    (req.auth as { user?: { role?: string } }).user?.role === "pending" &&
     !pathname.startsWith("/pending") &&
     !pathname.startsWith("/api/auth")
   ) {

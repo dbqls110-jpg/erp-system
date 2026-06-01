@@ -12,8 +12,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       authorization: { params: { prompt: "select_account" } },
     }),
   ],
+  session: {
+    strategy: "jwt",
+  },
   events: {
-    // 새 사용자가 생성된 직후 실행 — 첫 번째 유저는 자동으로 admin
     async createUser({ user }) {
       const count = await prisma.user.count();
       if (count === 1) {
@@ -25,23 +27,27 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     },
   },
   callbacks: {
-    async session({ session, user }) {
+    async jwt({ token, user }) {
+      if (user?.id) {
+        const dbUser = await prisma.user.findUnique({
+          where: { id: user.id },
+          select: { id: true, role: true },
+        });
+        token.id = dbUser?.id ?? user.id;
+        token.role = dbUser?.role ?? "pending";
+      }
+      return token;
+    },
+    async session({ session, token }) {
       if (session.user) {
-        session.user.id = user.id;
-        session.user.role = (user as { role?: string }).role ?? "pending";
+        session.user.id = token.id as string;
+        session.user.role = token.role as string;
       }
       return session;
-    },
-    async signIn({ user }) {
-      if (!user.email) return false;
-      return true;
     },
   },
   pages: {
     signIn: "/login",
     error: "/login",
-  },
-  session: {
-    strategy: "database",
   },
 });
