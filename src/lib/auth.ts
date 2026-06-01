@@ -9,6 +9,7 @@ export const authOptions: NextAuthOptions = {
       clientId: process.env.AUTH_GOOGLE_ID!,
       clientSecret: process.env.AUTH_GOOGLE_SECRET!,
       authorization: { params: { prompt: "select_account" } },
+      checks: ["state"],
     }),
   ],
   session: { strategy: "jwt" },
