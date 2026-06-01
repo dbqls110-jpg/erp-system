@@ -1,10 +1,8 @@
 import NextAuth from "next-auth";
 import Google from "next-auth/providers/google";
-import { PrismaAdapter } from "@auth/prisma-adapter";
 import { prisma } from "@/lib/prisma";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
-  adapter: PrismaAdapter(prisma),
   providers: [
     Google({
       clientId: process.env.AUTH_GOOGLE_ID!,
@@ -12,36 +10,40 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       authorization: { params: { prompt: "select_account" } },
     }),
   ],
-  session: {
-    strategy: "jwt",
-  },
-  events: {
-    async createUser({ user }) {
-      const count = await prisma.user.count();
-      if (count === 1) {
-        await prisma.user.update({
-          where: { id: user.id },
-          data: { role: "admin" },
-        });
-      }
-    },
-  },
+  session: { strategy: "jwt" },
   callbacks: {
-    async jwt({ token, user }) {
-      if (user?.id) {
-        const dbUser = await prisma.user.findUnique({
-          where: { id: user.id },
-          select: { id: true, role: true },
+    async jwt({ token, account, profile }) {
+      // Google 로그인 시점에만 실행
+      if (account?.provider === "google" && profile?.email) {
+        let dbUser = await prisma.user.findUnique({
+          where: { email: profile.email },
+          select: { id: true, role: true, name: true, image: true },
         });
-        token.id = dbUser?.id ?? user.id;
-        token.role = dbUser?.role ?? "pending";
+
+        if (!dbUser) {
+          const count = await prisma.user.count();
+          dbUser = await prisma.user.create({
+            data: {
+              email: profile.email,
+              name: profile.name ?? null,
+              image: (profile as { picture?: string }).picture ?? null,
+              role: count === 0 ? "admin" : "pending",
+            },
+            select: { id: true, role: true, name: true, image: true },
+          });
+        }
+
+        token.id = dbUser.id;
+        token.role = dbUser.role;
+        token.name = dbUser.name;
+        token.picture = dbUser.image;
       }
       return token;
     },
     async session({ session, token }) {
       if (session.user) {
         session.user.id = token.id as string;
-        session.user.role = token.role as string;
+        session.user.role = (token.role as string) ?? "pending";
       }
       return session;
     },
