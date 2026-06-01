@@ -5,12 +5,20 @@ import { redirect } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { UserRoleSelect } from "./UserRoleSelect";
+import { LeaveBalanceInput } from "./LeaveBalanceInput";
 
 export default async function AdminPage() {
   const session = await getServerSession(authOptions);
   if (session?.user?.role !== "admin") redirect("/dashboard");
 
-  const users = await prisma.user.findMany({ orderBy: { createdAt: "asc" } });
+  const year = new Date().getFullYear();
+
+  const users = await prisma.user.findMany({
+    orderBy: { createdAt: "asc" },
+    include: {
+      leaveBalances: { where: { year } },
+    },
+  });
 
   return (
     <div className="space-y-6">
@@ -26,27 +34,38 @@ export default async function AdminPage() {
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
-            {users.map((u) => (
-              <div key={u.id} className="flex items-center justify-between py-3 border-b border-ash-gray last:border-0">
-                <div className="flex items-center gap-3">
-                  <Avatar className="h-9 w-9">
-                    <AvatarImage src={u.image ?? undefined} />
-                    <AvatarFallback className="bg-hint-of-sky text-midnight-charcoal text-sm">
-                      {(u.name ?? u.email ?? "?").slice(0, 2).toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div>
-                    <p className="text-sm font-medium text-midnight-charcoal">{u.name ?? "이름 없음"}</p>
-                    <p className="text-xs text-smoke-gray">{u.email}</p>
+            {users.map((u) => {
+              const balance = u.leaveBalances[0];
+              return (
+                <div key={u.id} className="flex items-center justify-between py-3 border-b border-ash-gray last:border-0 gap-4 flex-wrap">
+                  <div className="flex items-center gap-3">
+                    <Avatar className="h-9 w-9">
+                      <AvatarImage src={u.image ?? undefined} />
+                      <AvatarFallback className="bg-hint-of-sky text-midnight-charcoal text-sm">
+                        {(u.name ?? u.email ?? "?").slice(0, 2).toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <p className="text-sm font-medium text-midnight-charcoal">{u.name ?? "이름 없음"}</p>
+                      <p className="text-xs text-smoke-gray">{u.email}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <LeaveBalanceInput
+                      userId={u.id}
+                      year={year}
+                      totalDays={balance?.totalDays ?? 15}
+                      usedDays={balance?.usedDays ?? 0}
+                    />
+                    <UserRoleSelect
+                      userId={u.id}
+                      currentRole={u.role}
+                      isCurrentUser={u.id === session.user.id}
+                    />
                   </div>
                 </div>
-                <UserRoleSelect
-                  userId={u.id}
-                  currentRole={u.role}
-                  isCurrentUser={u.id === session.user.id}
-                />
-              </div>
-            ))}
+              );
+            })}
           </div>
         </CardContent>
       </Card>
