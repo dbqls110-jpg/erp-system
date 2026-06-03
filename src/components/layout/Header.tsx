@@ -8,8 +8,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
@@ -90,35 +88,47 @@ export function Header({ user, onMobileMenuOpen }: HeaderProps) {
               </AvatarFallback>
             </Avatar>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-56">
-            <DropdownMenuLabel>
-              <p className="text-sm font-medium">{user.name}</p>
-              <p className="text-xs text-smoke-gray truncate">{user.email}</p>
-            </DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              className="gap-2 cursor-pointer"
-              onClick={() => router.push("/dashboard")}
-            >
-              <LayoutDashboard size={14} />
-              대시보드
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              className="gap-2 cursor-pointer"
-              onClick={() => window.open("https://mail.google.com", "_blank")}
-            >
-              <Mail size={14} />
-              Gmail 바로가기
-              <ExternalLink size={11} className="ml-auto text-smoke-gray" />
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              className="gap-2 cursor-pointer text-destructive focus:text-destructive"
-              onClick={handleLogout}
-            >
-              <LogOut size={14} />
-              로그아웃 (퇴근 처리)
-            </DropdownMenuItem>
+          <DropdownMenuContent align="end" className="w-64 p-0">
+            {/* 프로필 헤더 */}
+            <div className="flex flex-col items-center gap-2 px-4 py-5 border-b border-ash-gray">
+              <Avatar className="h-16 w-16">
+                <AvatarImage src={user.image ?? undefined} alt={user.name ?? ""} />
+                <AvatarFallback className="text-xl bg-hint-of-sky text-midnight-charcoal">
+                  {initials}
+                </AvatarFallback>
+              </Avatar>
+              <div className="text-center">
+                <p className="text-sm font-semibold text-deep-space-charcoal">{user.name}</p>
+                <p className="text-xs text-smoke-gray">{user.email}</p>
+              </div>
+            </div>
+            {/* 메뉴 */}
+            <div className="py-1">
+              <DropdownMenuItem
+                className="gap-2 cursor-pointer mx-1 rounded-lg"
+                onClick={() => router.push("/dashboard")}
+              >
+                <LayoutDashboard size={14} />
+                대시보드
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                className="gap-2 cursor-pointer mx-1 rounded-lg"
+                onClick={() => window.open("https://mail.google.com", "_blank")}
+              >
+                <Mail size={14} />
+                Gmail 바로가기
+                <ExternalLink size={11} className="ml-auto text-smoke-gray" />
+              </DropdownMenuItem>
+            </div>
+            <div className="border-t border-ash-gray py-1">
+              <DropdownMenuItem
+                className="gap-2 cursor-pointer mx-1 rounded-lg text-destructive focus:text-destructive"
+                onClick={handleLogout}
+              >
+                <LogOut size={14} />
+                로그아웃 (퇴근 처리)
+              </DropdownMenuItem>
+            </div>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
