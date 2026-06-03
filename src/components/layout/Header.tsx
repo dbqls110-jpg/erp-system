@@ -13,7 +13,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
-import { LogOut, Menu } from "lucide-react";
+import { LogOut, Menu, Mail, ExternalLink } from "lucide-react";
 import { clockOut } from "@/app/actions/attendance";
 
 const pageTitle: Record<string, string> = {
@@ -94,6 +94,15 @@ export function Header({ user, onMobileMenuOpen }: HeaderProps) {
                 <p className="text-xs text-smoke-gray truncate">{user.email}</p>
               </DropdownMenuLabel>
             </Link>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              className="gap-2 cursor-pointer"
+              onClick={() => window.open("https://mail.google.com", "_blank")}
+            >
+              <Mail size={14} />
+              Gmail 바로가기
+              <ExternalLink size={11} className="ml-auto text-smoke-gray" />
+            </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem
               className="gap-2 cursor-pointer text-destructive focus:text-destructive"
