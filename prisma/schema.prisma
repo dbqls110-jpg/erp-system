@@ -136,6 +136,8 @@ model Project {
   progress     Float    @default(0)
   assignee     String?
   memo         String?
+  revenue      Float?   // 매출
+  cost         Float?   // 매입
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 

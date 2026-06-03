@@ -20,6 +20,8 @@ interface Project {
   assignee: string | null;
   memo: string | null;
   status: string;
+  revenue: number | null;
+  cost: number | null;
 }
 
 export function ProjectEditButton({ project }: { project: Project }) {
@@ -85,6 +87,16 @@ export function ProjectEditButton({ project }: { project: Project }) {
                     <SelectItem value="on_hold">보류</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label>매출 (원)</Label>
+                <Input type="number" name="revenue" placeholder="0" min="0" step="10000" defaultValue={project.revenue ?? ""} />
+              </div>
+              <div className="space-y-1">
+                <Label>매입 (원)</Label>
+                <Input type="number" name="cost" placeholder="0" min="0" step="10000" defaultValue={project.cost ?? ""} />
               </div>
             </div>
             <div className="space-y-1">

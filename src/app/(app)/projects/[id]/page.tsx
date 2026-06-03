@@ -9,7 +9,7 @@ import { ChecklistPanel } from "./ChecklistPanel";
 import { ProjectEditButton } from "./ProjectEditButton";
 import { ProjectDeleteButton } from "../ProjectDeleteButton";
 import { MemoEditor } from "./MemoEditor";
-import { Calendar, User, Building, ChevronRight } from "lucide-react";
+import { Calendar, User, Building, ChevronRight, TrendingUp, TrendingDown } from "lucide-react";
 import Link from "next/link";
 
 const statusConfig: Record<string, { label: string; class: string }> = {
@@ -54,6 +54,21 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
             {project.assignee && <span className="flex items-center gap-1"><User size={13} />{project.assignee}</span>}
             {project.announceDate && <span className="flex items-center gap-1"><Calendar size={13} />발표 {project.announceDate}</span>}
             {project.deadline && <span className="flex items-center gap-1"><Calendar size={13} />마감 {project.deadline}</span>}
+            {project.revenue != null && (
+              <span className="flex items-center gap-1 text-green-600">
+                <TrendingUp size={13} />매출 {project.revenue.toLocaleString()}원
+              </span>
+            )}
+            {project.cost != null && (
+              <span className="flex items-center gap-1 text-warm-fade">
+                <TrendingDown size={13} />매입 {project.cost.toLocaleString()}원
+              </span>
+            )}
+            {project.revenue != null && project.cost != null && (
+              <span className={`flex items-center gap-1 font-medium ${project.revenue - project.cost >= 0 ? "text-deep-violet" : "text-destructive"}`}>
+                순이익 {(project.revenue - project.cost).toLocaleString()}원
+              </span>
+            )}
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">

@@ -9,6 +9,9 @@ export async function createProject(formData: FormData) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) throw new Error("Unauthorized");
 
+  const revenueRaw = formData.get("revenue") as string;
+  const costRaw = formData.get("cost") as string;
+
   await prisma.project.create({
     data: {
       name: formData.get("name") as string,
@@ -17,6 +20,8 @@ export async function createProject(formData: FormData) {
       deadline: (formData.get("deadline") as string) || null,
       assignee: (formData.get("assignee") as string) || null,
       memo: (formData.get("memo") as string) || null,
+      revenue: revenueRaw ? parseFloat(revenueRaw) : null,
+      cost: costRaw ? parseFloat(costRaw) : null,
       status: "active",
     },
   });
@@ -26,6 +31,9 @@ export async function createProject(formData: FormData) {
 export async function updateProject(id: string, formData: FormData) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) throw new Error("Unauthorized");
+
+  const revenueRaw = formData.get("revenue") as string;
+  const costRaw = formData.get("cost") as string;
 
   await prisma.project.update({
     where: { id },
@@ -37,6 +45,8 @@ export async function updateProject(id: string, formData: FormData) {
       assignee: (formData.get("assignee") as string) || null,
       memo: (formData.get("memo") as string) || null,
       status: formData.get("status") as string,
+      revenue: revenueRaw ? parseFloat(revenueRaw) : null,
+      cost: costRaw ? parseFloat(costRaw) : null,
     },
   });
   revalidatePath(`/projects/${id}`);

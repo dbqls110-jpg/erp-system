@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "projects" ADD COLUMN "revenue" DOUBLE PRECISION;
+ALTER TABLE "projects" ADD COLUMN "cost" DOUBLE PRECISION;

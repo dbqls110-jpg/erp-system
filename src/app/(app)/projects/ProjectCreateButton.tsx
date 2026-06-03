@@ -59,6 +59,16 @@ export function ProjectCreateButton() {
               <Label>담당자</Label>
               <Input name="assignee" placeholder="담당자 이름" />
             </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label>매출 (원)</Label>
+                <Input type="number" name="revenue" placeholder="0" min="0" step="10000" />
+              </div>
+              <div className="space-y-1">
+                <Label>매입 (원)</Label>
+                <Input type="number" name="cost" placeholder="0" min="0" step="10000" />
+              </div>
+            </div>
             <div className="space-y-1">
               <Label>메모</Label>
               <Textarea name="memo" rows={2} />
