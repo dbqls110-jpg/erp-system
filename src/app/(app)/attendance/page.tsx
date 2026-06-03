@@ -9,6 +9,7 @@ import { Clock } from "lucide-react";
 import { ClockButtons } from "./ClockButtons";
 import { AdminMonthlyPanel } from "./AdminMonthlyPanel";
 import { WorkingTimer } from "./WorkingTimer";
+import { AttendanceAdminRow } from "./AttendanceAdminRow";
 
 function isLate(d: Date | null) {
   if (!d) return false;
@@ -192,6 +193,14 @@ export default async function AttendancePage() {
                         {ot && <Badge className="bg-purple-100 text-purple-600 border-purple-200 text-[10px] py-0">야근</Badge>}
                       </div>
                       <span className="w-14 text-right">{r.workHours ? `${r.workHours.toFixed(1)}h` : "—"}</span>
+                      {isAdmin && (
+                        <AttendanceAdminRow
+                          id={r.id}
+                          date={r.date}
+                          clockInIso={r.clockIn ? new Date(r.clockIn).toISOString() : null}
+                          clockOutIso={r.clockOut ? new Date(r.clockOut).toISOString() : null}
+                        />
+                      )}
                     </div>
                   </div>
                 );

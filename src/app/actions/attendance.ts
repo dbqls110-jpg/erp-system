@@ -48,6 +48,13 @@ export async function manualClockIn() {
   revalidatePath("/attendance");
 }
 
+export async function adminDeleteAttendance(id: string) {
+  const session = await getServerSession(authOptions);
+  if (session?.user?.role !== "admin") throw new Error("Unauthorized");
+  await prisma.attendance.delete({ where: { id } });
+  revalidatePath("/attendance");
+}
+
 export async function adminUpdateAttendance(
   attendanceId: string,
   clockIn: string | null,
