@@ -34,13 +34,18 @@ export default async function CalendarPage() {
       if (p.deadline) evts.push({ date: p.deadline, title: `🎯 ${p.name} 마감`, type: "deadline" as const, id: p.id });
       return evts;
     }),
-    ...leaves.map((l) => ({
-      date: l.startDate,
-      title: `🌴 ${l.user.name ?? "직원"} 휴가`,
-      type: "leave" as const,
-      id: l.id,
-      endDate: l.endDate,
-    })),
+    ...leaves.map((l) => {
+      const typeLabel: Record<string, string> = {
+        annual: "연차", half_am: "반차(오전)", half_pm: "반차(오후)", hourly: "시간차",
+      };
+      return {
+        date: l.startDate,
+        title: `🌴 ${l.user.name ?? "직원"} ${typeLabel[l.type] ?? "휴가"}`,
+        type: "leave" as const,
+        id: l.id,
+        endDate: l.endDate,
+      };
+    }),
   ];
 
   return (

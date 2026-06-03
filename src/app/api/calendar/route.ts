@@ -15,6 +15,13 @@ export async function GET(req: NextRequest) {
   const lastDay = new Date(year, month, 0).getDate();
   const end = `${year}-${monthStr}-${String(lastDay).padStart(2, "0")}`;
 
+  const leaveTypeLabel: Record<string, string> = {
+    annual: "연차",
+    half_am: "반차(오전)",
+    half_pm: "반차(오후)",
+    hourly: "시간차",
+  };
+
   const [projects, leaves] = await Promise.all([
     prisma.project.findMany({
       where: {
@@ -40,7 +47,7 @@ export async function GET(req: NextRequest) {
     }),
     ...leaves.map((l) => ({
       date: l.startDate,
-      title: `🌴 ${l.user.name ?? "직원"} 휴가`,
+      title: `🌴 ${l.user.name ?? "직원"} ${leaveTypeLabel[l.type] ?? "휴가"}`,
       type: "leave",
       id: l.id,
       endDate: l.endDate,
