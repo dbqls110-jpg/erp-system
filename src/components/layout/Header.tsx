@@ -1,7 +1,7 @@
 "use client";
 
 import { signOut } from "next-auth/react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -13,7 +13,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
-import { LogOut, Menu, Mail, ExternalLink } from "lucide-react";
+import { LogOut, Menu, Mail, ExternalLink, LayoutDashboard } from "lucide-react";
 import { clockOut } from "@/app/actions/attendance";
 
 const pageTitle: Record<string, string> = {
@@ -45,6 +45,7 @@ const roleLabel: Record<string, { label: string; class: string }> = {
 
 export function Header({ user, onMobileMenuOpen }: HeaderProps) {
   const pathname = usePathname();
+  const router = useRouter();
   const title = Object.entries(pageTitle).find(([key]) => pathname === key || pathname.startsWith(key + "/"))?.[1] ?? "";
   const initials = user.name
     ? user.name.slice(0, 2).toUpperCase()
@@ -73,28 +74,35 @@ export function Header({ user, onMobileMenuOpen }: HeaderProps) {
       <div className="flex items-center gap-3">
         {user.role === "admin" ? (
           <Link href="/admin">
-            <Badge variant="outline" className={`hidden sm:inline-flex cursor-pointer hover:opacity-80 transition-opacity ${role.class}`}>{role.label}</Badge>
+            <Badge variant="outline" className={`hidden sm:inline-flex cursor-pointer hover:opacity-80 transition-opacity ${role.class}`}>
+              {role.label}
+            </Badge>
           </Link>
         ) : (
           <Badge variant="outline" className={`hidden sm:inline-flex ${role.class}`}>{role.label}</Badge>
         )}
         <DropdownMenu>
-          <DropdownMenuTrigger className="flex items-center gap-2 rounded-full outline-none focus-visible:ring-2 focus-visible:ring-deep-violet">
-            <Avatar className="h-8 w-8">
+          <DropdownMenuTrigger className="rounded-full outline-none focus-visible:ring-2 focus-visible:ring-deep-violet">
+            <Avatar className="h-8 w-8 cursor-pointer">
               <AvatarImage src={user.image ?? undefined} alt={user.name ?? ""} />
               <AvatarFallback className="text-xs bg-hint-of-sky text-midnight-charcoal">
                 {initials}
               </AvatarFallback>
             </Avatar>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-52">
-            <Link href="/dashboard" className="block">
-              <DropdownMenuLabel className="cursor-pointer hover:text-deep-violet transition-colors">
-                <p className="text-sm font-medium">{user.name}</p>
-                <p className="text-xs text-smoke-gray truncate">{user.email}</p>
-              </DropdownMenuLabel>
-            </Link>
+          <DropdownMenuContent align="end" className="w-56">
+            <DropdownMenuLabel>
+              <p className="text-sm font-medium">{user.name}</p>
+              <p className="text-xs text-smoke-gray truncate">{user.email}</p>
+            </DropdownMenuLabel>
             <DropdownMenuSeparator />
+            <DropdownMenuItem
+              className="gap-2 cursor-pointer"
+              onClick={() => router.push("/dashboard")}
+            >
+              <LayoutDashboard size={14} />
+              대시보드
+            </DropdownMenuItem>
             <DropdownMenuItem
               className="gap-2 cursor-pointer"
               onClick={() => window.open("https://mail.google.com", "_blank")}
