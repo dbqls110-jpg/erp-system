@@ -50,12 +50,9 @@ export function Sidebar({ role, onClose }: SidebarProps) {
     <aside className="w-60 shrink-0 flex flex-col h-full border-r border-ash-gray bg-canvas-white">
       {/* 로고 */}
       <div className="h-16 flex items-center justify-between px-6 border-b border-ash-gray shrink-0">
-        <span
-          className="text-lg font-bold text-deep-space-charcoal tracking-tight"
-          style={{ fontFamily: "var(--font-plus-jakarta-sans)" }}
-        >
+        <Link href="/dashboard" onClick={onClose} className="text-lg font-bold text-deep-space-charcoal tracking-tight hover:text-deep-violet transition-colors" style={{ fontFamily: "var(--font-plus-jakarta-sans)" }}>
           ERP 시스템
-        </span>
+        </Link>
         {onClose && (
           <button onClick={onClose} className="text-smoke-gray hover:text-midnight-charcoal lg:hidden">
             <X size={18} />
