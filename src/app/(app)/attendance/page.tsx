@@ -8,6 +8,18 @@ import { ko } from "date-fns/locale";
 import { Clock } from "lucide-react";
 import { ClockButtons } from "./ClockButtons";
 import { AdminMonthlyPanel } from "./AdminMonthlyPanel";
+import { WorkingTimer } from "./WorkingTimer";
+
+function isLate(d: Date | null) {
+  if (!d) return false;
+  const dt = new Date(d);
+  return dt.getHours() > 10 || (dt.getHours() === 10 && dt.getMinutes() > 0);
+}
+function isOvertime(d: Date | null) {
+  if (!d) return false;
+  const dt = new Date(d);
+  return dt.getHours() > 18 || (dt.getHours() === 18 && dt.getMinutes() > 0);
+}
 
 export default async function AttendancePage() {
   const session = await getServerSession(authOptions);
@@ -36,6 +48,8 @@ export default async function AttendancePage() {
   ]);
 
   const totalWorkHours = monthlyRecords.reduce((sum, r) => sum + (r.workHours ?? 0), 0);
+  const late = isLate(todayRecord?.clockIn ?? null);
+  const working = !!todayRecord?.clockIn && !todayRecord?.clockOut;
 
   return (
     <div className="space-y-6">
@@ -57,24 +71,39 @@ export default async function AttendancePage() {
             <Clock size={16} className="text-deep-violet" />
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold text-deep-space-charcoal">
-              {todayRecord?.clockIn ? format(new Date(todayRecord.clockIn), "HH:mm") : "—"}
-            </p>
+            <div className="flex items-center gap-2">
+              <p className="text-2xl font-bold text-deep-space-charcoal">
+                {todayRecord?.clockIn ? format(new Date(todayRecord.clockIn), "HH:mm") : "—"}
+              </p>
+              {late && <Badge className="bg-orange-100 text-orange-600 border-orange-200 text-xs">지각</Badge>}
+            </div>
+            {working && todayRecord?.clockIn && (
+              <div className="mt-1">
+                <WorkingTimer clockInIso={new Date(todayRecord.clockIn).toISOString()} />
+              </div>
+            )}
           </CardContent>
         </Card>
+
         <Card className="border-ash-gray shadow-[var(--shadow-sm)]">
           <CardHeader className="pb-2 flex flex-row items-center justify-between">
             <CardTitle className="text-sm font-medium text-smoke-gray">오늘 퇴근</CardTitle>
             <Clock size={16} className="text-electric-blue" />
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold text-deep-space-charcoal">
-              {todayRecord?.clockIn
-                ? (todayRecord?.clockOut ? format(new Date(todayRecord.clockOut), "HH:mm") : "근무 중")
-                : "—"}
-            </p>
+            <div className="flex items-center gap-2">
+              <p className="text-2xl font-bold text-deep-space-charcoal">
+                {todayRecord?.clockOut
+                  ? format(new Date(todayRecord.clockOut), "HH:mm")
+                  : todayRecord?.clockIn ? "근무 중" : "—"}
+              </p>
+              {isOvertime(todayRecord?.clockOut ?? null) && (
+                <Badge className="bg-purple-100 text-purple-600 border-purple-200 text-xs">야근</Badge>
+              )}
+            </div>
           </CardContent>
         </Card>
+
         <Card className="border-ash-gray shadow-[var(--shadow-sm)]">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-smoke-gray">이번 달 총 근무</CardTitle>
@@ -101,9 +130,15 @@ export default async function AttendancePage() {
                 {(allRecords as Array<{ id: string; user: { name: string | null; email: string }; clockIn: Date | null; clockOut: Date | null; workHours: number | null }>).map((r) => (
                   <div key={r.id} className="flex items-center justify-between py-2 border-b border-ash-gray last:border-0">
                     <span className="text-sm font-medium text-midnight-charcoal">{r.user.name ?? r.user.email}</span>
-                    <div className="flex items-center gap-4 text-sm text-smoke-gray">
-                      <span>출근 {r.clockIn ? format(new Date(r.clockIn), "HH:mm") : "—"}</span>
-                      <span>퇴근 {r.clockOut ? format(new Date(r.clockOut), "HH:mm") : "근무 중"}</span>
+                    <div className="flex items-center gap-3 text-sm text-smoke-gray">
+                      <div className="flex items-center gap-1.5">
+                        <span>출근 {r.clockIn ? format(new Date(r.clockIn), "HH:mm") : "—"}</span>
+                        {isLate(r.clockIn) && <Badge className="bg-orange-100 text-orange-600 border-orange-200 text-[10px] py-0">지각</Badge>}
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span>퇴근 {r.clockOut ? format(new Date(r.clockOut), "HH:mm") : "근무 중"}</span>
+                        {isOvertime(r.clockOut) && <Badge className="bg-purple-100 text-purple-600 border-purple-200 text-[10px] py-0">야근</Badge>}
+                      </div>
                       {r.workHours && <Badge variant="outline">{r.workHours.toFixed(1)}h</Badge>}
                     </div>
                   </div>
@@ -130,25 +165,35 @@ export default async function AttendancePage() {
           ) : (
             <div className="space-y-1">
               {monthlyRecords.map((r) => {
-                const missingClockOut = !!r.clockIn && !r.clockOut;
+                const ci = r.clockIn ? new Date(r.clockIn) : null;
+                const co = r.clockOut ? new Date(r.clockOut) : null;
+                const missingClockOut = !!ci && !co;
+                const late = isLate(ci);
+                const ot = isOvertime(co);
                 return (
-                <div key={r.id} className="flex items-center justify-between py-2 border-b border-ash-gray last:border-0 text-sm">
-                  <div className="flex items-center gap-2">
-                    {missingClockOut && (
-                      <span className="w-1.5 h-1.5 rounded-full bg-yellow-400 shrink-0" title="퇴근 미기록" />
-                    )}
-                    <span className="font-medium text-midnight-charcoal">
-                      {format(new Date(r.date), "M/d (eee)", { locale: ko })}
-                    </span>
+                  <div key={r.id} className="flex items-center justify-between py-2 border-b border-ash-gray last:border-0 text-sm">
+                    <div className="flex items-center gap-2">
+                      {missingClockOut && (
+                        <span className="w-1.5 h-1.5 rounded-full bg-yellow-400 shrink-0" title="퇴근 미기록" />
+                      )}
+                      <span className="font-medium text-midnight-charcoal">
+                        {format(new Date(r.date), "M/d (eee)", { locale: ko })}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 text-smoke-gray flex-wrap justify-end">
+                      <div className="flex items-center gap-1.5">
+                        <span>출근 {ci ? format(ci, "HH:mm") : "—"}</span>
+                        {late && <Badge className="bg-orange-100 text-orange-600 border-orange-200 text-[10px] py-0">지각</Badge>}
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span className={missingClockOut ? "text-yellow-500 font-medium" : ""}>
+                          퇴근 {co ? format(co, "HH:mm") : "미기록"}
+                        </span>
+                        {ot && <Badge className="bg-purple-100 text-purple-600 border-purple-200 text-[10px] py-0">야근</Badge>}
+                      </div>
+                      <span className="w-14 text-right">{r.workHours ? `${r.workHours.toFixed(1)}h` : "—"}</span>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-4 text-smoke-gray">
-                    <span>출근 {r.clockIn ? format(new Date(r.clockIn), "HH:mm") : "—"}</span>
-                    <span className={missingClockOut ? "text-yellow-500 font-medium" : ""}>
-                      퇴근 {r.clockOut ? format(new Date(r.clockOut), "HH:mm") : "미기록"}
-                    </span>
-                    <span className="w-16 text-right">{r.workHours ? `${r.workHours.toFixed(1)}h` : "—"}</span>
-                  </div>
-                </div>
                 );
               })}
             </div>
