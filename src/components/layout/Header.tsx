@@ -2,6 +2,7 @@
 
 import { signOut } from "next-auth/react";
 import { usePathname } from "next/navigation";
+import Link from "next/link";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -70,7 +71,13 @@ export function Header({ user, onMobileMenuOpen }: HeaderProps) {
         <p className="text-sm font-semibold text-midnight-charcoal">{title}</p>
       </div>
       <div className="flex items-center gap-3">
-        <Badge variant="outline" className={`hidden sm:inline-flex ${role.class}`}>{role.label}</Badge>
+        {user.role === "admin" ? (
+          <Link href="/admin">
+            <Badge variant="outline" className={`hidden sm:inline-flex cursor-pointer hover:opacity-80 transition-opacity ${role.class}`}>{role.label}</Badge>
+          </Link>
+        ) : (
+          <Badge variant="outline" className={`hidden sm:inline-flex ${role.class}`}>{role.label}</Badge>
+        )}
         <DropdownMenu>
           <DropdownMenuTrigger className="flex items-center gap-2 rounded-full outline-none focus-visible:ring-2 focus-visible:ring-deep-violet">
             <Avatar className="h-8 w-8">
@@ -79,15 +86,14 @@ export function Header({ user, onMobileMenuOpen }: HeaderProps) {
                 {initials}
               </AvatarFallback>
             </Avatar>
-            <span className="text-sm font-medium text-midnight-charcoal hidden sm:block">
-              {user.name ?? user.email}
-            </span>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-52">
-            <DropdownMenuLabel>
-              <p className="text-sm font-medium">{user.name}</p>
-              <p className="text-xs text-smoke-gray truncate">{user.email}</p>
-            </DropdownMenuLabel>
+            <Link href="/dashboard" className="block">
+              <DropdownMenuLabel className="cursor-pointer hover:text-deep-violet transition-colors">
+                <p className="text-sm font-medium">{user.name}</p>
+                <p className="text-xs text-smoke-gray truncate">{user.email}</p>
+              </DropdownMenuLabel>
+            </Link>
             <DropdownMenuSeparator />
             <DropdownMenuItem
               className="gap-2 cursor-pointer text-destructive focus:text-destructive"
