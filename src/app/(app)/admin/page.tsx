@@ -56,6 +56,7 @@ export default async function AdminPage() {
                       year={year}
                       totalDays={balance?.totalDays ?? 15}
                       usedDays={balance?.usedDays ?? 0}
+                      pendingDays={balance?.pendingDays ?? 0}
                     />
                     <UserRoleSelect
                       userId={u.id}

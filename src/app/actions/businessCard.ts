@@ -25,7 +25,7 @@ export async function createBusinessCard(formData: FormData) {
 
 export async function deleteBusinessCard(id: string) {
   const session = await getServerSession(authOptions);
-  if (!session?.user?.id) throw new Error("Unauthorized");
+  if (session?.user?.role !== "admin") throw new Error("Unauthorized");
   await prisma.businessCard.delete({ where: { id } });
   revalidatePath("/business-cards");
 }

@@ -7,6 +7,7 @@ import { format, startOfMonth, endOfMonth } from "date-fns";
 import { ko } from "date-fns/locale";
 import { Clock } from "lucide-react";
 import { ClockButtons } from "./ClockButtons";
+import { AdminMonthlyPanel } from "./AdminMonthlyPanel";
 
 export default async function AttendancePage() {
   const session = await getServerSession(authOptions);
@@ -68,7 +69,9 @@ export default async function AttendancePage() {
           </CardHeader>
           <CardContent>
             <p className="text-2xl font-bold text-deep-space-charcoal">
-              {todayRecord?.clockOut ? format(new Date(todayRecord.clockOut), "HH:mm") : "근무 중"}
+              {todayRecord?.clockIn
+                ? (todayRecord?.clockOut ? format(new Date(todayRecord.clockOut), "HH:mm") : "근무 중")
+                : "—"}
             </p>
           </CardContent>
         </Card>
@@ -111,6 +114,9 @@ export default async function AttendancePage() {
         </Card>
       )}
 
+      {/* 관리자: 월별 전체 직원 조회 */}
+      {isAdmin && <AdminMonthlyPanel />}
+
       {/* 이번 달 기록 */}
       <Card className="border-ash-gray shadow-[var(--shadow-sm)]">
         <CardHeader>
@@ -123,18 +129,28 @@ export default async function AttendancePage() {
             <p className="text-sm text-smoke-gray">이번 달 기록이 없습니다.</p>
           ) : (
             <div className="space-y-1">
-              {monthlyRecords.map((r) => (
+              {monthlyRecords.map((r) => {
+                const missingClockOut = !!r.clockIn && !r.clockOut;
+                return (
                 <div key={r.id} className="flex items-center justify-between py-2 border-b border-ash-gray last:border-0 text-sm">
-                  <span className="font-medium text-midnight-charcoal">
-                    {format(new Date(r.date), "M/d (eee)", { locale: ko })}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    {missingClockOut && (
+                      <span className="w-1.5 h-1.5 rounded-full bg-yellow-400 shrink-0" title="퇴근 미기록" />
+                    )}
+                    <span className="font-medium text-midnight-charcoal">
+                      {format(new Date(r.date), "M/d (eee)", { locale: ko })}
+                    </span>
+                  </div>
                   <div className="flex items-center gap-4 text-smoke-gray">
                     <span>출근 {r.clockIn ? format(new Date(r.clockIn), "HH:mm") : "—"}</span>
-                    <span>퇴근 {r.clockOut ? format(new Date(r.clockOut), "HH:mm") : "—"}</span>
+                    <span className={missingClockOut ? "text-yellow-500 font-medium" : ""}>
+                      퇴근 {r.clockOut ? format(new Date(r.clockOut), "HH:mm") : "미기록"}
+                    </span>
                     <span className="w-16 text-right">{r.workHours ? `${r.workHours.toFixed(1)}h` : "—"}</span>
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </CardContent>

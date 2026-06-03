@@ -12,6 +12,7 @@ import {
   CreditCard,
   Banknote,
   Settings,
+  X,
 } from "lucide-react";
 
 interface NavItem {
@@ -34,9 +35,10 @@ const navItems: NavItem[] = [
 
 interface SidebarProps {
   role?: string;
+  onClose?: () => void;
 }
 
-export function Sidebar({ role }: SidebarProps) {
+export function Sidebar({ role, onClose }: SidebarProps) {
   const pathname = usePathname();
 
   const items = navItems.filter((item) => {
@@ -47,13 +49,18 @@ export function Sidebar({ role }: SidebarProps) {
   return (
     <aside className="w-60 shrink-0 flex flex-col h-full border-r border-ash-gray bg-canvas-white">
       {/* 로고 */}
-      <div className="h-16 flex items-center px-6 border-b border-ash-gray">
+      <div className="h-16 flex items-center justify-between px-6 border-b border-ash-gray shrink-0">
         <span
           className="text-lg font-bold text-deep-space-charcoal tracking-tight"
           style={{ fontFamily: "var(--font-plus-jakarta-sans)" }}
         >
           ERP 시스템
         </span>
+        {onClose && (
+          <button onClick={onClose} className="text-smoke-gray hover:text-midnight-charcoal lg:hidden">
+            <X size={18} />
+          </button>
+        )}
       </div>
 
       {/* 네비게이션 */}
@@ -65,6 +72,7 @@ export function Sidebar({ role }: SidebarProps) {
             <Link
               key={item.href}
               href={item.href}
+              onClick={onClose}
               className={cn(
                 "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
                 isActive
@@ -85,7 +93,7 @@ export function Sidebar({ role }: SidebarProps) {
       </nav>
 
       {/* 하단 버전 */}
-      <div className="px-6 py-4 border-t border-ash-gray">
+      <div className="px-6 py-4 border-t border-ash-gray shrink-0">
         <p className="text-xs text-smoke-gray">v1.0.0</p>
       </div>
     </aside>

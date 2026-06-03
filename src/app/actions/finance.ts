@@ -40,7 +40,7 @@ export async function addExpense(formData: FormData) {
 
 export async function deleteExpense(id: string) {
   const session = await getServerSession(authOptions);
-  if (!session?.user?.id) throw new Error("Unauthorized");
+  if (session?.user?.role !== "admin") throw new Error("Unauthorized");
   await prisma.expense.delete({ where: { id } });
   revalidatePath("/finance");
 }

@@ -1,6 +1,5 @@
 import { prisma } from "@/lib/prisma";
 import { CalendarView } from "./CalendarView";
-import { format } from "date-fns";
 
 export default async function CalendarPage() {
   const now = new Date();
@@ -49,7 +48,7 @@ export default async function CalendarPage() {
       <h1 className="text-2xl font-bold text-deep-space-charcoal" style={{ fontFamily: "var(--font-plus-jakarta-sans)", letterSpacing: "-0.91px" }}>
         캘린더
       </h1>
-      <CalendarView events={events} currentYear={year} currentMonth={month} />
+      <CalendarView initialEvents={events} currentYear={year} currentMonth={month} />
     </div>
   );
 }

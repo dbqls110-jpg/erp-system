@@ -6,11 +6,12 @@ import { Button } from "@/components/ui/button";
 import { setLeaveBalance } from "@/app/actions/admin";
 import { toast } from "sonner";
 
-export function LeaveBalanceInput({ userId, year, totalDays, usedDays }: {
+export function LeaveBalanceInput({ userId, year, totalDays, usedDays, pendingDays }: {
   userId: string;
   year: number;
   totalDays: number;
   usedDays: number;
+  pendingDays: number;
 }) {
   const [days, setDays] = useState(String(totalDays));
   const [loading, setLoading] = useState(false);
@@ -41,7 +42,7 @@ export function LeaveBalanceInput({ userId, year, totalDays, usedDays }: {
         step="0.5"
       />
       <span className="text-smoke-gray text-xs">일</span>
-      <span className="text-xs text-smoke-gray">(사용 {usedDays})</span>
+      <span className="text-xs text-smoke-gray">(사용 {usedDays} / 대기 {pendingDays})</span>
       <Button size="sm" variant="outline" className="h-7 px-2 text-xs" disabled={loading} onClick={handleSave}>
         저장
       </Button>

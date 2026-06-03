@@ -1,11 +1,14 @@
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import Link from "next/link";
-import { format } from "date-fns";
 import { ProjectCreateButton } from "./ProjectCreateButton";
-import { Calendar, User } from "lucide-react";
+import { ProjectDeleteButton } from "./ProjectDeleteButton";
+import { ProjectFilter } from "./ProjectFilter";
+import { Calendar, User, FolderOpen } from "lucide-react";
 
 const statusConfig: Record<string, { label: string; class: string }> = {
   active: { label: "진행 중", class: "bg-electric-blue/10 text-electric-blue border-electric-blue/20" },
@@ -13,25 +16,44 @@ const statusConfig: Record<string, { label: string; class: string }> = {
   on_hold: { label: "보류", class: "bg-yellow-50 text-yellow-700 border-yellow-200" },
 };
 
-export default async function ProjectsPage() {
+export default async function ProjectsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ status?: string }>;
+}) {
+  const { status } = await searchParams;
+  const currentFilter = ["active", "completed", "on_hold"].includes(status ?? "") ? status! : "all";
+
+  const session = await getServerSession(authOptions);
+  const isAdmin = session?.user?.role === "admin";
+
+  const whereStatus = currentFilter === "all" ? {} : { status: currentFilter };
   const projects = await prisma.project.findMany({
+    where: whereStatus,
     include: { _count: { select: { checklistItems: true } } },
     orderBy: { createdAt: "desc" },
   });
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-4 flex-wrap">
         <h1 className="text-2xl font-bold text-deep-space-charcoal" style={{ fontFamily: "var(--font-plus-jakarta-sans)", letterSpacing: "-0.91px" }}>
           프로젝트
         </h1>
-        <ProjectCreateButton />
+        <div className="flex items-center gap-3 flex-wrap">
+          <ProjectFilter current={currentFilter} />
+          <ProjectCreateButton />
+        </div>
       </div>
 
       {projects.length === 0 ? (
         <Card className="border-ash-gray">
-          <CardContent className="py-12 text-center text-smoke-gray text-sm">
-            등록된 프로젝트가 없습니다.
+          <CardContent className="py-16 flex flex-col items-center gap-3 text-center">
+            <FolderOpen size={40} className="text-ash-gray" />
+            <p className="text-sm font-medium text-midnight-charcoal">
+              {currentFilter === "all" ? "등록된 프로젝트가 없습니다" : `${({ active: "진행 중", completed: "완료", on_hold: "보류" } as Record<string, string>)[currentFilter]} 프로젝트가 없습니다`}
+            </p>
+            <p className="text-xs text-smoke-gray">새 프로젝트를 추가해 보세요</p>
           </CardContent>
         </Card>
       ) : (
@@ -46,7 +68,10 @@ export default async function ProjectsPage() {
                       <CardTitle className="text-base font-semibold text-deep-space-charcoal line-clamp-1" style={{ fontFamily: "var(--font-plus-jakarta-sans)" }}>
                         {p.name}
                       </CardTitle>
-                      <Badge variant="outline" className={`shrink-0 text-xs ${s.class}`}>{s.label}</Badge>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <Badge variant="outline" className={`text-xs ${s.class}`}>{s.label}</Badge>
+                        {isAdmin && <ProjectDeleteButton id={p.id} name={p.name} />}
+                      </div>
                     </div>
                     {p.client && <p className="text-sm text-smoke-gray">{p.client}</p>}
                   </CardHeader>

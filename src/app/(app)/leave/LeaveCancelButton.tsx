@@ -3,22 +3,22 @@
 import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { deleteBusinessCard } from "@/app/actions/businessCard";
+import { cancelLeave } from "@/app/actions/leave";
 import { toast } from "sonner";
-import { Trash2 } from "lucide-react";
+import { X } from "lucide-react";
 
-export function CardDeleteButton({ id, name }: { id: string; name: string }) {
+export function LeaveCancelButton({ id }: { id: string }) {
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
 
-  const handleDelete = () => {
+  const handleCancel = () => {
     startTransition(async () => {
       try {
-        await deleteBusinessCard(id);
-        toast.success("삭제됐습니다.");
+        await cancelLeave(id);
+        toast.success("휴가 신청이 취소됐습니다.");
         setOpen(false);
-      } catch {
-        toast.error("삭제 실패");
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "취소 실패");
       }
     });
   };
@@ -27,32 +27,34 @@ export function CardDeleteButton({ id, name }: { id: string; name: string }) {
     <>
       <button
         onClick={() => setOpen(true)}
-        className="text-smoke-gray hover:text-destructive transition-colors ml-2 shrink-0"
+        className="text-smoke-gray hover:text-destructive transition-colors"
+        title="취소"
       >
-        <Trash2 size={14} />
+        <X size={14} />
       </button>
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
             <DialogTitle className="text-deep-space-charcoal" style={{ fontFamily: "var(--font-plus-jakarta-sans)" }}>
-              명함 삭제
+              휴가 신청 취소
             </DialogTitle>
           </DialogHeader>
           <p className="text-sm text-smoke-gray">
-            <span className="font-semibold text-midnight-charcoal">&ldquo;{name}&rdquo;</span> 명함을 삭제하시겠습니까?
+            신청한 휴가를 취소하시겠습니까?<br />
+            취소 후에는 다시 신청해야 합니다.
           </p>
           <div className="flex justify-end gap-2 mt-2">
             <Button variant="outline" size="sm" onClick={() => setOpen(false)} disabled={pending}>
-              취소
+              닫기
             </Button>
             <Button
               size="sm"
               className="bg-red-500 hover:bg-red-600 text-white"
-              onClick={handleDelete}
+              onClick={handleCancel}
               disabled={pending}
             >
-              {pending ? "삭제 중…" : "삭제"}
+              {pending ? "취소 중…" : "신청 취소"}
             </Button>
           </div>
         </DialogContent>

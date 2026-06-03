@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { LeaveApplyButton } from "./LeaveApplyButton";
 import { LeaveAdminPanel } from "./LeaveAdminPanel";
+import { LeaveCancelButton } from "./LeaveCancelButton";
 
 const typeLabel: Record<string, string> = {
   annual: "연차", half_am: "반차(오전)", half_pm: "반차(오후)", hourly: "시간차",
@@ -48,7 +49,8 @@ export default async function LeavePage() {
   const totalDays = balance?.totalDays ?? 15;
   const usedDays = balance?.usedDays ?? 0;
   const pendingDays = balance?.pendingDays ?? 0;
-  const remaining = totalDays - usedDays - pendingDays;
+  const remaining = Math.max(0, totalDays - usedDays - pendingDays);
+  const isOverused = totalDays - usedDays - pendingDays < 0;
 
   return (
     <div className="space-y-6">
@@ -64,8 +66,8 @@ export default async function LeavePage() {
         {[
           { label: "총 부여 휴가", value: `${totalDays}일`, color: "text-deep-space-charcoal" },
           { label: "사용 완료", value: `${usedDays}일`, color: "text-smoke-gray" },
-          { label: "승인 대기", value: `${pendingDays}일`, color: "text-warm-fade" },
-          { label: "사용 가능", value: `${remaining}일`, color: "text-deep-violet" },
+          { label: "승인 대기", value: `${pendingDays}일`, color: pendingDays > 0 ? "text-warm-fade" : "text-smoke-gray" },
+          { label: "사용 가능", value: `${remaining}일`, color: isOverused ? "text-destructive" : "text-deep-violet" },
         ].map((item) => (
           <Card key={item.label} className="border-ash-gray shadow-[var(--shadow-sm)]">
             <CardHeader className="pb-1">
@@ -141,6 +143,7 @@ export default async function LeavePage() {
                     <div className="flex items-center gap-2">
                       <span className="text-smoke-gray">{r.days}일</span>
                       <Badge variant="outline" className={s.class}>{s.label}</Badge>
+                      {r.status === "pending" && <LeaveCancelButton id={r.id} />}
                     </div>
                   </div>
                 );

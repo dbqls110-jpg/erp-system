@@ -1,3 +1,5 @@
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { notFound } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
@@ -5,8 +7,10 @@ import { Progress } from "@/components/ui/progress";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChecklistPanel } from "./ChecklistPanel";
 import { ProjectEditButton } from "./ProjectEditButton";
+import { ProjectDeleteButton } from "../ProjectDeleteButton";
 import { MemoEditor } from "./MemoEditor";
-import { Calendar, User, Building } from "lucide-react";
+import { Calendar, User, Building, ChevronRight } from "lucide-react";
+import Link from "next/link";
 
 const statusConfig: Record<string, { label: string; class: string }> = {
   active: { label: "진행 중", class: "bg-electric-blue/10 text-electric-blue border-electric-blue/20" },
@@ -16,6 +20,9 @@ const statusConfig: Record<string, { label: string; class: string }> = {
 
 export default async function ProjectDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+  const session = await getServerSession(authOptions);
+  const isAdmin = session?.user?.role === "admin";
+
   const project = await prisma.project.findUnique({
     where: { id },
     include: { checklistItems: { orderBy: { order: "asc" } } },
@@ -27,6 +34,13 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
 
   return (
     <div className="space-y-6 max-w-3xl">
+      {/* 브레드크럼 */}
+      <nav className="flex items-center gap-1.5 text-sm text-smoke-gray">
+        <Link href="/projects" className="hover:text-midnight-charcoal transition-colors">프로젝트</Link>
+        <ChevronRight size={14} className="shrink-0" />
+        <span className="text-midnight-charcoal font-medium truncate max-w-xs">{project.name}</span>
+      </nav>
+
       <div className="flex items-start justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 mb-1">
@@ -42,7 +56,10 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
             {project.deadline && <span className="flex items-center gap-1"><Calendar size={13} />마감 {project.deadline}</span>}
           </div>
         </div>
-        <ProjectEditButton project={project} />
+        <div className="flex items-center gap-2 shrink-0">
+          <ProjectEditButton project={project} />
+          {isAdmin && <ProjectDeleteButton id={project.id} name={project.name} />}
+        </div>
       </div>
 
       {/* 진행률 */}
