@@ -24,25 +24,26 @@ export default async function LeavePage() {
   const [balance, myRequests, allPending, allRequests] = await Promise.all([
     prisma.leaveBalance.findUnique({
       where: { userId_year: { userId: session!.user.id, year } },
+      select: { totalDays: true, usedDays: true, pendingDays: true },
     }),
     prisma.leaveRequest.findMany({
       where: { userId: session!.user.id },
+      select: { id: true, type: true, startDate: true, endDate: true, days: true, reason: true, status: true },
       orderBy: { createdAt: "desc" },
       take: 20,
     }),
     isAdmin
       ? prisma.leaveRequest.findMany({
           where: { status: "pending" },
-          include: { user: { select: { name: true, email: true } } },
+          select: { id: true, type: true, startDate: true, endDate: true, days: true, reason: true, user: { select: { name: true, email: true } } },
           orderBy: { createdAt: "asc" },
         })
       : Promise.resolve([]),
-    // 전체 직원 휴가 내역 (승인된 것만)
     prisma.leaveRequest.findMany({
       where: { status: "approved" },
-      include: { user: { select: { name: true, email: true } } },
+      select: { id: true, type: true, startDate: true, endDate: true, days: true, reason: true, user: { select: { name: true, email: true } } },
       orderBy: { startDate: "desc" },
-      take: 30,
+      take: 20,
     }),
   ]);
 

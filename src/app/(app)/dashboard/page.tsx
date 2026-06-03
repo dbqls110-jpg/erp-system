@@ -17,24 +17,32 @@ export default async function DashboardPage() {
   const monthStr = String(month).padStart(2, "0");
   const monthStart = `${year}-${monthStr}-01`;
 
-  const [attendance, activeProjects, budget, expenses, upcomingEvents, workDaysCount, leaveBalance] = await Promise.all([
-    prisma.attendance.findUnique({ where: { userId_date: { userId: session!.user.id, date: today } } }),
-    prisma.project.count({ where: { status: "active" } }),
-    prisma.budget.findUnique({ where: { year_month: { year, month } } }),
-    prisma.expense.aggregate({
-      where: { date: { gte: monthStart } },
-      _sum: { amount: true },
+  const weekLater = format(new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000), "yyyy-MM-dd");
+
+  // 근태 쿼리 2개 → 1개로 통합 (today 포함 이번달 전체)
+  const [monthlyAttendance, activeProjects, budget, expenses, upcomingEvents, leaveBalance] = await Promise.all([
+    prisma.attendance.findMany({
+      where: { userId: session!.user.id, date: { gte: monthStart, lte: today } },
+      select: { date: true, clockIn: true, clockOut: true },
+      orderBy: { date: "desc" },
     }),
+    prisma.project.count({ where: { status: "active" } }),
+    prisma.budget.findUnique({ where: { year_month: { year, month } }, select: { amount: true } }),
+    prisma.expense.aggregate({ where: { date: { gte: monthStart } }, _sum: { amount: true } }),
     prisma.project.findMany({
-      where: { status: "active", deadline: { gte: today, lte: format(new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000), "yyyy-MM-dd") } },
+      where: { status: "active", deadline: { gte: today, lte: weekLater } },
+      select: { id: true, name: true, deadline: true },
       orderBy: { deadline: "asc" },
       take: 5,
     }),
-    prisma.attendance.count({
-      where: { userId: session!.user.id, date: { gte: monthStart, lte: today }, clockIn: { not: null } },
+    prisma.leaveBalance.findUnique({
+      where: { userId_year: { userId: session!.user.id, year } },
+      select: { totalDays: true, usedDays: true, pendingDays: true },
     }),
-    prisma.leaveBalance.findUnique({ where: { userId_year: { userId: session!.user.id, year } } }),
   ]);
+
+  const attendance = monthlyAttendance.find((r) => r.date === today) ?? null;
+  const workDaysCount = monthlyAttendance.filter((r) => r.clockIn).length;
 
   const totalExpenses = expenses._sum.amount ?? 0;
   const remaining = budget ? budget.amount - totalExpenses : null;
