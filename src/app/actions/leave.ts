@@ -119,6 +119,32 @@ export async function cancelLeave(id: string) {
   revalidatePath("/leave");
 }
 
+export async function deleteLeave(id: string) {
+  const session = await getServerSession(authOptions);
+  if (session?.user?.role !== "admin") throw new Error("관리자만 삭제할 수 있습니다.");
+
+  const req = await prisma.leaveRequest.findUnique({ where: { id } });
+  if (!req) return;
+
+  const year = new Date(req.startDate).getFullYear();
+
+  const balanceUpdates: Parameters<typeof prisma.leaveBalance.update>[0]["data"] = {};
+  if (req.status === "pending") balanceUpdates.pendingDays = { decrement: req.days };
+  if (req.status === "approved") balanceUpdates.usedDays = { decrement: req.days };
+
+  await prisma.$transaction([
+    prisma.leaveRequest.delete({ where: { id } }),
+    ...(Object.keys(balanceUpdates).length > 0
+      ? [prisma.leaveBalance.update({
+          where: { userId_year: { userId: req.userId, year } },
+          data: balanceUpdates,
+        })]
+      : []),
+  ]);
+
+  revalidatePath("/leave");
+}
+
 export async function rejectLeave(id: string, note: string) {
   const session = await getServerSession(authOptions);
   if (session?.user?.role !== "admin") throw new Error("Unauthorized");

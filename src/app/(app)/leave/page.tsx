@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { LeaveApplyButton } from "./LeaveApplyButton";
 import { LeaveAdminPanel } from "./LeaveAdminPanel";
 import { LeaveCancelButton } from "./LeaveCancelButton";
+import { LeaveDeleteButton } from "./LeaveDeleteButton";
 
 const typeLabel: Record<string, string> = {
   annual: "연차", half_am: "반차(오전)", half_pm: "반차(오후)", hourly: "시간차",
@@ -28,20 +29,20 @@ export default async function LeavePage() {
     }),
     prisma.leaveRequest.findMany({
       where: { userId: session!.user.id },
-      select: { id: true, type: true, startDate: true, endDate: true, days: true, reason: true, status: true },
+      select: { id: true, type: true, startDate: true, endDate: true, startTime: true, endTime: true, days: true, reason: true, status: true },
       orderBy: { createdAt: "desc" },
       take: 20,
     }),
     isAdmin
       ? prisma.leaveRequest.findMany({
           where: { status: "pending" },
-          select: { id: true, type: true, startDate: true, endDate: true, days: true, reason: true, user: { select: { name: true, email: true } } },
+          select: { id: true, type: true, startDate: true, endDate: true, startTime: true, endTime: true, days: true, reason: true, user: { select: { name: true, email: true } } },
           orderBy: { createdAt: "asc" },
         })
       : Promise.resolve([]),
     prisma.leaveRequest.findMany({
       where: { status: "approved" },
-      select: { id: true, type: true, startDate: true, endDate: true, days: true, reason: true, user: { select: { name: true, email: true } } },
+      select: { id: true, type: true, startDate: true, endDate: true, startTime: true, endTime: true, days: true, reason: true, user: { select: { name: true, email: true } } },
       orderBy: { startDate: "desc" },
       take: 20,
     }),
@@ -98,21 +99,28 @@ export default async function LeavePage() {
             <p className="text-sm text-smoke-gray">승인된 휴가가 없습니다.</p>
           ) : (
             <div className="space-y-1">
-              {allRequests.map((r) => (
-                <div key={r.id} className="flex items-center justify-between py-2 border-b border-ash-gray last:border-0 text-sm">
-                  <div className="flex items-center gap-3">
-                    <span className="font-medium text-midnight-charcoal w-16 shrink-0">
-                      {(r as typeof r & { user: { name: string | null } }).user.name ?? "직원"}
-                    </span>
-                    <span className="text-smoke-gray">{typeLabel[r.type]}</span>
-                    <span className="text-smoke-gray">
-                      {r.startDate === r.endDate ? r.startDate : `${r.startDate} ~ ${r.endDate}`}
-                    </span>
-                    {r.reason && <span className="text-smoke-gray hidden sm:inline">· {r.reason}</span>}
+              {allRequests.map((r) => {
+                const req = r as typeof r & { user: { name: string | null }; startTime: string | null; endTime: string | null };
+                return (
+                  <div key={r.id} className="flex items-center justify-between py-2 border-b border-ash-gray last:border-0 text-sm">
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <span className="font-medium text-midnight-charcoal w-16 shrink-0">{req.user.name ?? "직원"}</span>
+                      <span className="text-smoke-gray">{typeLabel[r.type]}</span>
+                      <span className="text-smoke-gray">
+                        {r.startDate === r.endDate ? r.startDate : `${r.startDate} ~ ${r.endDate}`}
+                        {r.type === "hourly" && req.startTime && req.endTime && (
+                          <span className="ml-1 text-electric-blue">({req.startTime}~{req.endTime})</span>
+                        )}
+                      </span>
+                      {r.reason && <span className="text-smoke-gray hidden sm:inline">· {r.reason}</span>}
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="text-smoke-gray">{r.days}일</span>
+                      {isAdmin && <LeaveDeleteButton id={r.id} />}
+                    </div>
                   </div>
-                  <span className="text-smoke-gray shrink-0">{r.days}일</span>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </CardContent>
@@ -134,10 +142,13 @@ export default async function LeavePage() {
                 const s = statusLabel[r.status] ?? statusLabel.pending;
                 return (
                   <div key={r.id} className="flex items-center justify-between py-2 border-b border-ash-gray last:border-0 text-sm">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-medium text-midnight-charcoal">{typeLabel[r.type]}</span>
                       <span className="text-smoke-gray">
                         {r.startDate === r.endDate ? r.startDate : `${r.startDate} ~ ${r.endDate}`}
+                        {r.type === "hourly" && r.startTime && r.endTime && (
+                          <span className="ml-1 text-electric-blue">({r.startTime}~{r.endTime})</span>
+                        )}
                       </span>
                       {r.reason && <span className="text-smoke-gray hidden sm:inline">· {r.reason}</span>}
                     </div>
@@ -145,6 +156,7 @@ export default async function LeavePage() {
                       <span className="text-smoke-gray">{r.days}일</span>
                       <Badge variant="outline" className={s.class}>{s.label}</Badge>
                       {r.status === "pending" && <LeaveCancelButton id={r.id} />}
+                      {isAdmin && <LeaveDeleteButton id={r.id} />}
                     </div>
                   </div>
                 );
