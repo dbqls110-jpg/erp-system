@@ -3,7 +3,7 @@
 import { useRef, useState, useTransition } from "react";
 import { uploadProjectFile, deleteProjectFile } from "@/app/actions/projectFile";
 import { Button } from "@/components/ui/button";
-import { Upload, Trash2, ExternalLink, FileText, Loader2 } from "lucide-react";
+import { Upload, Trash2, ExternalLink, FileText, Loader2, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 
 interface ProjectFile {
@@ -18,6 +18,7 @@ interface ProjectFile {
 interface Props {
   projectId: string;
   files: ProjectFile[];
+  hasDriveAccess: boolean;
 }
 
 function formatBytes(bytes: number | null) {
@@ -27,7 +28,7 @@ function formatBytes(bytes: number | null) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-export function ProjectFilesPanel({ projectId, files }: Props) {
+export function ProjectFilesPanel({ projectId, files, hasDriveAccess }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [isPending, startTransition] = useTransition();
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -111,20 +112,30 @@ export function ProjectFilesPanel({ projectId, files }: Props) {
         </ul>
       )}
 
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={() => inputRef.current?.click()}
-        disabled={isPending}
-        className="gap-2"
-      >
-        {isPending && !deletingId ? (
-          <Loader2 size={14} className="animate-spin" />
-        ) : (
-          <Upload size={14} />
-        )}
-        파일 업로드
-      </Button>
+      {!hasDriveAccess ? (
+        <div className="flex items-start gap-2 p-3 rounded-lg bg-yellow-50 border border-yellow-200 text-sm">
+          <AlertCircle size={15} className="text-yellow-600 shrink-0 mt-0.5" />
+          <div>
+            <p className="font-medium text-yellow-800">Google Drive 연결 필요</p>
+            <p className="text-yellow-700 text-xs mt-0.5">파일 업로드를 사용하려면 로그아웃 후 재로그인 시 Drive 권한을 허용해 주세요.</p>
+          </div>
+        </div>
+      ) : (
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => inputRef.current?.click()}
+          disabled={isPending}
+          className="gap-2"
+        >
+          {isPending && !deletingId ? (
+            <Loader2 size={14} className="animate-spin" />
+          ) : (
+            <Upload size={14} />
+          )}
+          파일 업로드
+        </Button>
+      )}
     </div>
   );
 }

@@ -23,6 +23,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
   const { id } = await params;
   const session = await getServerSession(authOptions);
   const isAdmin = session?.user?.role === "admin";
+  const hasDriveAccess = !!session?.accessToken;
 
   const project = await prisma.project.findUnique({
     where: { id },
@@ -112,7 +113,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <ProjectFilesPanel projectId={project.id} files={project.files} />
+          <ProjectFilesPanel projectId={project.id} files={project.files} hasDriveAccess={hasDriveAccess} />
         </CardContent>
       </Card>
 
