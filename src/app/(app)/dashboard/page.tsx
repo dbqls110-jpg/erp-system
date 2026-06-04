@@ -3,6 +3,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Clock, FolderKanban, Banknote, Calendar, CalendarCheck, Palmtree } from "lucide-react";
+import { AutoRefresh } from "@/components/AutoRefresh";
 import { format } from "date-fns";
 import { ko } from "date-fns/locale";
 import Link from "next/link";
@@ -102,6 +103,7 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-6">
+      <AutoRefresh intervalMs={60000} />
       <div>
         <h1 className="text-2xl font-bold text-deep-space-charcoal" style={{ fontFamily: "var(--font-plus-jakarta-sans)", letterSpacing: "-0.91px" }}>
           대시보드

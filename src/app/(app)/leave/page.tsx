@@ -8,6 +8,7 @@ import { LeaveAdminPanel } from "./LeaveAdminPanel";
 import { LeaveCancelButton } from "./LeaveCancelButton";
 import { LeaveDeleteButton } from "./LeaveDeleteButton";
 import { LeaveHistoryButton } from "./LeaveHistoryModal";
+import { AutoRefresh } from "@/components/AutoRefresh";
 
 const typeLabel: Record<string, string> = {
   annual: "연차", half_am: "반차(오전)", half_pm: "반차(오후)", hourly: "시간차",
@@ -65,6 +66,7 @@ export default async function LeavePage() {
 
   return (
     <div className="space-y-6">
+      <AutoRefresh intervalMs={isAdmin ? 15000 : 30000} />
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-deep-space-charcoal" style={{ fontFamily: "var(--font-plus-jakarta-sans)", letterSpacing: "-0.91px" }}>
           휴가 관리
