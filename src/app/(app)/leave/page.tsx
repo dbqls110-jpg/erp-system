@@ -115,8 +115,8 @@ export default async function LeavePage() {
                     <div className="flex items-center gap-3 flex-wrap">
                       {isAdmin ? (
                         <LeaveHistoryButton
+                          userId={(req as typeof req & { userId: string }).userId}
                           name={req.user.name ?? "직원"}
-                          requests={allUserRequests.filter(r => r.userId === (req as typeof req & { userId: string }).userId)}
                         />
                       ) : (
                         <span className="font-medium text-midnight-charcoal w-16 shrink-0">{req.user.name ?? "직원"}</span>

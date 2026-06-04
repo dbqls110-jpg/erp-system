@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { UserRoleSelect } from "./UserRoleSelect";
 import { LeaveBalanceInput } from "./LeaveBalanceInput";
+import { UserNameInput } from "./UserNameInput";
 
 export default async function AdminPage() {
   const session = await getServerSession(authOptions);
@@ -46,7 +47,7 @@ export default async function AdminPage() {
                       </AvatarFallback>
                     </Avatar>
                     <div>
-                      <p className="text-sm font-medium text-midnight-charcoal">{u.name ?? "이름 없음"}</p>
+                      <UserNameInput userId={u.id} name={u.name ?? ""} />
                       <p className="text-xs text-smoke-gray">{u.email}</p>
                     </div>
                   </div>

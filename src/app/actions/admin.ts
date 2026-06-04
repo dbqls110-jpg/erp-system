@@ -18,6 +18,17 @@ export async function setLeaveBalance(userId: string, year: number, totalDays: n
   revalidatePath("/leave");
 }
 
+export async function updateUserName(userId: string, name: string) {
+  const session = await getServerSession(authOptions);
+  if (session?.user?.role !== "admin") throw new Error("Unauthorized");
+  if (!name.trim()) throw new Error("이름을 입력해주세요.");
+
+  await prisma.user.update({ where: { id: userId }, data: { name: name.trim() } });
+  revalidatePath("/admin");
+  revalidatePath("/leave");
+  revalidatePath("/dashboard");
+}
+
 export async function updateUserRole(userId: string, role: string) {
   const session = await getServerSession(authOptions);
   if (session?.user?.role !== "admin") throw new Error("Unauthorized");
