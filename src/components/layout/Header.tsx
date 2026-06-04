@@ -58,7 +58,7 @@ export function Header({ user, onMobileMenuOpen }: HeaderProps) {
   // 페이지 이동 시 즉시 갱신 + 10초 폴링
   useEffect(() => {
     refreshUnread();
-    const id = setInterval(refreshUnread, 10000);
+    const id = setInterval(refreshUnread, 30000);
     return () => clearInterval(id);
   }, [pathname, refreshUnread]);
   const title = Object.entries(pageTitle).find(([key]) => pathname === key || pathname.startsWith(key + "/"))?.[1] ?? "";
