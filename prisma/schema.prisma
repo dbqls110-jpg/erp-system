@@ -25,7 +25,10 @@ model User {
   leaveRequests LeaveRequest[]
   expenses      Expense[]
   businessCards   BusinessCard[]
-  calendarEvents  CalendarEvent[]
+  calendarEvents    CalendarEvent[]
+  conversationsAsA  Conversation[]  @relation("ConvA")
+  conversationsAsB  Conversation[]  @relation("ConvB")
+  sentMessages      Message[]       @relation("MessageSender")
 
   @@map("users")
 }
@@ -219,6 +222,36 @@ model Expense {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("expenses")
+}
+
+// ─── 메신저 ───────────────────────────────────────────────
+model Conversation {
+  id           String    @id @default(cuid())
+  participantA String
+  participantB String
+  lastMessageAt DateTime @default(now())
+  createdAt    DateTime  @default(now())
+
+  userA    User      @relation("ConvA", fields: [participantA], references: [id], onDelete: Cascade)
+  userB    User      @relation("ConvB", fields: [participantB], references: [id], onDelete: Cascade)
+  messages Message[]
+
+  @@unique([participantA, participantB])
+  @@map("conversations")
+}
+
+model Message {
+  id             String       @id @default(cuid())
+  conversationId String
+  senderId       String
+  content        String
+  readAt         DateTime?
+  createdAt      DateTime     @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender       User         @relation("MessageSender", fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@map("messages")
 }
 
 // ─── 캘린더 ───────────────────────────────────────────────

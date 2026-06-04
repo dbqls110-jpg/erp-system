@@ -12,6 +12,7 @@ import {
   CreditCard,
   Banknote,
   Settings,
+  MessageCircle,
   X,
 } from "lucide-react";
 
@@ -30,6 +31,7 @@ const navItems: NavItem[] = [
   { label: "캘린더", href: "/calendar", icon: CalendarDays },
   { label: "명함 관리", href: "/business-cards", icon: CreditCard },
   { label: "재무 관리", href: "/finance", icon: Banknote },
+  { label: "메신저", href: "/messenger", icon: MessageCircle },
   { label: "관리자", href: "/admin", icon: Settings, adminOnly: true },
 ];
 

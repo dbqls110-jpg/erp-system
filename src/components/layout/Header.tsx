@@ -11,8 +11,9 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
-import { LogOut, Menu, Mail, ExternalLink, LayoutDashboard } from "lucide-react";
+import { LogOut, Menu, Mail, ExternalLink, LayoutDashboard, MessageCircle } from "lucide-react";
 import { clockOut } from "@/app/actions/attendance";
+import { useEffect, useState } from "react";
 
 const pageTitle: Record<string, string> = {
   "/dashboard": "대시보드",
@@ -23,6 +24,7 @@ const pageTitle: Record<string, string> = {
   "/business-cards": "명함 관리",
   "/finance": "재무 관리",
   "/admin": "관리자",
+  "/messenger": "메신저",
 };
 
 interface HeaderProps {
@@ -44,6 +46,15 @@ const roleLabel: Record<string, { label: string; class: string }> = {
 export function Header({ user, onMobileMenuOpen }: HeaderProps) {
   const pathname = usePathname();
   const router = useRouter();
+  const [unread, setUnread] = useState(0);
+
+  useEffect(() => {
+    const fetch_ = () =>
+      fetch("/api/messenger/unread").then(r => r.json()).then(d => setUnread(d.count ?? 0)).catch(() => {});
+    fetch_();
+    const id = setInterval(fetch_, 30000);
+    return () => clearInterval(id);
+  }, []);
   const title = Object.entries(pageTitle).find(([key]) => pathname === key || pathname.startsWith(key + "/"))?.[1] ?? "";
   const initials = user.name
     ? user.name.slice(0, 2).toUpperCase()
@@ -70,6 +81,14 @@ export function Header({ user, onMobileMenuOpen }: HeaderProps) {
         <p className="text-sm font-semibold text-midnight-charcoal">{title}</p>
       </div>
       <div className="flex items-center gap-3">
+        <Link href="/messenger" className="relative text-smoke-gray hover:text-deep-violet transition-colors">
+          <MessageCircle size={20} />
+          {unread > 0 && (
+            <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-0.5 rounded-full bg-warm-fade text-white text-[10px] flex items-center justify-center font-bold">
+              {unread > 9 ? "9+" : unread}
+            </span>
+          )}
+        </Link>
         {user.role === "admin" ? (
           <Link href="/admin">
             <Badge variant="outline" className={`hidden sm:inline-flex cursor-pointer hover:opacity-80 transition-opacity ${role.class}`}>
