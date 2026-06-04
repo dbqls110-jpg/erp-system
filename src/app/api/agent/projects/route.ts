@@ -22,16 +22,22 @@ export async function POST(req: NextRequest) {
   if (!verifyAgentApiKey(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = await req.json();
-  const { name, client, announceDate, deadline, assignee, memo, revenue, cost } = body;
+  const { name, client, announceDate, deadline, status, progress, assignee, memo, revenue, cost } = body;
 
-  if (!name) return NextResponse.json({ error: "name 필수" }, { status: 400 });
+  if (!name) return NextResponse.json({ error: "name은 필수입니다." }, { status: 400 });
 
   const project = await prisma.project.create({
     data: {
-      name, client: client ?? null, announceDate: announceDate ?? null,
-      deadline: deadline ?? null, assignee: assignee ?? null,
-      memo: memo ?? null, revenue: revenue ?? null, cost: cost ?? null,
-      status: "active",
+      name,
+      client: client ?? null,
+      announceDate: announceDate ?? null,
+      deadline: deadline ?? null,
+      status: status ?? "active",
+      progress: progress ?? 0,
+      assignee: assignee ?? null,
+      memo: memo ?? null,
+      revenue: revenue ?? null,
+      cost: cost ?? null,
     },
   });
 

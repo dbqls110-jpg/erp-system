@@ -8,19 +8,16 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const { id } = await params;
   const body = await req.json();
 
-  const project = await prisma.project.update({
-    where: { id },
-    data: {
-      ...(body.name !== undefined && { name: body.name }),
-      ...(body.status !== undefined && { status: body.status }),
-      ...(body.progress !== undefined && { progress: body.progress }),
-      ...(body.assignee !== undefined && { assignee: body.assignee }),
-      ...(body.deadline !== undefined && { deadline: body.deadline }),
-      ...(body.memo !== undefined && { memo: body.memo }),
-      ...(body.revenue !== undefined && { revenue: body.revenue }),
-      ...(body.cost !== undefined && { cost: body.cost }),
-    },
-  });
+  const existing = await prisma.project.findUnique({ where: { id } });
+  if (!existing) return NextResponse.json({ error: "프로젝트를 찾을 수 없습니다." }, { status: 404 });
+
+  const allowed = ["name", "client", "announceDate", "deadline", "status", "progress", "assignee", "memo", "revenue", "cost"] as const;
+  const data: Record<string, unknown> = {};
+  for (const key of allowed) {
+    if (key in body) data[key] = body[key];
+  }
+
+  const project = await prisma.project.update({ where: { id }, data });
 
   return NextResponse.json({ project });
 }

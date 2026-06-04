@@ -11,28 +11,27 @@ export async function GET(req: NextRequest) {
   const month = parseInt(searchParams.get("month") ?? String(now.getMonth() + 1));
   const monthStr = String(month).padStart(2, "0");
   const start = `${year}-${monthStr}-01`;
-  const lastDay = new Date(year, month, 0).getDate();
-  const end = `${year}-${monthStr}-${String(lastDay).padStart(2, "0")}`;
+  const end = `${year}-${monthStr}-${String(new Date(year, month, 0).getDate()).padStart(2, "0")}`;
 
-  const [budget, expenses, fixedExpenses] = await Promise.all([
+  const [budget, expenses] = await Promise.all([
     prisma.budget.findUnique({ where: { year_month: { year, month } } }),
     prisma.expense.findMany({ where: { date: { gte: start, lte: end } }, orderBy: { date: "desc" } }),
-    prisma.fixedExpense.findMany({ orderBy: { order: "asc" } }),
   ]);
 
   const totalExpense = expenses.reduce((s, e) => s + e.amount, 0);
-  const totalFixed = fixedExpenses.reduce((s, f) => s + f.amount, 0);
-  const otherExpense = expenses.filter(e => !e.fixedExpenseId).reduce((s, e) => s + e.amount, 0);
-  const remaining = budget ? budget.amount - totalFixed - otherExpense : null;
+  const remainingBudget = budget ? budget.amount - totalExpense : null;
+
+  const byCategory = expenses.reduce((acc, e) => {
+    acc[e.category] = (acc[e.category] ?? 0) + e.amount;
+    return acc;
+  }, {} as Record<string, number>);
 
   return NextResponse.json({
     year, month,
     budget: budget?.amount ?? null,
     totalExpense,
-    totalFixed,
-    otherExpense,
-    remaining,
-    fixedExpenses,
+    remainingBudget,
+    byCategory,
     expenses,
   });
 }
