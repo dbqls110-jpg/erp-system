@@ -51,7 +51,7 @@ export function Sidebar({ role, onClose }: SidebarProps) {
       {/* 로고 */}
       <div className="h-16 flex items-center justify-between px-6 border-b border-ash-gray shrink-0">
         <Link href="/dashboard" onClick={onClose} className="text-lg font-bold text-deep-space-charcoal tracking-tight hover:text-deep-violet transition-colors" style={{ fontFamily: "var(--font-plus-jakarta-sans)" }}>
-          ERP 시스템
+          천우영 시스템
         </Link>
         {onClose && (
           <button onClick={onClose} className="text-smoke-gray hover:text-midnight-charcoal lg:hidden">

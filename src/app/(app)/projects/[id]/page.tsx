@@ -9,6 +9,7 @@ import { ChecklistPanel } from "./ChecklistPanel";
 import { ProjectEditButton } from "./ProjectEditButton";
 import { ProjectDeleteButton } from "../ProjectDeleteButton";
 import { MemoEditor } from "./MemoEditor";
+import { ProjectFilesPanel } from "./ProjectFilesPanel";
 import { Calendar, User, Building, ChevronRight, TrendingUp, TrendingDown } from "lucide-react";
 import Link from "next/link";
 
@@ -25,7 +26,10 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
 
   const project = await prisma.project.findUnique({
     where: { id },
-    include: { checklistItems: { orderBy: { order: "asc" } } },
+    include: {
+      checklistItems: { orderBy: { order: "asc" } },
+      files: { orderBy: { createdAt: "desc" } },
+    },
   });
 
   if (!project) notFound();
@@ -97,6 +101,18 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
         </CardHeader>
         <CardContent>
           <ChecklistPanel projectId={project.id} items={project.checklistItems} />
+        </CardContent>
+      </Card>
+
+      {/* 파일 */}
+      <Card className="border-ash-gray shadow-[var(--shadow-sm)]">
+        <CardHeader>
+          <CardTitle className="text-base font-semibold text-deep-space-charcoal" style={{ fontFamily: "var(--font-plus-jakarta-sans)" }}>
+            파일 ({project.files.length})
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ProjectFilesPanel projectId={project.id} files={project.files} />
         </CardContent>
       </Card>
 

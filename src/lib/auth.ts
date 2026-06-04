@@ -8,13 +8,23 @@ export const authOptions: NextAuthOptions = {
     GoogleProvider({
       clientId: process.env.AUTH_GOOGLE_ID!,
       clientSecret: process.env.AUTH_GOOGLE_SECRET!,
-      authorization: { params: { prompt: "select_account" } },
+      authorization: {
+        params: {
+          prompt: "consent",
+          access_type: "offline",
+          scope: "openid email profile https://www.googleapis.com/auth/drive.file",
+        },
+      },
       checks: ["state"],
     }),
   ],
   session: { strategy: "jwt" },
   callbacks: {
     async jwt({ token, account, profile }) {
+      if (account?.provider === "google" && account.access_token) {
+        token.accessToken = account.access_token;
+        token.refreshToken = account.refresh_token;
+      }
       if (account?.provider === "google" && profile?.email) {
         try {
           const sql = neon(process.env.DATABASE_URL!);
@@ -61,6 +71,7 @@ export const authOptions: NextAuthOptions = {
         session.user.id = token.id as string;
         session.user.role = (token.role as string) ?? "pending";
       }
+      session.accessToken = token.accessToken as string | undefined;
       return session;
     },
   },

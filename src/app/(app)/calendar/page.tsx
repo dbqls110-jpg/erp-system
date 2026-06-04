@@ -7,7 +7,7 @@ export default async function CalendarPage() {
   const month = now.getMonth() + 1;
   const monthStr = String(month).padStart(2, "0");
 
-  const [projects, leaves] = await Promise.all([
+  const [projects, leaves, customEvents] = await Promise.all([
     prisma.project.findMany({
       where: {
         status: "active",
@@ -24,6 +24,9 @@ export default async function CalendarPage() {
         startDate: { gte: `${year}-${monthStr}-01` },
       },
       include: { user: { select: { name: true } } },
+    }),
+    prisma.calendarEvent.findMany({
+      where: { date: { gte: `${year}-${monthStr}-01` } },
     }),
   ]);
 
@@ -46,6 +49,14 @@ export default async function CalendarPage() {
         endDate: l.endDate,
       };
     }),
+    ...customEvents.map((e) => ({
+      date: e.date,
+      title: e.title,
+      type: "custom" as const,
+      id: e.id,
+      endDate: e.endDate ?? undefined,
+      color: e.color,
+    })),
   ];
 
   return (

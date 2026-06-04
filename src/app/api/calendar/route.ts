@@ -22,7 +22,7 @@ export async function GET(req: NextRequest) {
     hourly: "시간차",
   };
 
-  const [projects, leaves] = await Promise.all([
+  const [projects, leaves, customEvents] = await Promise.all([
     prisma.project.findMany({
       where: {
         OR: [
@@ -34,6 +34,10 @@ export async function GET(req: NextRequest) {
     }),
     prisma.leaveRequest.findMany({
       where: { status: "approved", startDate: { gte: start, lte: end } },
+      include: { user: { select: { name: true } } },
+    }),
+    prisma.calendarEvent.findMany({
+      where: { date: { gte: start, lte: end } },
       include: { user: { select: { name: true } } },
     }),
   ]);
@@ -51,6 +55,14 @@ export async function GET(req: NextRequest) {
       type: "leave",
       id: l.id,
       endDate: l.endDate,
+    })),
+    ...customEvents.map((e) => ({
+      date: e.date,
+      title: e.title,
+      type: "custom" as const,
+      id: e.id,
+      endDate: e.endDate ?? undefined,
+      color: e.color,
     })),
   ];
 

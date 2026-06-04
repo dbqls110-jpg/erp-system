@@ -8,6 +8,7 @@ import { ExpenseAddButton } from "./ExpenseAddButton";
 import { BudgetSetButton } from "./BudgetSetButton";
 import { ExpenseDeleteButton } from "./ExpenseDeleteButton";
 import { FinanceMonthNav } from "./FinanceMonthNav";
+import { FixedExpensePanel } from "./FixedExpensePanel";
 
 const categoryLabel: Record<string, string> = {
   rent: "임차료", salary: "인건비", telecom: "통신비",
@@ -34,13 +35,21 @@ export default async function FinancePage({
   const daysInMonth = new Date(year, month, 0).getDate();
   const monthEnd = `${year}-${monthStr}-${String(daysInMonth).padStart(2, "0")}`;
 
-  const [budget, expenses] = await Promise.all([
+  const [budget, expenses, fixedExpenses] = await Promise.all([
     prisma.budget.findUnique({ where: { year_month: { year, month } } }),
     prisma.expense.findMany({
       where: { date: { gte: `${year}-${monthStr}-01`, lte: monthEnd } },
       orderBy: { date: "desc" },
     }),
+    prisma.fixedExpense.findMany({ orderBy: { order: "asc" } }),
   ]);
+
+  // 이번 달 납부 완료된 고정비 ID 목록
+  const checkedFixedIds = new Set(
+    expenses
+      .filter((e) => e.fixedExpenseId !== null)
+      .map((e) => e.fixedExpenseId as string)
+  );
 
   const totalExpense = expenses.reduce((sum, e) => sum + e.amount, 0);
   const remaining = budget ? budget.amount - totalExpense : null;
@@ -99,6 +108,24 @@ export default async function FinancePage({
           </CardContent>
         </Card>
       </div>
+
+      {/* 고정비 */}
+      <Card className="border-ash-gray shadow-[var(--shadow-sm)]">
+        <CardHeader>
+          <CardTitle className="text-base font-semibold text-deep-space-charcoal" style={{ fontFamily: "var(--font-plus-jakarta-sans)" }}>
+            고정비 ({fixedExpenses.filter(f => checkedFixedIds.has(f.id)).length}/{fixedExpenses.length} 납부)
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <FixedExpensePanel
+            items={fixedExpenses}
+            checkedIds={checkedFixedIds}
+            year={year}
+            month={month}
+            isAdmin={isAdmin}
+          />
+        </CardContent>
+      </Card>
 
       {/* 차트 */}
       {(categoryData.length > 0 || dailyData.length > 0) && (
