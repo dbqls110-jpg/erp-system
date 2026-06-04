@@ -20,7 +20,7 @@ export default async function DashboardPage() {
   const weekLater = format(new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000), "yyyy-MM-dd");
 
   // 근태 쿼리 2개 → 1개로 통합 (today 포함 이번달 전체)
-  const [monthlyAttendance, activeProjects, budget, expenses, upcomingEvents, leaveBalance] = await Promise.all([
+  const [monthlyAttendance, activeProjects, budget, expenses, upcomingEvents, leaveBalance, fixedExpenses] = await Promise.all([
     prisma.attendance.findMany({
       where: { userId: session!.user.id, date: { gte: monthStart, lte: today } },
       select: { date: true, clockIn: true, clockOut: true },
@@ -39,13 +39,16 @@ export default async function DashboardPage() {
       where: { userId_year: { userId: session!.user.id, year } },
       select: { totalDays: true, usedDays: true, pendingDays: true },
     }),
+    prisma.fixedExpense.aggregate({ _sum: { amount: true } }),
   ]);
 
   const attendance = monthlyAttendance.find((r) => r.date === today) ?? null;
   const workDaysCount = monthlyAttendance.filter((r) => r.clockIn).length;
 
   const totalExpenses = expenses._sum.amount ?? 0;
-  const remaining = budget ? budget.amount - totalExpenses : null;
+  const totalFixed = fixedExpenses._sum.amount ?? 0;
+  const otherExpenses = totalExpenses - totalFixed < 0 ? 0 : totalExpenses - totalFixed;
+  const remaining = budget ? budget.amount - totalFixed - otherExpenses : null;
   const remainingLeave = leaveBalance
     ? leaveBalance.totalDays - leaveBalance.usedDays - leaveBalance.pendingDays
     : null;

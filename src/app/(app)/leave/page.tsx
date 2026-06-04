@@ -7,6 +7,7 @@ import { LeaveApplyButton } from "./LeaveApplyButton";
 import { LeaveAdminPanel } from "./LeaveAdminPanel";
 import { LeaveCancelButton } from "./LeaveCancelButton";
 import { LeaveDeleteButton } from "./LeaveDeleteButton";
+import { LeaveHistoryButton } from "./LeaveHistoryModal";
 
 const typeLabel: Record<string, string> = {
   annual: "연차", half_am: "반차(오전)", half_pm: "반차(오후)", hourly: "시간차",
@@ -42,11 +43,19 @@ export default async function LeavePage() {
       : Promise.resolve([]),
     prisma.leaveRequest.findMany({
       where: { status: "approved" },
-      select: { id: true, type: true, startDate: true, endDate: true, startTime: true, endTime: true, days: true, reason: true, user: { select: { name: true, email: true } } },
+      select: { id: true, userId: true, type: true, startDate: true, endDate: true, startTime: true, endTime: true, days: true, reason: true, user: { select: { name: true, email: true } } },
       orderBy: { startDate: "desc" },
-      take: 20,
+      take: 50,
     }),
   ]);
+
+  // 관리자용: 직원별 전체 휴가 내역
+  const allUserRequests = isAdmin
+    ? await prisma.leaveRequest.findMany({
+        select: { id: true, userId: true, type: true, startDate: true, endDate: true, startTime: true, endTime: true, days: true, reason: true, status: true },
+        orderBy: { createdAt: "desc" },
+      })
+    : [];
 
   const totalDays = balance?.totalDays ?? 15;
   const usedDays = balance?.usedDays ?? 0;
@@ -104,7 +113,14 @@ export default async function LeavePage() {
                 return (
                   <div key={r.id} className="flex items-center justify-between py-2 border-b border-ash-gray last:border-0 text-sm">
                     <div className="flex items-center gap-3 flex-wrap">
-                      <span className="font-medium text-midnight-charcoal w-16 shrink-0">{req.user.name ?? "직원"}</span>
+                      {isAdmin ? (
+                        <LeaveHistoryButton
+                          name={req.user.name ?? "직원"}
+                          requests={allUserRequests.filter(r => r.userId === (req as typeof req & { userId: string }).userId)}
+                        />
+                      ) : (
+                        <span className="font-medium text-midnight-charcoal w-16 shrink-0">{req.user.name ?? "직원"}</span>
+                      )}
                       <span className="text-smoke-gray">{typeLabel[r.type]}</span>
                       <span className="text-smoke-gray">
                         {r.startDate === r.endDate ? r.startDate : `${r.startDate} ~ ${r.endDate}`}

@@ -11,7 +11,7 @@ import { applyLeave } from "@/app/actions/leave";
 import { toast } from "sonner";
 import { Plus } from "lucide-react";
 
-const isHalfDay = (t: string) => t === "half_am" || t === "half_pm";
+const isSingleDay = (t: string) => t === "half_am" || t === "half_pm" || t === "hourly";
 
 export function LeaveApplyButton() {
   const [open, setOpen] = useState(false);
@@ -31,7 +31,7 @@ export function LeaveApplyButton() {
       const fd = new FormData(e.currentTarget);
       fd.set("type", type);
       // 반차는 종료일 = 시작일로 고정
-      if (isHalfDay(type)) {
+      if (isSingleDay(type)) {
         fd.set("endDate", fd.get("startDate") as string);
       }
       await applyLeave(fd);
@@ -75,7 +75,7 @@ export function LeaveApplyButton() {
             </div>
 
             {/* 반차: 날짜 하나만 */}
-            {isHalfDay(type) ? (
+            {isSingleDay(type) ? (
               <div className="space-y-1">
                 <Label>날짜</Label>
                 <Input
@@ -112,15 +112,10 @@ export function LeaveApplyButton() {
             )}
 
             {type === "hourly" && (
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <Label>시작 시간</Label>
-                  <Input type="time" name="startTime" />
-                </div>
-                <div className="space-y-1">
-                  <Label>종료 시간</Label>
-                  <Input type="time" name="endTime" />
-                </div>
+              <div className="space-y-1">
+                <Label>시작 시간 <span className="text-smoke-gray text-xs">(종료: 18:00 고정)</span></Label>
+                <Input type="time" name="startTime" required min="06:00" max="18:00" />
+                <input type="hidden" name="endTime" value="18:00" />
               </div>
             )}
 

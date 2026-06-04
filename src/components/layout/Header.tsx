@@ -52,7 +52,7 @@ export function Header({ user, onMobileMenuOpen }: HeaderProps) {
     const fetch_ = () =>
       fetch("/api/messenger/unread").then(r => r.json()).then(d => setUnread(d.count ?? 0)).catch(() => {});
     fetch_();
-    const id = setInterval(fetch_, 30000);
+    const id = setInterval(fetch_, 10000);
     return () => clearInterval(id);
   }, []);
   const title = Object.entries(pageTitle).find(([key]) => pathname === key || pathname.startsWith(key + "/"))?.[1] ?? "";

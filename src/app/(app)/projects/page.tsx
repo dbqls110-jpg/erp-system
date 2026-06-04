@@ -8,7 +8,7 @@ import Link from "next/link";
 import { ProjectCreateButton } from "./ProjectCreateButton";
 import { ProjectDeleteButton } from "./ProjectDeleteButton";
 import { ProjectFilter } from "./ProjectFilter";
-import { Calendar, User, FolderOpen } from "lucide-react";
+import { Calendar, User, FolderOpen, BarChart2 } from "lucide-react";
 
 const statusConfig: Record<string, { label: string; class: string }> = {
   active: { label: "진행 중", class: "bg-electric-blue/10 text-electric-blue border-electric-blue/20" },
@@ -42,6 +42,9 @@ export default async function ProjectsPage({
         </h1>
         <div className="flex items-center gap-3 flex-wrap">
           <ProjectFilter current={currentFilter} />
+          <Link href="/projects/stats" className="flex items-center gap-1.5 text-sm font-medium text-smoke-gray hover:text-deep-violet transition-colors border border-ash-gray rounded-lg px-3 py-2">
+            <BarChart2 size={15} /> 통계
+          </Link>
           <ProjectCreateButton />
         </div>
       </div>

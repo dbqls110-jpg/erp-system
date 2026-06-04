@@ -45,6 +45,10 @@ const CUSTOM_COLORS: Record<string, string> = {
   purple: "bg-purple-50 text-purple-700",
 };
 
+function eventTitle(e: CalEvent) {
+  return e.type === "custom" && e.color === "red" ? `⭐ ${e.title}` : e.title;
+}
+
 type ModalState =
   | { mode: "closed" }
   | { mode: "create"; date: string }
@@ -217,8 +221,8 @@ export function CalendarView({ initialEvents, currentYear, currentMonth }: {
                         );
                       }
                       return (
-                        <div key={i} className={cn("block text-[10px] rounded px-1 truncate", cls)} title={e.title}>
-                          {e.title}
+                        <div key={i} className={cn("block text-[10px] rounded px-1 truncate", cls)} title={eventTitle(e)}>
+                          {eventTitle(e)}
                         </div>
                       );
                     })}
@@ -253,7 +257,7 @@ export function CalendarView({ initialEvents, currentYear, currentMonth }: {
                 const cls = e.type === "custom" ? CUSTOM_COLORS[e.color ?? "gray"] : TYPE_COLORS[e.type];
                 return (
                   <div key={i} className={cn("flex items-center justify-between rounded-lg px-3 py-2", cls)}>
-                    <span className="text-sm font-medium truncate flex-1">{e.title}</span>
+                    <span className="text-sm font-medium truncate flex-1">{eventTitle(e)}</span>
                     {e.type === "custom" && (
                       <button
                         onClick={() => handleDelete(e.id, e.title)}

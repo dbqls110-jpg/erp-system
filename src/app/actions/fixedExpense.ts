@@ -21,6 +21,19 @@ export async function createFixedExpense(data: {
   revalidatePath("/finance");
 }
 
+export async function updateFixedExpense(id: string, data: {
+  name: string;
+  amount: number;
+  dayOfMonth: number;
+  category: string;
+}) {
+  const session = await getServerSession(authOptions);
+  if (session?.user?.role !== "admin") throw new Error("관리자만 수정할 수 있습니다.");
+
+  await prisma.fixedExpense.update({ where: { id }, data });
+  revalidatePath("/finance");
+}
+
 export async function deleteFixedExpense(id: string) {
   const session = await getServerSession(authOptions);
   if (session?.user?.role !== "admin") throw new Error("관리자만 삭제할 수 있습니다.");

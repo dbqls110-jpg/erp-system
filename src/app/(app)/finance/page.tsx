@@ -12,11 +12,13 @@ import { FixedExpensePanel } from "./FixedExpensePanel";
 
 const categoryLabel: Record<string, string> = {
   rent: "임차료", salary: "인건비", telecom: "통신비",
-  supplies: "비품", food: "식대", other: "기타",
+  supplies: "비품", food: "식대", software: "소프트웨어",
+  insurance: "4대보험", other: "기타",
 };
 const categoryColors: Record<string, string> = {
   rent: "#7b68ee", salary: "#0091ff", telecom: "#6647f0",
-  supplies: "#514b81", food: "#ff5b36", other: "#b3b3b3",
+  supplies: "#514b81", food: "#ff5b36", software: "#22c55e",
+  insurance: "#f59e0b", other: "#b3b3b3",
 };
 
 export default async function FinancePage({
@@ -65,11 +67,15 @@ export default async function FinancePage({
   const remaining = budget ? budget.amount - totalFixed - totalOther : null;
   const usagePercent = budget ? Math.min(Math.round(((totalFixed + totalOther) / budget.amount) * 100), 100) : 0;
 
-  // 카테고리별 집계
+  // 카테고리별 집계 (실지출 + 미납부 고정비 포함)
   const byCategory = expenses.reduce((acc, e) => {
     acc[e.category] = (acc[e.category] ?? 0) + e.amount;
     return acc;
   }, {} as Record<string, number>);
+  // 미납부 고정비도 카테고리에 포함
+  fixedExpenses.filter(f => !checkedFixedIds.has(f.id)).forEach(f => {
+    byCategory[f.category] = (byCategory[f.category] ?? 0) + f.amount;
+  });
 
   const categoryData = Object.entries(byCategory).map(([name, value]) => ({
     name: categoryLabel[name] ?? name, value, color: categoryColors[name] ?? "#b3b3b3",

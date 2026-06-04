@@ -7,10 +7,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Trash2, CheckSquare, Square } from "lucide-react";
+import { Plus, Trash2, CheckSquare, Square, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import {
   createFixedExpense,
+  updateFixedExpense,
   deleteFixedExpense,
   checkFixedExpense,
   uncheckFixedExpense,
@@ -18,7 +19,8 @@ import {
 
 const CATEGORY_LABELS: Record<string, string> = {
   rent: "임차료", salary: "인건비", telecom: "통신비",
-  supplies: "비품", food: "식대", other: "기타",
+  supplies: "비품", food: "식대", software: "소프트웨어",
+  insurance: "4대보험", other: "기타",
 };
 
 interface FixedExpenseItem {
@@ -39,6 +41,7 @@ interface Props {
 
 export function FixedExpensePanel({ items, checkedIds, year, month, isAdmin }: Props) {
   const [open, setOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const [pendingId, setPendingId] = useState<string | null>(null);
 
@@ -48,6 +51,21 @@ export function FixedExpensePanel({ items, checkedIds, year, month, isAdmin }: P
   const [dayOfMonth, setDayOfMonth] = useState("1");
   const [category, setCategory] = useState("other");
   const [saving, setSaving] = useState(false);
+
+  function openCreate() {
+    setEditingId(null);
+    setName(""); setAmount(""); setDayOfMonth("1"); setCategory("other");
+    setOpen(true);
+  }
+
+  function openEdit(item: FixedExpenseItem) {
+    setEditingId(item.id);
+    setName(item.name);
+    setAmount(String(item.amount));
+    setDayOfMonth(String(item.dayOfMonth));
+    setCategory(item.category);
+    setOpen(true);
+  }
 
   function handleCheck(item: FixedExpenseItem, checked: boolean) {
     setPendingId(item.id);
@@ -82,18 +100,18 @@ export function FixedExpensePanel({ items, checkedIds, year, month, isAdmin }: P
     });
   }
 
-  async function handleCreate() {
+  async function handleSave() {
     if (!name.trim() || !amount) return;
     setSaving(true);
     try {
-      await createFixedExpense({
-        name: name.trim(),
-        amount: parseFloat(amount),
-        dayOfMonth: parseInt(dayOfMonth),
-        category,
-      });
-      toast.success("고정비 항목이 추가됐습니다.");
-      setName(""); setAmount(""); setDayOfMonth("1"); setCategory("other");
+      const data = { name: name.trim(), amount: parseFloat(amount), dayOfMonth: parseInt(dayOfMonth), category };
+      if (editingId) {
+        await updateFixedExpense(editingId, data);
+        toast.success("수정됐습니다.");
+      } else {
+        await createFixedExpense(data);
+        toast.success("고정비 항목이 추가됐습니다.");
+      }
       setOpen(false);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "저장 실패");
@@ -142,13 +160,14 @@ export function FixedExpensePanel({ items, checkedIds, year, month, isAdmin }: P
                       {item.amount.toLocaleString()}원
                     </span>
                     {isAdmin && (
-                      <button
-                        onClick={() => handleDelete(item)}
-                        disabled={pending}
-                        className="text-smoke-gray hover:text-destructive transition-colors disabled:opacity-50"
-                      >
-                        <Trash2 size={14} />
-                      </button>
+                      <>
+                        <button onClick={() => openEdit(item)} disabled={pending} className="text-smoke-gray hover:text-deep-violet transition-colors disabled:opacity-50">
+                          <Pencil size={13} />
+                        </button>
+                        <button onClick={() => handleDelete(item)} disabled={pending} className="text-smoke-gray hover:text-destructive transition-colors disabled:opacity-50">
+                          <Trash2 size={14} />
+                        </button>
+                      </>
                     )}
                   </div>
                 </div>
@@ -170,7 +189,7 @@ export function FixedExpensePanel({ items, checkedIds, year, month, isAdmin }: P
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setOpen(true)}
+            onClick={openCreate}
             className="gap-1.5 mt-2"
           >
             <Plus size={13} /> 고정비 항목 추가
@@ -181,7 +200,7 @@ export function FixedExpensePanel({ items, checkedIds, year, month, isAdmin }: P
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>고정비 항목 추가</DialogTitle>
+            <DialogTitle>{editingId ? "고정비 수정" : "고정비 항목 추가"}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-1.5">
@@ -218,7 +237,7 @@ export function FixedExpensePanel({ items, checkedIds, year, month, isAdmin }: P
             </div>
             <div className="flex gap-2 justify-end pt-1">
               <Button variant="outline" size="sm" onClick={() => setOpen(false)}>취소</Button>
-              <Button size="sm" onClick={handleCreate} disabled={!name.trim() || !amount || saving}>
+              <Button size="sm" onClick={handleSave} disabled={!name.trim() || !amount || saving}>
                 {saving ? "저장 중..." : "저장"}
               </Button>
             </div>
