@@ -51,9 +51,19 @@ export default async function FinancePage({
       .map((e) => e.fixedExpenseId as string)
   );
 
+  // 고정비 전체 합계 (납부 여부 무관)
+  const totalFixed = fixedExpenses.reduce((sum, f) => sum + f.amount, 0);
+  const paidFixedCount = fixedExpenses.filter(f => checkedFixedIds.has(f.id)).length;
+
+  // 기타 지출 (고정비 외)
+  const otherExpenses = expenses.filter(e => !e.fixedExpenseId);
+  const totalOther = otherExpenses.reduce((sum, e) => sum + e.amount, 0);
+
   const totalExpense = expenses.reduce((sum, e) => sum + e.amount, 0);
-  const remaining = budget ? budget.amount - totalExpense : null;
-  const usagePercent = budget ? Math.min(Math.round((totalExpense / budget.amount) * 100), 100) : 0;
+
+  // 잔여 예산 = 예산 - 고정비 전체 - 기타 지출
+  const remaining = budget ? budget.amount - totalFixed - totalOther : null;
+  const usagePercent = budget ? Math.min(Math.round(((totalFixed + totalOther) / budget.amount) * 100), 100) : 0;
 
   // 카테고리별 집계
   const byCategory = expenses.reduce((acc, e) => {
@@ -87,24 +97,32 @@ export default async function FinancePage({
       </div>
 
       {/* 요약 카드 */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <Card className="border-ash-gray shadow-[var(--shadow-sm)]">
           <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-smoke-gray">이번 달 예산</CardTitle></CardHeader>
-          <CardContent><p className="text-2xl font-bold text-deep-space-charcoal">{budget ? `${budget.amount.toLocaleString()}원` : "미설정"}</p></CardContent>
+          <CardContent><p className="text-xl font-bold text-deep-space-charcoal">{budget ? `${budget.amount.toLocaleString()}원` : "미설정"}</p></CardContent>
         </Card>
         <Card className="border-ash-gray shadow-[var(--shadow-sm)]">
-          <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-smoke-gray">이번 달 지출</CardTitle></CardHeader>
+          <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-smoke-gray">고정비</CardTitle></CardHeader>
           <CardContent>
-            <p className={`text-2xl font-bold ${totalExpense > 0 ? "text-warm-fade" : "text-deep-space-charcoal"}`}>{totalExpense.toLocaleString()}원</p>
-            {budget && <p className="text-xs text-smoke-gray mt-1">예산의 {usagePercent}% 사용</p>}
+            <p className="text-xl font-bold text-midnight-charcoal">{totalFixed.toLocaleString()}원</p>
+            <p className="text-xs text-smoke-gray mt-1">{paidFixedCount}/{fixedExpenses.length}건 납부</p>
+          </CardContent>
+        </Card>
+        <Card className="border-ash-gray shadow-[var(--shadow-sm)]">
+          <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-smoke-gray">기타 지출</CardTitle></CardHeader>
+          <CardContent>
+            <p className={`text-xl font-bold ${totalOther > 0 ? "text-warm-fade" : "text-deep-space-charcoal"}`}>{totalOther.toLocaleString()}원</p>
+            {budget && <p className="text-xs text-smoke-gray mt-1">예산의 {usagePercent}% 소진</p>}
           </CardContent>
         </Card>
         <Card className="border-ash-gray shadow-[var(--shadow-sm)]">
           <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-smoke-gray">잔여 예산</CardTitle></CardHeader>
           <CardContent>
-            <p className={`text-2xl font-bold ${remaining !== null && remaining < 0 ? "text-destructive" : "text-deep-violet"}`}>
+            <p className={`text-xl font-bold ${remaining !== null && remaining < 0 ? "text-destructive" : "text-deep-violet"}`}>
               {remaining !== null ? `${remaining.toLocaleString()}원` : "미설정"}
             </p>
+            {remaining !== null && <p className="text-xs text-smoke-gray mt-1">고정비 포함 차감</p>}
           </CardContent>
         </Card>
       </div>
