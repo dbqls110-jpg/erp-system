@@ -1,17 +1,19 @@
 "use client";
 
+import { useEffect, useState, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { approveLeave, rejectLeave } from "@/app/actions/leave";
 import { toast } from "sonner";
-import { useState } from "react";
 
 interface LeaveRequest {
   id: string;
   type: string;
   startDate: string;
   endDate: string;
+  startTime: string | null;
+  endTime: string | null;
   days: number;
   reason: string | null;
   user: { name: string | null; email: string };
@@ -21,14 +23,29 @@ const typeLabel: Record<string, string> = {
   annual: "연차", half_am: "반차(오전)", half_pm: "반차(오후)", hourly: "시간차",
 };
 
-export function LeaveAdminPanel({ requests }: { requests: LeaveRequest[] }) {
+export function LeaveAdminPanel({ requests: initial }: { requests: LeaveRequest[] }) {
+  const [requests, setRequests] = useState<LeaveRequest[]>(initial);
   const [loading, setLoading] = useState<string | null>(null);
+
+  const fetchPending = useCallback(async () => {
+    try {
+      const res = await fetch("/api/leave/pending");
+      if (res.ok) setRequests(await res.json());
+    } catch {}
+  }, []);
+
+  // 20초마다 새 신청 확인
+  useEffect(() => {
+    const id = setInterval(fetchPending, 20000);
+    return () => clearInterval(id);
+  }, [fetchPending]);
 
   const handleApprove = async (id: string) => {
     setLoading(id + "-approve");
     try {
       await approveLeave(id);
       toast.success("승인됐습니다.");
+      setRequests(prev => prev.filter(r => r.id !== id));
     } catch {
       toast.error("처리 실패");
     } finally {
@@ -41,12 +58,15 @@ export function LeaveAdminPanel({ requests }: { requests: LeaveRequest[] }) {
     try {
       await rejectLeave(id, "");
       toast.success("반려됐습니다.");
+      setRequests(prev => prev.filter(r => r.id !== id));
     } catch {
       toast.error("처리 실패");
     } finally {
       setLoading(null);
     }
   };
+
+  if (requests.length === 0) return null;
 
   return (
     <Card className="border-deep-violet/20 shadow-[var(--shadow-sm)]">
@@ -64,6 +84,7 @@ export function LeaveAdminPanel({ requests }: { requests: LeaveRequest[] }) {
               </p>
               <p className="text-xs text-smoke-gray">
                 {r.startDate === r.endDate ? r.startDate : `${r.startDate} ~ ${r.endDate}`}
+                {r.type === "hourly" && r.startTime && r.endTime && ` (${r.startTime}~${r.endTime})`}
                 {r.reason && ` · ${r.reason}`}
               </p>
             </div>
