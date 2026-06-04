@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ChevronLeft, ChevronRight, Users, Pencil, Check, X } from "lucide-react";
+import Link from "next/link";
 import { adminUpdateAttendance } from "@/app/actions/attendance";
 import { toast } from "sonner";
 
@@ -172,7 +173,13 @@ export function AdminMonthlyPanel() {
                   className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition-colors text-left"
                   onClick={() => setExpanded(expanded === s.user.id ? null : s.user.id)}
                 >
-                  <span className="text-sm font-medium text-midnight-charcoal">{s.user.name ?? s.user.email}</span>
+                  <Link
+                    href={`/attendance/${s.user.id}?year=${year}&month=${month}`}
+                    onClick={(e) => e.stopPropagation()}
+                    className="text-sm font-medium text-midnight-charcoal hover:text-deep-violet transition-colors underline-offset-2 hover:underline"
+                  >
+                    {s.user.name ?? s.user.email}
+                  </Link>
                   <div className="flex items-center gap-3 text-xs text-smoke-gray">
                     <Badge variant="outline" className="text-xs">{s.workDays}일 출근</Badge>
                     <span className="font-medium text-midnight-charcoal">{s.totalHours.toFixed(1)}h</span>
