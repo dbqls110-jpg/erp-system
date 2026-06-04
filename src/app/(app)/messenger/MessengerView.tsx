@@ -103,14 +103,14 @@ export function MessengerView({ myId, users }: { myId: string; users: User[] }) 
 
   useEffect(() => {
     fetchConversations();
-    const id = setInterval(fetchConversations, 10000);
+    const id = setInterval(fetchConversations, 20000);
     return () => clearInterval(id);
   }, [fetchConversations]);
 
   useEffect(() => {
     if (!selectedConvId) return;
     fetchMessages(selectedConvId);
-    const id = setInterval(() => fetchMessages(selectedConvId), 3000);
+    const id = setInterval(() => fetchMessages(selectedConvId), 5000);
     return () => clearInterval(id);
   }, [selectedConvId, fetchMessages]);
 

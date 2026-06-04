@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { RevenueCharts } from "./RevenueCharts";
+import dynamic from "next/dynamic";
+const RevenueCharts = dynamic(() => import("./RevenueCharts").then(m => ({ default: m.RevenueCharts })), { ssr: false, loading: () => <div className="h-60 animate-pulse bg-ash-gray/30 rounded-xl" /> });
 import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
 
