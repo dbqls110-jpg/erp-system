@@ -13,7 +13,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { LogOut, Menu, Mail, ExternalLink, LayoutDashboard, MessageCircle } from "lucide-react";
 import { clockOut } from "@/app/actions/attendance";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 const pageTitle: Record<string, string> = {
   "/dashboard": "대시보드",
@@ -48,13 +48,19 @@ export function Header({ user, onMobileMenuOpen }: HeaderProps) {
   const router = useRouter();
   const [unread, setUnread] = useState(0);
 
-  useEffect(() => {
-    const fetch_ = () =>
-      fetch("/api/messenger/unread").then(r => r.json()).then(d => setUnread(d.count ?? 0)).catch(() => {});
-    fetch_();
-    const id = setInterval(fetch_, 10000);
-    return () => clearInterval(id);
+  const refreshUnread = useCallback(() => {
+    fetch("/api/messenger/unread")
+      .then(r => r.ok ? r.json() : { count: 0 })
+      .then(d => setUnread(d.count ?? 0))
+      .catch(() => {});
   }, []);
+
+  // 페이지 이동 시 즉시 갱신 + 10초 폴링
+  useEffect(() => {
+    refreshUnread();
+    const id = setInterval(refreshUnread, 10000);
+    return () => clearInterval(id);
+  }, [pathname, refreshUnread]);
   const title = Object.entries(pageTitle).find(([key]) => pathname === key || pathname.startsWith(key + "/"))?.[1] ?? "";
   const initials = user.name
     ? user.name.slice(0, 2).toUpperCase()
