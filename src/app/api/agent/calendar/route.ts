@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyAgentApiKey } from "@/lib/agentAuth";
+import { auditLog } from "@/lib/agentAudit";
 import { prisma } from "@/lib/prisma";
 import { getHermesUser } from "@/lib/agentApi";
 
@@ -27,7 +28,7 @@ export async function POST(req: NextRequest) {
   if (!verifyAgentApiKey(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = await req.json();
-  const { title, date, endDate, color, createdBy } = body;
+  const { title, date, endDate, color, createdBy, dryRun } = body;
 
   if (!title) return NextResponse.json({ error: "title은 필수입니다." }, { status: 400 });
   if (!date) return NextResponse.json({ error: "date는 필수입니다." }, { status: 400 });
@@ -36,22 +37,20 @@ export async function POST(req: NextRequest) {
   if (!userId) {
     const hermesUser = await getHermesUser();
     if (!hermesUser) {
-      return NextResponse.json({
-        error: "Hermes 계정(ybsw1220@gmail.com)을 찾을 수 없습니다. 먼저 해당 계정으로 ERP에 로그인하여 계정을 생성해주세요.",
-      }, { status: 400 });
+      return NextResponse.json({ error: "Hermes 계정(ybsw1220@gmail.com)을 찾을 수 없습니다. 해당 계정으로 ERP에 로그인 필요." }, { status: 400 });
     }
     userId = hermesUser.id;
   }
 
-  const event = await prisma.calendarEvent.create({
-    data: {
-      title,
-      date,
-      endDate: endDate ?? null,
-      color: color ?? "blue",
-      createdBy: userId,
-    },
-  });
+  const data = { title, date, endDate: endDate ?? null, color: color ?? "blue", createdBy: userId };
+
+  if (dryRun === true) {
+    await auditLog({ method: "POST", endpoint: "/api/agent/calendar", action: "create_calendar_event", dryRun: true, payload: data });
+    return NextResponse.json({ dryRun: true, preview: data, message: "dryRun=true: 실제 저장되지 않았습니다." });
+  }
+
+  const event = await prisma.calendarEvent.create({ data });
+  await auditLog({ method: "POST", endpoint: "/api/agent/calendar", action: "create_calendar_event", dryRun: false, payload: data, result: { id: event.id } });
 
   return NextResponse.json({ event }, { status: 201 });
 }

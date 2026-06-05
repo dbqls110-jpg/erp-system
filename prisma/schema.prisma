@@ -261,6 +261,21 @@ model Message {
   @@map("messages")
 }
 
+// ─── Agent 감사 로그 ──────────────────────────────────────
+model AgentAuditLog {
+  id        String   @id @default(cuid())
+  method    String   // GET | POST | PATCH
+  endpoint  String   // /api/agent/projects
+  action    String   // create_project | update_project | send_message ...
+  dryRun    Boolean  @default(false)
+  payload   Json?    // 요청 내용
+  result    Json?    // 결과 (dryRun이면 예상 결과)
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@map("agent_audit_logs")
+}
+
 // ─── 캘린더 ───────────────────────────────────────────────
 model CalendarEvent {
   id        String   @id @default(cuid())
