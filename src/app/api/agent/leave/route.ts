@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
     prisma.leaveRequest.count({ where }),
     prisma.leaveRequest.findMany({
       where,
-      include: { user: { select: { id: true, name: true, email: true } } },
+      include: { user: { select: { id: true, name: true, email: true, isAgent: true } } },
       orderBy: { createdAt: "desc" },
       take: limit,
       skip: (page - 1) * limit,

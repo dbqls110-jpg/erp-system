@@ -10,7 +10,7 @@ export async function GET(req: NextRequest) {
 
   const attendances = await prisma.attendance.findMany({
     where: { date },
-    include: { user: { select: { id: true, name: true, email: true } } },
+    include: { user: { select: { id: true, name: true, email: true, isAgent: true } } },
     orderBy: { clockIn: "asc" },
   });
 

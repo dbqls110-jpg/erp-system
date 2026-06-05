@@ -15,7 +15,7 @@ export async function POST(req: NextRequest) {
 
   const hermesUser = await getHermesUser();
   if (!hermesUser) {
-    return NextResponse.json({ error: "Hermes 계정(ybsw1220@gmail.com)을 찾을 수 없습니다. 해당 계정으로 ERP에 로그인 필요." }, { status: 400 });
+    return NextResponse.json({ error: "Hermes Agent 계정을 찾을 수 없습니다." }, { status: 500 });
   }
 
   const recipient = await prisma.user.findUnique({ where: { id: recipientUserId }, select: { id: true, name: true } });

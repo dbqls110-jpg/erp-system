@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
   const [todayAtt, pendingLeaves, upcomingProjects, budget, expenses, fixedExpenses] = await Promise.all([
     prisma.attendance.findMany({
       where: { date: today },
-      include: { user: { select: { id: true, name: true, email: true } } },
+      include: { user: { select: { id: true, name: true, email: true, isAgent: true } } },
     }),
     prisma.leaveRequest.findMany({
       where: { status: "pending" },

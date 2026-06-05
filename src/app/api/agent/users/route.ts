@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
     prisma.user.count({ where }),
     prisma.user.findMany({
       where,
-      select: { id: true, email: true, name: true, role: true, active: true, createdAt: true },
+      select: { id: true, email: true, name: true, role: true, isAgent: true, active: true, createdAt: true },
       orderBy: { createdAt: "asc" },
       take: limit,
       skip: (page - 1) * limit,

@@ -42,7 +42,7 @@ export default async function AttendancePage() {
     isAdmin
       ? prisma.attendance.findMany({
           where: { date: today },
-          include: { user: { select: { name: true, email: true } } },
+          include: { user: { select: { name: true, email: true, isAgent: true } } },
           orderBy: { clockIn: "asc" },
         })
       : Promise.resolve([]),
@@ -128,9 +128,14 @@ export default async function AttendancePage() {
               <p className="text-sm text-smoke-gray">오늘 출근한 직원이 없습니다.</p>
             ) : (
               <div className="space-y-2">
-                {(allRecords as Array<{ id: string; user: { name: string | null; email: string }; clockIn: Date | null; clockOut: Date | null; workHours: number | null }>).map((r) => (
+                {(allRecords as Array<{ id: string; user: { name: string | null; email: string; isAgent: boolean }; clockIn: Date | null; clockOut: Date | null; workHours: number | null }>).map((r) => (
                   <div key={r.id} className="flex items-center justify-between py-2 border-b border-ash-gray last:border-0">
-                    <span className="text-sm font-medium text-midnight-charcoal">{r.user.name ?? r.user.email}</span>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-sm font-medium text-midnight-charcoal">{r.user.name ?? r.user.email}</span>
+                      {r.user.isAgent && (
+                        <Badge className="bg-violet-100 text-violet-600 border-violet-200 text-[10px] py-0 px-1.5">AI</Badge>
+                      )}
+                    </div>
                     <div className="flex items-center gap-3 text-sm text-smoke-gray">
                       <div className="flex items-center gap-1.5">
                         <span>출근 {r.clockIn ? format(new Date(r.clockIn), "HH:mm") : "—"}</span>

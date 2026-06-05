@@ -16,11 +16,11 @@ interface AttendanceRecord {
   clockIn: string | null;
   clockOut: string | null;
   workHours: number | null;
-  user: { id: string; name: string | null; email: string };
+  user: { id: string; name: string | null; email: string; isAgent: boolean };
 }
 
 interface UserSummary {
-  user: { id: string; name: string | null; email: string };
+  user: { id: string; name: string | null; email: string; isAgent: boolean };
   records: AttendanceRecord[];
   totalHours: number;
   workDays: number;
@@ -173,13 +173,18 @@ export function AdminMonthlyPanel() {
                   className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition-colors text-left"
                   onClick={() => setExpanded(expanded === s.user.id ? null : s.user.id)}
                 >
-                  <Link
-                    href={`/attendance/${s.user.id}?year=${year}&month=${month}`}
-                    onClick={(e) => e.stopPropagation()}
-                    className="text-sm font-medium text-midnight-charcoal hover:text-deep-violet transition-colors underline-offset-2 hover:underline"
-                  >
-                    {s.user.name ?? s.user.email}
-                  </Link>
+                  <div className="flex items-center gap-1.5">
+                    <Link
+                      href={`/attendance/${s.user.id}?year=${year}&month=${month}`}
+                      onClick={(e) => e.stopPropagation()}
+                      className="text-sm font-medium text-midnight-charcoal hover:text-deep-violet transition-colors underline-offset-2 hover:underline"
+                    >
+                      {s.user.name ?? s.user.email}
+                    </Link>
+                    {s.user.isAgent && (
+                      <Badge className="bg-violet-100 text-violet-600 border-violet-200 text-[10px] py-0 px-1.5">AI</Badge>
+                    )}
+                  </div>
                   <div className="flex items-center gap-3 text-xs text-smoke-gray">
                     <Badge variant="outline" className="text-xs">{s.workDays}일 출근</Badge>
                     <span className="font-medium text-midnight-charcoal">{s.totalHours.toFixed(1)}h</span>

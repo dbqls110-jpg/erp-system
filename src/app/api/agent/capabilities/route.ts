@@ -3,14 +3,14 @@ import { verifyAgentApiKey } from "@/lib/agentAuth";
 
 const CAPABILITIES = {
   system: "천우영 ERP",
-  version: "1.0.0",
+  version: "1.1.0",
   baseUrl: "/api/agent",
   resources: [
     {
       name: "me",
-      description: "연결 테스트 및 시스템 상태 확인",
+      description: "연결 테스트 및 Hermes Agent identity 확인",
       endpoints: [
-        { method: "GET", path: "/api/agent/me", description: "연결 상태 및 시스템 정보 반환", auth: true, dryRun: false, params: [] },
+        { method: "GET", path: "/api/agent/me", description: "연결 상태·시스템 정보·agent identity 반환", auth: true, dryRun: false, params: [] },
       ],
     },
     {
@@ -34,7 +34,7 @@ const CAPABILITIES = {
       endpoints: [
         {
           method: "GET", path: "/api/agent/users",
-          description: "활성 직원 목록 반환",
+          description: "활성 직원 목록 반환 (isAgent 필드 포함)",
           auth: true, dryRun: false,
           params: [
             { name: "q", type: "string", required: false, description: "이름/이메일 검색" },
@@ -91,16 +91,63 @@ const CAPABILITIES = {
     },
     {
       name: "attendance",
-      description: "근태 기록 조회",
-      read: true, write: false,
+      description: "근태 기록 조회·Hermes Agent 출퇴근",
+      read: true, write: true,
       endpoints: [
         {
           method: "GET", path: "/api/agent/attendance",
-          description: "특정 날짜의 출근 현황 반환",
+          description: "특정 날짜의 전체 직원 출근 현황 반환",
           auth: true, dryRun: false,
           params: [
             { name: "date", type: "YYYY-MM-DD", required: false, description: "없으면 오늘" },
           ],
+        },
+        {
+          method: "GET", path: "/api/agent/attendance/me",
+          description: "Hermes Agent 본인의 근태 상태 조회",
+          auth: true, dryRun: false,
+          params: [
+            { name: "date", type: "YYYY-MM-DD", required: false, description: "없으면 오늘" },
+          ],
+        },
+        {
+          method: "GET", path: "/api/agent/attendance/logs",
+          description: "Hermes Agent 근태 기록 목록 (최신순)",
+          auth: true, dryRun: false,
+          params: [
+            { name: "limit", type: "number", required: false, description: "최대 반환 수 (기본 30, 최대 100)" },
+            { name: "offset", type: "number", required: false, description: "건너뛸 수 (기본 0)" },
+          ],
+        },
+        {
+          method: "POST", path: "/api/agent/attendance/check-in",
+          description: "Hermes Agent 출근 기록 (당일 1회)",
+          auth: true, dryRun: true,
+          body: { dryRun: "boolean (선택)" },
+        },
+        {
+          method: "POST", path: "/api/agent/attendance/check-out",
+          description: "Hermes Agent 퇴근 기록 (근무 시간 자동 계산)",
+          auth: true, dryRun: true,
+          body: { dryRun: "boolean (선택)" },
+        },
+      ],
+    },
+    {
+      name: "activity-log",
+      description: "Hermes Agent 외부 활동 로그 기록",
+      read: false, write: true,
+      endpoints: [
+        {
+          method: "POST", path: "/api/agent/activity-log",
+          description: "Discord/외부 활동을 ERP에 기록 (AgentAuditLog에 저장)",
+          auth: true, dryRun: false,
+          body: {
+            action: "string (필수) — 활동 설명 (예: discord_command_processed)",
+            context: "string (선택) — 컨텍스트 레이블 (예: /discord, /cron)",
+            payload: "object (선택) — 요청/입력 데이터",
+            result: "object (선택) — 결과 데이터",
+          },
         },
       ],
     },
@@ -153,14 +200,14 @@ const CAPABILITIES = {
         },
         {
           method: "POST", path: "/api/agent/calendar",
-          description: "일정 등록 (createdBy 없으면 Hermes 계정 사용)",
+          description: "일정 등록 (createdBy 없으면 Hermes Agent 계정 사용)",
           auth: true, dryRun: true,
           body: {
             title: "string (필수)",
             date: "YYYY-MM-DD (필수)",
             endDate: "YYYY-MM-DD (선택)",
             color: "blue | green | red | yellow | purple | gray (기본 blue)",
-            createdBy: "userId (선택, 없으면 Hermes 계정)",
+            createdBy: "userId (선택, 없으면 Hermes Agent)",
             dryRun: "boolean (선택)",
           },
         },
@@ -170,7 +217,7 @@ const CAPABILITIES = {
       name: "messages",
       description: "직원 간 메시지 조회·전송",
       read: true, write: true,
-      note: "Hermes 발신 시 ybsw1220@gmail.com 계정을 sender로 사용",
+      note: "Hermes 발신 시 isAgent=true 계정을 sender로 사용",
       endpoints: [
         {
           method: "GET", path: "/api/agent/messages",
@@ -183,7 +230,7 @@ const CAPABILITIES = {
         },
         {
           method: "POST", path: "/api/agent/messages",
-          description: "Hermes가 직원에게 메시지 전송",
+          description: "Hermes Agent가 직원에게 메시지 전송",
           auth: true, dryRun: true,
           body: {
             recipientUserId: "string (필수)",
@@ -200,7 +247,7 @@ const CAPABILITIES = {
       endpoints: [
         {
           method: "GET", path: "/api/agent/audit",
-          description: "최근 쓰기 작업 로그 반환",
+          description: "최근 Agent 작업 로그 반환 (activity-log 포함)",
           auth: true, dryRun: false,
           params: [
             { name: "limit", type: "number", required: false, description: "기본 20" },
