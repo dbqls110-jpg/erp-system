@@ -3,7 +3,7 @@ import { verifyAgentApiKey } from "@/lib/agentAuth";
 
 const CAPABILITIES = {
   system: "천우영 ERP",
-  version: "1.1.0",
+  version: "1.2.0",
   baseUrl: "/api/agent",
   resources: [
     {
@@ -255,6 +255,43 @@ const CAPABILITIES = {
           ],
         },
       ],
+    },
+    {
+      name: "webhook",
+      description: "ERP → Hermes 웹훅 (메신저 키워드 감지 시 자동 발송)",
+      note: [
+        "ERP 메신저에서 '헤르메스', '@헤르메스', 'hermes', '@hermes' 포함 메시지 전송 시 자동 발송",
+        "서버가 HERMES_WEBHOOK_URL, HERMES_WEBHOOK_SECRET 환경변수를 보유해야 함",
+        "서명: X-Hermes-Signature: sha256=HMAC-SHA256(secret, timestamp + '.' + body)",
+        "타임스탬프: X-Hermes-Timestamp (Unix ms)",
+        "웹훅 실패는 메시지 저장을 블록하지 않음 (fire-and-forget, 5초 timeout)",
+        "secret 값은 절대 응답에 포함되지 않음",
+      ],
+      endpoints: [
+        {
+          method: "POST", path: "/api/agent/webhook-test",
+          description: "웹훅 연결 테스트 (실제 webhook URL로 테스트 페이로드 발송)",
+          auth: true, dryRun: false,
+          body: {},
+          response: {
+            ok: "boolean — 웹훅 수신 성공 여부",
+            status: "number — HTTP 응답 코드",
+            latencyMs: "number — 응답 시간(ms)",
+            configured: {
+              hasWebhookUrl: "boolean",
+              hasSecret: "boolean",
+            },
+          },
+        },
+      ],
+      webhookPayload: {
+        event: "messenger.mention | webhook.test",
+        senderId: "string — ERP 사용자 ID",
+        senderName: "string | undefined — ERP 사용자 이름",
+        conversationId: "string — 대화 ID",
+        content: "string — 메시지 원문",
+        timestamp: "ISO 8601 timestamp",
+      },
     },
   ],
 };

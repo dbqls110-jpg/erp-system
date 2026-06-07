@@ -4,6 +4,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { containsHermesKeyword, dispatchHermesWebhook } from "@/lib/hermesWebhook";
 
 // 대화 가져오기 (없으면 생성)
 async function getOrCreateConversation(userAId: string, userBId: string) {
@@ -31,6 +32,22 @@ export async function sendMessage(receiverId: string, content: string) {
     where: { id: conv.id },
     data: { lastMessageAt: new Date() },
   });
+
+  // Hermes 키워드가 포함된 메시지면 웹훅 발송 (fire-and-forget, 메시지 저장을 블록하지 않음)
+  if (containsHermesKeyword(content)) {
+    const sender = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { name: true },
+    });
+    void dispatchHermesWebhook({
+      event: "messenger.mention",
+      senderId: session.user.id,
+      senderName: sender?.name ?? undefined,
+      conversationId: conv.id,
+      content: content.trim(),
+      timestamp: new Date().toISOString(),
+    });
+  }
 
   revalidatePath("/messenger");
 }
