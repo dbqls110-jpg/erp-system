@@ -48,7 +48,7 @@ export async function dispatchHermesWebhook(
         "Content-Type": "application/json",
         "X-Hermes-Signature": signature,
         "X-Hermes-Timestamp": timestamp,
-        "X-ERP-System": "천우영 ERP",
+        "X-ERP-System": "erp",
       },
       body,
       signal: controller.signal,
