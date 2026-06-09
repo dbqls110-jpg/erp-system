@@ -128,7 +128,7 @@ export default async function AttendancePage() {
               <p className="text-sm text-smoke-gray">오늘 출근한 직원이 없습니다.</p>
             ) : (
               <div className="space-y-2">
-                {(allRecords as Array<{ id: string; user: { name: string | null; email: string; isAgent: boolean }; clockIn: Date | null; clockOut: Date | null; workHours: number | null }>).map((r) => (
+                {(allRecords as Array<{ id: string; date: string; user: { name: string | null; email: string; isAgent: boolean }; clockIn: Date | null; clockOut: Date | null; workHours: number | null }>).map((r) => (
                   <div key={r.id} className="flex items-center justify-between py-2 border-b border-ash-gray last:border-0">
                     <div className="flex items-center gap-1.5">
                       <span className="text-sm font-medium text-midnight-charcoal">{r.user.name ?? r.user.email}</span>
@@ -146,6 +146,12 @@ export default async function AttendancePage() {
                         {isOvertime(r.clockOut) && <Badge className="bg-purple-100 text-purple-600 border-purple-200 text-[10px] py-0">야근</Badge>}
                       </div>
                       {r.workHours && <Badge variant="outline">{r.workHours.toFixed(1)}h</Badge>}
+                      <AttendanceAdminRow
+                        id={r.id}
+                        date={r.date}
+                        clockInIso={r.clockIn ? new Date(r.clockIn).toISOString() : null}
+                        clockOutIso={r.clockOut ? new Date(r.clockOut).toISOString() : null}
+                      />
                     </div>
                   </div>
                 ))}

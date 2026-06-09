@@ -7,9 +7,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { ChevronLeft, ChevronRight, Plus, Trash2, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, Trash2, Pencil } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { createCalendarEvent, deleteCalendarEvent } from "@/app/actions/calendar";
+import { createCalendarEvent, updateCalendarEvent, deleteCalendarEvent } from "@/app/actions/calendar";
 import { toast } from "sonner";
 
 interface CalEvent {
@@ -52,7 +52,8 @@ function eventTitle(e: CalEvent) {
 type ModalState =
   | { mode: "closed" }
   | { mode: "create"; date: string }
-  | { mode: "detail"; date: string; events: CalEvent[] };
+  | { mode: "detail"; date: string; events: CalEvent[] }
+  | { mode: "edit"; event: CalEvent };
 
 export function CalendarView({ initialEvents, currentYear, currentMonth }: {
   initialEvents: CalEvent[];
@@ -65,7 +66,7 @@ export function CalendarView({ initialEvents, currentYear, currentMonth }: {
   const [loading, setLoading] = useState(false);
   const [modal, setModal] = useState<ModalState>({ mode: "closed" });
 
-  // create form state
+  // create/edit form state
   const [title, setTitle] = useState("");
   const [endDate, setEndDate] = useState("");
   const [color, setColor] = useState("blue");
@@ -126,6 +127,13 @@ export function CalendarView({ initialEvents, currentYear, currentMonth }: {
     setModal({ mode: "create", date });
   }
 
+  function openEdit(event: CalEvent) {
+    setTitle(event.title);
+    setEndDate(event.endDate ?? "");
+    setColor(event.color ?? "blue");
+    setModal({ mode: "edit", event });
+  }
+
   async function handleCreate() {
     if (!title.trim()) return;
     if (modal.mode !== "create") return;
@@ -137,6 +145,27 @@ export function CalendarView({ initialEvents, currentYear, currentMonth }: {
       setModal({ mode: "closed" });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "저장 실패");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleUpdate() {
+    if (!title.trim()) return;
+    if (modal.mode !== "edit") return;
+    setSaving(true);
+    try {
+      await updateCalendarEvent(modal.event.id, {
+        title: title.trim(),
+        date: modal.event.date,
+        endDate: endDate || undefined,
+        color,
+      });
+      toast.success("일정이 수정됐습니다.");
+      await fetchEvents(year, month);
+      setModal({ mode: "closed" });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "수정 실패");
     } finally {
       setSaving(false);
     }
@@ -259,13 +288,23 @@ export function CalendarView({ initialEvents, currentYear, currentMonth }: {
                   <div key={i} className={cn("flex items-center justify-between rounded-lg px-3 py-2", cls)}>
                     <span className="text-sm font-medium truncate flex-1">{eventTitle(e)}</span>
                     {e.type === "custom" && (
-                      <button
-                        onClick={() => handleDelete(e.id, e.title)}
-                        disabled={deletingId === e.id}
-                        className="ml-2 opacity-60 hover:opacity-100 transition-opacity shrink-0"
-                      >
-                        <Trash2 size={13} />
-                      </button>
+                      <div className="flex items-center gap-1.5 ml-2 shrink-0">
+                        <button
+                          onClick={() => openEdit(e)}
+                          className="opacity-60 hover:opacity-100 transition-opacity"
+                          title="수정"
+                        >
+                          <Pencil size={13} />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(e.id, e.title)}
+                          disabled={deletingId === e.id}
+                          className="opacity-60 hover:opacity-100 transition-opacity"
+                          title="삭제"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
                     )}
                   </div>
                 );
@@ -333,6 +372,63 @@ export function CalendarView({ initialEvents, currentYear, currentMonth }: {
                 <Button variant="outline" size="sm" onClick={() => setModal({ mode: "closed" })}>취소</Button>
                 <Button size="sm" onClick={handleCreate} disabled={!title.trim() || saving}>
                   {saving ? "저장 중..." : "저장"}
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* 일정 수정 모달 */}
+      <Dialog open={modal.mode === "edit"} onOpenChange={(o) => { if (!o) setModal({ mode: "closed" }); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-base">
+              {modal.mode === "edit" && formatDate(modal.event.date)} 일정 수정
+            </DialogTitle>
+          </DialogHeader>
+          {modal.mode === "edit" && (
+            <div className="space-y-4">
+              <div className="space-y-1.5">
+                <Label>제목</Label>
+                <Input
+                  placeholder="일정 제목"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") handleUpdate(); }}
+                  autoFocus
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>종료일 <span className="text-smoke-gray text-xs">(선택)</span></Label>
+                <Input
+                  type="date"
+                  value={endDate}
+                  min={modal.event.date}
+                  onChange={(e) => setEndDate(e.target.value)}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>색상</Label>
+                <div className="flex gap-2">
+                  {COLOR_OPTIONS.map((c) => (
+                    <button
+                      key={c.value}
+                      onClick={() => setColor(c.value)}
+                      title={c.label}
+                      className={cn(
+                        "w-6 h-6 rounded-full transition-all",
+                        c.class,
+                        color === c.value ? "ring-2 ring-offset-2 ring-midnight-charcoal scale-110" : "opacity-60 hover:opacity-100"
+                      )}
+                    />
+                  ))}
+                </div>
+              </div>
+              <div className="flex gap-2 justify-end pt-1">
+                <Button variant="outline" size="sm" onClick={() => setModal({ mode: "closed" })}>취소</Button>
+                <Button size="sm" onClick={handleUpdate} disabled={!title.trim() || saving}>
+                  {saving ? "저장 중..." : "수정"}
                 </Button>
               </div>
             </div>

@@ -27,6 +27,33 @@ export async function createCalendarEvent(data: {
   revalidatePath("/calendar");
 }
 
+export async function updateCalendarEvent(
+  id: string,
+  data: { title: string; date: string; endDate?: string; color: string }
+) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) throw new Error("Unauthorized");
+
+  const event = await prisma.calendarEvent.findUnique({ where: { id } });
+  if (!event) throw new Error("일정을 찾을 수 없습니다.");
+
+  if (event.createdBy !== session.user.id && session.user.role !== "admin") {
+    throw new Error("수정 권한이 없습니다.");
+  }
+
+  await prisma.calendarEvent.update({
+    where: { id },
+    data: {
+      title: data.title,
+      date: data.date,
+      endDate: data.endDate || null,
+      color: data.color,
+    },
+  });
+
+  revalidatePath("/calendar");
+}
+
 export async function deleteCalendarEvent(id: string) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) throw new Error("Unauthorized");

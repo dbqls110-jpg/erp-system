@@ -28,7 +28,7 @@ export default async function DashboardPage() {
     }),
     prisma.project.count({ where: { status: "active" } }),
     prisma.budget.findUnique({ where: { year_month: { year, month } }, select: { amount: true } }),
-    prisma.expense.aggregate({ where: { date: { gte: monthStart } }, _sum: { amount: true } }),
+    prisma.expense.aggregate({ where: { date: { gte: monthStart }, fixedExpenseId: null }, _sum: { amount: true } }),
     prisma.project.findMany({
       where: { status: "active", deadline: { gte: today, lte: weekLater } },
       select: { id: true, name: true, deadline: true },
@@ -45,10 +45,9 @@ export default async function DashboardPage() {
   const attendance = monthlyAttendance.find((r) => r.date === today) ?? null;
   const workDaysCount = monthlyAttendance.filter((r) => r.clockIn).length;
 
-  const totalExpenses = expenses._sum.amount ?? 0;
+  const totalOther = expenses._sum.amount ?? 0;
   const totalFixed = fixedExpenses._sum.amount ?? 0;
-  const otherExpenses = totalExpenses - totalFixed < 0 ? 0 : totalExpenses - totalFixed;
-  const remaining = budget ? budget.amount - totalFixed - otherExpenses : null;
+  const remaining = budget ? budget.amount - totalFixed - totalOther : null;
   const remainingLeave = leaveBalance
     ? leaveBalance.totalDays - leaveBalance.usedDays - leaveBalance.pendingDays
     : null;
