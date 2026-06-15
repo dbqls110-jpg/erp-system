@@ -293,6 +293,23 @@ model CalendarEvent {
   @@map("calendar_events")
 }
 
+// ─── ID 데이터베이스 ──────────────────────────────────────
+model Credential {
+  id        String   @id @default(cuid())
+  name      String   // 서비스명
+  company   String?  // 회사
+  category  String?  // 구분 (나라장터, Google, Naver, etc.)
+  username  String?  // 아이디
+  password  String?  // 비밀번호
+  memo      String?  // 비고
+  url       String?  // 링크
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("credentials")
+}
+
 // ─── 명함 ─────────────────────────────────────────────────
 model BusinessCard {
   id         String   @id @default(cuid())
