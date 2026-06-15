@@ -3,6 +3,7 @@ import { verifyAgentApiKey } from "@/lib/agentAuth";
 import { getHermesUser } from "@/lib/agentApi";
 import { auditLog } from "@/lib/agentAudit";
 import { prisma } from "@/lib/prisma";
+import { dispatchHermesWebhook } from "@/lib/hermesWebhook";
 
 // POST /api/agent/attendance/check-in
 // Hermes Agent 출근 기록 (당일 1회만 허용)
@@ -30,11 +31,11 @@ export async function POST(req: NextRequest) {
   }
 
   const now = new Date();
-  const payload = { userId: hermesUser.id, date: today, clockIn: now.toISOString() };
+  const webhookPayload = { userId: hermesUser.id, date: today, clockIn: now.toISOString() };
 
   if (dryRun) {
-    await auditLog({ method: "POST", endpoint: "/api/agent/attendance/check-in", action: "clock_in", dryRun: true, payload });
-    return NextResponse.json({ dryRun: true, preview: payload, message: "dryRun=true: 실제 저장되지 않았습니다." });
+    await auditLog({ method: "POST", endpoint: "/api/agent/attendance/check-in", action: "clock_in", dryRun: true, payload: webhookPayload });
+    return NextResponse.json({ dryRun: true, preview: webhookPayload, message: "dryRun=true: 실제 저장되지 않았습니다." });
   }
 
   let attendance;
@@ -49,7 +50,19 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  await auditLog({ method: "POST", endpoint: "/api/agent/attendance/check-in", action: "clock_in", dryRun: false, payload, result: { id: attendance.id } });
+  await auditLog({ method: "POST", endpoint: "/api/agent/attendance/check-in", action: "clock_in", dryRun: false, payload: webhookPayload, result: { id: attendance.id } });
+
+  // 출근 저장 성공 후 webhook 발송 (fire-and-forget)
+  void dispatchHermesWebhook({
+    eventId: `attendance-checkin-${attendance.id}`,
+    event: "erp.attendance.checked_in",
+    userId: hermesUser.id,
+    userName: hermesUser.name ?? null,
+    userEmail: hermesUser.email,
+    attendanceId: attendance.id,
+    clockIn: attendance.clockIn ? new Date(attendance.clockIn).toISOString() : now.toISOString(),
+    createdAt: new Date().toISOString(),
+  });
 
   return NextResponse.json({ attendance }, { status: 201 });
 }

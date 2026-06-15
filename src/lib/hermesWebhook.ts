@@ -7,15 +7,6 @@ export function containsHermesKeyword(text: string): boolean {
   return HERMES_KEYWORDS.some((kw) => lower.includes(kw.toLowerCase()));
 }
 
-export interface HermesWebhookPayload {
-  event: string;
-  senderId: string;
-  senderName?: string;
-  conversationId: string;
-  content: string;
-  timestamp: string;
-}
-
 export interface HermesWebhookResult {
   ok: boolean;
   status?: number;
@@ -23,7 +14,7 @@ export interface HermesWebhookResult {
 }
 
 export async function dispatchHermesWebhook(
-  payload: HermesWebhookPayload
+  payload: Record<string, unknown>
 ): Promise<HermesWebhookResult> {
   const webhookUrl = process.env.HERMES_WEBHOOK_URL;
   const secret = process.env.HERMES_WEBHOOK_SECRET;

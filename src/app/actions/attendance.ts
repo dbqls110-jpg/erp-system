@@ -5,6 +5,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { format } from "date-fns";
 import { revalidatePath } from "next/cache";
+import { dispatchHermesWebhook } from "@/lib/hermesWebhook";
 
 export async function clockOut() {
   const session = await getServerSession(authOptions);
@@ -38,13 +39,26 @@ export async function manualClockIn() {
   const existing = await prisma.attendance.findUnique({
     where: { userId_date: { userId: session.user.id, date: today } },
   });
-  if (existing?.clockIn) return; // 이미 출근 기록 있으면 무시
+  if (existing?.clockIn) return;
 
-  await prisma.attendance.upsert({
+  const record = await prisma.attendance.upsert({
     where: { userId_date: { userId: session.user.id, date: today } },
     update: { clockIn: new Date(), clockOut: null, workHours: null },
     create: { userId: session.user.id, date: today, clockIn: new Date() },
   });
+
+  // 출근 저장 성공 후 webhook 발송 (fire-and-forget, 실패해도 출근 처리에 영향 없음)
+  void dispatchHermesWebhook({
+    eventId: `attendance-checkin-${record.id}`,
+    event: "erp.attendance.checked_in",
+    userId: session.user.id,
+    userName: session.user.name ?? null,
+    userEmail: session.user.email ?? "",
+    attendanceId: record.id,
+    clockIn: record.clockIn ? new Date(record.clockIn).toISOString() : new Date().toISOString(),
+    createdAt: new Date().toISOString(),
+  });
+
   revalidatePath("/attendance");
 }
 
