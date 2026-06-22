@@ -57,10 +57,11 @@ export default async function LeavePage() {
       })
     : [];
 
+  const r2 = (n: number) => Math.round(n * 100) / 100;
   const totalDays = balance?.totalDays ?? 15;
-  const usedDays = balance?.usedDays ?? 0;
-  const pendingDays = balance?.pendingDays ?? 0;
-  const remaining = Math.max(0, totalDays - usedDays - pendingDays);
+  const usedDays = r2(balance?.usedDays ?? 0);
+  const pendingDays = r2(balance?.pendingDays ?? 0);
+  const remaining = r2(Math.max(0, totalDays - usedDays - pendingDays));
   const isOverused = totalDays - usedDays - pendingDays < 0;
 
   return (
@@ -131,7 +132,7 @@ export default async function LeavePage() {
                       {r.reason && <span className="text-smoke-gray hidden sm:inline">· {r.reason}</span>}
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
-                      <span className="text-smoke-gray">{r.days}일</span>
+                      <span className="text-smoke-gray">{Math.round(r.days * 100) / 100}일</span>
                       {isAdmin && <LeaveDeleteButton id={r.id} />}
                     </div>
                   </div>
@@ -169,7 +170,7 @@ export default async function LeavePage() {
                       {r.reason && <span className="text-smoke-gray hidden sm:inline">· {r.reason}</span>}
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="text-smoke-gray">{r.days}일</span>
+                      <span className="text-smoke-gray">{Math.round(r.days * 100) / 100}일</span>
                       <Badge variant="outline" className={s.class}>{s.label}</Badge>
                       {r.status === "pending" && <LeaveCancelButton id={r.id} />}
                       {isAdmin && <LeaveDeleteButton id={r.id} />}
