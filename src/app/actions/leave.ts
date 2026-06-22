@@ -25,7 +25,7 @@ export async function applyLeave(formData: FormData) {
     const [eh, em] = endTime.split(":").map(Number);
     const hours = (eh * 60 + em - sh * 60 - sm) / 60;
     if (hours <= 0) throw new Error("종료 시간은 시작 시간보다 늦어야 합니다.");
-    days = Math.round((hours / 7) * 100) / 100;
+    days = Math.round((hours / 8) * 100) / 100;
   } else if (type === "annual" && startDate && endDate) {
     // UTC 파싱으로 시간대 오류 방지
     const [sy, smo, sd] = startDate.split("-").map(Number);
