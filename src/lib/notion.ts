@@ -1,37 +1,26 @@
-import { Client } from "@notionhq/client";
+const NOTION_VERSION = "2022-06-28";
 
-let _client: Client | null = null;
-
-function getClient(): Client | null {
-  if (!process.env.NOTION_API_KEY) return null;
-  return (_client ??= new Client({ auth: process.env.NOTION_API_KEY }));
+async function notionFetch(path: string, method = "GET", body?: unknown) {
+  const res = await fetch(`https://api.notion.com/v1${path}`, {
+    method,
+    headers: {
+      "Authorization": `Bearer ${process.env.NOTION_API_KEY}`,
+      "Content-Type": "application/json",
+      "Notion-Version": NOTION_VERSION,
+    },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  return res.json();
 }
 
-function dbId(): string {
+function dbId() {
   return process.env.NOTION_CALENDAR_DB_ID ?? "";
 }
 
-interface DBProps { titleProp: string; dateProp: string | null }
-let _props: DBProps | null = null;
-
-async function resolveProps(): Promise<DBProps | null> {
-  const c = getClient();
-  if (!c || !dbId()) return null;
-  if (_props) return _props;
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const db = await (c.databases.retrieve as any)({ database_id: dbId() });
-    let titleProp = "이름";
-    let dateProp: string | null = null;
-    for (const [name, prop] of Object.entries(db.properties ?? {})) {
-      if ((prop as { type: string }).type === "title") titleProp = name;
-      if ((prop as { type: string }).type === "date" && !dateProp) dateProp = name;
-    }
-    return (_props = { titleProp, dateProp });
-  } catch {
-    return null;
-  }
-}
+// 속성명 (Plan Detail DB 기준)
+const TITLE_PROP = "Name";
+const DATE_PROP = "Date";
+const END_DATE_PROP = "End date";
 
 export interface NotionEvent {
   notionId: string;
@@ -41,47 +30,41 @@ export interface NotionEvent {
 }
 
 export async function getNotionEvents(year: number, month: number): Promise<NotionEvent[]> {
-  const c = getClient();
-  if (!c || !dbId()) return [];
-  const p = await resolveProps();
-  if (!p?.dateProp) return [];
+  if (!process.env.NOTION_API_KEY || !dbId()) return [];
 
   const pad = (n: number) => String(n).padStart(2, "0");
   const start = `${year}-${pad(month)}-01`;
   const end = `${year}-${pad(month)}-${new Date(year, month, 0).getDate()}`;
-  const dateProp = p.dateProp;
 
   try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const res = await (c as any).databases.query({
-      database_id: dbId(),
+    const res = await notionFetch(`/databases/${dbId()}/query`, "POST", {
       filter: {
         and: [
-          { property: dateProp, date: { on_or_after: start } },
-          { property: dateProp, date: { on_or_before: end } },
+          { property: DATE_PROP, date: { on_or_after: start } },
+          { property: DATE_PROP, date: { on_or_before: end } },
         ],
       },
+      page_size: 100,
     });
+
+    if (res.object === "error") return [];
 
     const events: NotionEvent[] = [];
     for (const page of res.results ?? []) {
       if (page.object !== "page") continue;
       const props = page.properties ?? {};
-      const titlePropVal = props[p.titleProp];
-      const datePropVal = props[dateProp];
+      const dateProp = props[DATE_PROP];
+      if (!dateProp?.date?.start) continue;
 
-      if (!datePropVal || datePropVal.type !== "date" || !datePropVal.date) continue;
-
-      const title =
-        titlePropVal?.type === "title"
-          ? (titlePropVal.title ?? []).map((t: { plain_text: string }) => t.plain_text).join("") || "Notion 일정"
-          : "Notion 일정";
+      const titleArr = props[TITLE_PROP]?.title ?? [];
+      const title = titleArr.map((t: { plain_text: string }) => t.plain_text).join("") || "Notion 일정";
+      const endDate = props[END_DATE_PROP]?.date?.start ?? undefined;
 
       events.push({
         notionId: page.id,
         title,
-        date: datePropVal.date.start.split("T")[0],
-        endDate: datePropVal.date.end ? datePropVal.date.end.split("T")[0] : undefined,
+        date: dateProp.date.start.split("T")[0],
+        endDate: endDate ? endDate.split("T")[0] : undefined,
       });
     }
     return events;
@@ -91,20 +74,22 @@ export async function getNotionEvents(year: number, month: number): Promise<Noti
 }
 
 export async function createNotionEvent(title: string, date: string, endDate?: string): Promise<string | null> {
-  const c = getClient();
-  if (!c || !dbId()) return null;
-  const p = await resolveProps();
-  if (!p) return null;
+  if (!process.env.NOTION_API_KEY || !dbId()) return null;
 
   try {
     const properties: Record<string, unknown> = {
-      [p.titleProp]: { title: [{ text: { content: title } }] },
+      [TITLE_PROP]: { title: [{ text: { content: title } }] },
+      [DATE_PROP]: { date: { start: date, end: null } },
     };
-    if (p.dateProp) {
-      properties[p.dateProp] = { date: { start: date, end: endDate ?? null } };
+    if (endDate) {
+      properties[END_DATE_PROP] = { date: { start: endDate, end: null } };
     }
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const page = await (c.pages.create as any)({ parent: { database_id: dbId() }, properties });
+
+    const page = await notionFetch("/pages", "POST", {
+      parent: { database_id: dbId() },
+      properties,
+    });
+
     return page.id ?? null;
   } catch {
     return null;
@@ -112,31 +97,24 @@ export async function createNotionEvent(title: string, date: string, endDate?: s
 }
 
 export async function updateNotionEvent(pageId: string, title: string, date: string, endDate?: string): Promise<void> {
-  const c = getClient();
-  if (!c) return;
-  const p = await resolveProps();
-  if (!p) return;
+  if (!process.env.NOTION_API_KEY) return;
 
   try {
     const properties: Record<string, unknown> = {
-      [p.titleProp]: { title: [{ text: { content: title } }] },
+      [TITLE_PROP]: { title: [{ text: { content: title } }] },
+      [DATE_PROP]: { date: { start: date, end: null } },
+      [END_DATE_PROP]: { date: endDate ? { start: endDate, end: null } : null },
     };
-    if (p.dateProp) {
-      properties[p.dateProp] = { date: { start: date, end: endDate ?? null } };
-    }
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await (c.pages.update as any)({ page_id: pageId, properties });
+    await notionFetch(`/pages/${pageId}`, "PATCH", { properties });
   } catch {
     // silent
   }
 }
 
 export async function archiveNotionEvent(pageId: string): Promise<void> {
-  const c = getClient();
-  if (!c) return;
+  if (!process.env.NOTION_API_KEY) return;
   try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await (c.pages.update as any)({ page_id: pageId, archived: true });
+    await notionFetch(`/pages/${pageId}`, "PATCH", { archived: true });
   } catch {
     // silent
   }
