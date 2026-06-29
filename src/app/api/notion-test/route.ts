@@ -1,44 +1,52 @@
 import { NextResponse } from "next/server";
-import { Client } from "@notionhq/client";
+
+const NOTION_VERSION = "2022-06-28";
+
+async function notionFetch(path: string, method = "GET", body?: unknown) {
+  const res = await fetch(`https://api.notion.com/v1${path}`, {
+    method,
+    headers: {
+      "Authorization": `Bearer ${process.env.NOTION_API_KEY}`,
+      "Content-Type": "application/json",
+      "Notion-Version": NOTION_VERSION,
+    },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  return res.json();
+}
 
 export async function GET() {
   const apiKey = process.env.NOTION_API_KEY;
   const dbId = process.env.NOTION_CALENDAR_DB_ID;
 
   if (!apiKey || !dbId) {
-    return NextResponse.json({ ok: false, error: "env vars missing", hasApiKey: !!apiKey, hasDbId: !!dbId });
+    return NextResponse.json({ ok: false, error: "env vars missing" });
   }
 
-  const c = new Client({ auth: apiKey });
-
-  // 1. databases.retrieve로 data_sources 목록 가져오기
-  let dataSources: Array<{ id: string }> = [];
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const db = await c.databases.retrieve({ database_id: dbId }) as any;
-    dataSources = db.data_sources ?? [];
-  } catch (e) {
-    return NextResponse.json({ ok: false, step: "databases.retrieve", error: String(e) });
+  // 1. DB 스키마 조회
+  const db = await notionFetch(`/databases/${dbId}`);
+  if (db.object === "error") {
+    return NextResponse.json({ ok: false, step: "retrieve", error: db.message });
   }
 
-  if (dataSources.length === 0) {
-    return NextResponse.json({ ok: false, error: "data_sources 없음", tip: "Notion 연결 권한 확인 필요" });
-  }
+  const propNames = Object.entries(db.properties ?? {}).map(([name, p]) => ({
+    name,
+    type: (p as { type: string }).type,
+  }));
 
-  // 2. 각 data source에서 속성 조회
-  const results = [];
-  for (const ds of dataSources) {
-    try {
-      const dsData = await c.dataSources.retrieve({ data_source_id: ds.id });
-      const props = Object.entries(dsData.properties).map(([name, p]) => ({
-        name,
-        type: (p as { type: string }).type,
-      }));
-      results.push({ id: ds.id, ok: true, properties: props });
-    } catch (e) {
-      results.push({ id: ds.id, ok: false, error: String(e) });
-    }
-  }
+  // 2. 쿼리 테스트
+  const today = new Date().toISOString().split("T")[0];
+  const query = await notionFetch(`/databases/${dbId}/query`, "POST", {
+    filter: { property: propNames.find(p => p.type === "date")?.name ?? "날짜", date: { on_or_after: today } },
+    page_size: 3,
+  });
 
-  return NextResponse.json({ ok: true, dbId, dataSources: results });
+  return NextResponse.json({
+    ok: true,
+    title: db.title?.[0]?.plain_text,
+    properties: propNames,
+    queryOk: query.object !== "error",
+    queryError: query.object === "error" ? query.message : undefined,
+    sampleCount: query.results?.length ?? 0,
+  });
 }
