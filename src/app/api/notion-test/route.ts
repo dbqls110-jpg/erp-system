@@ -15,7 +15,8 @@ export async function GET() {
   try {
     const ds = await c.dataSources.retrieve({ data_source_id: dbId });
     const propNames = Object.entries(ds.properties).map(([name, p]) => ({ name, type: (p as { type: string }).type }));
-    return NextResponse.json({ ok: true, method: "dataSources.retrieve", title: ds.title?.[0]?.plain_text, properties: propNames });
+    const dsAny = ds as unknown as { title?: Array<{ plain_text: string }> };
+    return NextResponse.json({ ok: true, method: "dataSources.retrieve", title: dsAny.title?.[0]?.plain_text, properties: propNames });
   } catch (e1) {
     // 2. databases.retrieve 시도 (구버전 fallback)
     try {
