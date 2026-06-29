@@ -16,29 +16,40 @@ async function notionFetch(path: string, method = "GET", body?: unknown) {
 }
 
 export async function GET() {
-  if (!process.env.NOTION_API_KEY) {
+  const dbId = process.env.NOTION_CALENDAR_DB_ID;
+  if (!process.env.NOTION_API_KEY || !dbId) {
     return NextResponse.json({ ok: false, error: "env vars missing" });
   }
 
-  // URL에서 찾은 실제 페이지 ID로 직접 조회
-  const pageId = "38ed422d7f34802b9db7d94251e69e89";
-  const page = await notionFetch(`/pages/${pageId}`);
+  // 현재 달 이벤트 쿼리
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const start = `${year}-${month}-01`;
+  const end = `${year}-${month}-${new Date(year, now.getMonth() + 1, 0).getDate()}`;
 
-  if (page.object === "error") {
-    return NextResponse.json({ ok: false, error: page.message });
+  const res = await notionFetch(`/databases/${dbId}/query`, "POST", {
+    filter: {
+      and: [
+        { property: "Date", date: { on_or_after: start } },
+        { property: "Date", date: { on_or_before: end } },
+      ],
+    },
+    page_size: 10,
+  });
+
+  if (res.object === "error") {
+    return NextResponse.json({ ok: false, dbId, error: res.message });
   }
 
-  const props = Object.entries(page.properties ?? {}).map(([name, p]) => ({
-    name,
-    type: (p as { type: string }).type,
-    value: p,
-  }));
-
-  return NextResponse.json({
-    ok: true,
-    pageId: page.id,
-    parentType: page.parent?.type,
-    parentId: page.parent?.database_id ?? page.parent?.page_id,
-    properties: props,
+  const events = (res.results ?? []).map((p: Record<string, unknown>) => {
+    const props = p.properties as Record<string, { type: string; date?: { start: string }; title?: Array<{ plain_text: string }> }>;
+    return {
+      id: p.id,
+      title: props?.Name?.title?.map(t => t.plain_text).join("") || "(제목없음)",
+      date: props?.Date?.date?.start ?? null,
+    };
   });
+
+  return NextResponse.json({ ok: true, dbId, range: `${start} ~ ${end}`, count: events.length, events });
 }
