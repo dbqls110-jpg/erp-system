@@ -1,4 +1,4 @@
-import { Client, isFullPage } from "@notionhq/client";
+import { Client } from "@notionhq/client";
 
 let _client: Client | null = null;
 
@@ -7,7 +7,7 @@ function getClient(): Client | null {
   return (_client ??= new Client({ auth: process.env.NOTION_API_KEY }));
 }
 
-function dsId(): string {
+function dbId(): string {
   return process.env.NOTION_CALENDAR_DB_ID ?? "";
 }
 
@@ -16,13 +16,14 @@ let _props: DBProps | null = null;
 
 async function resolveProps(): Promise<DBProps | null> {
   const c = getClient();
-  if (!c || !dsId()) return null;
+  if (!c || !dbId()) return null;
   if (_props) return _props;
   try {
-    const ds = await c.dataSources.retrieve({ data_source_id: dsId() });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const db = await (c.databases.retrieve as any)({ database_id: dbId() });
     let titleProp = "이름";
     let dateProp: string | null = null;
-    for (const [name, prop] of Object.entries(ds.properties)) {
+    for (const [name, prop] of Object.entries(db.properties ?? {})) {
       if ((prop as { type: string }).type === "title") titleProp = name;
       if ((prop as { type: string }).type === "date" && !dateProp) dateProp = name;
     }
@@ -41,7 +42,7 @@ export interface NotionEvent {
 
 export async function getNotionEvents(year: number, month: number): Promise<NotionEvent[]> {
   const c = getClient();
-  if (!c || !dsId()) return [];
+  if (!c || !dbId()) return [];
   const p = await resolveProps();
   if (!p?.dateProp) return [];
 
@@ -51,8 +52,9 @@ export async function getNotionEvents(year: number, month: number): Promise<Noti
   const dateProp = p.dateProp;
 
   try {
-    const res = await c.dataSources.query({
-      data_source_id: dsId(),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const res = await (c.databases.query as any)({
+      database_id: dbId(),
       filter: {
         and: [
           { property: dateProp, date: { on_or_after: start } },
@@ -62,16 +64,17 @@ export async function getNotionEvents(year: number, month: number): Promise<Noti
     });
 
     const events: NotionEvent[] = [];
-    for (const page of res.results) {
-      if (!isFullPage(page)) continue;
-      const titlePropVal = page.properties[p.titleProp];
-      const datePropVal = page.properties[dateProp];
+    for (const page of res.results ?? []) {
+      if (page.object !== "page") continue;
+      const props = page.properties ?? {};
+      const titlePropVal = props[p.titleProp];
+      const datePropVal = props[dateProp];
 
       if (!datePropVal || datePropVal.type !== "date" || !datePropVal.date) continue;
 
       const title =
         titlePropVal?.type === "title"
-          ? titlePropVal.title.map((t) => t.plain_text).join("") || "Notion 일정"
+          ? (titlePropVal.title ?? []).map((t: { plain_text: string }) => t.plain_text).join("") || "Notion 일정"
           : "Notion 일정";
 
       events.push({
@@ -89,7 +92,7 @@ export async function getNotionEvents(year: number, month: number): Promise<Noti
 
 export async function createNotionEvent(title: string, date: string, endDate?: string): Promise<string | null> {
   const c = getClient();
-  if (!c || !dsId()) return null;
+  if (!c || !dbId()) return null;
   const p = await resolveProps();
   if (!p) return null;
 
@@ -101,8 +104,8 @@ export async function createNotionEvent(title: string, date: string, endDate?: s
       properties[p.dateProp] = { date: { start: date, end: endDate ?? null } };
     }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const page = await c.pages.create({ parent: { data_source_id: dsId() } as any, properties: properties as any });
-    return page.id;
+    const page = await (c.pages.create as any)({ parent: { database_id: dbId() }, properties });
+    return page.id ?? null;
   } catch {
     return null;
   }
@@ -122,7 +125,7 @@ export async function updateNotionEvent(pageId: string, title: string, date: str
       properties[p.dateProp] = { date: { start: date, end: endDate ?? null } };
     }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await c.pages.update({ page_id: pageId, properties: properties as any });
+    await (c.pages.update as any)({ page_id: pageId, properties });
   } catch {
     // silent
   }
@@ -132,7 +135,8 @@ export async function archiveNotionEvent(pageId: string): Promise<void> {
   const c = getClient();
   if (!c) return;
   try {
-    await c.pages.update({ page_id: pageId, archived: true });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (c.pages.update as any)({ page_id: pageId, archived: true });
   } catch {
     // silent
   }

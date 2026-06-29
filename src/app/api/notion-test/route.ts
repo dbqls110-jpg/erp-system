@@ -11,23 +11,15 @@ export async function GET() {
 
   const c = new Client({ auth: apiKey });
 
-  // 1. dataSources.retrieve 시도
   try {
-    const ds = await c.dataSources.retrieve({ data_source_id: dbId });
-    const propNames = Object.entries(ds.properties).map(([name, p]) => ({ name, type: (p as { type: string }).type }));
-    const dsAny = ds as unknown as { title?: Array<{ plain_text: string }> };
-    return NextResponse.json({ ok: true, method: "dataSources.retrieve", title: dsAny.title?.[0]?.plain_text, properties: propNames });
-  } catch (e1) {
-    // 2. databases.retrieve 시도 (구버전 fallback)
-    try {
-      const db = await c.databases.retrieve({ database_id: dbId });
-      return NextResponse.json({ ok: true, method: "databases.retrieve (fallback)", id: db.id });
-    } catch (e2) {
-      return NextResponse.json({
-        ok: false,
-        dataSourcesError: String(e1),
-        databasesError: String(e2),
-      });
-    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const db = await (c.databases.retrieve as any)({ database_id: dbId });
+    const propNames = Object.entries(db.properties ?? {}).map(([name, p]) => ({
+      name,
+      type: (p as { type: string }).type,
+    }));
+    return NextResponse.json({ ok: true, title: db.title?.[0]?.plain_text, properties: propNames });
+  } catch (e) {
+    return NextResponse.json({ ok: false, error: String(e) });
   }
 }
