@@ -53,7 +53,7 @@ export async function getNotionEvents(year: number, month: number): Promise<Noti
 
   try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const res = await (c.databases.query as any)({
+    const res = await (c as any).databases.query({
       database_id: dbId(),
       filter: {
         and: [
