@@ -16,31 +16,29 @@ async function notionFetch(path: string, method = "GET", body?: unknown) {
 }
 
 export async function GET() {
-  const dbId = process.env.NOTION_CALENDAR_DB_ID;
-  if (!process.env.NOTION_API_KEY || !dbId) {
+  if (!process.env.NOTION_API_KEY) {
     return NextResponse.json({ ok: false, error: "env vars missing" });
   }
 
-  // 필터 없이 최근 페이지 3개 조회
-  const query = await notionFetch(`/databases/${dbId}/query`, "POST", { page_size: 3 });
+  // URL에서 찾은 실제 페이지 ID로 직접 조회
+  const pageId = "38ed422d7f34802b9db7d94251e69e89";
+  const page = await notionFetch(`/pages/${pageId}`);
 
-  if (query.object === "error") {
-    return NextResponse.json({ ok: false, error: query.message });
+  if (page.object === "error") {
+    return NextResponse.json({ ok: false, error: page.message });
   }
 
-  // 첫 번째 페이지의 실제 속성 확인
-  const firstPage = query.results?.[0];
-  const firstProps = firstPage
-    ? Object.entries(firstPage.properties ?? {}).map(([name, p]) => ({
-        name,
-        type: (p as { type: string }).type,
-      }))
-    : [];
+  const props = Object.entries(page.properties ?? {}).map(([name, p]) => ({
+    name,
+    type: (p as { type: string }).type,
+    value: p,
+  }));
 
   return NextResponse.json({
     ok: true,
-    totalResults: query.results?.length ?? 0,
-    firstPageProperties: firstProps,
-    firstPageTitle: firstPage?.properties?.Name?.title?.[0]?.plain_text ?? "(없음)",
+    pageId: page.id,
+    parentType: page.parent?.type,
+    parentId: page.parent?.database_id ?? page.parent?.page_id,
+    properties: props,
   });
 }
