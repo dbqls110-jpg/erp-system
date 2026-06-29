@@ -16,37 +16,31 @@ async function notionFetch(path: string, method = "GET", body?: unknown) {
 }
 
 export async function GET() {
-  const apiKey = process.env.NOTION_API_KEY;
   const dbId = process.env.NOTION_CALENDAR_DB_ID;
-
-  if (!apiKey || !dbId) {
+  if (!process.env.NOTION_API_KEY || !dbId) {
     return NextResponse.json({ ok: false, error: "env vars missing" });
   }
 
-  // 1. DB 스키마 조회
-  const db = await notionFetch(`/databases/${dbId}`);
-  if (db.object === "error") {
-    return NextResponse.json({ ok: false, step: "retrieve", error: db.message });
+  // 필터 없이 최근 페이지 3개 조회
+  const query = await notionFetch(`/databases/${dbId}/query`, "POST", { page_size: 3 });
+
+  if (query.object === "error") {
+    return NextResponse.json({ ok: false, error: query.message });
   }
 
-  const propNames = Object.entries(db.properties ?? {}).map(([name, p]) => ({
-    name,
-    type: (p as { type: string }).type,
-  }));
-
-  // 2. 쿼리 테스트
-  const today = new Date().toISOString().split("T")[0];
-  const query = await notionFetch(`/databases/${dbId}/query`, "POST", {
-    filter: { property: propNames.find(p => p.type === "date")?.name ?? "날짜", date: { on_or_after: today } },
-    page_size: 3,
-  });
+  // 첫 번째 페이지의 실제 속성 확인
+  const firstPage = query.results?.[0];
+  const firstProps = firstPage
+    ? Object.entries(firstPage.properties ?? {}).map(([name, p]) => ({
+        name,
+        type: (p as { type: string }).type,
+      }))
+    : [];
 
   return NextResponse.json({
     ok: true,
-    title: db.title?.[0]?.plain_text,
-    properties: propNames,
-    queryOk: query.object !== "error",
-    queryError: query.object === "error" ? query.message : undefined,
-    sampleCount: query.results?.length ?? 0,
+    totalResults: query.results?.length ?? 0,
+    firstPageProperties: firstProps,
+    firstPageTitle: firstPage?.properties?.Name?.title?.[0]?.plain_text ?? "(없음)",
   });
 }
