@@ -15,7 +15,7 @@ import { toast } from "sonner";
 interface CalEvent {
   date: string;
   title: string;
-  type: "announce" | "deadline" | "leave" | "custom";
+  type: "announce" | "deadline" | "leave" | "custom" | "notion";
   id: string;
   endDate?: string;
   color?: string;
@@ -44,6 +44,8 @@ const CUSTOM_COLORS: Record<string, string> = {
   yellow: "bg-yellow-50 text-yellow-700",
   purple: "bg-purple-50 text-purple-700",
 };
+
+const NOTION_STYLE = "bg-violet-50 text-violet-700 border border-violet-200/60";
 
 function eventTitle(e: CalEvent) {
   return e.type === "custom" && e.color === "red" ? `⭐ ${e.title}` : e.title;
@@ -233,6 +235,13 @@ export function CalendarView({ initialEvents, currentYear, currentMonth }: {
                   </div>
                   <div className="space-y-0.5">
                     {dayEvents.slice(0, 2).map((e, i) => {
+                      if (e.type === "notion") {
+                        return (
+                          <div key={i} className={cn("block text-[10px] rounded px-1 truncate", NOTION_STYLE)} title={e.title}>
+                            <span className="opacity-50 mr-0.5 font-bold">N</span>{e.title}
+                          </div>
+                        );
+                      }
                       const cls = e.type === "custom"
                         ? CUSTOM_COLORS[e.color ?? "gray"]
                         : TYPE_COLORS[e.type];
@@ -267,6 +276,7 @@ export function CalendarView({ initialEvents, currentYear, currentMonth }: {
             <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-warm-fade inline-block" />마감일</span>
             <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-deep-violet inline-block" />휴가</span>
             <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-500 inline-block" />직접 등록</span>
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-violet-400 inline-block" />Notion</span>
             <span className="text-smoke-gray/70">날짜 클릭 시 일정 추가</span>
           </div>
         </CardContent>
@@ -283,10 +293,18 @@ export function CalendarView({ initialEvents, currentYear, currentMonth }: {
           {modal.mode === "detail" && (
             <div className="space-y-2">
               {modal.events.map((e, i) => {
-                const cls = e.type === "custom" ? CUSTOM_COLORS[e.color ?? "gray"] : TYPE_COLORS[e.type];
+                const cls =
+                  e.type === "notion"
+                    ? NOTION_STYLE
+                    : e.type === "custom"
+                    ? CUSTOM_COLORS[e.color ?? "gray"]
+                    : TYPE_COLORS[e.type];
                 return (
                   <div key={i} className={cn("flex items-center justify-between rounded-lg px-3 py-2", cls)}>
-                    <span className="text-sm font-medium truncate flex-1">{eventTitle(e)}</span>
+                    <span className="text-sm font-medium truncate flex-1">
+                      {e.type === "notion" && <span className="opacity-50 mr-1 font-bold text-xs">N</span>}
+                      {eventTitle(e)}
+                    </span>
                     {e.type === "custom" && (
                       <div className="flex items-center gap-1.5 ml-2 shrink-0">
                         <button

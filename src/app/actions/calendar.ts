@@ -4,6 +4,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { createNotionEvent, updateNotionEvent, archiveNotionEvent } from "@/lib/notion";
 
 export async function createCalendarEvent(data: {
   title: string;
@@ -14,7 +15,7 @@ export async function createCalendarEvent(data: {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) throw new Error("Unauthorized");
 
-  await prisma.calendarEvent.create({
+  const event = await prisma.calendarEvent.create({
     data: {
       title: data.title,
       date: data.date,
@@ -23,6 +24,15 @@ export async function createCalendarEvent(data: {
       createdBy: session.user.id,
     },
   });
+
+  // Notion에도 생성 (성공 시 notionPageId 저장)
+  const notionPageId = await createNotionEvent(data.title, data.date, data.endDate);
+  if (notionPageId) {
+    await prisma.calendarEvent.update({
+      where: { id: event.id },
+      data: { notionPageId },
+    });
+  }
 
   revalidatePath("/calendar");
 }
@@ -51,6 +61,11 @@ export async function updateCalendarEvent(
     },
   });
 
+  // Notion 동기화 (fire-and-forget)
+  if (event.notionPageId) {
+    void updateNotionEvent(event.notionPageId, data.title, data.date, data.endDate);
+  }
+
   revalidatePath("/calendar");
 }
 
@@ -66,5 +81,11 @@ export async function deleteCalendarEvent(id: string) {
   }
 
   await prisma.calendarEvent.delete({ where: { id } });
+
+  // Notion에서 보관(아카이브) 처리 (fire-and-forget)
+  if (event.notionPageId) {
+    void archiveNotionEvent(event.notionPageId);
+  }
+
   revalidatePath("/calendar");
 }

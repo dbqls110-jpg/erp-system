@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { getNotionEvents } from "@/lib/notion";
 import { CalendarView } from "./CalendarView";
 
 export default async function CalendarPage() {
@@ -7,7 +8,7 @@ export default async function CalendarPage() {
   const month = now.getMonth() + 1;
   const monthStr = String(month).padStart(2, "0");
 
-  const [projects, leaves, customEvents] = await Promise.all([
+  const [projects, leaves, customEvents, notionEvents] = await Promise.all([
     prisma.project.findMany({
       where: {
         status: "active",
@@ -27,8 +28,12 @@ export default async function CalendarPage() {
     }),
     prisma.calendarEvent.findMany({
       where: { date: { gte: `${year}-${monthStr}-01` } },
+      select: { id: true, title: true, date: true, endDate: true, color: true, notionPageId: true },
     }),
+    getNotionEvents(year, month).catch(() => []),
   ]);
+
+  const linkedNotionIds = new Set(customEvents.map((e) => e.notionPageId).filter(Boolean));
 
   const events = [
     ...projects.flatMap((p) => {
@@ -57,6 +62,15 @@ export default async function CalendarPage() {
       endDate: e.endDate ?? undefined,
       color: e.color,
     })),
+    ...notionEvents
+      .filter((e) => !linkedNotionIds.has(e.notionId))
+      .map((e) => ({
+        date: e.date,
+        title: e.title,
+        type: "notion" as const,
+        id: e.notionId,
+        endDate: e.endDate,
+      })),
   ];
 
   return (
