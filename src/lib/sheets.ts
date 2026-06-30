@@ -5,10 +5,7 @@ function getAuth() {
   const credentials = JSON.parse(Buffer.from(b64, "base64").toString("utf8"));
   return new google.auth.GoogleAuth({
     credentials,
-    scopes: [
-      "https://www.googleapis.com/auth/spreadsheets",
-      "https://www.googleapis.com/auth/drive",
-    ],
+    scopes: ["https://www.googleapis.com/auth/spreadsheets"],
   });
 }
 
