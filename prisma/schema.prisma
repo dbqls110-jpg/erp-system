@@ -112,19 +112,20 @@ model LeaveBalance {
 }
 
 model LeaveRequest {
-  id        String   @id @default(cuid())
-  userId    String
-  type      String   // "annual" | "half_am" | "half_pm" | "hourly"
-  startDate String   // "YYYY-MM-DD"
-  endDate   String   // "YYYY-MM-DD"
-  startTime String?
-  endTime   String?
-  days      Float
-  reason    String?
-  status    String   @default("pending") // "pending" | "approved" | "rejected"
-  adminNote String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id           String   @id @default(cuid())
+  userId       String
+  type         String   // "annual" | "half_am" | "half_pm" | "hourly"
+  startDate    String   // "YYYY-MM-DD"
+  endDate      String   // "YYYY-MM-DD"
+  startTime    String?
+  endTime      String?
+  days         Float
+  reason       String?
+  status       String   @default("pending") // "pending" | "approved" | "rejected"
+  adminNote    String?
+  notionPageId String?  // Notion page ID (승인 시 생성)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 

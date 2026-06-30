@@ -4,6 +4,11 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { createNotionEvent, archiveNotionEvent } from "@/lib/notion";
+
+const LEAVE_TYPE_LABEL: Record<string, string> = {
+  annual: "연차", half_am: "반차(오전)", half_pm: "반차(오후)", hourly: "시간차",
+};
 
 export async function applyLeave(formData: FormData) {
   const session = await getServerSession(authOptions);
@@ -78,7 +83,10 @@ export async function approveLeave(id: string) {
   const session = await getServerSession(authOptions);
   if (session?.user?.role !== "admin") throw new Error("Unauthorized");
 
-  const req = await prisma.leaveRequest.findUnique({ where: { id } });
+  const req = await prisma.leaveRequest.findUnique({
+    where: { id },
+    include: { user: { select: { name: true } } },
+  });
   if (!req || req.status !== "pending") return;
 
   const year = new Date(req.startDate).getFullYear();
@@ -93,6 +101,14 @@ export async function approveLeave(id: string) {
       },
     }),
   ]);
+
+  // Notion 캘린더에 휴가 등록
+  const title = `🌴 ${req.user.name ?? "직원"} ${LEAVE_TYPE_LABEL[req.type] ?? "휴가"}`;
+  const endDate = req.endDate !== req.startDate ? req.endDate : undefined;
+  const notionPageId = await createNotionEvent(title, req.startDate, endDate);
+  if (notionPageId) {
+    await prisma.leaveRequest.update({ where: { id }, data: { notionPageId } });
+  }
 
   revalidatePath("/leave");
 }
@@ -141,6 +157,11 @@ export async function deleteLeave(id: string) {
         })]
       : []),
   ]);
+
+  // Notion 이벤트 아카이브 (승인된 휴가였던 경우)
+  if (req.notionPageId) {
+    void archiveNotionEvent(req.notionPageId);
+  }
 
   revalidatePath("/leave");
 }
