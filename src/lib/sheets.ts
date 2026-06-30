@@ -1,12 +1,10 @@
 import { google } from "googleapis";
 
 function getAuth() {
-  const privateKey = (process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY ?? "").replace(/\\n/g, "\n");
+  const b64 = process.env.GOOGLE_SERVICE_ACCOUNT_B64 ?? "";
+  const credentials = JSON.parse(Buffer.from(b64, "base64").toString("utf8"));
   return new google.auth.GoogleAuth({
-    credentials: {
-      client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
-      private_key: privateKey,
-    },
+    credentials,
     scopes: [
       "https://www.googleapis.com/auth/spreadsheets",
       "https://www.googleapis.com/auth/drive",
