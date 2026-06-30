@@ -1,0 +1,25 @@
+name: Keep Alive
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"  # 10분마다 실행
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check time (KST 02:00~07:00 skip)
+        id: check
+        run: |
+          HOUR_KST=$(TZ="Asia/Seoul" date +%H)
+          echo "KST hour: $HOUR_KST"
+          if [ "$HOUR_KST" -ge 2 ] && [ "$HOUR_KST" -lt 7 ]; then
+            echo "skip=true" >> $GITHUB_OUTPUT
+          else
+            echo "skip=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Ping Render
+        if: steps.check.outputs.skip == 'false'
+        run: |
+          curl -s -o /dev/null -w "%{http_code}" https://erp-system-lojo.onrender.com/api/health
