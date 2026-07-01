@@ -179,7 +179,7 @@ export function SheetList({ sheets, isAdmin }: Props) {
                 </span>
                 <span className="text-xs text-gray-400">{grouped[cat].length}개</span>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
                 {grouped[cat].map(sheet => (
                   <a
                     key={sheet.id}
