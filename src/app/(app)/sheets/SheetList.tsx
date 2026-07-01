@@ -96,6 +96,10 @@ function Modal({
               <option value="프로젝트">프로젝트</option>
               <option value="인사">인사</option>
               <option value="마케팅">마케팅</option>
+              <option value="널위문">널위문</option>
+              <option value="노브">노브</option>
+              <option value="클로원">클로원</option>
+              <option value="입찰">입찰</option>
               <option value="기타">기타</option>
             </select>
           </div>
