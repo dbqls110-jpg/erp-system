@@ -31,7 +31,20 @@ export async function GET(req: Request) {
 
   try {
     await prisma.$executeRaw`ALTER TABLE "leave_requests" ADD COLUMN IF NOT EXISTS "notionPageId" TEXT`;
-    return NextResponse.json({ ok: true, message: "notionPageId 컬럼 추가 완료" });
+    await prisma.$executeRaw`
+      CREATE TABLE IF NOT EXISTS "sheet_links" (
+        "id" TEXT NOT NULL,
+        "name" TEXT NOT NULL,
+        "url" TEXT NOT NULL,
+        "description" TEXT,
+        "category" TEXT,
+        "order" INTEGER NOT NULL DEFAULT 0,
+        "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT "sheet_links_pkey" PRIMARY KEY ("id")
+      )
+    `;
+    return NextResponse.json({ ok: true, message: "DB 수정 완료" });
   } catch (e) {
     return NextResponse.json({ ok: false, error: String(e) });
   }
