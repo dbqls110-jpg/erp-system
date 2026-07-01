@@ -175,51 +175,46 @@ export function SheetList({ sheets, isAdmin }: Props) {
                 </span>
                 <span className="text-xs text-gray-400">{grouped[cat].length}개</span>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {grouped[cat].map(sheet => (
-                  <div
+                  <a
                     key={sheet.id}
-                    className="group bg-white border border-gray-100 rounded-xl p-4 hover:shadow-md hover:border-violet-200 transition-all"
+                    href={sheet.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="group bg-white border border-gray-100 rounded-xl p-5 hover:shadow-md hover:border-violet-200 transition-all block"
                   >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <div className="w-8 h-8 rounded-lg bg-green-50 flex items-center justify-center shrink-0">
-                          <Sheet size={16} className="text-green-600" />
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-10 h-10 rounded-lg bg-green-50 flex items-center justify-center shrink-0">
+                          <Sheet size={20} className="text-green-600" />
                         </div>
                         <div className="min-w-0">
-                          <p className="text-sm font-medium text-gray-900 truncate">{sheet.name}</p>
+                          <p className="text-base font-semibold text-gray-900 truncate">{sheet.name}</p>
                           {sheet.description && (
-                            <p className="text-xs text-gray-400 truncate">{sheet.description}</p>
+                            <p className="text-sm text-gray-500 truncate mt-0.5">{sheet.description}</p>
                           )}
                         </div>
                       </div>
                       <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button
-                          onClick={() => setEditing(sheet)}
+                          onClick={e => { e.preventDefault(); setEditing(sheet); }}
                           className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-700"
                         >
-                          <Pencil size={13} />
+                          <Pencil size={14} />
                         </button>
                         {isAdmin && (
                           <button
-                            onClick={() => handleDelete(sheet.id)}
+                            onClick={e => { e.preventDefault(); handleDelete(sheet.id); }}
                             className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500"
                           >
-                            <Trash2 size={13} />
+                            <Trash2 size={14} />
                           </button>
                         )}
+                        <ExternalLink size={14} className="text-violet-400 ml-1" />
                       </div>
                     </div>
-                    <a
-                      href={sheet.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="mt-3 flex items-center gap-1.5 text-xs text-violet-600 hover:text-violet-800 font-medium"
-                    >
-                      <ExternalLink size={12} />
-                      시트 열기
-                    </a>
-                  </div>
+                  </a>
                 ))}
               </div>
             </div>
