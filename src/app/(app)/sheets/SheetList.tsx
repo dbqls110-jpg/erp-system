@@ -179,14 +179,14 @@ export function SheetList({ sheets, isAdmin }: Props) {
                 </span>
                 <span className="text-xs text-gray-400">{grouped[cat].length}개</span>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 {grouped[cat].map(sheet => (
                   <a
                     key={sheet.id}
                     href={sheet.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="group bg-white border border-gray-100 rounded-xl p-5 hover:shadow-md hover:border-violet-200 transition-all block"
+                    className="group bg-white border border-gray-100 rounded-xl p-3.5 hover:shadow-md hover:border-violet-200 transition-all block"
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex items-center gap-3 min-w-0">
