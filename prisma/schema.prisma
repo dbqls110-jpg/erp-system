@@ -312,6 +312,20 @@ model Credential {
   @@map("credentials")
 }
 
+// ─── 구글 시트 디렉토리 ───────────────────────────────────
+model SheetLink {
+  id          String   @id @default(cuid())
+  name        String
+  url         String
+  description String?
+  category    String?
+  order       Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("sheet_links")
+}
+
 // ─── 명함 ─────────────────────────────────────────────────
 model BusinessCard {
   id         String   @id @default(cuid())
