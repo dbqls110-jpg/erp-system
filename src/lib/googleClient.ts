@@ -1,7 +1,7 @@
 import { google } from "googleapis";
 
 const SHEETS_SCOPE = "https://www.googleapis.com/auth/spreadsheets";
-const DRIVE_FILE_SCOPE = "https://www.googleapis.com/auth/drive.file";
+const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive";
 
 function buildCredentials(): object {
   const b64 = process.env.GOOGLE_SERVICE_ACCOUNT_B64;
@@ -24,7 +24,7 @@ function buildCredentials(): object {
 export function makeAuth(withDrive = false) {
   return new google.auth.GoogleAuth({
     credentials: buildCredentials(),
-    scopes: withDrive ? [SHEETS_SCOPE, DRIVE_FILE_SCOPE] : [SHEETS_SCOPE],
+    scopes: withDrive ? [SHEETS_SCOPE, DRIVE_SCOPE] : [SHEETS_SCOPE],
   });
 }
 

@@ -1,16 +1,74 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyAgentApiKey } from "@/lib/agentAuth";
 import { auditLog } from "@/lib/agentAudit";
-import {
-  makeSheetsClient,
-  makeDriveClient,
-  resolveFolderAlias,
-  LIMITS,
-} from "@/lib/googleClient";
+import { makeSheetsClient, makeDriveClient, LIMITS } from "@/lib/googleClient";
+import type { drive_v3 } from "googleapis";
+
+const ROOT_FOLDER_NAME = "Hermes 운영 시트";
+
+const AGENT_FOLDER_MAP: Record<string, string> = {
+  hermes: "Hermes",
+  marketer: "마케터",
+  report: "보고서",
+};
+
+function sanitizeTitle(raw: string, maxLen: number = LIMITS.MAX_TITLE_LEN): string {
+  return raw
+    .replace(/[<>:"/\\|?*\x00-\x1f]/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, maxLen)
+    .trim();
+}
+
+function generateTitle(sourcePrompt?: string): string {
+  if (!sourcePrompt) return "새 시트";
+  const cleaned = sanitizeTitle(sourcePrompt, 50);
+  return cleaned || "새 시트";
+}
+
+// Drive API query에서 single quote 이스케이프
+function escapeQ(str: string): string {
+  return str.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+}
+
+// 이름으로 폴더 검색, 없으면 생성
+async function findOrCreateFolder(
+  drive: drive_v3.Drive,
+  name: string,
+  parentId?: string
+): Promise<string> {
+  const parentClause = parentId ? ` and '${escapeQ(parentId)}' in parents` : "";
+  const q = `name = '${escapeQ(name)}' and mimeType = 'application/vnd.google-apps.folder'${parentClause} and trashed = false`;
+
+  const res = await drive.files.list({
+    q,
+    fields: "files(id, name)",
+    pageSize: 1,
+    corpora: "user",
+    spaces: "drive",
+  });
+
+  const existing = res.data.files?.[0];
+  if (existing?.id) return existing.id;
+
+  const created = await drive.files.create({
+    requestBody: {
+      name,
+      mimeType: "application/vnd.google-apps.folder",
+      ...(parentId ? { parents: [parentId] } : {}),
+    },
+    fields: "id",
+  });
+
+  return created.data.id!;
+}
 
 interface CreateBody {
+  agentType?: string;
+  folderName?: string;
   title?: string;
-  folder?: string;
+  sourcePrompt?: string;
   tabs?: string[];
   data?: Record<string, string[][]>;
   dryRun?: boolean;
@@ -27,34 +85,40 @@ export async function POST(req: NextRequest) {
   }
 
   const {
+    agentType = "hermes",
+    folderName,
     title,
-    folder,
+    sourcePrompt,
     tabs = ["Sheet1"],
     data = {},
     dryRun = false,
   } = body;
 
-  // 유효성 검사
-  if (!title || typeof title !== "string" || !title.trim()) {
-    return NextResponse.json({ error: "title은 필수입니다." }, { status: 400 });
+  // 서브폴더명 결정
+  const rawSubfolder = folderName
+    ? sanitizeTitle(String(folderName), 50)
+    : (AGENT_FOLDER_MAP[String(agentType)] ?? "Hermes");
+
+  if (!rawSubfolder) {
+    return NextResponse.json({ error: "folderName이 유효하지 않습니다." }, { status: 400 });
   }
-  if (title.length > LIMITS.MAX_TITLE_LEN) {
-    return NextResponse.json({ error: `title은 ${LIMITS.MAX_TITLE_LEN}자 이내여야 합니다.` }, { status: 400 });
+
+  const folderPath = `${ROOT_FOLDER_NAME}/${rawSubfolder}`;
+
+  // 제목 결정
+  const finalTitle = title
+    ? sanitizeTitle(String(title), LIMITS.MAX_TITLE_LEN)
+    : generateTitle(sourcePrompt);
+
+  if (!finalTitle) {
+    return NextResponse.json({ error: "title 또는 sourcePrompt가 필요합니다." }, { status: 400 });
   }
+
+  // 탭 검증
   if (!Array.isArray(tabs) || tabs.length === 0 || tabs.length > LIMITS.MAX_TABS) {
     return NextResponse.json({ error: `tabs는 1~${LIMITS.MAX_TABS}개 배열이어야 합니다.` }, { status: 400 });
   }
-
-  // 폴더 alias 확인
-  let folderId: string | null = null;
-  if (folder) {
-    folderId = resolveFolderAlias(folder);
-    if (!folderId) {
-      return NextResponse.json({
-        error: `알 수 없는 folder alias: "${folder}". GET /api/agent/sheets/folders 로 사용 가능한 alias를 확인하세요.`,
-      }, { status: 400 });
-    }
-  }
+  const safeTabs = [...new Set(tabs.map((t) => String(t).trim()).filter(Boolean))];
 
   // 초기 데이터 셀 수 제한
   let totalCells = 0;
@@ -71,38 +135,39 @@ export async function POST(req: NextRequest) {
     }, { status: 400 });
   }
 
-  const safeTitle = title.trim();
-  const safeTabs = [...new Set(tabs.map((t) => String(t).trim()).filter(Boolean))];
-
-  // dryRun: 실제 생성 없이 미리보기만
+  // dryRun: 실제 생성 없이 preview만 반환
   if (dryRun === true) {
     await auditLog({
       method: "POST",
       endpoint: "/api/agent/sheets/create",
       action: "create_spreadsheet",
       dryRun: true,
-      payload: { title: safeTitle, folder: folder ?? null, tabs: safeTabs, totalCells },
+      payload: { title: finalTitle, folderPath, tabs: safeTabs, totalCells },
     });
     return NextResponse.json({
       dryRun: true,
-      preview: {
-        title: safeTitle,
-        folder: folder ?? null,
-        tabs: safeTabs,
-        dataTabCount: Object.keys(data).length,
-        totalCells,
-      },
+      preview: { title: finalTitle, folderPath, tabs: safeTabs },
       message: "dryRun=true: 실제 생성되지 않았습니다.",
     });
   }
 
   try {
-    const sheets = makeSheetsClient(Boolean(folderId));
+    const sheets = makeSheetsClient();
+    const drive = makeDriveClient();
 
-    // 스프레드시트 생성 (탭 포함)
+    // 1. 루트 폴더 ID 확인 (env 우선, 없으면 검색/생성)
+    let rootFolderId = process.env.GOOGLE_DRIVE_HERMES_ROOT_FOLDER_ID ?? "";
+    if (!rootFolderId) {
+      rootFolderId = await findOrCreateFolder(drive, ROOT_FOLDER_NAME);
+    }
+
+    // 2. 서브폴더 검색 또는 생성
+    const subFolderId = await findOrCreateFolder(drive, rawSubfolder, rootFolderId);
+
+    // 3. 스프레드시트 생성
     const createRes = await sheets.spreadsheets.create({
       requestBody: {
-        properties: { title: safeTitle },
+        properties: { title: finalTitle },
         sheets: safeTabs.map((tabTitle, idx) => ({
           properties: { title: tabTitle, sheetId: idx },
         })),
@@ -112,72 +177,51 @@ export async function POST(req: NextRequest) {
     const spreadsheetId = createRes.data.spreadsheetId!;
     const url = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit`;
 
-    // 탭별 초기 데이터 입력
+    // 4. 탭별 초기 데이터 입력
     const dataEntries = Object.entries(data).filter(
       ([tabName, rows]) => safeTabs.includes(tabName) && Array.isArray(rows) && rows.length > 0
     );
     if (dataEntries.length > 0) {
-      const batchData = dataEntries.map(([tabName, rows]) => {
-        const safeRows = (rows as string[][])
-          .slice(0, LIMITS.MAX_WRITE_ROWS)
-          .map((row) =>
-            Array.isArray(row)
-              ? row.slice(0, LIMITS.MAX_COLS).map((v) => String(v ?? ""))
-              : []
-          );
-        return {
-          range: `'${tabName}'!A1`,
-          values: safeRows,
-        };
-      });
-
       await sheets.spreadsheets.values.batchUpdate({
         spreadsheetId,
         requestBody: {
           valueInputOption: "USER_ENTERED",
-          data: batchData,
+          data: dataEntries.map(([tabName, rows]) => ({
+            range: `'${tabName}'!A1`,
+            values: (rows as string[][])
+              .slice(0, LIMITS.MAX_WRITE_ROWS)
+              .map((row) =>
+                Array.isArray(row)
+                  ? row.slice(0, LIMITS.MAX_COLS).map((v) => String(v ?? ""))
+                  : []
+              ),
+          })),
         },
       });
     }
 
-    // 폴더로 이동 (서비스 계정에 해당 폴더 편집 권한이 있어야 함)
-    let folderMoved = false;
-    if (folderId) {
-      try {
-        const drive = makeDriveClient();
-        await drive.files.update({
-          fileId: spreadsheetId,
-          addParents: folderId,
-          removeParents: "root",
-          fields: "id,parents",
-        });
-        folderMoved = true;
-      } catch {
-        // 폴더 이동 실패는 치명적이지 않음 - 시트는 정상 생성됨
-      }
-    }
+    // 5. 서브폴더로 이동
+    await drive.files.update({
+      fileId: spreadsheetId,
+      addParents: subFolderId,
+      removeParents: "root",
+      fields: "id,parents",
+    });
 
-    const result = {
-      spreadsheetId,
-      url,
-      title: safeTitle,
-      folder: folder ?? null,
-      folderMoved,
-      tabs: safeTabs,
-    };
+    const result = { spreadsheetId, url, title: finalTitle, folderPath };
 
     await auditLog({
       method: "POST",
       endpoint: "/api/agent/sheets/create",
       action: "create_spreadsheet",
       dryRun: false,
-      payload: { title: safeTitle, folder: folder ?? null, tabs: safeTabs, totalCells },
-      result: { spreadsheetId, url, folderMoved },
+      payload: { title: finalTitle, folderPath, tabs: safeTabs, totalCells },
+      result: { spreadsheetId, url, folderPath },
     });
 
     return NextResponse.json(result, { status: 201 });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Google Sheets API 오류";
+    const message = err instanceof Error ? err.message : "Google API 오류";
     return NextResponse.json({ error: "스프레드시트 생성 실패", detail: message }, { status: 502 });
   }
 }

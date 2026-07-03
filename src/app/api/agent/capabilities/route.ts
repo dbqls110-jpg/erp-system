@@ -3,7 +3,7 @@ import { verifyAgentApiKey } from "@/lib/agentAuth";
 
 const CAPABILITIES = {
   system: "천우영 ERP",
-  version: "1.3.0",
+  version: "1.4.0",
   baseUrl: "/api/agent",
   resources: [
     {
@@ -270,38 +270,46 @@ const CAPABILITIES = {
           dryRun: false,
           params: [],
           response: {
-            folders: "{ alias: string, configured: boolean }[]",
-            total: "number",
+            root: "string — 최상위 폴더명 (Hermes 운영 시트)",
+            rootFolderConfigured: "boolean — env에 루트 폴더 ID 설정 여부",
+            agentDefaults: "{ agentType, subfolder, folderPath }[] — agentType별 기본 폴더 경로",
           },
         },
         {
           method: "POST",
           path: "/api/agent/sheets/create",
-          description: "새 Google Spreadsheet 생성 (탭 생성·초기 데이터 입력 포함). 생성 후 URL을 Discord에 바로 전달 가능",
+          description: "새 Google Spreadsheet 생성. 폴더 없으면 자동 생성. URL을 Discord에 바로 전달 가능",
           auth: true,
           dryRun: true,
           body: {
-            title: "string (필수) — 스프레드시트 제목. 예: \"2026-07-03_디스코드_자료정리\"",
-            folder: "string (선택) — Hermes 폴더 alias. GET /api/agent/sheets/folders 로 확인. 예: \"discord\"",
+            agentType: "\"hermes\" | \"marketer\" | \"report\" (선택, 기본 hermes) — 기본 폴더 결정에 사용",
+            folderName: "string (선택) — 직접 폴더명 지정. 예: \"ERP\" → Hermes 운영 시트/ERP",
+            title: "string (선택) — 시트 제목. 없으면 sourcePrompt에서 자동 생성",
+            sourcePrompt: "string (선택) — title 없을 때 제목 생성용 원문",
             tabs: "string[] (선택, 기본 [\"Sheet1\"]) — 탭 이름 배열. 최대 10개",
-            data: "object (선택) — 탭별 초기 데이터 2D 배열. 예: { \"정리\": [[\"항목\",\"내용\"],[\"A\",\"B\"]] }",
-            dryRun: "boolean (선택)",
+            data: "object (선택) — 탭별 초기 데이터 2D 배열. 예: { \"정리\": [[\"항목\",\"내용\"]] }",
+            dryRun: "boolean (선택) — true면 title·folderPath preview만 반환, 실제 생성 안 함",
           },
           response: {
             spreadsheetId: "string",
             url: "string — 편집 URL (Discord에 바로 전달 가능)",
             title: "string",
-            folder: "string | null",
-            folderMoved: "boolean — 폴더 이동 성공 여부",
-            tabs: "string[]",
+            folderPath: "string — 예: Hermes 운영 시트/Hermes",
+          },
+          folderLogic: {
+            "folderName 없음 + agentType=hermes": "Hermes 운영 시트/Hermes",
+            "folderName 없음 + agentType=marketer": "Hermes 운영 시트/마케터",
+            "folderName 없음 + agentType=report": "Hermes 운영 시트/보고서",
+            "folderName=ERP": "Hermes 운영 시트/ERP",
+            "폴더 없으면": "자동 생성",
           },
           example: {
-            title: "2026-07-03_디스코드_자료정리",
-            folder: "discord",
+            agentType: "hermes",
+            folderName: "ERP",
+            sourcePrompt: "사용자 요청: ERP 관련 자료 정리",
             tabs: ["정리", "원본"],
             data: {
               "정리": [["항목", "내용", "출처"], ["A", "내용", "링크"]],
-              "원본": [["원문"]],
             },
             dryRun: true,
           },
