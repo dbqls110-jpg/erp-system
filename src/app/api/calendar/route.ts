@@ -45,7 +45,10 @@ export async function GET(req: NextRequest) {
   ]);
 
   // ERP에서 이미 Notion과 연결된 페이지 ID 목록 (중복 방지)
-  const linkedNotionIds = new Set(customEvents.map((e) => e.notionPageId).filter(Boolean));
+  const linkedNotionIds = new Set([
+    ...customEvents.map((e) => e.notionPageId),
+    ...leaves.map((l) => (l as { notionPageId?: string | null }).notionPageId),
+  ].filter(Boolean) as string[]);
 
   const events = [
     ...projects.flatMap((p) => {

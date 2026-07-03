@@ -33,7 +33,10 @@ export default async function CalendarPage() {
     getNotionEvents(year, month).catch(() => []),
   ]);
 
-  const linkedNotionIds = new Set(customEvents.map((e) => e.notionPageId).filter(Boolean));
+  const linkedNotionIds = new Set([
+    ...customEvents.map((e) => e.notionPageId),
+    ...leaves.map((l) => (l as { notionPageId?: string | null }).notionPageId),
+  ].filter(Boolean) as string[]);
 
   const events = [
     ...projects.flatMap((p) => {
