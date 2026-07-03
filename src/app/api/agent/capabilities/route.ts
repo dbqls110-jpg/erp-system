@@ -3,7 +3,7 @@ import { verifyAgentApiKey } from "@/lib/agentAuth";
 
 const CAPABILITIES = {
   system: "천우영 ERP",
-  version: "1.2.0",
+  version: "1.3.0",
   baseUrl: "/api/agent",
   resources: [
     {
@@ -254,6 +254,122 @@ const CAPABILITIES = {
             { name: "dryRun", type: "boolean", required: false, description: "true면 dryRun 로그만" },
           ],
         },
+      ],
+    },
+    {
+      name: "sheets",
+      description: "Google Sheets 생성·읽기·수정·행 추가 (ERP 서비스 계정 경유, Hermes가 직접 Google 키 불필요)",
+      read: true,
+      write: true,
+      endpoints: [
+        {
+          method: "GET",
+          path: "/api/agent/sheets/folders",
+          description: "사용 가능한 Hermes 운영 폴더 alias 목록 반환",
+          auth: true,
+          dryRun: false,
+          params: [],
+          response: {
+            folders: "{ alias: string, configured: boolean }[]",
+            total: "number",
+          },
+        },
+        {
+          method: "POST",
+          path: "/api/agent/sheets/create",
+          description: "새 Google Spreadsheet 생성 (탭 생성·초기 데이터 입력 포함). 생성 후 URL을 Discord에 바로 전달 가능",
+          auth: true,
+          dryRun: true,
+          body: {
+            title: "string (필수) — 스프레드시트 제목. 예: \"2026-07-03_디스코드_자료정리\"",
+            folder: "string (선택) — Hermes 폴더 alias. GET /api/agent/sheets/folders 로 확인. 예: \"discord\"",
+            tabs: "string[] (선택, 기본 [\"Sheet1\"]) — 탭 이름 배열. 최대 10개",
+            data: "object (선택) — 탭별 초기 데이터 2D 배열. 예: { \"정리\": [[\"항목\",\"내용\"],[\"A\",\"B\"]] }",
+            dryRun: "boolean (선택)",
+          },
+          response: {
+            spreadsheetId: "string",
+            url: "string — 편집 URL (Discord에 바로 전달 가능)",
+            title: "string",
+            folder: "string | null",
+            folderMoved: "boolean — 폴더 이동 성공 여부",
+            tabs: "string[]",
+          },
+          example: {
+            title: "2026-07-03_디스코드_자료정리",
+            folder: "discord",
+            tabs: ["정리", "원본"],
+            data: {
+              "정리": [["항목", "내용", "출처"], ["A", "내용", "링크"]],
+              "원본": [["원문"]],
+            },
+            dryRun: true,
+          },
+        },
+        {
+          method: "GET",
+          path: "/api/agent/sheets/values",
+          description: "지정 시트 범위 읽기. spreadsheetId 없으면 ERP 재무 시트(GOOGLE_SHEET_ID) 사용",
+          auth: true,
+          dryRun: false,
+          params: [
+            { name: "spreadsheetId", type: "string", required: false, description: "없으면 GOOGLE_SHEET_ID 기본값" },
+            { name: "range", type: "string", required: true, description: "A1 notation. 예: 정리!A1:D20" },
+          ],
+          response: {
+            spreadsheetId: "string",
+            range: "string",
+            rowCount: "number",
+            colCount: "number",
+            values: "string[][]",
+          },
+        },
+        {
+          method: "POST",
+          path: "/api/agent/sheets/values",
+          description: "지정 범위 덮어쓰기 (기존 값 대체). spreadsheetId 없으면 ERP 재무 시트 사용",
+          auth: true,
+          dryRun: true,
+          body: {
+            spreadsheetId: "string (선택, 없으면 GOOGLE_SHEET_ID)",
+            range: "string (필수) — A1 notation. 예: 정리!A1:B2",
+            values: "string[][] (필수) — 2D 배열. 최대 500행 × 26열",
+            dryRun: "boolean (선택)",
+          },
+        },
+        {
+          method: "POST",
+          path: "/api/agent/sheets/append",
+          description: "마지막 행 이후에 행 추가 (기존 데이터 유지). spreadsheetId 없으면 ERP 재무 시트 사용",
+          auth: true,
+          dryRun: true,
+          body: {
+            spreadsheetId: "string (선택, 없으면 GOOGLE_SHEET_ID)",
+            range: "string (필수) — 열 범위. 예: 정리!A:D",
+            values: "string[][] (필수) — 추가할 행들. 최대 500행",
+            dryRun: "boolean (선택)",
+          },
+          response: {
+            tableRange: "string — 기존 데이터 범위",
+            updatedRange: "string — 실제 추가된 범위",
+            updatedRows: "number",
+            updatedCells: "number",
+          },
+        },
+      ],
+      limits: {
+        maxReadRows: 1000,
+        maxWriteRows: 500,
+        maxCols: 26,
+        maxTabs: 10,
+        maxTitleLen: 100,
+        maxInitialCells: 13000,
+      },
+      notes: [
+        "서비스 계정(erp-sheet@navercafe-data.iam.gserviceaccount.com)이 해당 시트에 편집 권한이 있어야 합니다.",
+        "폴더 기능: Google Drive 폴더를 서비스 계정과 공유(편집자) 후 Render env에 GOOGLE_DRIVE_HERMES_*_FOLDER_ID를 등록하세요.",
+        "folder 없이 create 호출 시 서비스 계정의 Drive에 생성됩니다 — 직접 접근하려면 폴더를 설정하거나 URL로 접근하세요.",
+        "spreadsheetId 없이 values/append 호출 시 GOOGLE_SHEET_ID(ERP 재무 시트)에 쓰게 됩니다 — 의도한 시트인지 확인하세요.",
       ],
     },
     {
