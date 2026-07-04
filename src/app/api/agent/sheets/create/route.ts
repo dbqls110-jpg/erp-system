@@ -152,22 +152,39 @@ export async function POST(req: NextRequest) {
     // 1. 루트 폴더 확인
     let rootFolderId = process.env.GOOGLE_DRIVE_HERMES_ROOT_FOLDER_ID ?? "";
     if (!rootFolderId) {
-      rootFolderId = await findOrCreateFolder(drive, ROOT_FOLDER_NAME);
+      try {
+        rootFolderId = await findOrCreateFolder(drive, ROOT_FOLDER_NAME);
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : "unknown";
+        return NextResponse.json({ error: "루트 폴더 생성 실패", detail: msg, step: "root_folder" }, { status: 502 });
+      }
     }
 
     // 2. 서브폴더 검색 또는 생성
-    const subFolderId = await findOrCreateFolder(drive, rawSubfolder, rootFolderId);
+    let subFolderId: string;
+    try {
+      subFolderId = await findOrCreateFolder(drive, rawSubfolder, rootFolderId);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "unknown";
+      return NextResponse.json({ error: "서브폴더 생성 실패", detail: msg, step: "subfolder", rootFolderId }, { status: 502 });
+    }
 
     // 3. 스프레드시트를 목표 폴더에 직접 생성 (Move 불필요)
-    const driveRes = await drive.files.create({
-      requestBody: {
-        name: finalTitle,
-        mimeType: "application/vnd.google-apps.spreadsheet",
-        parents: [subFolderId],
-      },
-      fields: "id",
-    });
-    const spreadsheetId = driveRes.data.id!;
+    let spreadsheetId: string;
+    try {
+      const driveRes = await drive.files.create({
+        requestBody: {
+          name: finalTitle,
+          mimeType: "application/vnd.google-apps.spreadsheet",
+          parents: [subFolderId],
+        },
+        fields: "id",
+      });
+      spreadsheetId = driveRes.data.id!;
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "unknown";
+      return NextResponse.json({ error: "파일 생성 실패", detail: msg, step: "create_file", subFolderId }, { status: 502 });
+    }
     const url = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit`;
 
     // 4. 탭 구성: 기본 시트 이름 변경 + 추가 탭 생성
