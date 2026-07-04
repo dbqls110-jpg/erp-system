@@ -27,12 +27,11 @@ function generateTitle(sourcePrompt?: string): string {
   return cleaned || "새 시트";
 }
 
-// Drive API query에서 single quote 이스케이프
 function escapeQ(str: string): string {
   return str.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
 }
 
-// 이름으로 폴더 검색, 없으면 생성
+// 폴더 검색 (없으면 생성). corpora 제한 없이 접근 가능한 모든 Drive 대상
 async function findOrCreateFolder(
   drive: drive_v3.Drive,
   name: string,
@@ -45,7 +44,6 @@ async function findOrCreateFolder(
     q,
     fields: "files(id, name)",
     pageSize: 1,
-    corpora: "user",
     spaces: "drive",
   });
 
@@ -94,7 +92,6 @@ export async function POST(req: NextRequest) {
     dryRun = false,
   } = body;
 
-  // 서브폴더명 결정
   const rawSubfolder = folderName
     ? sanitizeTitle(String(folderName), 50)
     : (AGENT_FOLDER_MAP[String(agentType)] ?? "Hermes");
@@ -105,7 +102,6 @@ export async function POST(req: NextRequest) {
 
   const folderPath = `${ROOT_FOLDER_NAME}/${rawSubfolder}`;
 
-  // 제목 결정
   const finalTitle = title
     ? sanitizeTitle(String(title), LIMITS.MAX_TITLE_LEN)
     : generateTitle(sourcePrompt);
@@ -114,13 +110,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "title 또는 sourcePrompt가 필요합니다." }, { status: 400 });
   }
 
-  // 탭 검증
   if (!Array.isArray(tabs) || tabs.length === 0 || tabs.length > LIMITS.MAX_TABS) {
     return NextResponse.json({ error: `tabs는 1~${LIMITS.MAX_TABS}개 배열이어야 합니다.` }, { status: 400 });
   }
   const safeTabs = [...new Set(tabs.map((t) => String(t).trim()).filter(Boolean))];
+  if (safeTabs.length === 0) safeTabs.push("Sheet1");
 
-  // 초기 데이터 셀 수 제한
   let totalCells = 0;
   for (const rows of Object.values(data)) {
     if (Array.isArray(rows)) {
@@ -135,7 +130,6 @@ export async function POST(req: NextRequest) {
     }, { status: 400 });
   }
 
-  // dryRun: 실제 생성 없이 preview만 반환
   if (dryRun === true) {
     await auditLog({
       method: "POST",
@@ -152,10 +146,10 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const sheets = makeSheetsClient();
     const drive = makeDriveClient();
+    const sheets = makeSheetsClient();
 
-    // 1. 루트 폴더 ID 확인 (env 우선, 없으면 검색/생성)
+    // 1. 루트 폴더 확인
     let rootFolderId = process.env.GOOGLE_DRIVE_HERMES_ROOT_FOLDER_ID ?? "";
     if (!rootFolderId) {
       rootFolderId = await findOrCreateFolder(drive, ROOT_FOLDER_NAME);
@@ -164,20 +158,40 @@ export async function POST(req: NextRequest) {
     // 2. 서브폴더 검색 또는 생성
     const subFolderId = await findOrCreateFolder(drive, rawSubfolder, rootFolderId);
 
-    // 3. 스프레드시트 생성
-    const createRes = await sheets.spreadsheets.create({
+    // 3. 스프레드시트를 목표 폴더에 직접 생성 (Move 불필요)
+    const driveRes = await drive.files.create({
       requestBody: {
-        properties: { title: finalTitle },
-        sheets: safeTabs.map((tabTitle, idx) => ({
-          properties: { title: tabTitle, sheetId: idx },
-        })),
+        name: finalTitle,
+        mimeType: "application/vnd.google-apps.spreadsheet",
+        parents: [subFolderId],
       },
+      fields: "id",
     });
-
-    const spreadsheetId = createRes.data.spreadsheetId!;
+    const spreadsheetId = driveRes.data.id!;
     const url = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit`;
 
-    // 4. 탭별 초기 데이터 입력
+    // 4. 탭 구성: 기본 시트 이름 변경 + 추가 탭 생성
+    const ssInfo = await sheets.spreadsheets.get({ spreadsheetId });
+    const defaultSheetId = ssInfo.data.sheets?.[0]?.properties?.sheetId ?? 0;
+
+    const tabRequests: object[] = [
+      {
+        updateSheetProperties: {
+          properties: { sheetId: defaultSheetId, title: safeTabs[0] },
+          fields: "title",
+        },
+      },
+      ...safeTabs.slice(1).map((tabTitle) => ({
+        addSheet: { properties: { title: tabTitle } },
+      })),
+    ];
+
+    await sheets.spreadsheets.batchUpdate({
+      spreadsheetId,
+      requestBody: { requests: tabRequests },
+    });
+
+    // 5. 탭별 초기 데이터 입력
     const dataEntries = Object.entries(data).filter(
       ([tabName, rows]) => safeTabs.includes(tabName) && Array.isArray(rows) && rows.length > 0
     );
@@ -199,14 +213,6 @@ export async function POST(req: NextRequest) {
         },
       });
     }
-
-    // 5. 서브폴더로 이동
-    await drive.files.update({
-      fileId: spreadsheetId,
-      addParents: subFolderId,
-      removeParents: "root",
-      fields: "id,parents",
-    });
 
     const result = { spreadsheetId, url, title: finalTitle, folderPath };
 
