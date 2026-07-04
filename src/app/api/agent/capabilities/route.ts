@@ -3,7 +3,7 @@ import { verifyAgentApiKey } from "@/lib/agentAuth";
 
 const CAPABILITIES = {
   system: "천우영 ERP",
-  version: "1.4.0",
+  version: "1.5.0",
   baseUrl: "/api/agent",
   resources: [
     {
@@ -375,10 +375,60 @@ const CAPABILITIES = {
       },
       notes: [
         "서비스 계정(erp-sheet@navercafe-data.iam.gserviceaccount.com)이 해당 시트에 편집 권한이 있어야 합니다.",
-        "폴더 기능: Google Drive 폴더를 서비스 계정과 공유(편집자) 후 Render env에 GOOGLE_DRIVE_HERMES_*_FOLDER_ID를 등록하세요.",
-        "folder 없이 create 호출 시 서비스 계정의 Drive에 생성됩니다 — 직접 접근하려면 폴더를 설정하거나 URL로 접근하세요.",
+        "폴더 기능: Google Drive 폴더를 서비스 계정과 공유(편집자) 후 Render env에 GOOGLE_DRIVE_HERMES_ROOT_FOLDER_ID를 등록하세요.",
         "spreadsheetId 없이 values/append 호출 시 GOOGLE_SHEET_ID(ERP 재무 시트)에 쓰게 됩니다 — 의도한 시트인지 확인하세요.",
+        "전형적인 Hermes 흐름: find로 spreadsheetId 검색 → values로 읽기 → append로 행 추가",
       ],
+      driveSearch: {
+        description: "Google Drive 폴더 안의 스프레드시트를 조회/검색하는 엔드포인트",
+        endpoints: [
+          {
+            method: "GET",
+            path: "/api/agent/sheets/folder-files",
+            description: "폴더 안의 Google Spreadsheet 목록 반환. folderId/folderUrl 없으면 root(Hermes 운영 시트) 사용",
+            auth: true,
+            params: [
+              { name: "folderId", type: "string", required: false, description: "Google Drive 폴더 ID. 없으면 root 폴더 사용" },
+              { name: "folderUrl", type: "string", required: false, description: "Google Drive 폴더 URL. folderId보다 우선순위 낮음. 예: https://drive.google.com/drive/folders/1aYyO3..." },
+              { name: "limit", type: "number", required: false, description: "최대 반환 수 (기본 50, 최대 100)" },
+            ],
+            response: {
+              folderId: "string",
+              isRootFolder: "boolean",
+              count: "number",
+              files: "{ name, spreadsheetId, url, modifiedTime, parentFolderId }[]",
+            },
+            example: "GET /api/agent/sheets/folder-files (파라미터 없이 → root 폴더 목록)",
+            security: "root 폴더 또는 직계 하위 폴더만 허용. 외부 폴더는 403 반환",
+          },
+          {
+            method: "GET",
+            path: "/api/agent/sheets/find",
+            description: "폴더 안에서 시트 이름으로 검색. 대소문자·공백 차이 무시. bestMatch로 가장 유사한 결과 반환",
+            auth: true,
+            params: [
+              { name: "q", type: "string", required: true, description: "검색어 (시트 이름 일부). 예: 고객리스트" },
+              { name: "folderId", type: "string", required: false, description: "검색할 폴더 ID. 없으면 root 폴더" },
+              { name: "folderUrl", type: "string", required: false, description: "검색할 폴더 URL" },
+              { name: "limit", type: "number", required: false, description: "최대 반환 수 (기본 10, 최대 50)" },
+            ],
+            response: {
+              q: "string — 검색어",
+              folderId: "string",
+              totalScanned: "number — 전체 스캔 파일 수",
+              matchCount: "number",
+              matches: "{ name, spreadsheetId, url, modifiedTime }[]",
+              bestMatch: "{ name, spreadsheetId, url, modifiedTime } | null",
+            },
+            example: "GET /api/agent/sheets/find?q=고객리스트",
+          },
+        ],
+        typicalFlow: [
+          "1. GET /api/agent/sheets/find?q=시트이름 → bestMatch.spreadsheetId 획득",
+          "2. GET /api/agent/sheets/values?spreadsheetId=...&range=A1:D10 → 내용 읽기",
+          "3. POST /api/agent/sheets/append { spreadsheetId, range, values } → 행 추가",
+        ],
+      },
     },
     {
       name: "webhook",

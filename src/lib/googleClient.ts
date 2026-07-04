@@ -53,6 +53,23 @@ export function resolveFolderAlias(alias: string): string | null {
   return getHermesFolderMap()[alias] ?? null;
 }
 
+// Google Drive 폴더 URL에서 folderId 파싱
+// 예: https://drive.google.com/drive/folders/1aYyO3Xj... → 1aYyO3Xj...
+export function parseFolderIdFromUrl(url: string): string | null {
+  const match = url.match(/\/folders\/([A-Za-z0-9_-]+)/);
+  return match?.[1] ?? null;
+}
+
+// folderId, folderUrl, root 순서로 유효한 폴더 ID 반환
+export function resolveEffectiveFolderId(
+  folderId?: string | null,
+  folderUrl?: string | null
+): string | null {
+  if (folderId) return folderId;
+  if (folderUrl) return parseFolderIdFromUrl(folderUrl);
+  return process.env.GOOGLE_DRIVE_HERMES_ROOT_FOLDER_ID ?? null;
+}
+
 export function isValidSpreadsheetId(id: string): boolean {
   return typeof id === "string" && /^[A-Za-z0-9_-]{20,60}$/.test(id);
 }
