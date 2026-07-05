@@ -169,44 +169,37 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "서브폴더 생성 실패", detail: msg, step: "subfolder", rootFolderId }, { status: 502 });
     }
 
-    // 3. 스프레드시트를 목표 폴더에 직접 생성 (Move 불필요)
+    // 3. Sheets API로 탭 포함 스프레드시트 생성 (서비스 계정 My Drive에 생성됨)
     let spreadsheetId: string;
     try {
-      const driveRes = await drive.files.create({
+      const createRes = await sheets.spreadsheets.create({
         requestBody: {
-          name: finalTitle,
-          mimeType: "application/vnd.google-apps.spreadsheet",
-          parents: [subFolderId],
+          properties: { title: finalTitle },
+          sheets: safeTabs.map((title) => ({ properties: { title } })),
         },
-        fields: "id",
+        fields: "spreadsheetId",
       });
-      spreadsheetId = driveRes.data.id!;
+      spreadsheetId = createRes.data.spreadsheetId!;
     } catch (e) {
       const msg = e instanceof Error ? e.message : "unknown";
-      return NextResponse.json({ error: "파일 생성 실패", detail: msg, step: "create_file", subFolderId }, { status: 502 });
+      return NextResponse.json({ error: "스프레드시트 생성 실패", detail: msg, step: "sheets_create" }, { status: 502 });
     }
     const url = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit`;
 
-    // 4. 탭 구성: 기본 시트 이름 변경 + 추가 탭 생성
-    const ssInfo = await sheets.spreadsheets.get({ spreadsheetId });
-    const defaultSheetId = ssInfo.data.sheets?.[0]?.properties?.sheetId ?? 0;
-
-    const tabRequests: object[] = [
-      {
-        updateSheetProperties: {
-          properties: { sheetId: defaultSheetId, title: safeTabs[0] },
-          fields: "title",
-        },
-      },
-      ...safeTabs.slice(1).map((tabTitle) => ({
-        addSheet: { properties: { title: tabTitle } },
-      })),
-    ];
-
-    await sheets.spreadsheets.batchUpdate({
-      spreadsheetId,
-      requestBody: { requests: tabRequests },
-    });
+    // 4. 현재 부모 ID 조회 후 서브폴더로 이동
+    try {
+      const fileInfo = await drive.files.get({ fileId: spreadsheetId, fields: "parents" });
+      const currentParents = (fileInfo.data.parents ?? []).join(",");
+      await drive.files.update({
+        fileId: spreadsheetId,
+        addParents: subFolderId,
+        ...(currentParents ? { removeParents: currentParents } : {}),
+        fields: "id,parents",
+      });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "unknown";
+      return NextResponse.json({ error: "폴더 이동 실패", detail: msg, step: "move_to_folder", spreadsheetId, url, subFolderId }, { status: 502 });
+    }
 
     // 5. 탭별 초기 데이터 입력
     const dataEntries = Object.entries(data).filter(
