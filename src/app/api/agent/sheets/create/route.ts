@@ -169,20 +169,21 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "서브폴더 생성 실패", detail: msg, step: "subfolder", rootFolderId }, { status: 502 });
     }
 
-    // 3. Sheets API로 탭 포함 스프레드시트 생성 (서비스 계정 My Drive에 생성됨)
+    // 3. 서비스 계정 Drive 파일 생성 가능 여부 진단: 부모 없이 SA root에 생성 시도
     let spreadsheetId: string;
     try {
-      const createRes = await sheets.spreadsheets.create({
+      const diagRes = await drive.files.create({
         requestBody: {
-          properties: { title: finalTitle },
-          sheets: safeTabs.map((title) => ({ properties: { title } })),
+          name: finalTitle,
+          mimeType: "application/vnd.google-apps.spreadsheet",
+          // parents 없음 → SA 자신의 Drive root에 생성
         },
-        fields: "spreadsheetId",
+        fields: "id",
       });
-      spreadsheetId = createRes.data.spreadsheetId!;
+      spreadsheetId = diagRes.data.id!;
     } catch (e) {
       const msg = e instanceof Error ? e.message : "unknown";
-      return NextResponse.json({ error: "스프레드시트 생성 실패", detail: msg, step: "sheets_create" }, { status: 502 });
+      return NextResponse.json({ error: "SA Drive 파일 생성 불가", detail: msg, step: "diag_sa_root_create" }, { status: 502 });
     }
     const url = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit`;
 
