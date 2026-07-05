@@ -147,7 +147,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const drive = makeDriveClient();
-    const sheets = makeSheetsClient();
+    const sheets = makeSheetsClient(true); // create에는 Drive 스코프도 필요
 
     // 1. 루트 폴더 확인
     let rootFolderId = process.env.GOOGLE_DRIVE_HERMES_ROOT_FOLDER_ID ?? "";
