@@ -79,6 +79,26 @@ export function isValidRange(range: string): boolean {
   return typeof range === "string" && range.length <= 200 && /^[A-Za-z0-9 _\-'!:.]+$/.test(range);
 }
 
+// dbqls110@gmail.com OAuth2 클라이언트 (Drive 파일 생성용)
+function makeOwnerOAuth2() {
+  const refreshToken = process.env.GOOGLE_DRIVE_OWNER_REFRESH_TOKEN;
+  if (!refreshToken) throw new Error("GOOGLE_DRIVE_OWNER_REFRESH_TOKEN이 설정되지 않았습니다.");
+  const oauth2 = new google.auth.OAuth2(
+    process.env.AUTH_GOOGLE_ID,
+    process.env.AUTH_GOOGLE_SECRET,
+  );
+  oauth2.setCredentials({ refresh_token: refreshToken });
+  return oauth2;
+}
+
+export function makeDriveClientAsOwner() {
+  return google.drive({ version: "v3", auth: makeOwnerOAuth2() });
+}
+
+export function makeSheetsClientAsOwner() {
+  return google.sheets({ version: "v4", auth: makeOwnerOAuth2() });
+}
+
 export const LIMITS = {
   MAX_READ_ROWS: 1000,
   MAX_WRITE_ROWS: 500,

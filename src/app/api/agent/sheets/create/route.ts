@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyAgentApiKey } from "@/lib/agentAuth";
 import { auditLog } from "@/lib/agentAudit";
-import { makeSheetsClient, makeDriveClient, LIMITS } from "@/lib/googleClient";
+import {
+  makeSheetsClient,
+  makeDriveClientAsOwner,
+  LIMITS,
+} from "@/lib/googleClient";
 import type { drive_v3 } from "googleapis";
 
 const ROOT_FOLDER_NAME = "Hermes 운영 시트";
@@ -31,7 +35,7 @@ function escapeQ(str: string): string {
   return str.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
 }
 
-// 폴더 검색 (없으면 생성). corpora 제한 없이 접근 가능한 모든 Drive 대상
+// owner 계정(dbqls110@gmail.com)으로 폴더 검색/생성
 async function findOrCreateFolder(
   drive: drive_v3.Drive,
   name: string,
@@ -146,60 +150,73 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const drive = makeDriveClient();
-    const sheets = makeSheetsClient(true); // create에는 Drive 스코프도 필요
+    // owner 계정(dbqls110@gmail.com)으로 Drive 클라이언트 생성
+    const ownerDrive = makeDriveClientAsOwner();
+    // 데이터 쓰기는 서비스 계정 유지
+    const sheets = makeSheetsClient();
 
     // 1. 루트 폴더 확인
     let rootFolderId = process.env.GOOGLE_DRIVE_HERMES_ROOT_FOLDER_ID ?? "";
     if (!rootFolderId) {
       try {
-        rootFolderId = await findOrCreateFolder(drive, ROOT_FOLDER_NAME);
+        rootFolderId = await findOrCreateFolder(ownerDrive, ROOT_FOLDER_NAME);
       } catch (e) {
         const msg = e instanceof Error ? e.message : "unknown";
         return NextResponse.json({ error: "루트 폴더 생성 실패", detail: msg, step: "root_folder" }, { status: 502 });
       }
     }
 
-    // 2. 서브폴더 검색 또는 생성
+    // 2. 서브폴더 검색 또는 생성 (owner 계정으로)
     let subFolderId: string;
     try {
-      subFolderId = await findOrCreateFolder(drive, rawSubfolder, rootFolderId);
+      subFolderId = await findOrCreateFolder(ownerDrive, rawSubfolder, rootFolderId);
     } catch (e) {
       const msg = e instanceof Error ? e.message : "unknown";
-      return NextResponse.json({ error: "서브폴더 생성 실패", detail: msg, step: "subfolder", rootFolderId }, { status: 502 });
+      return NextResponse.json({ error: "서브폴더 생성 실패", detail: msg, step: "subfolder" }, { status: 502 });
     }
 
-    // 3. 서비스 계정 Drive 파일 생성 가능 여부 진단: 부모 없이 SA root에 생성 시도
+    // 3. owner 계정으로 스프레드시트를 서브폴더에 직접 생성
     let spreadsheetId: string;
     try {
-      const diagRes = await drive.files.create({
+      const driveRes = await ownerDrive.files.create({
         requestBody: {
           name: finalTitle,
           mimeType: "application/vnd.google-apps.spreadsheet",
-          // parents 없음 → SA 자신의 Drive root에 생성
+          parents: [subFolderId],
         },
         fields: "id",
       });
-      spreadsheetId = diagRes.data.id!;
+      spreadsheetId = driveRes.data.id!;
     } catch (e) {
       const msg = e instanceof Error ? e.message : "unknown";
-      return NextResponse.json({ error: "SA Drive 파일 생성 불가", detail: msg, step: "diag_sa_root_create" }, { status: 502 });
+      return NextResponse.json({ error: "파일 생성 실패", detail: msg, step: "create_file", subFolderId }, { status: 502 });
     }
     const url = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit`;
 
-    // 4. 현재 부모 ID 조회 후 서브폴더로 이동
+    // 4. 탭 구성 (기본 시트 이름 변경 + 추가 탭)
     try {
-      const fileInfo = await drive.files.get({ fileId: spreadsheetId, fields: "parents" });
-      const currentParents = (fileInfo.data.parents ?? []).join(",");
-      await drive.files.update({
-        fileId: spreadsheetId,
-        addParents: subFolderId,
-        ...(currentParents ? { removeParents: currentParents } : {}),
-        fields: "id,parents",
+      const ssInfo = await sheets.spreadsheets.get({ spreadsheetId });
+      const defaultSheetId = ssInfo.data.sheets?.[0]?.properties?.sheetId ?? 0;
+
+      const tabRequests: object[] = [
+        {
+          updateSheetProperties: {
+            properties: { sheetId: defaultSheetId, title: safeTabs[0] },
+            fields: "title",
+          },
+        },
+        ...safeTabs.slice(1).map((tabTitle) => ({
+          addSheet: { properties: { title: tabTitle } },
+        })),
+      ];
+
+      await sheets.spreadsheets.batchUpdate({
+        spreadsheetId,
+        requestBody: { requests: tabRequests },
       });
     } catch (e) {
       const msg = e instanceof Error ? e.message : "unknown";
-      return NextResponse.json({ error: "폴더 이동 실패", detail: msg, step: "move_to_folder", spreadsheetId, url, subFolderId }, { status: 502 });
+      return NextResponse.json({ error: "탭 구성 실패", detail: msg, step: "configure_tabs", spreadsheetId, url }, { status: 502 });
     }
 
     // 5. 탭별 초기 데이터 입력
@@ -207,22 +224,27 @@ export async function POST(req: NextRequest) {
       ([tabName, rows]) => safeTabs.includes(tabName) && Array.isArray(rows) && rows.length > 0
     );
     if (dataEntries.length > 0) {
-      await sheets.spreadsheets.values.batchUpdate({
-        spreadsheetId,
-        requestBody: {
-          valueInputOption: "USER_ENTERED",
-          data: dataEntries.map(([tabName, rows]) => ({
-            range: `'${tabName}'!A1`,
-            values: (rows as string[][])
-              .slice(0, LIMITS.MAX_WRITE_ROWS)
-              .map((row) =>
-                Array.isArray(row)
-                  ? row.slice(0, LIMITS.MAX_COLS).map((v) => String(v ?? ""))
-                  : []
-              ),
-          })),
-        },
-      });
+      try {
+        await sheets.spreadsheets.values.batchUpdate({
+          spreadsheetId,
+          requestBody: {
+            valueInputOption: "USER_ENTERED",
+            data: dataEntries.map(([tabName, rows]) => ({
+              range: `'${tabName}'!A1`,
+              values: (rows as string[][])
+                .slice(0, LIMITS.MAX_WRITE_ROWS)
+                .map((row) =>
+                  Array.isArray(row)
+                    ? row.slice(0, LIMITS.MAX_COLS).map((v) => String(v ?? ""))
+                    : []
+                ),
+            })),
+          },
+        });
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : "unknown";
+        return NextResponse.json({ error: "데이터 입력 실패", detail: msg, step: "write_data", spreadsheetId, url }, { status: 502 });
+      }
     }
 
     const result = { spreadsheetId, url, title: finalTitle, folderPath };
