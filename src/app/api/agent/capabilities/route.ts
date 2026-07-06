@@ -474,9 +474,10 @@ const CAPABILITIES = {
         timestamp: "ISO 8601 timestamp",
       },
       mentionRouting: {
-        "헤르메스 | @헤르메스 | hermes | @hermes": "agentType: \"hermes\"",
-        "마케터 | @마케터 | marketer | @marketer": "agentType: \"marketer\"",
+        "헤르메스 | @헤르메스 | hermes | @hermes": "agentType: \"hermes\" → HERMES_WEBHOOK_URL 발송",
+        "마케터 | @마케터 | marketer | @marketer": "agentType: \"marketer\" → MARKETER_WEBHOOK_URL 발송 (미설정 시 HERMES_WEBHOOK_URL fallback)",
         "우선순위": "marketer > hermes (동시 포함 시 marketer로 라우팅)",
+        "secret": "agentType=marketer → MARKETER_WEBHOOK_SECRET (미설정 시 HERMES_WEBHOOK_SECRET fallback)",
       },
     },
     {

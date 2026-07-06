@@ -22,13 +22,30 @@ export interface HermesWebhookResult {
   error?: string;
 }
 
+function resolveWebhookConfig(agentType?: string): { url: string; secret: string | undefined } | null {
+  if (agentType === "marketer") {
+    const url = process.env.MARKETER_WEBHOOK_URL || process.env.HERMES_WEBHOOK_URL;
+    if (!url) return null;
+    const secret = process.env.MARKETER_WEBHOOK_SECRET || process.env.HERMES_WEBHOOK_SECRET;
+    return { url, secret };
+  }
+  const url = process.env.HERMES_WEBHOOK_URL;
+  if (!url) return null;
+  return { url, secret: process.env.HERMES_WEBHOOK_SECRET };
+}
+
 export async function dispatchHermesWebhook(
   payload: Record<string, unknown>
 ): Promise<HermesWebhookResult> {
-  const webhookUrl = process.env.HERMES_WEBHOOK_URL;
-  const secret = process.env.HERMES_WEBHOOK_SECRET;
+  const agentType = typeof payload.agentType === "string" ? payload.agentType : undefined;
+  const config = resolveWebhookConfig(agentType);
 
-  if (!webhookUrl) return { ok: false, error: "HERMES_WEBHOOK_URL not configured" };
+  if (!config) {
+    const missing = agentType === "marketer" ? "MARKETER_WEBHOOK_URL / HERMES_WEBHOOK_URL" : "HERMES_WEBHOOK_URL";
+    return { ok: false, error: `${missing} not configured` };
+  }
+
+  const { url: webhookUrl, secret } = config;
 
   const body = JSON.stringify(payload);
   const timestamp = Date.now().toString();
