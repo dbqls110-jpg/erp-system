@@ -216,9 +216,10 @@ const CAPABILITIES = {
     },
     {
       name: "messages",
-      description: "직원 간 메시지 조회·전송",
+      description: "직원 간 메시지 조회·전송·pending 조회·ack",
       read: true, write: true,
-      note: "Hermes 발신 시 isAgent=true 계정을 sender로 사용",
+      operationMode: "webhook (Hermes) 또는 polling (마케터) 모두 지원",
+      note: "agentType 지정 시 해당 에이전트 계정을 sender로 사용. 미지정 시 Hermes(기본)",
       endpoints: [
         {
           method: "GET", path: "/api/agent/messages",
@@ -231,15 +232,63 @@ const CAPABILITIES = {
         },
         {
           method: "POST", path: "/api/agent/messages",
-          description: "Hermes Agent가 직원에게 메시지 전송",
+          description: "에이전트가 직원에게 메시지 전송. agentType으로 발신자 계정 선택",
           auth: true, dryRun: true,
           body: {
-            recipientUserId: "string (필수)",
+            agentType: "\"hermes\" | \"marketer\" (선택, 기본 hermes) — sender 계정 결정",
+            recipientUserId: "string (conversationId 없을 때 필수) — 수신자 userId",
+            conversationId: "string (선택) — 대화 ID 직접 지정. pending에서 받은 conversationId로 답장 시 사용",
             content: "string (필수)",
             dryRun: "boolean (선택)",
           },
+          note: "conversationId와 recipientUserId 중 하나 필수. conversationId 우선",
+        },
+        {
+          method: "GET", path: "/api/agent/messages/pending",
+          description: "에이전트 대상 미처리 메시지 목록 반환 (polling 방식). agentType별 엄격히 분리",
+          auth: true, dryRun: false,
+          params: [
+            { name: "agentType", type: "\"hermes\" | \"marketer\"", required: true, description: "조회할 에이전트 타입" },
+            { name: "limit", type: "number", required: false, description: "최대 반환 수 (기본 20, 최대 50)" },
+          ],
+          response: {
+            agentType: "string",
+            count: "number",
+            messages: "{ messageId, conversationId, senderUserId, senderName, content, agentType, createdAt }[]",
+          },
+          rules: [
+            "agentType=marketer → @마케터/마케터/marketer 키워드 메시지만 반환",
+            "agentType=hermes → @헤르메스/헤르메스/hermes 키워드 메시지만 반환",
+            "에이전트 자신이 보낸 메시지는 제외",
+            "ack 완료된 메시지는 제외",
+            "최근 7일 기준 스캔",
+          ],
+        },
+        {
+          method: "POST", path: "/api/agent/messages/:id/ack",
+          description: "메시지 처리 완료 기록. messageId + agentType 기준으로 중복 방지",
+          auth: true, dryRun: false,
+          body: {
+            agentType: "\"hermes\" | \"marketer\" (필수)",
+            status: "\"processed\" | \"error\" (기본 processed)",
+            resultMessageId: "string (선택) — 답장으로 보낸 messageId",
+            error: "string (선택) — status=error일 때 오류 내용",
+          },
+          response: {
+            ok: "boolean — 신규 처리 완료",
+            alreadyProcessed: "boolean — 이미 ack된 경우",
+            record: "{ id, messageId, agentType, status, processedAt, resultMessageId }",
+          },
         },
       ],
+      pollingFlow: [
+        "1. GET /api/agent/messages/pending?agentType=marketer → 미처리 메시지 목록",
+        "2. 메시지 처리 (Discord 봇 응답 등)",
+        "3. POST /api/agent/messages { agentType: marketer, conversationId, content } → ERP 메신저 답장",
+        "4. POST /api/agent/messages/:id/ack { agentType: marketer, status: processed, resultMessageId } → 처리 완료 기록",
+        "5. 주기적으로 1번부터 반복",
+      ],
+      agentTypeSeparation: "agentType=marketer pending에는 marketer 키워드 메시지만 반환. hermes 메시지는 절대 포함하지 않음",
     },
     {
       name: "audit",

@@ -1,0 +1,89 @@
+import { NextRequest, NextResponse } from "next/server";
+import { verifyAgentApiKey } from "@/lib/agentAuth";
+import { prisma } from "@/lib/prisma";
+
+const ALLOWED_AGENT_TYPES = ["hermes", "marketer"] as const;
+type AllowedAgentType = (typeof ALLOWED_AGENT_TYPES)[number];
+
+export async function POST(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  if (!verifyAgentApiKey(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const { id: messageId } = await params;
+
+  let body: Record<string, unknown>;
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
+
+  const {
+    agentType,
+    status = "processed",
+    resultMessageId,
+    error,
+  } = body as {
+    agentType?: string;
+    status?: string;
+    resultMessageId?: string;
+    error?: string;
+  };
+
+  if (!agentType || !ALLOWED_AGENT_TYPES.includes(agentType as AllowedAgentType)) {
+    return NextResponse.json(
+      { error: `agentType은 ${ALLOWED_AGENT_TYPES.join(" | ")} 중 하나여야 합니다.` },
+      { status: 400 }
+    );
+  }
+
+  const allowedStatuses = ["processed", "error"];
+  if (!allowedStatuses.includes(status as string)) {
+    return NextResponse.json({ error: "status는 processed | error 여야 합니다." }, { status: 400 });
+  }
+
+  // 메시지 존재 확인
+  const message = await prisma.message.findUnique({ where: { id: messageId }, select: { id: true } });
+  if (!message) return NextResponse.json({ error: "메시지를 찾을 수 없습니다." }, { status: 404 });
+
+  // 이미 처리된 경우 확인
+  const existing = await prisma.agentMessageProcessing.findUnique({
+    where: { messageId_agentType: { messageId, agentType } },
+  });
+  if (existing) {
+    return NextResponse.json({
+      alreadyProcessed: true,
+      record: {
+        messageId: existing.messageId,
+        agentType: existing.agentType,
+        status: existing.status,
+        processedAt: existing.processedAt,
+      },
+    });
+  }
+
+  const record = await prisma.agentMessageProcessing.create({
+    data: {
+      messageId,
+      agentType,
+      status,
+      processedAt: new Date(),
+      resultMessageId: resultMessageId ?? null,
+      error: error ?? null,
+    },
+  });
+
+  return NextResponse.json({
+    ok: true,
+    record: {
+      id: record.id,
+      messageId: record.messageId,
+      agentType: record.agentType,
+      status: record.status,
+      processedAt: record.processedAt,
+      resultMessageId: record.resultMessageId,
+    },
+  }, { status: 201 });
+}

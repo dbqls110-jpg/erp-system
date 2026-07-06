@@ -327,6 +327,23 @@ model SheetLink {
   @@map("sheet_links")
 }
 
+// ─── Agent 메시지 처리 기록 ──────────────────────────────
+model AgentMessageProcessing {
+  id              String    @id @default(cuid())
+  messageId       String
+  agentType       String    // "hermes" | "marketer"
+  status          String    @default("processed") // "processed" | "error"
+  processedAt     DateTime?
+  resultMessageId String?   // 답장 messageId
+  error           String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@unique([messageId, agentType])
+  @@index([agentType, createdAt])
+  @@map("agent_message_processing")
+}
+
 // ─── 명함 ─────────────────────────────────────────────────
 model BusinessCard {
   id         String   @id @default(cuid())
