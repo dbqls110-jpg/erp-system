@@ -254,7 +254,7 @@ const CAPABILITIES = {
           response: {
             agentType: "string",
             count: "number",
-            messages: "{ messageId, conversationId, senderUserId, senderName, content, agentType, createdAt }[]",
+            messages: "{ messageId, conversationId, senderUserId, senderName, replyRecipientId, content, agentType, createdAt }[]",
           },
           rules: [
             "agentType=marketer → @마케터/마케터/marketer 키워드 메시지만 반환",
@@ -263,6 +263,7 @@ const CAPABILITIES = {
             "ack 완료된 메시지는 제외",
             "최근 7일 기준 스캔",
           ],
+          replyNote: "답장 시 conversationId 대신 replyRecipientId를 recipientUserId로 사용 권장. conversationId를 직접 사용하면 에이전트가 해당 대화 참여자가 아닌 경우 자동으로 올바른 에이전트↔유저 대화로 전환됨.",
         },
         {
           method: "POST", path: "/api/agent/messages/:id/ack",
@@ -284,10 +285,11 @@ const CAPABILITIES = {
       pollingFlow: [
         "1. GET /api/agent/messages/pending?agentType=marketer → 미처리 메시지 목록",
         "2. 메시지 처리 (Discord 봇 응답 등)",
-        "3. POST /api/agent/messages { agentType: marketer, conversationId, content } → ERP 메신저 답장",
+        "3. POST /api/agent/messages { agentType: marketer, recipientUserId: replyRecipientId, content } → ERP 메신저 답장 (conversationId 아닌 recipientUserId 사용 권장)",
         "4. POST /api/agent/messages/:id/ack { agentType: marketer, status: processed, resultMessageId } → 처리 완료 기록",
         "5. 주기적으로 1번부터 반복",
       ],
+      conversationSeparationNote: "conversationId를 직접 사용하면 에이전트가 참여자가 아닌 대화에 메시지를 삽입할 수 있어 헤르메스↔마케터 대화방 혼용 문제가 발생함. replyRecipientId를 recipientUserId로 사용하면 에이전트별 독립 대화방이 자동 생성/유지됨.",
       agentTypeSeparation: "agentType=marketer pending에는 marketer 키워드 메시지만 반환. hermes 메시지는 절대 포함하지 않음",
     },
     {

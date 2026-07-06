@@ -57,6 +57,8 @@ export async function GET(req: NextRequest) {
       conversationId: msg.conversationId,
       senderUserId: msg.senderId,
       senderName: msg.sender.name ?? null,
+      // 에이전트가 답장할 때 사용할 userId (conversationId 대신 recipientUserId로 사용 권장)
+      replyRecipientId: msg.senderId,
       content: msg.content,
       agentType,
       createdAt: msg.createdAt,
