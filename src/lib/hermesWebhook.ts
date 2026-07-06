@@ -1,10 +1,19 @@
 import crypto from "crypto";
 
 const HERMES_KEYWORDS = ["헤르메스", "@헤르메스", "hermes", "@hermes"];
+const MARKETER_KEYWORDS = ["마케터", "@마케터", "marketer", "@marketer"];
 
 export function containsHermesKeyword(text: string): boolean {
   const lower = text.toLowerCase();
   return HERMES_KEYWORDS.some((kw) => lower.includes(kw.toLowerCase()));
+}
+
+// 멘션된 에이전트 타입 반환 (marketer 우선). 없으면 null
+export function detectAgentMention(text: string): "hermes" | "marketer" | null {
+  const lower = text.toLowerCase();
+  if (MARKETER_KEYWORDS.some((kw) => lower.includes(kw.toLowerCase()))) return "marketer";
+  if (HERMES_KEYWORDS.some((kw) => lower.includes(kw.toLowerCase()))) return "hermes";
+  return null;
 }
 
 export interface HermesWebhookResult {

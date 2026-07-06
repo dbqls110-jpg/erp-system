@@ -14,7 +14,8 @@ model User {
   name          String?
   image         String?
   role          String    @default("pending") // "admin" | "user" | "pending"
-  isAgent       Boolean   @default(false)     // true = Hermes Agent (bot)
+  isAgent       Boolean   @default(false)     // true = Agent bot
+  agentType     String?                        // "hermes" | "marketer" | null
   active        Boolean   @default(true)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt

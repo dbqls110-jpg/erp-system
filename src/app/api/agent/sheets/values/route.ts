@@ -1,19 +1,28 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyAgentApiKey } from "@/lib/agentAuth";
 import { auditLog } from "@/lib/agentAudit";
-import { makeSheetsClient, isValidSpreadsheetId, isValidRange, LIMITS } from "@/lib/googleClient";
+import {
+  makeSheetsClient,
+  isValidRange,
+  resolveSpreadsheetId,
+  LIMITS,
+} from "@/lib/googleClient";
 
 // GET: 범위 읽기
 export async function GET(req: NextRequest) {
   if (!verifyAgentApiKey(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { searchParams } = req.nextUrl;
-  const rawId = searchParams.get("spreadsheetId") ?? process.env.GOOGLE_SHEET_ID ?? "";
+  const rawId = searchParams.get("spreadsheetId") ?? null;
+  const rawUrl = searchParams.get("spreadsheetUrl") ?? null;
   const range = searchParams.get("range") ?? "";
 
-  if (!rawId || !isValidSpreadsheetId(rawId)) {
-    return NextResponse.json({ error: "spreadsheetId가 유효하지 않습니다." }, { status: 400 });
+  const resolved = resolveSpreadsheetId(rawId, rawUrl, process.env.GOOGLE_SHEET_ID);
+  if (!resolved) {
+    const hint = rawUrl ? "spreadsheetUrl 형식이 올바르지 않습니다. docs.google.com/spreadsheets URL을 사용하세요." : "spreadsheetId 또는 spreadsheetUrl이 필요합니다.";
+    return NextResponse.json({ error: hint }, { status: 400 });
   }
+
   if (!range) {
     return NextResponse.json({ error: "range 파라미터가 필요합니다. 예: 정리!A1:D20" }, { status: 400 });
   }
@@ -24,7 +33,7 @@ export async function GET(req: NextRequest) {
   try {
     const sheets = makeSheetsClient();
     const res = await sheets.spreadsheets.values.get({
-      spreadsheetId: rawId,
+      spreadsheetId: resolved.id,
       range,
     });
 
@@ -36,7 +45,8 @@ export async function GET(req: NextRequest) {
     }
 
     return NextResponse.json({
-      spreadsheetId: rawId,
+      spreadsheetId: resolved.id,
+      ...(resolved.gid ? { parsedGid: resolved.gid } : {}),
       range: res.data.range,
       rowCount: values.length,
       colCount: values[0]?.length ?? 0,
@@ -61,21 +71,24 @@ export async function POST(req: NextRequest) {
 
   const {
     spreadsheetId: rawId,
+    spreadsheetUrl: rawUrl,
     range,
     values,
     dryRun = false,
   } = body as {
     spreadsheetId?: string;
+    spreadsheetUrl?: string;
     range?: string;
     values?: string[][];
     dryRun?: boolean;
   };
 
-  const spreadsheetId = rawId ?? process.env.GOOGLE_SHEET_ID ?? "";
-
-  if (!spreadsheetId || !isValidSpreadsheetId(spreadsheetId)) {
-    return NextResponse.json({ error: "spreadsheetId가 유효하지 않습니다." }, { status: 400 });
+  const resolved = resolveSpreadsheetId(rawId, rawUrl ?? null, process.env.GOOGLE_SHEET_ID);
+  if (!resolved) {
+    const hint = rawUrl ? "spreadsheetUrl 형식이 올바르지 않습니다." : "spreadsheetId 또는 spreadsheetUrl이 필요합니다.";
+    return NextResponse.json({ error: hint }, { status: 400 });
   }
+
   if (!range || typeof range !== "string" || !isValidRange(range)) {
     return NextResponse.json({ error: "range가 유효하지 않습니다. 예: 정리!A1:B10" }, { status: 400 });
   }
@@ -98,12 +111,13 @@ export async function POST(req: NextRequest) {
       endpoint: "/api/agent/sheets/values",
       action: "write_values",
       dryRun: true,
-      payload: { spreadsheetId, range, rowCount: safeValues.length },
+      payload: { spreadsheetId: resolved.id, range, rowCount: safeValues.length },
     });
     return NextResponse.json({
       dryRun: true,
       preview: {
-        spreadsheetId,
+        spreadsheetId: resolved.id,
+        ...(resolved.gid ? { parsedGid: resolved.gid } : {}),
         range,
         rowCount: safeValues.length,
         colCount: safeValues[0]?.length ?? 0,
@@ -115,7 +129,7 @@ export async function POST(req: NextRequest) {
   try {
     const sheets = makeSheetsClient();
     const res = await sheets.spreadsheets.values.update({
-      spreadsheetId,
+      spreadsheetId: resolved.id,
       range,
       valueInputOption: "USER_ENTERED",
       requestBody: { values: safeValues },
@@ -126,12 +140,13 @@ export async function POST(req: NextRequest) {
       endpoint: "/api/agent/sheets/values",
       action: "write_values",
       dryRun: false,
-      payload: { spreadsheetId, range, rowCount: safeValues.length },
+      payload: { spreadsheetId: resolved.id, range, rowCount: safeValues.length },
       result: { updatedRows: res.data.updatedRows, updatedCells: res.data.updatedCells },
     });
 
     return NextResponse.json({
-      spreadsheetId,
+      spreadsheetId: resolved.id,
+      ...(resolved.gid ? { parsedGid: resolved.gid } : {}),
       updatedRange: res.data.updatedRange,
       updatedRows: res.data.updatedRows,
       updatedCells: res.data.updatedCells,

@@ -1,13 +1,21 @@
 import { prisma } from "@/lib/prisma";
 
-// HERMES_AGENT_EMAIL 환경변수로 재정의 가능 (기본값: ybsw1220@gmail.com)
 export const HERMES_AGENT_EMAIL = process.env.HERMES_AGENT_EMAIL ?? "ybsw1220@gmail.com";
+export const MARKETER_AGENT_EMAIL = process.env.MARKETER_AGENT_EMAIL ?? "marketer-agent@local.erp";
 
+export async function getAgentUser(agentType: string) {
+  const byType = await prisma.user.findFirst({
+    where: { agentType, isAgent: true, active: true },
+  });
+  if (byType) return byType;
+  // email fallback for known agent types
+  const fallbackEmail = agentType === "marketer" ? MARKETER_AGENT_EMAIL : HERMES_AGENT_EMAIL;
+  return prisma.user.findUnique({ where: { email: fallbackEmail } });
+}
+
+// 하위 호환 wrapper
 export async function getHermesUser() {
-  // isAgent=true 레코드를 우선 사용, 없으면 이메일로 fallback
-  const byFlag = await prisma.user.findFirst({ where: { isAgent: true, active: true } });
-  if (byFlag) return byFlag;
-  return prisma.user.findUnique({ where: { email: HERMES_AGENT_EMAIL } });
+  return getAgentUser("hermes");
 }
 
 export async function getOrCreateConversation(userIdA: string, userIdB: string) {

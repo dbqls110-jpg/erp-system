@@ -79,6 +79,39 @@ export function isValidRange(range: string): boolean {
   return typeof range === "string" && range.length <= 200 && /^[A-Za-z0-9 _\-'!:.]+$/.test(range);
 }
 
+// Google Sheets URL에서 spreadsheetId와 gid 추출
+// 허용 도메인: docs.google.com/spreadsheets, spreadsheets.google.com
+export function parseGoogleSheetUrl(url: string): { spreadsheetId: string; gid?: string } | null {
+  if (typeof url !== "string") return null;
+  if (!/^https:\/\/(docs\.google\.com\/spreadsheets|spreadsheets\.google\.com)/.test(url)) return null;
+  const idMatch = url.match(/\/spreadsheets\/d\/([A-Za-z0-9_-]{20,60})/);
+  if (!idMatch) return null;
+  const spreadsheetId = idMatch[1];
+  const gidMatch = url.match(/[?&#]gid=(\d+)/);
+  const gid = gidMatch?.[1];
+  return { spreadsheetId, ...(gid ? { gid } : {}) };
+}
+
+// spreadsheetId 또는 spreadsheetUrl에서 ID 확정. 둘 다 없으면 fallback(env) 사용
+export function resolveSpreadsheetId(
+  spreadsheetId?: string | null,
+  spreadsheetUrl?: string | null,
+  fallback?: string,
+): { id: string; gid?: string } | null {
+  if (spreadsheetId && isValidSpreadsheetId(spreadsheetId)) {
+    return { id: spreadsheetId };
+  }
+  if (spreadsheetUrl) {
+    const parsed = parseGoogleSheetUrl(spreadsheetUrl);
+    if (parsed) return { id: parsed.spreadsheetId, gid: parsed.gid };
+    return null; // URL 형식이 잘못됨 → 명시적 오류 처리를 위해 null 반환
+  }
+  if (fallback && isValidSpreadsheetId(fallback)) {
+    return { id: fallback };
+  }
+  return null;
+}
+
 // dbqls110@gmail.com OAuth2 클라이언트 (Drive 파일 생성용)
 function makeOwnerOAuth2() {
   const refreshToken = process.env.GOOGLE_DRIVE_OWNER_REFRESH_TOKEN;

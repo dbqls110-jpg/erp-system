@@ -3,7 +3,7 @@ import { verifyAgentApiKey } from "@/lib/agentAuth";
 
 const CAPABILITIES = {
   system: "천우영 ERP",
-  version: "1.5.0",
+  version: "1.6.0",
   baseUrl: "/api/agent",
   resources: [
     {
@@ -34,7 +34,7 @@ const CAPABILITIES = {
       endpoints: [
         {
           method: "GET", path: "/api/agent/users",
-          description: "활성 직원 목록 반환 (isAgent 필드 포함)",
+          description: "활성 직원 목록 반환 (isAgent, agentType 필드 포함)",
           auth: true, dryRun: false,
           params: [
             { name: "q", type: "string", required: false, description: "이름/이메일 검색" },
@@ -322,10 +322,12 @@ const CAPABILITIES = {
           dryRun: false,
           params: [
             { name: "spreadsheetId", type: "string", required: false, description: "없으면 GOOGLE_SHEET_ID 기본값" },
+            { name: "spreadsheetUrl", type: "string", required: false, description: "Google Sheets URL (spreadsheetId 대신 사용 가능). gid 포함 시 parsedGid 반환" },
             { name: "range", type: "string", required: true, description: "A1 notation. 예: 정리!A1:D20" },
           ],
           response: {
             spreadsheetId: "string",
+            parsedGid: "string | undefined — URL에 gid 포함 시만 반환",
             range: "string",
             rowCount: "number",
             colCount: "number",
@@ -340,6 +342,7 @@ const CAPABILITIES = {
           dryRun: true,
           body: {
             spreadsheetId: "string (선택, 없으면 GOOGLE_SHEET_ID)",
+            spreadsheetUrl: "string (선택) — Google Sheets URL. spreadsheetId 대신 사용 가능",
             range: "string (필수) — A1 notation. 예: 정리!A1:B2",
             values: "string[][] (필수) — 2D 배열. 최대 500행 × 26열",
             dryRun: "boolean (선택)",
@@ -353,7 +356,8 @@ const CAPABILITIES = {
           dryRun: true,
           body: {
             spreadsheetId: "string (선택, 없으면 GOOGLE_SHEET_ID)",
-            range: "string (필수) — 열 범위. 예: 정리!A:D",
+            spreadsheetUrl: "string (선택) — Google Sheets URL. spreadsheetId 대신 사용 가능",
+            range: "string (선택, 기본 A1) — 열 범위. 예: 정리!A:D. 없으면 첫 번째 시트 A1부터 자동 탐색",
             values: "string[][] (필수) — 추가할 행들. 최대 500행",
             dryRun: "boolean (선택)",
           },
@@ -377,7 +381,9 @@ const CAPABILITIES = {
         "서비스 계정(erp-sheet@navercafe-data.iam.gserviceaccount.com)이 해당 시트에 편집 권한이 있어야 합니다.",
         "폴더 기능: Google Drive 폴더를 서비스 계정과 공유(편집자) 후 Render env에 GOOGLE_DRIVE_HERMES_ROOT_FOLDER_ID를 등록하세요.",
         "spreadsheetId 없이 values/append 호출 시 GOOGLE_SHEET_ID(ERP 재무 시트)에 쓰게 됩니다 — 의도한 시트인지 확인하세요.",
+        "spreadsheetUrl 허용 도메인: docs.google.com/spreadsheets — 다른 도메인은 400 오류.",
         "전형적인 Hermes 흐름: find로 spreadsheetId 검색 → values로 읽기 → append로 행 추가",
+        "URL 흐름: 사용자가 준 Sheets 링크 → spreadsheetUrl로 바로 전달 → 서버가 ID 추출",
       ],
       driveSearch: {
         description: "Google Drive 폴더 안의 스프레드시트를 조회/검색하는 엔드포인트",
@@ -460,12 +466,40 @@ const CAPABILITIES = {
       ],
       webhookPayload: {
         event: "messenger.mention | webhook.test",
+        agentType: "\"hermes\" | \"marketer\" — 멘션된 에이전트 타입",
         senderId: "string — ERP 사용자 ID",
         senderName: "string | undefined — ERP 사용자 이름",
         conversationId: "string — 대화 ID",
         content: "string — 메시지 원문",
         timestamp: "ISO 8601 timestamp",
       },
+      mentionRouting: {
+        "헤르메스 | @헤르메스 | hermes | @hermes": "agentType: \"hermes\"",
+        "마케터 | @마케터 | marketer | @marketer": "agentType: \"marketer\"",
+        "우선순위": "marketer > hermes (동시 포함 시 marketer로 라우팅)",
+      },
+    },
+    {
+      name: "multi-agent",
+      description: "다중 에이전트 구성 (Hermes + 마케터)",
+      agents: [
+        {
+          agentType: "hermes",
+          name: "헤르메스",
+          email: "ybsw1220@gmail.com",
+          keywords: ["헤르메스", "@헤르메스", "hermes", "@hermes"],
+          isAgent: true,
+        },
+        {
+          agentType: "marketer",
+          name: "마케터",
+          email: "marketer-agent@local.erp",
+          keywords: ["마케터", "@마케터", "marketer", "@marketer"],
+          isAgent: true,
+        },
+      ],
+      routing: "ERP 메신저에서 키워드 감지 시 웹훅 payload.agentType으로 수신 에이전트 구분. 동일 webhook URL 사용 권장",
+      verify: "GET /api/agent/users → isAgent: true 레코드 2개 확인 (agentType: hermes, marketer)",
     },
   ],
 };
