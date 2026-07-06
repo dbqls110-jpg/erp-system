@@ -37,36 +37,15 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // 대화 확정
+  // 대화 확정: conversationId가 주어진 경우 그대로 사용 (pending에서 받은 값 신뢰)
   let conversation: { id: string };
   if (conversationId) {
     const found = await prisma.conversation.findUnique({
       where: { id: conversationId },
-      select: { id: true, participantA: true, participantB: true },
+      select: { id: true },
     });
     if (!found) return NextResponse.json({ error: "conversationId를 찾을 수 없습니다." }, { status: 404 });
-
-    const isParticipant = found.participantA === senderUser.id || found.participantB === senderUser.id;
-    if (isParticipant) {
-      conversation = { id: found.id };
-    } else {
-      // 에이전트가 해당 대화 참여자가 아닌 경우 → 비에이전트 참여자와 에이전트↔유저 대화 생성
-      // (예: 직원↔헤르메스 conversationId로 마케터가 답장 시도 → 직원↔마케터 대화로 자동 전환)
-      const humanParticipant = await prisma.user.findFirst({
-        where: {
-          id: { in: [found.participantA, found.participantB] },
-          isAgent: false,
-        },
-        select: { id: true },
-      });
-      if (!humanParticipant) {
-        return NextResponse.json(
-          { error: "에이전트가 해당 대화의 참여자가 아닙니다. recipientUserId를 직접 지정하세요." },
-          { status: 400 }
-        );
-      }
-      conversation = await getOrCreateConversation(senderUser.id, humanParticipant.id);
-    }
+    conversation = { id: found.id };
   } else {
     const recipient = await prisma.user.findUnique({
       where: { id: recipientUserId! },

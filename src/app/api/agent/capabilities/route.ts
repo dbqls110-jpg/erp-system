@@ -3,7 +3,7 @@ import { verifyAgentApiKey } from "@/lib/agentAuth";
 
 const CAPABILITIES = {
   system: "천우영 ERP",
-  version: "1.6.0",
+  version: "1.7.0",
   baseUrl: "/api/agent",
   resources: [
     {
@@ -216,7 +216,7 @@ const CAPABILITIES = {
     },
     {
       name: "messages",
-      description: "직원 간 메시지 조회·전송·pending 조회·ack",
+      description: "직원 간 메시지 조회·전송·pending 조회·claim·ack",
       read: true, write: true,
       operationMode: "webhook (Hermes) 또는 polling (마케터) 모두 지원",
       note: "agentType 지정 시 해당 에이전트 계정을 sender로 사용. 미지정 시 Hermes(기본)",
@@ -237,11 +237,11 @@ const CAPABILITIES = {
           body: {
             agentType: "\"hermes\" | \"marketer\" (선택, 기본 hermes) — sender 계정 결정",
             recipientUserId: "string (conversationId 없을 때 필수) — 수신자 userId",
-            conversationId: "string (선택) — 대화 ID 직접 지정. pending에서 받은 conversationId로 답장 시 사용",
+            conversationId: "string (선택) — 대화 ID 직접 지정. pending에서 받은 conversationId를 그대로 사용해 답장",
             content: "string (필수)",
             dryRun: "boolean (선택)",
           },
-          note: "conversationId와 recipientUserId 중 하나 필수. conversationId 우선",
+          note: "conversationId와 recipientUserId 중 하나 필수. conversationId가 주어지면 그대로 사용(참여자 검증 없음). pending의 conversationId를 신뢰하고 그대로 전달할 것.",
         },
         {
           method: "GET", path: "/api/agent/messages/pending",
@@ -257,17 +257,32 @@ const CAPABILITIES = {
             messages: "{ messageId, conversationId, senderUserId, senderName, replyRecipientId, content, agentType, createdAt }[]",
           },
           rules: [
-            "agentType=marketer → @마케터/마케터/marketer 키워드 메시지만 반환",
-            "agentType=hermes → @헤르메스/헤르메스/hermes 키워드 메시지만 반환",
+            "이 에이전트의 1:1 대화방(participantA/B = 에이전트 ID) 내 메시지는 키워드 없이도 포함",
+            "다른 에이전트의 전용 1:1 대화방 내 메시지는 키워드 있어도 제외 (대화 완전 분리)",
+            "그 외 대화방(단체방 등)은 키워드 기반 라우팅 (@마케터/마케터/marketer/@marketer 등)",
             "에이전트 자신이 보낸 메시지는 제외",
-            "ack 완료된 메시지는 제외",
+            "status=processing 또는 processed 메시지는 제외 (claim 중 포함)",
             "최근 7일 기준 스캔",
           ],
-          replyNote: "답장 시 conversationId 대신 replyRecipientId를 recipientUserId로 사용 권장. conversationId를 직접 사용하면 에이전트가 해당 대화 참여자가 아닌 경우 자동으로 올바른 에이전트↔유저 대화로 전환됨.",
+          replyNote: "반환된 conversationId는 에이전트 1:1 대화방의 정확한 ID. POST /api/agent/messages에 그대로 전달할 것.",
+        },
+        {
+          method: "POST", path: "/api/agent/messages/:id/claim",
+          description: "메시지 처리 시작 전 원자적으로 claim. 중복 처리 방지용. 이미 처리 중/완료인 경우 claimed: false 반환",
+          auth: true, dryRun: false,
+          body: {
+            agentType: "\"hermes\" | \"marketer\" (필수)",
+          },
+          response: {
+            claimed: "true → 처리 시작 가능 / false → 다른 인스턴스가 이미 처리 중",
+            record: "{ id, messageId, agentType, status: \"processing\", createdAt } — claimed=true일 때",
+            existing: "{ status, createdAt } — claimed=false일 때 기존 레코드 정보",
+          },
+          note: "처리 실패 시 POST /api/agent/messages/:id/ack { status: \"error\" } 로 claim 해제 → 다음 polling에서 재처리 가능",
         },
         {
           method: "POST", path: "/api/agent/messages/:id/ack",
-          description: "메시지 처리 완료 기록. messageId + agentType 기준으로 중복 방지",
+          description: "메시지 처리 완료/실패 기록. processing → processed 전환 또는 claim 해제(error)",
           auth: true, dryRun: false,
           body: {
             agentType: "\"hermes\" | \"marketer\" (필수)",
@@ -276,21 +291,26 @@ const CAPABILITIES = {
             error: "string (선택) — status=error일 때 오류 내용",
           },
           response: {
-            ok: "boolean — 신규 처리 완료",
-            alreadyProcessed: "boolean — 이미 ack된 경우",
+            ok: "true → 신규 처리 완료 또는 processing→processed 전환",
+            released: "true → error로 claim 해제됨 (다음 polling에서 재처리 가능)",
+            alreadyProcessed: "true → 이미 processed 상태인 경우",
             record: "{ id, messageId, agentType, status, processedAt, resultMessageId }",
           },
         },
       ],
       pollingFlow: [
-        "1. GET /api/agent/messages/pending?agentType=marketer → 미처리 메시지 목록",
-        "2. 메시지 처리 (Discord 봇 응답 등)",
-        "3. POST /api/agent/messages { agentType: marketer, recipientUserId: replyRecipientId, content } → ERP 메신저 답장 (conversationId 아닌 recipientUserId 사용 권장)",
-        "4. POST /api/agent/messages/:id/ack { agentType: marketer, status: processed, resultMessageId } → 처리 완료 기록",
-        "5. 주기적으로 1번부터 반복",
+        "1. GET /api/agent/messages/pending?agentType=marketer → 미처리 메시지 목록 (1:1 대화방 포함)",
+        "2. 각 메시지별: POST /api/agent/messages/:id/claim { agentType } → claimed:true면 처리, false면 스킵 (중복 방지)",
+        "3. AI 응답 생성",
+        "4. POST /api/agent/messages { agentType: marketer, conversationId: <pending에서 받은 값 그대로>, content } → ERP 메신저 답장",
+        "5. POST /api/agent/messages/:id/ack { agentType: marketer, status: processed, resultMessageId } → 처리 완료",
+        "   실패 시: POST ack { status: error } → claim 해제, 다음 polling에서 재처리",
+        "6. 주기적으로 1번부터 반복",
       ],
-      conversationSeparationNote: "conversationId를 직접 사용하면 에이전트가 참여자가 아닌 대화에 메시지를 삽입할 수 있어 헤르메스↔마케터 대화방 혼용 문제가 발생함. replyRecipientId를 recipientUserId로 사용하면 에이전트별 독립 대화방이 자동 생성/유지됨.",
-      agentTypeSeparation: "agentType=marketer pending에는 marketer 키워드 메시지만 반환. hermes 메시지는 절대 포함하지 않음",
+      agentTypeSeparation: {
+        marketer: "마케터 1:1 대화방 메시지 + 단체방에서 @마케터 키워드. 헤르메스 전용 대화방 완전 제외",
+        hermes: "헤르메스 1:1 대화방 메시지 + 단체방에서 @헤르메스 키워드. 마케터 전용 대화방 완전 제외",
+      },
     },
     {
       name: "audit",

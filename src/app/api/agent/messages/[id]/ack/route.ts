@@ -48,27 +48,49 @@ export async function POST(
   const message = await prisma.message.findUnique({ where: { id: messageId }, select: { id: true } });
   if (!message) return NextResponse.json({ error: "메시지를 찾을 수 없습니다." }, { status: 404 });
 
-  // 이미 처리된 경우 확인
   const existing = await prisma.agentMessageProcessing.findUnique({
     where: { messageId_agentType: { messageId, agentType } },
   });
+
+  // 처리 실패(error): claim 해제 → 다음 polling에서 재처리 가능
+  if (status === "error") {
+    if (existing?.status === "processing") {
+      await prisma.agentMessageProcessing.delete({
+        where: { messageId_agentType: { messageId, agentType } },
+      });
+      return NextResponse.json({ ok: true, released: true, message: "처리 실패로 claim 해제됨. 다음 polling에서 재처리 가능합니다." });
+    }
+    if (existing?.status === "processed") {
+      return NextResponse.json({ alreadyProcessed: true, record: { messageId: existing.messageId, agentType: existing.agentType, status: existing.status } });
+    }
+    return NextResponse.json({ ok: true, note: "해제할 claim이 없습니다." });
+  }
+
+  // 처리 완료(processed): processing → processed 전환 또는 신규 생성
   if (existing) {
-    return NextResponse.json({
-      alreadyProcessed: true,
-      record: {
-        messageId: existing.messageId,
-        agentType: existing.agentType,
-        status: existing.status,
-        processedAt: existing.processedAt,
-      },
-    });
+    if (existing.status === "processed") {
+      return NextResponse.json({
+        alreadyProcessed: true,
+        record: { messageId: existing.messageId, agentType: existing.agentType, status: existing.status, processedAt: existing.processedAt },
+      });
+    }
+    if (existing.status === "processing") {
+      const updated = await prisma.agentMessageProcessing.update({
+        where: { messageId_agentType: { messageId, agentType } },
+        data: { status: "processed", processedAt: new Date(), resultMessageId: resultMessageId ?? null, error: null },
+      });
+      return NextResponse.json({
+        ok: true,
+        record: { id: updated.id, messageId: updated.messageId, agentType: updated.agentType, status: updated.status, processedAt: updated.processedAt, resultMessageId: updated.resultMessageId },
+      }, { status: 201 });
+    }
   }
 
   const record = await prisma.agentMessageProcessing.create({
     data: {
       messageId,
       agentType,
-      status,
+      status: "processed",
       processedAt: new Date(),
       resultMessageId: resultMessageId ?? null,
       error: error ?? null,

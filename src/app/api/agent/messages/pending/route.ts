@@ -24,15 +24,41 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  // 에이전트 자신의 userId 확인 (자기 메시지 제외용)
   const agentUser = await getAgentUser(agentType);
 
-  // 이미 처리된 messageId 목록
-  const processed = await prisma.agentMessageProcessing.findMany({
-    where: { agentType },
+  // "processing" 및 "processed" 모두 차단 (claim 중인 메시지도 제외)
+  const blockedProcessings = await prisma.agentMessageProcessing.findMany({
+    where: { agentType, status: { in: ["processing", "processed"] } },
     select: { messageId: true },
   });
-  const processedIds = new Set(processed.map((p) => p.messageId));
+  const blockedIds = new Set(blockedProcessings.map((p) => p.messageId));
+
+  // 이 에이전트가 직접 참여 중인 1:1 대화방 목록 (키워드 없이도 포함)
+  const agentConvIds: Set<string> = new Set();
+  if (agentUser) {
+    const agentConvs = await prisma.conversation.findMany({
+      where: { OR: [{ participantA: agentUser.id }, { participantB: agentUser.id }] },
+      select: { id: true },
+    });
+    agentConvs.forEach((c) => agentConvIds.add(c.id));
+  }
+
+  // 다른 에이전트의 전용 1:1 대화방 목록 (키워드 있어도 제외 → 대화 분리)
+  const otherAgentUsers = await prisma.user.findMany({
+    where: { isAgent: true, agentType: { not: agentType }, active: true },
+    select: { id: true },
+  });
+  const otherAgentConvIds: Set<string> = new Set();
+  if (otherAgentUsers.length > 0) {
+    const otherConvs = await prisma.conversation.findMany({
+      where: {
+        OR: otherAgentUsers.flatMap((u) => [{ participantA: u.id }, { participantB: u.id }]),
+        ...(agentConvIds.size > 0 ? { NOT: { id: { in: [...agentConvIds] } } } : {}),
+      },
+      select: { id: true },
+    });
+    otherConvs.forEach((c) => otherAgentConvIds.add(c.id));
+  }
 
   // 최근 SCAN_DAYS일 메시지 스캔 (에이전트 자신 발신 제외)
   const since = new Date(Date.now() - SCAN_DAYS * 24 * 60 * 60 * 1000);
@@ -48,16 +74,22 @@ export async function GET(req: NextRequest) {
     take: SCAN_LIMIT,
   });
 
-  // agentType 키워드 매칭 + 처리 완료 제외
   const pending = recentMessages
-    .filter((msg) => !processedIds.has(msg.id) && detectAgentMention(msg.content) === agentType)
+    .filter((msg) => {
+      if (blockedIds.has(msg.id)) return false;
+      // 이 에이전트의 1:1 대화방 → 키워드 없어도 포함
+      if (agentConvIds.has(msg.conversationId)) return true;
+      // 다른 에이전트 전용 1:1 대화방 → 키워드 있어도 제외
+      if (otherAgentConvIds.has(msg.conversationId)) return false;
+      // 그 외 대화방 → 키워드 기반 라우팅
+      return detectAgentMention(msg.content) === agentType;
+    })
     .slice(0, limit)
     .map((msg) => ({
       messageId: msg.id,
       conversationId: msg.conversationId,
       senderUserId: msg.senderId,
       senderName: msg.sender.name ?? null,
-      // 에이전트가 답장할 때 사용할 userId (conversationId 대신 recipientUserId로 사용 권장)
       replyRecipientId: msg.senderId,
       content: msg.content,
       agentType,

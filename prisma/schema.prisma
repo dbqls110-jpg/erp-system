@@ -332,7 +332,7 @@ model AgentMessageProcessing {
   id              String    @id @default(cuid())
   messageId       String
   agentType       String    // "hermes" | "marketer"
-  status          String    @default("processed") // "processed" | "error"
+  status          String    @default("processed") // "processing" | "processed" | "error"
   processedAt     DateTime?
   resultMessageId String?   // 답장 messageId
   error           String?
