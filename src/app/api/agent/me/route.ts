@@ -19,6 +19,7 @@ export async function GET(req: NextRequest) {
           name: hermesUser.name,
           email: hermesUser.email,
           isAgent: hermesUser.isAgent,
+          agentType: hermesUser.agentType,
           role: hermesUser.role,
         }
       : null,

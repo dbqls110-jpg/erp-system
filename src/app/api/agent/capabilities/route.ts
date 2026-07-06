@@ -41,6 +41,7 @@ const CAPABILITIES = {
             { name: "limit", type: "number", required: false, description: "최대 반환 수 (기본 50)" },
             { name: "page", type: "number", required: false, description: "페이지 번호 (1부터)" },
           ],
+          responseFields: "id, email, name, role, isAgent, agentType, active, createdAt",
         },
       ],
     },
