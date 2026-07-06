@@ -76,7 +76,7 @@ export function isValidSpreadsheetId(id: string): boolean {
 
 // A1 notation: 탭명!A1:Z100, A1:Z1000, SheetName!A:Z 등
 export function isValidRange(range: string): boolean {
-  return typeof range === "string" && range.length <= 200 && /^[A-Za-z0-9 _\-'!:.]+$/.test(range);
+  return typeof range === "string" && range.length <= 200 && /^[A-Za-z0-9 _\-'!:.\u3131-\uD79D]+$/.test(range);
 }
 
 // Google Sheets URL에서 spreadsheetId와 gid 추출
