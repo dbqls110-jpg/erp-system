@@ -101,16 +101,28 @@ export function MessengerView({ myId, users }: { myId: string; users: User[] }) 
     } catch {}
   }, []);
 
+  // 탭 가시성 추적 (백그라운드 탭에서 폴링 중단)
+  const visibleRef = useRef(true);
+  useEffect(() => {
+    const onChange = () => { visibleRef.current = document.visibilityState === "visible"; };
+    document.addEventListener("visibilitychange", onChange);
+    return () => document.removeEventListener("visibilitychange", onChange);
+  }, []);
+
   useEffect(() => {
     fetchConversations();
-    const id = setInterval(fetchConversations, 20000);
+    const id = setInterval(() => {
+      if (visibleRef.current) fetchConversations();
+    }, 30000); // 20s → 30s
     return () => clearInterval(id);
   }, [fetchConversations]);
 
   useEffect(() => {
     if (!selectedConvId) return;
     fetchMessages(selectedConvId);
-    const id = setInterval(() => fetchMessages(selectedConvId), 5000);
+    const id = setInterval(() => {
+      if (visibleRef.current) fetchMessages(selectedConvId);
+    }, 8000); // 5s → 8s, 백그라운드 탭 제외
     return () => clearInterval(id);
   }, [selectedConvId, fetchMessages]);
 

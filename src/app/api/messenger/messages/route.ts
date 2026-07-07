@@ -16,11 +16,16 @@ export async function GET(req: NextRequest) {
     return NextResponse.json([], { status: 403 });
   }
 
-  // 읽음 처리
-  await prisma.message.updateMany({
+  // 미읽음 여부 먼저 확인 후 updateMany (불필요한 쓰기 방지)
+  const hasUnread = await prisma.message.count({
     where: { conversationId: convId, senderId: { not: session.user.id }, readAt: null },
-    data: { readAt: new Date() },
   });
+  if (hasUnread > 0) {
+    await prisma.message.updateMany({
+      where: { conversationId: convId, senderId: { not: session.user.id }, readAt: null },
+      data: { readAt: new Date() },
+    });
+  }
 
   const messages = await prisma.message.findMany({
     where: { conversationId: convId },
