@@ -3,7 +3,7 @@ import { verifyAgentApiKey } from "@/lib/agentAuth";
 
 const CAPABILITIES = {
   system: "천우영 ERP",
-  version: "1.7.0",
+  version: "1.8.0",
   baseUrl: "/api/agent",
   resources: [
     {
@@ -439,6 +439,72 @@ const CAPABILITIES = {
             updatedRows: "number",
             updatedCells: "number",
           },
+        },
+        {
+          method: "POST",
+          path: "/api/agent/sheets/format",
+          description: "셀 서식 일괄 적용 (배경색·글자색·굵게·테두리·체크박스 등). Sheets API batchUpdate 사용",
+          auth: true,
+          dryRun: true,
+          body: {
+            spreadsheetId: "string (선택) — 없으면 spreadsheetUrl 필수",
+            spreadsheetUrl: "string (선택) — Google Sheets URL",
+            requests: `FormatRequest[] (필수, 최대 50개) — 각 요소:
+  {
+    range: string (필수) — A1 notation. 예: "Sheet1!A1:C3", "A1", "시트!B:D"
+    backgroundColor?: string | {red,green,blue} — 배경색. "#FF0000" 또는 {red:1,green:0,blue:0} (0-1)
+    textColor?: string | {red,green,blue} — 글자색
+    bold?: boolean — 굵게
+    italic?: boolean — 기울임
+    strikethrough?: boolean — 취소선
+    underline?: boolean — 밑줄
+    fontSize?: number — 글자 크기 (pt)
+    horizontalAlignment?: "LEFT" | "CENTER" | "RIGHT"
+    verticalAlignment?: "TOP" | "MIDDLE" | "BOTTOM"
+    wrapStrategy?: "OVERFLOW_CELL" | "CLIP" | "WRAP"
+    borders?: {
+      top? bottom? left? right? innerHorizontal? innerVertical?: "SOLID" | "SOLID_MEDIUM" | "SOLID_THICK" | "DOTTED" | "DASHED" | "DOUBLE" | "NONE"
+      color?: string | {red,green,blue} — 테두리 색상 (기본 검정)
+    }
+    checkbox?: boolean — true=체크박스 추가, false=체크박스 제거
+  }`,
+            dryRun: "boolean (선택) — true면 parsedRange·operations preview만 반환",
+          },
+          response: {
+            ok: "true — 성공",
+            spreadsheetId: "string",
+            appliedRequests: "number — 입력 요청 수",
+            apiRequestCount: "number — 실제 Sheets API 호출 수 (repeatCell + updateBorders + setDataValidation 합산)",
+          },
+          notes: [
+            "fields mask를 동적으로 구성하므로 지정하지 않은 서식은 기존 값 유지",
+            "테두리 color 미지정 시 기본값 검정 (#000000)",
+            "checkbox: false는 해당 범위의 데이터 유효성 검사(드롭다운 포함) 모두 제거",
+            "시트명 미지정 시 첫 번째 탭에 적용",
+            "서비스 계정이 해당 시트에 편집 권한이 있어야 함",
+          ],
+          examples: [
+            {
+              description: "헤더 행 배경색 파란색 + 흰색 글자 + 굵게 + 전체 테두리",
+              body: {
+                spreadsheetId: "1BxiMVs...",
+                requests: [{
+                  range: "Sheet1!A1:E1",
+                  backgroundColor: "#1565C0",
+                  textColor: "#FFFFFF",
+                  bold: true,
+                  borders: { top: "SOLID", bottom: "SOLID", left: "SOLID", right: "SOLID", innerVertical: "SOLID" },
+                }],
+              },
+            },
+            {
+              description: "A열 체크박스 추가",
+              body: {
+                spreadsheetId: "1BxiMVs...",
+                requests: [{ range: "시트1!A2:A20", checkbox: true }],
+              },
+            },
+          ],
         },
       ],
       limits: {
