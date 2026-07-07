@@ -115,7 +115,7 @@ export function LeaveApplyButton() {
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <Label>시작 시간</Label>
-                  <Input type="time" name="startTime" required defaultValue="09:00" min="06:00" max="23:00" />
+                  <Input type="time" name="startTime" required defaultValue="10:00" min="06:00" max="23:00" />
                 </div>
                 <div className="space-y-1">
                   <Label>종료 시간</Label>
