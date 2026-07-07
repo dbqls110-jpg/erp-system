@@ -112,10 +112,15 @@ export function LeaveApplyButton() {
             )}
 
             {type === "hourly" && (
-              <div className="space-y-1">
-                <Label>시작 시간 <span className="text-smoke-gray text-xs">(종료: 18:00 고정)</span></Label>
-                <Input type="time" name="startTime" required min="06:00" max="18:00" />
-                <input type="hidden" name="endTime" value="18:00" />
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label>시작 시간</Label>
+                  <Input type="time" name="startTime" required defaultValue="09:00" min="06:00" max="23:00" />
+                </div>
+                <div className="space-y-1">
+                  <Label>종료 시간</Label>
+                  <Input type="time" name="endTime" required defaultValue="18:00" min="06:00" max="23:00" />
+                </div>
               </div>
             )}
 
