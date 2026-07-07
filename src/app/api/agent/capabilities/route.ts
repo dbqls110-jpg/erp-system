@@ -3,7 +3,7 @@ import { verifyAgentApiKey } from "@/lib/agentAuth";
 
 const CAPABILITIES = {
   system: "천우영 ERP",
-  version: "1.8.0",
+  version: "1.9.0",
   baseUrl: "/api/agent",
   resources: [
     {
@@ -573,6 +573,110 @@ const CAPABILITIES = {
           "3. POST /api/agent/sheets/append { spreadsheetId, range, values } → 행 추가",
         ],
       },
+      enrichRestaurants: {
+        description: "식당/업체 후보 시트의 '확인 필요' 전화번호를 네이버 Local API로 자동 보강",
+        endpoint: {
+          method: "POST",
+          path: "/api/agent/sheets/enrich-restaurants",
+          auth: true,
+          dryRun: true,
+          body: {
+            spreadsheetId: "string (선택) — 없으면 spreadsheetUrl 필수",
+            spreadsheetUrl: "string (선택) — Google Sheets URL",
+            sheetName: "string (선택) — 탭 이름. 예: 신규후보_기존제외. 없으면 첫 번째 탭",
+            limit: "number (선택, 기본 20, 최대 50) — 처리할 최대 행 수",
+            dryRun: "boolean (선택) — true면 시트 수정 없이 preview만 반환",
+          },
+          response: {
+            ok: "true",
+            scanned: "number — 전체 데이터 행 수",
+            targets: "number — 보강 대상 행 수 (전화번호 '확인 필요' 행)",
+            enriched: "number — 실제 전화번호 보강 완료 행 수",
+            detectedColumns: "{ name, phone, address, status } — 감지된 컬럼 위치",
+            results: "RowResult[] — 행별 처리 결과",
+          },
+          rowResult: {
+            rowNum: "number — 시트 행 번호",
+            name: "string — 식당명",
+            originalPhone: "string — 기존 전화번호 값",
+            action: "\"updated\" | \"multiple_candidates\" | \"no_phone_found\" | \"no_match\" | \"api_error\" | \"skip\"",
+            newPhone: "string? — 보강된 전화번호 (action=updated)",
+            newStatus: "string? — 검증 상태 텍스트",
+            matchedTitle: "string? — 매칭된 네이버 상호명",
+            naverTotal: "number? — 네이버 검색 결과 수",
+          },
+          columnDetection: [
+            "식당명/상호명/업체명/가게명 → 이름 컬럼",
+            "전화번호/연락처/전화 → 전화번호 컬럼 (기존값 있으면 절대 덮어쓰지 않음)",
+            "도로명주소 우선, 없으면 주소 → 주소 컬럼 (검색 쿼리 보강용)",
+            "확인상태/검증상태/비고/상태/메모 → 상태 컬럼 (선택)",
+          ],
+          matchingRules: [
+            "이름 exact match → 단독 결과면 confident 처리",
+            "이름 포함 관계(2자 이상) + 주소 토큰 1개 이상 겹침 → confident",
+            "confident 결과 2개 이상 → '후보 다수 / 확인 필요'로 상태 기록",
+            "전화번호 있는 결과만 보강. 매칭돼도 전화번호 없으면 no_phone_found",
+            "기존 전화번호가 '확인 필요'·'-'·비어있음이 아니면 skip",
+          ],
+          statusValues: {
+            "네이버 Local API 확인": "단일 confident 매칭 + 전화번호 보강 완료",
+            "후보 다수 / 확인 필요": "confident 후보가 2개 이상 (수동 확인 필요)",
+          },
+        },
+        example: {
+          request: {
+            spreadsheetUrl: "https://docs.google.com/spreadsheets/d/1M9ss1ui.../edit",
+            sheetName: "신규후보_기존제외",
+            limit: 20,
+            dryRun: true,
+          },
+        },
+      },
+    },
+    {
+      name: "search",
+      description: "외부 검색 API 연동 (현재: 네이버 지역 검색)",
+      endpoints: [
+        {
+          method: "GET",
+          path: "/api/agent/search/naver/local",
+          description: "네이버 Local Search API — 상호명·주소·전화번호·카테고리 반환. 식당/업체 전화번호 확인에 활용",
+          auth: true,
+          dryRun: false,
+          params: [
+            { name: "q", type: "string", required: true, description: "검색어. 예: '막창도둑 성남복정점' 또는 '막창도둑 성남시'" },
+            { name: "display", type: "number", required: false, description: "결과 수 (기본 5, 최대 5 — Naver API 제한)" },
+          ],
+          response: {
+            query: "string — 실제 검색어",
+            display: "number",
+            total: "number — 전체 검색 결과 수",
+            items: `{
+  title: string — 상호명 (<b> 태그 제거됨)
+  category: string — 업종 카테고리
+  telephone: string — 전화번호 (없으면 빈 문자열)
+  address: string — 지번 주소
+  roadAddress: string — 도로명 주소
+  mapx: string — X 좌표
+  mapy: string — Y 좌표
+  link: string — 네이버 지도 링크
+}[]`,
+          },
+          security: "NAVER_CLIENT_SECRET은 응답·로그에 절대 포함되지 않음",
+          notes: [
+            "Naver Local API display 최대: 5 (API 자체 제한)",
+            "정확도를 위해 상호명 + 지역명을 함께 검색 권장. 예: '막창도둑 성남복정점 성남'",
+            "telephone이 빈 문자열인 결과도 반환될 수 있음 (업체가 전화번호 미등록)",
+          ],
+          example: "GET /api/agent/search/naver/local?q=막창도둑 성남복정점&display=3",
+        },
+      ],
+      typicalFlow: [
+        "1. GET /api/agent/search/naver/local?q={식당명} {지역} → items[0].telephone 확인",
+        "2. title이 식당명과 일치하고 address/roadAddress가 지역과 겹치면 telephone 사용",
+        "3. 여러 결과이면 address로 추가 구분 후 수동 확인 권장",
+        "4. 시트 대량 보강: POST /api/agent/sheets/enrich-restaurants (자동화)",
+      ],
     },
     {
       name: "webhook",
