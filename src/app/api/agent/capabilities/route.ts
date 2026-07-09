@@ -3,7 +3,7 @@ import { verifyAgentApiKey } from "@/lib/agentAuth";
 
 const CAPABILITIES = {
   system: "천우영 ERP",
-  version: "1.9.0",
+  version: "2.0.0",
   baseUrl: "/api/agent",
   resources: [
     {
@@ -505,6 +505,41 @@ const CAPABILITIES = {
               },
             },
           ],
+        },
+        {
+          method: "POST",
+          path: "/api/agent/sheets/add-sheet",
+          description: "스프레드시트에 새 탭(시트) 추가. 동일 제목 탭 이미 존재 시 에러 없이 { created: false, exists: true } 반환",
+          auth: true,
+          dryRun: true,
+          body: {
+            spreadsheetId: "string (선택) — 없으면 spreadsheetUrl 필수",
+            spreadsheetUrl: "string (선택) — Google Sheets URL",
+            title: "string (필수) — 새 탭 이름. 최대 100자. \\, /, *, ?, :, [, ] 불가",
+            dryRun: "boolean (선택) — true면 기존 탭 목록만 확인하고 실제 생성 안 함",
+          },
+          response: {
+            ok: "true",
+            created: "boolean — 새 탭 생성됨 (true) / 이미 존재 (false)",
+            exists: "boolean — 동일 제목 탭이 이미 존재할 때 true",
+            spreadsheetId: "string",
+            sheetTitle: "string — 실제 생성된 탭 이름",
+            sheetId: "number — Google Sheets 내부 탭 ID",
+          },
+          example: {
+            request: {
+              spreadsheetId: "1QgjdAxHr7U4J5eBB9FuBaRsifdesVu_eztV_3Hp8no4",
+              title: "해외_Behance_분리",
+              dryRun: false,
+            },
+            response: {
+              ok: true,
+              created: true,
+              spreadsheetId: "1QgjdAxHr7U4J5eBB9FuBaRsifdesVu_eztV_3Hp8no4",
+              sheetTitle: "해외_Behance_분리",
+              sheetId: 123456789,
+            },
+          },
         },
       ],
       limits: {
