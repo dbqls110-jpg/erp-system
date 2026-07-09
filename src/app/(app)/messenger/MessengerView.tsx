@@ -109,20 +109,26 @@ export function MessengerView({ myId, users }: { myId: string; users: User[] }) 
     return () => document.removeEventListener("visibilitychange", onChange);
   }, []);
 
+  // 새벽 2시~오전 8시: 폴링 완전 중단 (Render 무료 시간 절약)
+  function isQuietHours() {
+    const h = new Date().getHours();
+    return h >= 2 && h < 8;
+  }
+
   useEffect(() => {
-    fetchConversations();
+    if (!isQuietHours()) fetchConversations();
     const id = setInterval(() => {
-      if (visibleRef.current) fetchConversations();
-    }, 30000); // 20s → 30s
+      if (visibleRef.current && !isQuietHours()) fetchConversations();
+    }, 30000);
     return () => clearInterval(id);
   }, [fetchConversations]);
 
   useEffect(() => {
     if (!selectedConvId) return;
-    fetchMessages(selectedConvId);
+    if (!isQuietHours()) fetchMessages(selectedConvId);
     const id = setInterval(() => {
-      if (visibleRef.current) fetchMessages(selectedConvId);
-    }, 8000); // 5s → 8s, 백그라운드 탭 제외
+      if (visibleRef.current && !isQuietHours()) fetchMessages(selectedConvId);
+    }, 8000);
     return () => clearInterval(id);
   }, [selectedConvId, fetchMessages]);
 
