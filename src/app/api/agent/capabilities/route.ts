@@ -3,7 +3,7 @@ import { verifyAgentApiKey } from "@/lib/agentAuth";
 
 const CAPABILITIES = {
   system: "천우영 ERP",
-  version: "2.0.0",
+  version: "2.1.0",
   baseUrl: "/api/agent",
   resources: [
     {
@@ -242,6 +242,26 @@ const CAPABILITIES = {
             dryRun: "boolean (선택)",
           },
           note: "conversationId와 recipientUserId 중 하나 필수. conversationId가 주어지면 그대로 사용(참여자 검증 없음). pending의 conversationId를 신뢰하고 그대로 전달할 것.",
+        },
+        {
+          method: "GET", path: "/api/agent/messages/history",
+          description: "에이전트-유저 간 ERP 대화 이력 조회. role: agent/user 형태로 반환 → AI context에 바로 삽입 가능. 응답 생성 전 호출해 채널 무관하게 같은 기억 유지",
+          auth: true, dryRun: false,
+          params: [
+            { name: "agentType", type: "\"hermes\" | \"marketer\"", required: false, description: "기본 hermes" },
+            { name: "userId", type: "string", required: true, description: "대화 상대 ERP 유저 ID" },
+            { name: "limit", type: "number", required: false, description: "최대 반환 수 (기본 50, 최대 200)" },
+          ],
+          response: {
+            agentType: "string",
+            agentUserId: "string",
+            targetUserId: "string",
+            targetUserName: "string | null",
+            conversationId: "string | null — 대화 없으면 null",
+            messageCount: "number",
+            messages: "{ id, role: \"agent\"|\"user\", content, createdAt }[]",
+          },
+          contextUsage: "Discord나 ERP에서 메시지 수신 시, 응답 생성 전 이 API로 ERP 대화 이력 조회 → Hermes context에 포함 → 채널 무관하게 같은 기억 유지",
         },
         {
           method: "GET", path: "/api/agent/messages/pending",
