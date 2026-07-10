@@ -344,6 +344,21 @@ model AgentMessageProcessing {
   @@map("agent_message_processing")
 }
 
+// ─── Agent 기억 ───────────────────────────────────────────
+model AgentMemory {
+  id        String   @id @default(cuid())
+  agentType String   // "hermes" | "marketer"
+  source    String   // "discord" | "erp" | "manual"
+  title     String   // 짧은 제목/키워드 (최대 100자)
+  content   String   // 요약된 운영 규칙
+  tags      String[] // 태그 배열 (선택)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([agentType, createdAt])
+  @@map("agent_memories")
+}
+
 // ─── 명함 ─────────────────────────────────────────────────
 model BusinessCard {
   id         String   @id @default(cuid())

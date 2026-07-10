@@ -3,7 +3,7 @@ import { verifyAgentApiKey } from "@/lib/agentAuth";
 
 const CAPABILITIES = {
   system: "천우영 ERP",
-  version: "2.1.0",
+  version: "2.2.0",
   baseUrl: "/api/agent",
   resources: [
     {
@@ -318,15 +318,35 @@ const CAPABILITIES = {
           },
         },
       ],
-      pollingFlow: [
-        "1. GET /api/agent/messages/pending?agentType=marketer → 미처리 메시지 목록 (1:1 대화방 포함)",
-        "2. 각 메시지별: POST /api/agent/messages/:id/claim { agentType } → claimed:true면 처리, false면 스킵 (중복 방지)",
-        "3. AI 응답 생성",
-        "4. POST /api/agent/messages { agentType: marketer, conversationId: <pending에서 받은 값 그대로>, content } → ERP 메신저 답장",
-        "5. POST /api/agent/messages/:id/ack { agentType: marketer, status: processed, resultMessageId } → 처리 완료",
-        "   실패 시: POST ack { status: error } → claim 해제, 다음 polling에서 재처리",
-        "6. 주기적으로 1번부터 반복",
-      ],
+      pollingFlow: {
+        hermes: [
+          "1. GET /api/agent/messages/pending?agentType=hermes → 미처리 메시지 목록",
+          "2. 각 메시지별: POST /api/agent/messages/:id/claim { agentType: hermes } → claimed:true면 처리, false면 스킵",
+          "3. GET /api/agent/messages/history?agentType=hermes&userId={senderUserId}&limit=20 → ERP 대화 이력 조회",
+          "4. GET /api/agent/memory?agentType=hermes&limit=20 → Hermes 전용 기억 조회",
+          "5. [3번 이력 + 4번 기억]을 Hermes prompt/context 앞부분에 포함해서 AI 응답 생성",
+          "   - history messages: role=user→사용자 발화, role=agent→Hermes 발화",
+          "   - memory: 운영 규칙으로 system prompt에 삽입",
+          "6. POST /api/agent/messages { agentType: hermes, conversationId, content } → ERP 메신저 답장",
+          "7. POST /api/agent/messages/:id/ack { agentType: hermes, status: processed, resultMessageId } → 처리 완료",
+          "   실패 시: ack { status: error } → claim 해제, 다음 polling에서 재처리",
+          "8. 사용자 발화에 '기억해/이건 기억/매번 이렇게 해' 등 기억 키워드 있으면 POST /api/agent/memory { agentType: hermes, source: erp, ... }",
+        ],
+        marketer: [
+          "1. GET /api/agent/messages/pending?agentType=marketer → 미처리 메시지 목록",
+          "2. 각 메시지별: POST /api/agent/messages/:id/claim { agentType: marketer } → claimed:true면 처리, false면 스킵",
+          "3. GET /api/agent/messages/history?agentType=marketer&userId={senderUserId}&limit=20 → ERP 대화 이력 조회",
+          "4. GET /api/agent/memory?agentType=marketer&limit=20 → Marketer 전용 기억 조회",
+          "5. [3번 이력 + 4번 기억]을 Marketer prompt/context 앞부분에 포함해서 AI 응답 생성",
+          "   - history messages: role=user→사용자 발화, role=agent→Marketer 발화",
+          "   - memory: 운영 규칙으로 system prompt에 삽입",
+          "6. POST /api/agent/messages { agentType: marketer, conversationId, content } → ERP 메신저 답장",
+          "7. POST /api/agent/messages/:id/ack { agentType: marketer, status: processed, resultMessageId } → 처리 완료",
+          "   실패 시: ack { status: error } → claim 해제, 다음 polling에서 재처리",
+          "8. 사용자 발화에 '기억해/이건 기억/매번 이렇게 해' 등 기억 키워드 있으면 POST /api/agent/memory { agentType: marketer, source: erp, ... }",
+        ],
+        discordSharedMemory: "Discord Hermes/Marketer도 동일하게 /api/agent/memory를 agentType 기준으로 조회·저장하면 ERP와 기억 완전 공유",
+      },
       agentTypeSeparation: {
         marketer: "마케터 1:1 대화방 메시지 + 단체방에서 @마케터 키워드. 헤르메스 전용 대화방 완전 제외",
         hermes: "헤르메스 1:1 대화방 메시지 + 단체방에서 @헤르메스 키워드. 마케터 전용 대화방 완전 제외",
@@ -686,6 +706,51 @@ const CAPABILITIES = {
             dryRun: true,
           },
         },
+      },
+    },
+    {
+      name: "memory",
+      description: "agentType 기준 Agent 기억 저장·조회. Discord/ERP 채널 무관하게 같은 agentType이면 같은 기억 공유. Hermes ↔ Marketer 기억은 분리",
+      read: true, write: true,
+      endpoints: [
+        {
+          method: "POST", path: "/api/agent/memory",
+          description: "운영 규칙·사용자 지시 기억 저장. 단순 대화·일회성 요청·민감정보(API키/비밀번호)는 저장 금지",
+          auth: true, dryRun: false,
+          body: {
+            agentType: "\"hermes\" | \"marketer\" (필수) — 기억 주체. 조회 기준도 이것",
+            source: "\"discord\" | \"erp\" | \"manual\" (선택, 기본 erp) — 기록용. 조회 기준 아님",
+            title: "string (필수, 최대 100자) — 짧은 키워드/제목",
+            content: "string (필수, 최대 2000자) — 요약된 운영 규칙 형태로 저장",
+            tags: "string[] (선택, 최대 10개) — 분류 태그",
+          },
+          response: { ok: true, memory: "{ id, agentType, source, title, content, tags, createdAt }" },
+          saveRules: [
+            "저장 대상: '기억해', '이건 기억', '앞으로 이렇게 해', '매번 이렇게 해' 같은 표현",
+            "저장 형태: 원문 전체가 아닌 짧은 운영 규칙 형태로 요약해서 저장",
+            "저장 금지: 단순 대화, 일회성 요청, 민감정보(API키/비밀번호/시크릿)",
+          ],
+        },
+        {
+          method: "GET", path: "/api/agent/memory",
+          description: "agentType 기준 기억 조회 (최신순). 응답 생성 전 호출해 system prompt에 포함",
+          auth: true, dryRun: false,
+          params: [
+            { name: "agentType", type: "\"hermes\" | \"marketer\"", required: true },
+            { name: "limit", type: "number", required: false, description: "기본 20, 최대 100" },
+            { name: "tag", type: "string", required: false, description: "특정 태그 필터" },
+          ],
+          response: {
+            agentType: "string",
+            count: "number",
+            memories: "{ id, agentType, source, title, content, tags, createdAt }[]",
+          },
+        },
+      ],
+      sharedMemoryDesign: {
+        "agentType=hermes": "Discord Hermes + ERP Hermes 공통 기억. 어느 채널에서 저장해도 Hermes 응답 시 자동 포함",
+        "agentType=marketer": "Discord Marketer + ERP Marketer 공통 기억. 어느 채널에서 저장해도 Marketer 응답 시 자동 포함",
+        separation: "Hermes 기억과 Marketer 기억은 agentType으로 완전 분리. 서로 조회 불가",
       },
     },
     {
