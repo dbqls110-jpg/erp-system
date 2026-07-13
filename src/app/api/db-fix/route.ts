@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { createNotionEvent } from "@/lib/notion";
 
@@ -7,6 +9,11 @@ const LEAVE_TYPE_LABEL: Record<string, string> = {
 };
 
 export async function GET(req: Request) {
+  const session = await getServerSession(authOptions);
+  if (session?.user?.role !== "admin") {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+  }
+
   const { searchParams } = new URL(req.url);
 
   // ?sync=leave 이면 기존 승인 휴가 Notion 일괄 동기화

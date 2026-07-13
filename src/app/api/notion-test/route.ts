@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
 
 const NOTION_VERSION = "2022-06-28";
 
@@ -16,6 +18,11 @@ async function notionFetch(path: string, method = "GET", body?: unknown) {
 }
 
 export async function GET() {
+  const session = await getServerSession(authOptions);
+  if (session?.user?.role !== "admin") {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+  }
+
   const dbId = process.env.NOTION_CALENDAR_DB_ID;
   if (!process.env.NOTION_API_KEY || !dbId) {
     return NextResponse.json({ ok: false, error: "env vars missing" });

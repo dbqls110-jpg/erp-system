@@ -1,9 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
 import { google } from "googleapis";
 
 const CALLBACK_URL = "https://erp-system-lojo.onrender.com/api/admin/drive-callback";
 
 export async function GET(req: NextRequest) {
+  const session = await getServerSession(authOptions);
+  if (session?.user?.role !== "admin") {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+  }
+
   const code = req.nextUrl.searchParams.get("code");
   const error = req.nextUrl.searchParams.get("error");
 
@@ -30,10 +37,12 @@ export async function GET(req: NextRequest) {
       }, { status: 400 });
     }
 
+    // refresh_token을 응답에 직접 노출하지 않음 — 서버 로그에만 출력 (Render 로그에서 복사)
+    console.log("[drive-callback] GOOGLE_DRIVE_OWNER_REFRESH_TOKEN=", tokens.refresh_token);
     return NextResponse.json({
-      message: "아래 refresh_token을 Render 환경변수 GOOGLE_DRIVE_OWNER_REFRESH_TOKEN에 저장하세요.",
-      refresh_token: tokens.refresh_token,
+      message: "인증 성공. Render 로그에서 GOOGLE_DRIVE_OWNER_REFRESH_TOKEN 값을 복사해 환경변수에 저장하세요.",
       scope: tokens.scope,
+      hasRefreshToken: !!tokens.refresh_token,
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "unknown";
