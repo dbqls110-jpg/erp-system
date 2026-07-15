@@ -102,6 +102,9 @@ _hb_stop = threading.Event()
 
 def _heartbeat_loop():
     while not _hb_stop.wait(timeout=30):
+        # 운영 시간 외에는 heartbeat 전송 금지
+        if not is_operating_hours():
+            continue
         try:
             api_post("/api/agent/status", {
                 "agentType": AGENT_TYPE,
@@ -230,8 +233,12 @@ def sse_loop():
     while True:
         if not is_operating_hours():
             secs = seconds_until_open()
-            log.info(f"운영 시간 외 ({CLOSE_HOUR:02d}:00~{OPEN_HOUR:02d}:00). {secs//60}분 후 재연결")
-            time.sleep(min(secs + 10, 600))
+            wake_in = min(secs + 30, 3600)  # 최대 1시간, 실제 개시 30초 후 재연결
+            log.info(
+                f"운영 시간 외 ({CLOSE_HOUR:02d}:00~{OPEN_HOUR:02d}:00). "
+                f"{secs // 3600}시간 {(secs % 3600) // 60}분 후 재연결 (슬립 {wake_in}초)"
+            )
+            time.sleep(wake_in)
             continue
 
         log.info(f"SSE 연결 시도: {sse_url}")

@@ -1,111 +1,81 @@
 """
-Hermes Runner
-ERP Agent Bridge에서 호출. job.input을 받아 Claude API로 응답 생성.
-chunks를 yield해 실시간 스트리밍.
+Hermes Runner — hermes chat CLI 사용 (구독 플랜·로그인 재사용)
+Anthropic API 직접 호출 없음.
 
-사용 전 환경변수 필요:
-  ANTHROPIC_API_KEY=sk-ant-...
-  ERP_BASE_URL=https://erp-system-lojo.onrender.com
-  ERP_AGENT_API_KEY=...
+hermes chat -Q --query <입력> 를 subprocess 인수 배열로 실행.
+쉘 문자열 보간 없음 → 명령 인젝션 불가.
 """
 import os
+import subprocess
+import logging
 import requests
+
 from typing import Generator
 from protocol import AgentJob
 
-ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
-ERP_BASE_URL      = os.environ.get("ERP_BASE_URL", "https://erp-system-lojo.onrender.com")
+log = logging.getLogger("agent_bridge.hermes")
+
+ERP_BASE_URL      = os.environ.get("ERP_BASE_URL", "")
 ERP_AGENT_API_KEY = os.environ.get("ERP_AGENT_API_KEY", "")
 
-HERMES_SYSTEM_PROMPT = """당신은 Hermes입니다. ERP 시스템을 관리하는 AI 어시스턴트입니다.
-- 간결하고 명확하게 답변합니다.
-- ERP 관련 작업(근태, 프로젝트, 재무, 시트 등)을 도움을 드립니다.
-- 한국어로 소통합니다."""
+_ERP_HEADERS = {
+    "Authorization": f"Bearer {ERP_AGENT_API_KEY}",
+    "Content-Type": "application/json",
+}
 
 
-def _get_context(job: AgentJob) -> list[dict]:
-    """ERP에서 대화 히스토리와 메모리를 가져와 AI 컨텍스트 구성."""
-    messages = []
-    headers = {
-        "Authorization": f"Bearer {ERP_AGENT_API_KEY}",
-        "Content-Type": "application/json",
-    }
-
-    # 대화 히스토리
+def _get_history_text(job: AgentJob) -> str:
+    """ERP에서 최근 대화 히스토리를 가져와 텍스트 블록으로 반환."""
+    if not ERP_BASE_URL:
+        return ""
     try:
         r = requests.get(
             f"{ERP_BASE_URL}/api/agent/messages/history",
-            params={"agentType": "hermes", "userId": job.user_id, "limit": "20"},
-            headers=headers,
-            timeout=10,
+            params={"agentType": "hermes", "userId": job.user_id, "limit": "10"},
+            headers=_ERP_HEADERS,
+            timeout=8,
         )
-        if r.ok:
-            hist = r.json().get("messages", [])
-            for m in hist:
-                role = "assistant" if m.get("role") == "agent" else "user"
-                messages.append({"role": role, "content": m.get("content", "")})
+        if not r.ok:
+            return ""
+        messages = r.json().get("messages", [])
+        if not messages:
+            return ""
+        lines = []
+        for m in messages:
+            role = "어시스턴트" if m.get("role") == "agent" else "사용자"
+            lines.append(f"{role}: {m.get('content', '')}")
+        return "\n".join(lines) + "\n\n"
     except Exception:
-        pass
-
-    return messages
+        return ""
 
 
 def run(job: AgentJob) -> Generator[str, None, None]:
-    """Claude API 스트리밍으로 응답 생성."""
-    if not ANTHROPIC_API_KEY:
-        yield "⚠️ ANTHROPIC_API_KEY가 설정되지 않았습니다."
-        return
+    """
+    hermes chat CLI로 응답 생성.
+    현재 로그인된 Hermes 구독 모델·프로필을 그대로 사용.
+    """
+    history = _get_history_text(job)
+    query = f"{history}사용자: {job.input}" if history else job.input
 
-    ctx_messages = _get_context(job)
-    ctx_messages.append({"role": "user", "content": job.input})
+    # 인수 배열: 쉘 인젝션 불가
+    cmd = ["hermes", "chat", "-Q", "--query", query]
 
     try:
-        import anthropic
-        client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
-
-        with client.messages.stream(
-            model="claude-haiku-4-5-20251001",
-            max_tokens=2048,
-            system=HERMES_SYSTEM_PROMPT,
-            messages=ctx_messages,
-        ) as stream:
-            for text in stream.text_stream:
-                yield text
-
-    except ImportError:
-        # anthropic 패키지 없을 때 requests로 직접 호출
-        import json
-        r = requests.post(
-            "https://api.anthropic.com/v1/messages",
-            headers={
-                "x-api-key": ANTHROPIC_API_KEY,
-                "anthropic-version": "2023-06-01",
-                "content-type": "application/json",
-            },
-            json={
-                "model": "claude-haiku-4-5-20251001",
-                "max_tokens": 2048,
-                "system": HERMES_SYSTEM_PROMPT,
-                "messages": ctx_messages,
-                "stream": True,
-            },
-            stream=True,
-            timeout=60,
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=120,
         )
-        r.raise_for_status()
-        for line in r.iter_lines():
-            if not line:
-                continue
-            line = line.decode("utf-8")
-            if line.startswith("data: "):
-                data_str = line[6:]
-                if data_str == "[DONE]":
-                    break
-                try:
-                    data = json.loads(data_str)
-                    if data.get("type") == "content_block_delta":
-                        delta = data.get("delta", {})
-                        if delta.get("type") == "text_delta":
-                            yield delta.get("text", "")
-                except json.JSONDecodeError:
-                    pass
+    except subprocess.TimeoutExpired:
+        raise RuntimeError("hermes chat 응답 시간 초과 (120초)")
+    except FileNotFoundError:
+        raise RuntimeError(
+            "hermes 명령을 찾을 수 없습니다. Hermes CLI가 PATH에 있는지 확인하세요."
+        )
+
+    if result.returncode != 0:
+        # stderr에 인증 정보가 포함될 수 있으므로 원문 출력 금지
+        raise RuntimeError(f"hermes chat 실패 (exit {result.returncode})")
+
+    yield result.stdout.strip()

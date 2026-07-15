@@ -1,74 +1,42 @@
 """
-Marketer Runner
-ERP Agent Bridge에서 호출. job.input을 받아 Claude API로 마케팅 관련 응답 생성.
+Marketer Runner — hermes chat CLI 사용 (노트북 구독 플랜·로그인 재사용)
+Anthropic API 직접 호출 없음.
 
-사용 전 환경변수 필요:
-  ANTHROPIC_API_KEY=sk-ant-...
+노트북에서 `hermes profile use <marketer-profile>` 로 프로필을 설정한 뒤 실행.
+hermes chat -Q --query <입력> 를 subprocess 인수 배열로 실행.
+쉘 문자열 보간 없음 → 명령 인젝션 불가.
 """
-import os
+import subprocess
+import logging
+
 from typing import Generator
 from protocol import AgentJob
 
-ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
-
-MARKETER_SYSTEM_PROMPT = """당신은 마케터 AI입니다. 마케팅 전략, 카피라이팅, SNS 콘텐츠 제작을 도와드립니다.
-- 창의적이고 트렌디한 아이디어를 제안합니다.
-- 한국 시장에 맞는 마케팅 전략을 추천합니다.
-- 한국어로 소통합니다."""
+log = logging.getLogger("agent_bridge.marketer")
 
 
 def run(job: AgentJob) -> Generator[str, None, None]:
-    """Claude API 스트리밍으로 마케팅 응답 생성."""
-    if not ANTHROPIC_API_KEY:
-        yield "⚠️ ANTHROPIC_API_KEY가 설정되지 않았습니다."
-        return
+    """
+    hermes chat CLI로 마케팅 응답 생성.
+    노트북에 설정된 Hermes 프로필·구독 모델을 그대로 사용.
+    """
+    cmd = ["hermes", "chat", "-Q", "--query", job.input]
 
     try:
-        import anthropic
-        client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
-
-        with client.messages.stream(
-            model="claude-haiku-4-5-20251001",
-            max_tokens=2048,
-            system=MARKETER_SYSTEM_PROMPT,
-            messages=[{"role": "user", "content": job.input}],
-        ) as stream:
-            for text in stream.text_stream:
-                yield text
-
-    except ImportError:
-        import json, requests
-        r = requests.post(
-            "https://api.anthropic.com/v1/messages",
-            headers={
-                "x-api-key": ANTHROPIC_API_KEY,
-                "anthropic-version": "2023-06-01",
-                "content-type": "application/json",
-            },
-            json={
-                "model": "claude-haiku-4-5-20251001",
-                "max_tokens": 2048,
-                "system": MARKETER_SYSTEM_PROMPT,
-                "messages": [{"role": "user", "content": job.input}],
-                "stream": True,
-            },
-            stream=True,
-            timeout=60,
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=120,
         )
-        r.raise_for_status()
-        for line in r.iter_lines():
-            if not line:
-                continue
-            line = line.decode("utf-8")
-            if line.startswith("data: "):
-                data_str = line[6:]
-                if data_str == "[DONE]":
-                    break
-                try:
-                    data = json.loads(data_str)
-                    if data.get("type") == "content_block_delta":
-                        delta = data.get("delta", {})
-                        if delta.get("type") == "text_delta":
-                            yield delta.get("text", "")
-                except json.JSONDecodeError:
-                    pass
+    except subprocess.TimeoutExpired:
+        raise RuntimeError("hermes chat 응답 시간 초과 (120초)")
+    except FileNotFoundError:
+        raise RuntimeError(
+            "hermes 명령을 찾을 수 없습니다. Hermes CLI가 PATH에 있는지 확인하세요."
+        )
+
+    if result.returncode != 0:
+        raise RuntimeError(f"hermes chat 실패 (exit {result.returncode})")
+
+    yield result.stdout.strip()

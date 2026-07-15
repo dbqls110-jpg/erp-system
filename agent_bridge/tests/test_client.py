@@ -296,3 +296,70 @@ class TestNoTokenInLogs:
         api_key = os.environ.get("ERP_AGENT_API_KEY", "")
         for msg in log_messages:
             assert api_key not in msg, f"API 키가 로그에 노출됨: {msg}"
+
+
+# ─── 8. Heartbeat 운영 시간 준수 ────────────────────────────────────────────
+
+class TestHeartbeatOperatingHours:
+    def test_heartbeat_skips_outside_hours(self):
+        """운영 시간 외에는 heartbeat HTTP 요청을 보내지 않음."""
+        api_calls = []
+
+        def fake_api_post(path, data, timeout=15):
+            api_calls.append(path)
+            return {}
+
+        stop_after = [0]
+
+        def fake_wait(timeout):
+            stop_after[0] += 1
+            return stop_after[0] >= 3  # 3번 체크 후 종료
+
+        with patch.object(client, "is_operating_hours", return_value=False), \
+             patch.object(client._hb_stop, "wait", side_effect=fake_wait), \
+             patch.object(client, "api_post", side_effect=fake_api_post):
+            client._heartbeat_loop()
+
+        assert len(api_calls) == 0, \
+            f"운영 시간 외에 heartbeat를 {len(api_calls)}회 전송했습니다."
+
+    def test_heartbeat_sends_during_hours(self):
+        """운영 시간 중에는 heartbeat HTTP 요청을 전송함."""
+        api_calls = []
+
+        def fake_api_post(path, data, timeout=15):
+            api_calls.append(path)
+            return {}
+
+        stop_after = [0]
+
+        def fake_wait(timeout):
+            stop_after[0] += 1
+            return stop_after[0] >= 2  # 2번 체크 후 종료
+
+        with patch.object(client, "is_operating_hours", return_value=True), \
+             patch.object(client._hb_stop, "wait", side_effect=fake_wait), \
+             patch.object(client, "api_post", side_effect=fake_api_post):
+            client._heartbeat_loop()
+
+        assert len(api_calls) >= 1, "운영 시간 중 heartbeat가 전송되지 않았습니다."
+
+    def test_sse_loop_long_sleep_during_quiet_hours(self):
+        """운영 시간 외에 time.sleep이 600초 초과 (1시간 이내)로 호출됨."""
+        sleep_calls = []
+
+        with patch.object(client, "is_operating_hours", return_value=False), \
+             patch.object(client, "seconds_until_open", return_value=21600), \
+             patch("client.time.sleep", side_effect=lambda s: (sleep_calls.append(s), (_ for _ in ()).throw(Exception("stop"))) and None):
+            try:
+                client.sse_loop()
+            except Exception:
+                pass
+
+        assert len(sleep_calls) >= 1
+        # 1시간 이상 슬립 (단순 600초 폴링이 아님)
+        assert sleep_calls[0] > 600, \
+            f"quiet period sleep이 너무 짧습니다: {sleep_calls[0]}초"
+        # 1시간 이내 슬립 (영원히 잠들지 않음)
+        assert sleep_calls[0] <= 3600, \
+            f"quiet period sleep이 너무 깁니다: {sleep_calls[0]}초"
