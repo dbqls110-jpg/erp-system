@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Send, MessageCircle, ArrowLeft, CalendarPlus } from "lucide-react";
+import { AgentStatusBadge } from "@/components/AgentStatusBadge";
 import { sendMessage } from "@/app/actions/message";
 import { createCalendarEvent } from "@/app/actions/calendar";
 import { toast } from "sonner";
@@ -17,6 +18,8 @@ interface User {
   name: string | null;
   image: string | null;
   role: string;
+  isAgent?: boolean;
+  agentType?: string | null;
 }
 
 interface ConvItem {
@@ -305,7 +308,12 @@ export function MessengerView({ myId, users }: { myId: string; users: User[] }) 
                   <AvatarImage src={selectedUser.image ?? undefined} />
                   <AvatarFallback className="text-xs bg-hint-of-sky">{initials(selectedUser.name)}</AvatarFallback>
                 </Avatar>
-                <span className="text-sm font-semibold text-deep-space-charcoal">{selectedUser.name}</span>
+                <div className="flex flex-col min-w-0">
+                  <span className="text-sm font-semibold text-deep-space-charcoal">{selectedUser.name}</span>
+                  {selectedUser.isAgent && selectedUser.agentType && (
+                    <AgentStatusBadge agentType={selectedUser.agentType} />
+                  )}
+                </div>
                 <span className="text-xs text-smoke-gray ml-auto">메시지 우클릭 → 캘린더 등록</span>
               </div>
 

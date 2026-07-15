@@ -8,7 +8,7 @@ export default async function MessengerPage() {
 
   const users = await prisma.user.findMany({
     where: { active: true, id: { not: session!.user.id }, role: { not: "pending" } },
-    select: { id: true, name: true, image: true, role: true },
+    select: { id: true, name: true, image: true, role: true, isAgent: true, agentType: true },
     orderBy: { name: "asc" },
   });
 

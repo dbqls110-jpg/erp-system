@@ -359,6 +359,53 @@ model AgentMemory {
   @@map("agent_memories")
 }
 
+// ─── Agent 실시간 작업 큐 ────────────────────────────────
+model AgentJob {
+  id          String    @id @default(cuid())
+  agentType   String    // "hermes" | "marketer"
+  userId      String    // 요청자 userId
+  status      String    @default("pending") // "pending" | "accepted" | "processing" | "completed" | "error"
+  input       String    // 작업 내용 (메시지 또는 task)
+  output      String?   // 최종 응답
+  errorMsg    String?   // 오류 메시지
+  claimedAt   DateTime? // 브릿지가 수락한 시각
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  deltas AgentJobDelta[]
+
+  @@index([agentType, status, createdAt])
+  @@index([userId, createdAt])
+  @@map("agent_jobs")
+}
+
+model AgentJobDelta {
+  id        String   @id @default(cuid())
+  jobId     String
+  seq       Int      // 순서 번호 (0부터)
+  content   String   // 부분 출력 텍스트
+  createdAt DateTime @default(now())
+
+  job AgentJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@unique([jobId, seq])
+  @@index([jobId, seq])
+  @@map("agent_job_deltas")
+}
+
+// ─── Agent 브릿지 하트비트 ──────────────────────────────
+model AgentBridgeHeartbeat {
+  id        String   @id @default(cuid())
+  agentType String   @unique // "hermes" | "marketer"
+  lastSeenAt DateTime @default(now())
+  version   String?
+  hostname  String?
+  updatedAt DateTime @updatedAt
+
+  @@map("agent_bridge_heartbeats")
+}
+
 // ─── 명함 ─────────────────────────────────────────────────
 model BusinessCard {
   id         String   @id @default(cuid())

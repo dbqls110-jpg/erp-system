@@ -3,7 +3,7 @@ import { verifyAgentApiKey } from "@/lib/agentAuth";
 
 const CAPABILITIES = {
   system: "천우영 ERP",
-  version: "2.2.0",
+  version: "3.0.0",
   baseUrl: "/api/agent",
   resources: [
     {
@@ -751,6 +751,124 @@ const CAPABILITIES = {
         "agentType=hermes": "Discord Hermes + ERP Hermes 공통 기억. 어느 채널에서 저장해도 Hermes 응답 시 자동 포함",
         "agentType=marketer": "Discord Marketer + ERP Marketer 공통 기억. 어느 채널에서 저장해도 Marketer 응답 시 자동 포함",
         separation: "Hermes 기억과 Marketer 기억은 agentType으로 완전 분리. 서로 조회 불가",
+      },
+    },
+    {
+      name: "realtime",
+      description: "실시간 작업 큐 (AgentJob). Python 브릿지가 폴링해 처리. 브라우저는 SSE로 실시간 업데이트 수신.",
+      read: true, write: true,
+      endpoints: [
+        {
+          method: "POST", path: "/api/agent/jobs",
+          description: "새 작업 제출. Python 브릿지가 pending 상태 작업을 폴링해 처리",
+          auth: true, dryRun: false,
+          body: {
+            agentType: "\"hermes\" | \"marketer\" (선택, 기본 hermes)",
+            userId: "string (필수) — 요청자 ERP userId",
+            input: "string (필수, 최대 4000자) — 작업 내용",
+          },
+          response: { jobId: "string", status: "\"pending\"", agentType: "string", createdAt: "string" },
+        },
+        {
+          method: "GET", path: "/api/agent/jobs/pending",
+          description: "Python 브릿지 전용 폴링 엔드포인트. pending 상태 작업 목록 반환",
+          auth: true, dryRun: false,
+          params: [
+            { name: "agentType", type: "string", required: true },
+            { name: "limit", type: "number", required: false, description: "기본 5, 최대 10" },
+          ],
+          response: { agentType: "string", count: "number", jobs: "AgentJob[]" },
+        },
+        {
+          method: "GET", path: "/api/agent/jobs/:id",
+          description: "작업 상태 + 누적 델타 조회",
+          auth: true, dryRun: false,
+          response: {
+            jobId: "string", status: "pending|accepted|processing|completed|error",
+            output: "string|null", deltas: "{ seq, content, createdAt }[]",
+          },
+        },
+        {
+          method: "PATCH", path: "/api/agent/jobs/:id",
+          description: "작업 상태 업데이트 (브릿지 전용). accepted→processing→completed|error",
+          auth: true, dryRun: false,
+          body: {
+            status: "\"accepted\" | \"processing\" | \"completed\" | \"error\" (필수)",
+            output: "string (선택) — completed 시 최종 출력",
+            errorMsg: "string (선택) — error 시 오류 메시지",
+          },
+        },
+        {
+          method: "POST", path: "/api/agent/jobs/:id/delta",
+          description: "스트리밍 부분 출력 저장 (브릿지 전용). seq는 0부터 시작하는 순번",
+          auth: true, dryRun: false,
+          body: {
+            seq: "number (필수, 0부터 시작)",
+            content: "string (필수, 최대 5000자)",
+          },
+        },
+        {
+          method: "GET", path: "/api/agent/status",
+          description: "브릿지 온라인 여부 조회 (인증 불필요). lastSeenAt 기준 60초 내 = online",
+          auth: false, dryRun: false,
+          params: [{ name: "agentType", type: "string", required: true }],
+          response: { agentType: "string", online: "boolean", lastSeenAt: "string|null", version: "string|null" },
+        },
+        {
+          method: "POST", path: "/api/agent/status",
+          description: "브릿지 하트비트 (API 키 인증). 30초마다 호출해 온라인 상태 유지",
+          auth: true, dryRun: false,
+          body: {
+            agentType: "string (필수)",
+            version: "string (선택)",
+            hostname: "string (선택)",
+          },
+        },
+        {
+          method: "GET", path: "/api/agent/sse",
+          description: "브라우저용 Server-Sent Events. jobId 주면 해당 작업 실시간 추적. 90초 후 자동 close (재연결)",
+          auth: "세션 필요", dryRun: false,
+          params: [
+            { name: "agentType", type: "string", required: false, description: "기본 hermes" },
+            { name: "jobId", type: "string", required: false, description: "특정 작업 추적용" },
+          ],
+          events: {
+            connected: "연결 확인",
+            status: "작업 상태 변경 { jobId, status }",
+            delta: "부분 출력 { jobId, seq, content }",
+            completed: "작업 완료 { jobId, output }",
+            error: "오류 { jobId, errorMsg }",
+            timeout: "90초 후 재연결 안내",
+          },
+        },
+      ],
+      pythonBridge: {
+        location: "agent_bridge/ (ERP 프로젝트 루트)",
+        files: [
+          "client.py — 메인 폴링 루프 (운영시간·지수백오프·하트비트)",
+          "protocol.py — AgentJob 데이터 클래스",
+          "runners/hermes.py — Hermes Claude API 호출",
+          "runners/marketer.py — Marketer Claude API 호출",
+          "start_hermes.cmd / start_hermes.ps1 — Windows 시작 스크립트",
+          "start_marketer.cmd / start_marketer.ps1 — Windows 시작 스크립트",
+          "config.env.example — 환경변수 예시",
+        ],
+        env: {
+          ERP_BASE_URL: "https://erp-system-lojo.onrender.com",
+          ERP_AGENT_API_KEY: "ERP_AGENT_API_KEY와 동일",
+          ANTHROPIC_API_KEY: "Claude API 키",
+          AGENT_TYPE: "hermes | marketer",
+          AGENT_OPEN_HOUR: "8 (KST, 기본값)",
+          AGENT_CLOSE_HOUR: "1 (익일 KST, 기본값)",
+          AGENT_POLL_INTERVAL: "3 (초, 기본값)",
+        },
+        backoff: "연결 오류 시 5→15→30→60→120→300초 지수 백오프",
+        operatingHours: "08:00~익일 01:00 KST (환경변수로 조정 가능). 외 시간은 대기",
+        install: "cd agent_bridge && pip install -r requirements.txt && cp config.env.example .env (값 편집)",
+        start: {
+          hermes: "agent_bridge\\start_hermes.cmd (또는 .ps1)",
+          marketer: "agent_bridge\\start_marketer.cmd (또는 .ps1)",
+        },
       },
     },
     {
