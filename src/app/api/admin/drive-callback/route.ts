@@ -2,9 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { google } from "googleapis";
+import { prisma } from "@/lib/prisma";
+import { encryptForStorage } from "@/lib/googleClient";
 
 const CALLBACK_URL = "https://erp-system-lojo.onrender.com/api/admin/drive-callback";
 
+// 토큰을 DB에 암호화 저장 후 관리자가 /api/admin/get-drive-token으로 1회 조회
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions);
   if (session?.user?.role !== "admin") {
@@ -32,17 +35,31 @@ export async function GET(req: NextRequest) {
 
     if (!tokens.refresh_token) {
       return NextResponse.json({
-        error: "refresh_token이 없습니다. drive-setup을 다시 방문해 재인증하세요.",
-        hint: "이미 이 앱에 인증된 계정이면 Google 계정 설정에서 앱 권한을 취소 후 재시도하세요.",
+        error: "refresh_token이 없습니다.",
+        action: "Google 계정 설정 → 서드파티 앱에서 이 ERP 앱 권한 제거 후 /api/admin/drive-setup 재방문",
       }, { status: 400 });
     }
 
-    // refresh_token을 응답에 직접 노출하지 않음 — 서버 로그에만 출력 (Render 로그에서 복사)
-    console.log("[drive-callback] GOOGLE_DRIVE_OWNER_REFRESH_TOKEN=", tokens.refresh_token);
+    // 토큰을 암호화 후 AgentAuditLog에 10분 유효 임시 저장 (응답·로그에 원문 미노출)
+    const encrypted = encryptForStorage(tokens.refresh_token);
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+
+    await prisma.agentAuditLog.create({
+      data: {
+        method: "GET",
+        endpoint: "/api/admin/drive-callback",
+        action: "drive_token_pending",
+        dryRun: false,
+        payload: { expiresAt },
+        result: { enc: encrypted },
+      },
+    });
+
     return NextResponse.json({
-      message: "인증 성공. Render 로그에서 GOOGLE_DRIVE_OWNER_REFRESH_TOKEN 값을 복사해 환경변수에 저장하세요.",
+      ok: true,
+      message: "인증 성공. 10분 내에 GET /api/admin/get-drive-token (admin 세션 필요)을 호출해 토큰을 조회하세요.",
       scope: tokens.scope,
-      hasRefreshToken: !!tokens.refresh_token,
+      expiresAt,
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "unknown";

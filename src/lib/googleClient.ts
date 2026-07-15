@@ -1,4 +1,49 @@
 import { google } from "googleapis";
+import crypto from "crypto";
+
+// ─── OAuth 오류 감지 헬퍼 ─────────────────────────────────────────────────────
+
+export function isInvalidGrantError(err: unknown): boolean {
+  if (!err || typeof err !== "object") return false;
+  const e = err as Record<string, unknown>;
+  const msg = String(e.message ?? "").toLowerCase();
+  // googleapis 오류 구조
+  const resp = e.response as Record<string, unknown> | undefined;
+  const data = resp?.data as Record<string, unknown> | undefined;
+  if (data?.error === "invalid_grant") return true;
+  if (msg.includes("invalid_grant")) return true;
+  // GaxiosError / axios 형태
+  const errors = (e.errors as Array<Record<string, unknown>>) ?? [];
+  if (errors.some((er) => String(er.reason ?? "").includes("invalid_grant"))) return true;
+  return false;
+}
+
+// ─── 재인증 토큰 임시 암호화 저장 (DB 저장용) ────────────────────────────────
+
+function getEncKey(): Buffer {
+  const secret = process.env.NEXTAUTH_SECRET ?? process.env.AUTH_SECRET ?? "fallback-not-secure";
+  return crypto.createHash("sha256").update(secret).digest();
+}
+
+export function encryptForStorage(plaintext: string): string {
+  const key = getEncKey();
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv("aes-256-gcm", key, iv);
+  const enc = Buffer.concat([cipher.update(plaintext, "utf8"), cipher.final()]);
+  const tag = cipher.getAuthTag();
+  return Buffer.concat([iv, tag, enc]).toString("base64");
+}
+
+export function decryptFromStorage(encoded: string): string {
+  const key = getEncKey();
+  const buf = Buffer.from(encoded, "base64");
+  const iv = buf.subarray(0, 12);
+  const tag = buf.subarray(12, 28);
+  const ciphertext = buf.subarray(28);
+  const decipher = crypto.createDecipheriv("aes-256-gcm", key, iv);
+  decipher.setAuthTag(tag);
+  return Buffer.concat([decipher.update(ciphertext), decipher.final()]).toString("utf8");
+}
 
 const SHEETS_SCOPE = "https://www.googleapis.com/auth/spreadsheets";
 const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive";

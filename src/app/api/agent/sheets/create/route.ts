@@ -4,6 +4,7 @@ import { auditLog } from "@/lib/agentAudit";
 import {
   makeSheetsClient,
   makeDriveClientAsOwner,
+  isInvalidGrantError,
   LIMITS,
 } from "@/lib/googleClient";
 import type { drive_v3 } from "googleapis";
@@ -161,6 +162,14 @@ export async function POST(req: NextRequest) {
       try {
         rootFolderId = await findOrCreateFolder(ownerDrive, ROOT_FOLDER_NAME);
       } catch (e) {
+        if (isInvalidGrantError(e)) {
+          return NextResponse.json({
+            error: "Google Drive 인증 만료",
+            code: "GOOGLE_AUTH_EXPIRED",
+            step: "root_folder",
+            action: "재시도하지 말 것. 관리자가 /api/admin/drive-setup으로 재인증 필요.",
+          }, { status: 503 });
+        }
         const msg = e instanceof Error ? e.message : "unknown";
         return NextResponse.json({ error: "루트 폴더 생성 실패", detail: msg, step: "root_folder" }, { status: 502 });
       }
@@ -171,6 +180,14 @@ export async function POST(req: NextRequest) {
     try {
       subFolderId = await findOrCreateFolder(ownerDrive, rawSubfolder, rootFolderId);
     } catch (e) {
+      if (isInvalidGrantError(e)) {
+        return NextResponse.json({
+          error: "Google Drive 인증 만료",
+          code: "GOOGLE_AUTH_EXPIRED",
+          step: "subfolder",
+          action: "재시도하지 말 것. 관리자가 /api/admin/drive-setup으로 재인증 필요.",
+        }, { status: 503 });
+      }
       const msg = e instanceof Error ? e.message : "unknown";
       return NextResponse.json({ error: "서브폴더 생성 실패", detail: msg, step: "subfolder" }, { status: 502 });
     }
@@ -188,6 +205,14 @@ export async function POST(req: NextRequest) {
       });
       spreadsheetId = driveRes.data.id!;
     } catch (e) {
+      if (isInvalidGrantError(e)) {
+        return NextResponse.json({
+          error: "Google Drive 인증 만료",
+          code: "GOOGLE_AUTH_EXPIRED",
+          step: "create_file",
+          action: "재시도하지 말 것. 관리자가 /api/admin/drive-setup으로 재인증 필요.",
+        }, { status: 503 });
+      }
       const msg = e instanceof Error ? e.message : "unknown";
       return NextResponse.json({ error: "파일 생성 실패", detail: msg, step: "create_file", subFolderId }, { status: 502 });
     }
