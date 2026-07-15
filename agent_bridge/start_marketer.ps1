@@ -14,6 +14,45 @@ Get-Content $envFile | ForEach-Object {
 }
 $env:AGENT_TYPE = "marketer"
 
+# ── Hermes 실행 파일 경로 자동 탐색 ─────────────────────────────────────────
+$hermesExe = $env:HERMES_EXECUTABLE
+if (-not $hermesExe) {
+    $found = Get-Command hermes -ErrorAction SilentlyContinue
+    if ($found) {
+        $hermesExe = $found.Source
+    }
+}
+if (-not $hermesExe) {
+    $knownPath = Join-Path $env:LOCALAPPDATA "hermes\hermes-agent\venv\Scripts\hermes.exe"
+    if (Test-Path $knownPath) {
+        $hermesExe = $knownPath
+        $hermesScripts = Split-Path $knownPath -Parent
+        $env:PATH = "$hermesScripts;$env:PATH"
+        $env:HERMES_EXECUTABLE = $hermesExe
+    }
+}
+if (-not $hermesExe) {
+    Write-Error "[ERROR] hermes 실행 파일을 찾을 수 없습니다. HERMES_EXECUTABLE 환경변수를 설정하거나 Hermes 설치 경로를 PATH에 추가하세요."
+    exit 1
+}
+Write-Host "[INFO] Hermes 실행 파일: $hermesExe" -ForegroundColor Cyan
+
+# ── 사전점검 ──────────────────────────────────────────────────────────────────
+Write-Host "[사전점검] Hermes CLI 상태 확인 중..." -ForegroundColor Cyan
+$preflightResult = python -c @"
+import sys; sys.path.insert(0,r'$PSScriptRoot')
+import preflight, logging
+logging.basicConfig(stream=sys.stderr, level=logging.INFO, format='%(message)s')
+ok = preflight.run('marketer')
+sys.exit(0 if ok else 1)
+"@
+if ($LASTEXITCODE -ne 0) {
+    Write-Error "[ERROR] 사전점검 실패 — 오류를 해결한 뒤 다시 실행하세요. 상세 진단: check_marketer.cmd"
+    exit 1
+}
+Write-Host "[OK] 사전점검 통과" -ForegroundColor Green
+
+# ── 중복 실행 방지 ───────────────────────────────────────────────────────────
 $lockFile = Join-Path $PSScriptRoot "marketer.lock"
 if (Test-Path $lockFile) {
     $oldPid = Get-Content $lockFile -ErrorAction SilentlyContinue
@@ -25,6 +64,7 @@ if (Test-Path $lockFile) {
     Remove-Item $lockFile -Force
 }
 
+# ── 로그 파일 및 창 없이 백그라운드 실행 ────────────────────────────────────
 $logFile = Join-Path $PSScriptRoot "marketer.log"
 
 $proc = Start-Process -FilePath "pythonw" `

@@ -1,9 +1,10 @@
 @echo off
+setlocal enabledelayedexpansion
 :: ─────────────────────────────────────────────────────────
 :: ERP Marketer Bridge  (노트북용)
 :: - marketer.env 에서 환경변수 로드
-:: - 중복 실행 방지 (marketer.lock)
-:: - 검은 창 없이 실행: pythonw 사용
+:: - Hermes venv PATH 자동 추가
+:: - 사전점검(preflight) 통과 후 창 없이 실행
 :: ─────────────────────────────────────────────────────────
 cd /d "%~dp0"
 
@@ -20,17 +21,59 @@ for /f "usebackq tokens=1,* delims==" %%a in ("marketer.env") do (
 
 set AGENT_TYPE=marketer
 
+:: ── Hermes 실행 파일 경로 자동 탐색 ──────────────────────────────────────────
+if defined HERMES_EXECUTABLE (
+    if not exist "!HERMES_EXECUTABLE!" (
+        echo [ERROR] HERMES_EXECUTABLE 경로가 존재하지 않습니다: !HERMES_EXECUTABLE!
+        pause
+        exit /b 1
+    )
+    goto :hermes_found
+)
+
+where hermes >nul 2>&1
+if not errorlevel 1 goto :hermes_found
+
+set HERMES_DEFAULT=%LOCALAPPDATA%\hermes\hermes-agent\venv\Scripts
+if exist "%HERMES_DEFAULT%\hermes.exe" (
+    set "PATH=%HERMES_DEFAULT%;%PATH%"
+    set "HERMES_EXECUTABLE=%HERMES_DEFAULT%\hermes.exe"
+    goto :hermes_found
+)
+
+echo [ERROR] hermes 실행 파일을 찾을 수 없습니다.
+echo 해결 방법:
+echo   1. HERMES_EXECUTABLE 환경변수에 hermes.exe 전체 경로를 설정하세요
+echo   2. Hermes 설치 폴더를 PATH에 추가하세요
+pause
+exit /b 1
+
+:hermes_found
+
+:: ── 사전점검: visible python 창으로 preflight 실행 ───────────────────────────
+echo [사전점검] Hermes CLI 상태 확인 중...
+python -c "import sys; sys.path.insert(0,'%~dp0'); import preflight, logging; logging.basicConfig(stream=sys.stderr,level=logging.INFO,format='%%(message)s'); ok=preflight.run('marketer'); sys.exit(0 if ok else 1)"
+if errorlevel 1 (
+    echo [ERROR] 사전점검 실패 — 위 오류를 해결한 뒤 다시 실행하세요.
+    echo         상세 진단: check_marketer.cmd 실행
+    pause
+    exit /b 1
+)
+echo [OK] 사전점검 통과
+
+:: ── 중복 실행 방지 ──────────────────────────────────────────────────────────
 set LOCKFILE=%~dp0marketer.lock
 if exist "%LOCKFILE%" (
     set /p OLDPID=<"%LOCKFILE%"
-    tasklist /fi "pid eq %OLDPID%" /fo csv 2>nul | find /i "python" >nul
+    tasklist /fi "pid eq !OLDPID!" /fo csv 2>nul | find /i "python" >nul
     if not errorlevel 1 (
-        echo [INFO] Marketer 브릿지가 이미 실행 중입니다 (PID=%OLDPID%).
+        echo [INFO] Marketer 브릿지가 이미 실행 중입니다 (PID=!OLDPID!).
         exit /b 0
     )
     del "%LOCKFILE%"
 )
 
+:: ── 백그라운드 실행 (창 없음) ────────────────────────────────────────────────
 start "" /b pythonw client.py
 timeout /t 1 /nobreak >nul
 
@@ -39,5 +82,6 @@ for /f "tokens=2" %%p in ('tasklist /fi "imagename eq pythonw.exe" /fo csv /nh 2
     goto :got_pid
 )
 :got_pid
-echo %NEWPID%>"%LOCKFILE%"
-echo [OK] Marketer 브릿지 시작됨 (PID=%NEWPID%, 로그: marketer.log)
+echo !NEWPID!>"%LOCKFILE%"
+echo [OK] Marketer 브릿지 시작됨 (PID=!NEWPID!, 로그: marketer.log)
+endlocal
