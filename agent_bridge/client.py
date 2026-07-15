@@ -1,32 +1,49 @@
 """
-ERP Agent Bridge Client
-- ERP 서버에 HTTP 폴링으로 미처리 작업(AgentJob)을 가져와 실행
-- 실행 중 delta를 스트리밍으로 전송
-- 운영 시간(08:00~01:00 KST) 외에는 대기
-- 지수 백오프: 5, 15, 30, 60, 120, 300초
+ERP Agent Bridge Client  v2.0.0
+────────────────────────────────────────────────────────────
+동작 방식:
+  1. 시작 시 /pending 으로 밀린 작업 한 번 복구
+  2. SSE(/api/agent/sse?agentType=…) 로 실시간 작업 수신
+  3. SSE 연결 끊김 → 지수 백오프 후 재연결 + /pending 재복구
+  4. /pending 반복 호출 없음
+  5. 운영 시간(08:00~01:00 KST) 외 → 슬립 후 자동 재연결
+  6. 30초마다 하트비트
+  7. 이미 accepted/processing 상태인 job은 건너뜀 (중복 실행 방지)
 """
+
 import os
 import sys
 import time
+import json
 import socket
 import logging
+import threading
 import importlib
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 import requests
-from protocol import AgentJob, DeltaChunk, BACKOFF_STEPS, DEFAULT_OPEN_HOUR, DEFAULT_CLOSE_HOUR
+from protocol import AgentJob, BACKOFF_STEPS, DEFAULT_OPEN_HOUR, DEFAULT_CLOSE_HOUR
 
 # ─── 설정 ────────────────────────────────────────────────────────────────────
 
-ERP_BASE_URL  = os.environ.get("ERP_BASE_URL", "https://erp-system-lojo.onrender.com")
+ERP_BASE_URL  = os.environ.get("ERP_BASE_URL", "").rstrip("/")
 AGENT_API_KEY = os.environ.get("ERP_AGENT_API_KEY", "")
 AGENT_TYPE    = os.environ.get("AGENT_TYPE", "hermes")
 OPEN_HOUR     = int(os.environ.get("AGENT_OPEN_HOUR",  str(DEFAULT_OPEN_HOUR)))
 CLOSE_HOUR    = int(os.environ.get("AGENT_CLOSE_HOUR", str(DEFAULT_CLOSE_HOUR)))
-POLL_INTERVAL = int(os.environ.get("AGENT_POLL_INTERVAL", "3"))  # seconds
-VERSION       = "1.0.0"
+VERSION       = "2.0.0"
 
 KST = timezone(timedelta(hours=9))
+
+if not ERP_BASE_URL:
+    print("[FATAL] ERP_BASE_URL 환경변수가 없습니다.", file=sys.stderr)
+    sys.exit(1)
+if not AGENT_API_KEY:
+    print("[FATAL] ERP_AGENT_API_KEY 환경변수가 없습니다.", file=sys.stderr)
+    sys.exit(1)
+if AGENT_TYPE not in ("hermes", "marketer"):
+    print(f"[FATAL] AGENT_TYPE={AGENT_TYPE!r} — hermes 또는 marketer 이어야 합니다.", file=sys.stderr)
+    sys.exit(1)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -35,87 +52,116 @@ logging.basicConfig(
 )
 log = logging.getLogger("agent_bridge")
 
-HEADERS = {
+_BASE_HEADERS = {
     "Authorization": f"Bearer {AGENT_API_KEY}",
     "Content-Type": "application/json",
 }
 
-# ─── 운영 시간 확인 ──────────────────────────────────────────────────────────
+# ─── 운영 시간 ───────────────────────────────────────────────────────────────
 
 def is_operating_hours() -> bool:
-    now = datetime.now(KST)
-    h = now.hour
+    h = datetime.now(KST).hour
     if OPEN_HOUR < CLOSE_HOUR:
         return OPEN_HOUR <= h < CLOSE_HOUR
-    else:
-        # 자정 넘어가는 케이스: 08:00 ~ 익일 01:00
-        return h >= OPEN_HOUR or h < CLOSE_HOUR
+    return h >= OPEN_HOUR or h < CLOSE_HOUR
 
-def minutes_until_open() -> int:
+def seconds_until_open() -> int:
     now = datetime.now(KST)
-    h, m = now.hour, now.minute
-    if h < OPEN_HOUR:
-        return (OPEN_HOUR - h) * 60 - m
-    return (24 - h + OPEN_HOUR) * 60 - m
+    h, m, s = now.hour, now.minute, now.second
+    if OPEN_HOUR < CLOSE_HOUR:
+        if h < OPEN_HOUR:
+            return (OPEN_HOUR - h) * 3600 - m * 60 - s
+    else:
+        if CLOSE_HOUR <= h < OPEN_HOUR:
+            return (OPEN_HOUR - h) * 3600 - m * 60 - s
+    return 0
 
 # ─── ERP API 헬퍼 ───────────────────────────────────────────────────────────
 
-def api_get(path: str, params: Optional[dict] = None):
-    r = requests.get(f"{ERP_BASE_URL}{path}", headers=HEADERS, params=params, timeout=15)
+def api_get(path: str, params: Optional[dict] = None, timeout: int = 15) -> dict:
+    r = requests.get(f"{ERP_BASE_URL}{path}", headers=_BASE_HEADERS,
+                     params=params, timeout=timeout)
     r.raise_for_status()
     return r.json()
 
-def api_patch(path: str, data: dict):
-    r = requests.patch(f"{ERP_BASE_URL}{path}", headers=HEADERS, json=data, timeout=15)
+def api_patch(path: str, data: dict, timeout: int = 15) -> dict:
+    r = requests.patch(f"{ERP_BASE_URL}{path}", headers=_BASE_HEADERS,
+                       json=data, timeout=timeout)
     r.raise_for_status()
     return r.json()
 
-def api_post(path: str, data: dict):
-    r = requests.post(f"{ERP_BASE_URL}{path}", headers=HEADERS, json=data, timeout=15)
+def api_post(path: str, data: dict, timeout: int = 15) -> dict:
+    r = requests.post(f"{ERP_BASE_URL}{path}", headers=_BASE_HEADERS,
+                      json=data, timeout=timeout)
     r.raise_for_status()
     return r.json()
 
-# ─── 하트비트 ───────────────────────────────────────────────────────────────
+# ─── 하트비트 (별도 스레드) ──────────────────────────────────────────────────
 
-def send_heartbeat():
-    try:
-        api_post("/api/agent/status", {
-            "agentType": AGENT_TYPE,
-            "version": VERSION,
-            "hostname": socket.gethostname(),
-        })
-    except Exception as e:
-        log.warning(f"하트비트 전송 실패: {e}")
+_hb_stop = threading.Event()
+
+def _heartbeat_loop():
+    while not _hb_stop.wait(timeout=30):
+        try:
+            api_post("/api/agent/status", {
+                "agentType": AGENT_TYPE,
+                "version": VERSION,
+                "hostname": socket.gethostname(),
+            })
+        except Exception as e:
+            log.warning(f"하트비트 전송 실패: {e}")
+
+# ─── 중복 실행 방지 ──────────────────────────────────────────────────────────
+
+_active_jobs: set[str] = set()
+_jobs_lock = threading.Lock()
+
+def _try_claim(job_id: str) -> bool:
+    """이미 처리 중이면 False, 새로 등록하면 True."""
+    with _jobs_lock:
+        if job_id in _active_jobs:
+            return False
+        _active_jobs.add(job_id)
+        return True
+
+def _release(job_id: str):
+    with _jobs_lock:
+        _active_jobs.discard(job_id)
 
 # ─── 작업 처리 ───────────────────────────────────────────────────────────────
 
 def process_job(job: AgentJob):
-    log.info(f"작업 수락: {job.job_id} (type={job.agent_type}, user={job.user_id})")
+    if not _try_claim(job.job_id):
+        log.debug(f"중복 건너뜀: {job.job_id}")
+        return
 
+    log.info(f"작업 시작: {job.job_id} (type={job.agent_type}, user={job.user_id})")
+    try:
+        _run_job(job)
+    finally:
+        _release(job.job_id)
+
+def _run_job(job: AgentJob):
     # accepted
     try:
         api_patch(f"/api/agent/jobs/{job.job_id}", {"status": "accepted"})
     except Exception as e:
-        log.error(f"accepted 업데이트 실패: {e}")
+        log.error(f"accepted 전환 실패: {e}")
         return
 
     # processing
     try:
         api_patch(f"/api/agent/jobs/{job.job_id}", {"status": "processing"})
     except Exception as e:
-        log.error(f"processing 업데이트 실패: {e}")
+        log.error(f"processing 전환 실패: {e}")
         return
 
-    # runner 호출
     try:
         module = importlib.import_module(f"runners.{job.agent_type}")
         runner_fn = getattr(module, "run")
     except (ModuleNotFoundError, AttributeError) as e:
         log.error(f"Runner 로드 실패 ({job.agent_type}): {e}")
-        api_patch(f"/api/agent/jobs/{job.job_id}", {
-            "status": "error",
-            "errorMsg": f"Runner not found: {e}",
-        })
+        _mark_error(job.job_id, f"Runner not found: {e}")
         return
 
     full_output = ""
@@ -133,80 +179,139 @@ def process_job(job: AgentJob):
             "status": "completed",
             "output": full_output,
         })
-        log.info(f"작업 완료: {job.job_id} ({seq} chunks)")
+        log.info(f"작업 완료: {job.job_id} ({seq} chunks, {len(full_output)}자)")
     except Exception as e:
-        log.error(f"Runner 실행 오류: {e}")
-        api_patch(f"/api/agent/jobs/{job.job_id}", {
-            "status": "error",
-            "errorMsg": str(e)[:500],
-        })
+        log.error(f"Runner 실행 오류: {e}", exc_info=True)
+        _mark_error(job.job_id, str(e)[:500])
 
-# ─── 메인 루프 ──────────────────────────────────────────────────────────────
+def _mark_error(job_id: str, msg: str):
+    try:
+        api_patch(f"/api/agent/jobs/{job_id}", {"status": "error", "errorMsg": msg})
+    except Exception as e2:
+        log.error(f"error 전환 실패: {e2}")
 
-def main():
-    if not AGENT_API_KEY:
-        log.critical("ERP_AGENT_API_KEY가 설정되지 않았습니다. .env 파일을 확인하세요.")
-        sys.exit(1)
+# ─── pending 복구 (시작·재연결 시 1회) ──────────────────────────────────────
 
-    log.info(f"ERP Agent Bridge 시작 (type={AGENT_TYPE}, base={ERP_BASE_URL})")
-    log.info(f"운영 시간: {OPEN_HOUR:02d}:00 ~ {CLOSE_HOUR:02d}:00 KST")
+def recover_pending():
+    """서버에 남은 pending 작업을 가져와 처리. 별도 스레드로 실행."""
+    try:
+        data = api_get("/api/agent/jobs/pending", {"agentType": AGENT_TYPE, "limit": "10"})
+        jobs = data.get("jobs", [])
+        if jobs:
+            log.info(f"pending 복구: {len(jobs)}개")
+        for j in jobs:
+            job = AgentJob(
+                job_id=j["id"],
+                agent_type=j["agentType"],
+                user_id=j["userId"],
+                input=j["input"],
+                status=j["status"],
+            )
+            t = threading.Thread(target=process_job, args=(job,), daemon=True)
+            t.start()
+    except Exception as e:
+        log.warning(f"pending 복구 실패 (무시): {e}")
 
+# ─── SSE 연결 루프 ───────────────────────────────────────────────────────────
+
+def _parse_sse_line(line: str) -> tuple[Optional[str], Optional[str]]:
+    """'event: xxx' 또는 'data: xxx' 파싱."""
+    if line.startswith("event:"):
+        return "event", line[6:].strip()
+    if line.startswith("data:"):
+        return "data", line[5:].strip()
+    return None, None
+
+def sse_loop():
+    """SSE 스트림에 연결해 job 이벤트를 실시간 수신. 끊기면 백오프 후 재연결."""
     backoff_idx = 0
-    heartbeat_interval = 30  # seconds
-    last_hb = 0.0
+    sse_url = f"{ERP_BASE_URL}/api/agent/sse/bridge?agentType={AGENT_TYPE}"
 
     while True:
-        now = time.time()
-
-        # 하트비트 (30초마다)
-        if now - last_hb >= heartbeat_interval:
-            send_heartbeat()
-            last_hb = now
-
-        # 운영 시간 체크
         if not is_operating_hours():
-            wait_min = minutes_until_open()
-            log.info(f"운영 시간 외. {wait_min}분 후 재개 (다음 {OPEN_HOUR:02d}:00 KST)")
-            time.sleep(min(wait_min * 60, 600))
+            secs = seconds_until_open()
+            log.info(f"운영 시간 외 ({CLOSE_HOUR:02d}:00~{OPEN_HOUR:02d}:00). {secs//60}분 후 재연결")
+            time.sleep(min(secs + 10, 600))
             continue
 
+        log.info(f"SSE 연결 시도: {sse_url}")
         try:
-            data = api_get("/api/agent/jobs/pending", {"agentType": AGENT_TYPE, "limit": "3"})
-            jobs = data.get("jobs", [])
+            # pending 복구를 연결 직전에 실행
+            threading.Thread(target=recover_pending, daemon=True).start()
 
-            if jobs:
+            with requests.get(
+                sse_url,
+                headers=_BASE_HEADERS,
+                stream=True,
+                timeout=(10, 300),  # (connect, read)
+            ) as resp:
+                resp.raise_for_status()
+                log.info("SSE 연결됨")
                 backoff_idx = 0
-                for j in jobs:
-                    job = AgentJob(
-                        job_id=j["id"],
-                        agent_type=j["agentType"],
-                        user_id=j["userId"],
-                        input=j["input"],
-                        status=j["status"],
-                        created_at=j.get("createdAt"),
-                    )
-                    process_job(job)
-            else:
-                # 작업 없음 → 폴 인터벌 대기
-                time.sleep(POLL_INTERVAL)
 
+                event_type = None
+                for raw_line in resp.iter_lines(decode_unicode=True):
+                    if raw_line is None:
+                        continue
+                    field, val = _parse_sse_line(raw_line)
+                    if field == "event":
+                        event_type = val
+                    elif field == "data" and val:
+                        if event_type == "job":
+                            try:
+                                j = json.loads(val)
+                                job = AgentJob(
+                                    job_id=j["jobId"],
+                                    agent_type=j["agentType"],
+                                    user_id=j["userId"],
+                                    input=j["input"],
+                                    status="pending",
+                                )
+                                threading.Thread(
+                                    target=process_job, args=(job,), daemon=True
+                                ).start()
+                            except Exception as e:
+                                log.warning(f"SSE job 파싱 오류: {e}")
+                        elif event_type == "ping":
+                            pass  # keep-alive
+                        event_type = None
+
+        except requests.exceptions.ReadTimeout:
+            log.warning("SSE read timeout — 재연결")
         except requests.exceptions.ConnectionError as e:
             delay = BACKOFF_STEPS[min(backoff_idx, len(BACKOFF_STEPS) - 1)]
-            log.warning(f"연결 오류 (재시도 {delay}초): {e}")
+            log.warning(f"SSE 연결 오류 (재시도 {delay}초): {e}")
             time.sleep(delay)
             backoff_idx = min(backoff_idx + 1, len(BACKOFF_STEPS) - 1)
-
         except requests.exceptions.HTTPError as e:
             delay = BACKOFF_STEPS[min(backoff_idx, len(BACKOFF_STEPS) - 1)]
-            log.warning(f"HTTP 오류 (재시도 {delay}초): {e}")
+            log.warning(f"SSE HTTP 오류 (재시도 {delay}초): {e}")
+            time.sleep(delay)
+            backoff_idx = min(backoff_idx + 1, len(BACKOFF_STEPS) - 1)
+        except Exception as e:
+            delay = BACKOFF_STEPS[min(backoff_idx, len(BACKOFF_STEPS) - 1)]
+            log.error(f"SSE 예외 (재시도 {delay}초): {e}", exc_info=True)
             time.sleep(delay)
             backoff_idx = min(backoff_idx + 1, len(BACKOFF_STEPS) - 1)
 
-        except Exception as e:
-            delay = BACKOFF_STEPS[min(backoff_idx, len(BACKOFF_STEPS) - 1)]
-            log.error(f"예외 발생 (재시도 {delay}초): {e}", exc_info=True)
-            time.sleep(delay)
-            backoff_idx = min(backoff_idx + 1, len(BACKOFF_STEPS) - 1)
+# ─── 메인 ────────────────────────────────────────────────────────────────────
+
+def main():
+    log.info(f"ERP Agent Bridge v{VERSION} (type={AGENT_TYPE})")
+    log.info(f"서버: {ERP_BASE_URL}")
+    log.info(f"운영 시간: {OPEN_HOUR:02d}:00 ~ {CLOSE_HOUR:02d}:00 KST")
+
+    # 하트비트 스레드
+    hb_thread = threading.Thread(target=_heartbeat_loop, daemon=True)
+    hb_thread.start()
+
+    # SSE 메인 루프 (블로킹)
+    try:
+        sse_loop()
+    except KeyboardInterrupt:
+        log.info("종료 요청 (Ctrl+C)")
+    finally:
+        _hb_stop.set()
 
 
 if __name__ == "__main__":

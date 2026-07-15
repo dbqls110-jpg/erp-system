@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { verifyAgentApiKey } from "@/lib/agentAuth";
+import { verifyBridgeApiKey } from "@/lib/agentAuth";
 import { prisma } from "@/lib/prisma";
 
 const ONLINE_THRESHOLD_MS = 60_000; // 60초 내 하트비트 = 온라인
@@ -35,10 +35,8 @@ export async function GET(req: NextRequest) {
   });
 }
 
-// POST /api/agent/status — 브릿지 하트비트 (API 키 인증)
+// POST /api/agent/status — 브릿지 하트비트 (agentType 전용 키 인증)
 export async function POST(req: NextRequest) {
-  if (!verifyAgentApiKey(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
   let body: HeartbeatBody;
   try {
     body = await req.json();
@@ -50,6 +48,10 @@ export async function POST(req: NextRequest) {
 
   if (!ALLOWED_AGENT_TYPES.includes(agentType as (typeof ALLOWED_AGENT_TYPES)[number])) {
     return NextResponse.json({ error: "agentType은 hermes | marketer" }, { status: 400 });
+  }
+
+  if (!verifyBridgeApiKey(req, agentType)) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const hb = await prisma.agentBridgeHeartbeat.upsert({

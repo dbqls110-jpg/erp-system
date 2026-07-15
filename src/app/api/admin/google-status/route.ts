@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { makeDriveClientAsOwner, isInvalidGrantError } from "@/lib/googleClient";
+import { makeDriveClientAsOwner, isInvalidGrantError, clearDriveTokenCache } from "@/lib/googleClient";
+import { prisma } from "@/lib/prisma";
 
 // GET /api/admin/google-status
 // Drive OAuth 토큰 유효성 및 서비스 계정 상태를 확인한다.
@@ -27,29 +28,47 @@ export async function GET() {
     status: hasServiceAccount ? "configured" : "missing_env",
   };
 
-  // Owner OAuth 토큰 유효성 — 가벼운 Drive API 호출로 검증
-  const hasOwnerToken = !!process.env.GOOGLE_DRIVE_OWNER_REFRESH_TOKEN;
-  if (!hasOwnerToken) {
+  // Owner OAuth 토큰 — env 또는 DB 저장 여부 확인
+  const hasEnvToken  = !!process.env.GOOGLE_DRIVE_OWNER_REFRESH_TOKEN;
+  const hasDbToken   = !!(await prisma.agentAuditLog.findFirst({
+    where: { action: "drive_oauth_active" },
+    select: { id: true },
+  }));
+  const hasAnyToken  = hasEnvToken || hasDbToken;
+  const tokenSource  = hasEnvToken ? "env" : hasDbToken ? "db" : "none";
+
+  if (!hasAnyToken) {
     result.ownerOAuth = {
       configured: false,
-      status: "missing_env",
-      action: "GOOGLE_DRIVE_OWNER_REFRESH_TOKEN 환경변수가 없습니다. /api/admin/drive-setup으로 인증하세요.",
+      status: "not_configured",
+      tokenSource,
+      action: "/api/admin/drive-setup 방문 후 Google OAuth 인증하세요.",
     };
   } else {
     try {
-      const drive = makeDriveClientAsOwner();
-      await drive.about.get({ fields: "user(emailAddress)" });
-      result.ownerOAuth = { configured: true, status: "ok" };
+      // 상태 체크 시 캐시 초기화 후 재검증
+      clearDriveTokenCache();
+      const drive = await makeDriveClientAsOwner();
+      const about = await drive.about.get({ fields: "user(emailAddress)" });
+      result.ownerOAuth = {
+        configured: true,
+        status: "ok",
+        tokenSource,
+        ownerEmail: about.data.user?.emailAddress ?? null,
+      };
     } catch (err) {
       if (isInvalidGrantError(err)) {
+        // invalid_grant: 재시도 없이 즉시 재인증 필요로 표시
+        clearDriveTokenCache();
         result.ownerOAuth = {
           configured: true,
           status: "invalid_grant",
+          tokenSource,
           action: "/api/admin/drive-setup을 방문해 재인증하세요. (앱이 프로덕션으로 게시됐는지 확인)",
         };
       } else {
         const msg = err instanceof Error ? err.message : "unknown";
-        result.ownerOAuth = { configured: true, status: "error", detail: msg };
+        result.ownerOAuth = { configured: true, status: "error", tokenSource, detail: msg };
       }
     }
   }

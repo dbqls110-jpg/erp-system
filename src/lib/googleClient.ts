@@ -1,28 +1,57 @@
 import { google } from "googleapis";
 import crypto from "crypto";
 
-// ─── OAuth 오류 감지 헬퍼 ─────────────────────────────────────────────────────
+// ─── OAuth 오류 감지 ──────────────────────────────────────────────────────────
 
 export function isInvalidGrantError(err: unknown): boolean {
   if (!err || typeof err !== "object") return false;
   const e = err as Record<string, unknown>;
   const msg = String(e.message ?? "").toLowerCase();
-  // googleapis 오류 구조
   const resp = e.response as Record<string, unknown> | undefined;
   const data = resp?.data as Record<string, unknown> | undefined;
   if (data?.error === "invalid_grant") return true;
   if (msg.includes("invalid_grant")) return true;
-  // GaxiosError / axios 형태
   const errors = (e.errors as Array<Record<string, unknown>>) ?? [];
   if (errors.some((er) => String(er.reason ?? "").includes("invalid_grant"))) return true;
   return false;
 }
 
-// ─── 재인증 토큰 임시 암호화 저장 (DB 저장용) ────────────────────────────────
+export function isTransientError(err: unknown): boolean {
+  if (!err || typeof err !== "object") return false;
+  const e = err as Record<string, unknown>;
+  const resp = e.response as Record<string, unknown> | undefined;
+  const status = resp?.status as number | undefined;
+  // 일시적 오류만 재시도 허용: 5xx + 네트워크
+  if (typeof status === "number" && status >= 500) return true;
+  const msg = String(e.message ?? "").toLowerCase();
+  return msg.includes("econnreset") || msg.includes("etimedout") || msg.includes("enotfound");
+}
+
+// ─── 암호화 키 ────────────────────────────────────────────────────────────────
+// DRIVE_TOKEN_ENC_KEY: 고정된 32자 이상 문자열. 배포마다 변경하면 안 됨.
+// 없으면 NEXTAUTH_SECRET fallback (dev 허용, prod에서는 경고).
 
 function getEncKey(): Buffer {
-  const secret = process.env.NEXTAUTH_SECRET ?? process.env.AUTH_SECRET ?? "fallback-not-secure";
-  return crypto.createHash("sha256").update(secret).digest();
+  const key = process.env.DRIVE_TOKEN_ENC_KEY ?? process.env.NEXTAUTH_SECRET ?? process.env.AUTH_SECRET;
+  if (!key) {
+    throw new Error(
+      "[googleClient] DRIVE_TOKEN_ENC_KEY 또는 NEXTAUTH_SECRET 환경변수가 없습니다. " +
+      "서버를 시작할 수 없습니다."
+    );
+  }
+  if (key.length < 16) {
+    throw new Error(
+      "[googleClient] DRIVE_TOKEN_ENC_KEY가 너무 짧습니다 (최소 16자). " +
+      "배포마다 동일한 키를 사용해야 합니다."
+    );
+  }
+  if (process.env.NODE_ENV === "production" && !process.env.DRIVE_TOKEN_ENC_KEY) {
+    console.warn(
+      "[googleClient] 프로덕션에서 DRIVE_TOKEN_ENC_KEY 대신 NEXTAUTH_SECRET을 사용 중입니다. " +
+      "전용 DRIVE_TOKEN_ENC_KEY 설정을 권장합니다."
+    );
+  }
+  return crypto.createHash("sha256").update(key).digest();
 }
 
 export function encryptForStorage(plaintext: string): string {
@@ -45,8 +74,72 @@ export function decryptFromStorage(encoded: string): string {
   return Buffer.concat([decipher.update(ciphertext), decipher.final()]).toString("utf8");
 }
 
+// ─── Drive OAuth 토큰 (DB 우선, env 폴백) ─────────────────────────────────────
+// drive-callback이 암호화해 DB에 저장 → 수동 env 입력 불필요
+// env var(GOOGLE_DRIVE_OWNER_REFRESH_TOKEN)는 마이그레이션 기간 폴백으로만 사용
+
+let _cachedRefreshToken: string | null = null;
+
+export function clearDriveTokenCache() {
+  _cachedRefreshToken = null;
+}
+
+export async function getDriveRefreshToken(): Promise<string> {
+  if (process.env.GOOGLE_DRIVE_OWNER_REFRESH_TOKEN) {
+    return process.env.GOOGLE_DRIVE_OWNER_REFRESH_TOKEN;
+  }
+  if (_cachedRefreshToken) return _cachedRefreshToken;
+
+  // 동적 import로 순환 의존성 회피
+  const { prisma } = await import("@/lib/prisma");
+  const record = await prisma.agentAuditLog.findFirst({
+    where: { action: "drive_oauth_active" },
+    orderBy: { createdAt: "desc" },
+    select: { result: true },
+  });
+
+  if (!record?.result) {
+    throw new Error(
+      "Google Drive refresh_token이 없습니다. /api/admin/drive-setup 방문 후 재인증하세요."
+    );
+  }
+  const r = record.result as Record<string, string>;
+  if (!r.enc) throw new Error("저장된 Drive 토큰 데이터가 손상됐습니다.");
+
+  try {
+    _cachedRefreshToken = decryptFromStorage(r.enc);
+    return _cachedRefreshToken;
+  } catch {
+    throw new Error(
+      "Drive 토큰 복호화 실패. DRIVE_TOKEN_ENC_KEY(또는 NEXTAUTH_SECRET)가 인증 당시와 동일한지 확인하세요."
+    );
+  }
+}
+
+export async function makeDriveClientAsOwner() {
+  const refreshToken = await getDriveRefreshToken();
+  const oauth2 = new google.auth.OAuth2(
+    process.env.AUTH_GOOGLE_ID,
+    process.env.AUTH_GOOGLE_SECRET,
+  );
+  oauth2.setCredentials({ refresh_token: refreshToken });
+  return google.drive({ version: "v3", auth: oauth2 });
+}
+
+export async function makeSheetsClientAsOwner() {
+  const refreshToken = await getDriveRefreshToken();
+  const oauth2 = new google.auth.OAuth2(
+    process.env.AUTH_GOOGLE_ID,
+    process.env.AUTH_GOOGLE_SECRET,
+  );
+  oauth2.setCredentials({ refresh_token: refreshToken });
+  return google.sheets({ version: "v4", auth: oauth2 });
+}
+
+// ─── 서비스 계정 (Sheets 읽기/쓰기) ──────────────────────────────────────────
+
 const SHEETS_SCOPE = "https://www.googleapis.com/auth/spreadsheets";
-const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive";
+const DRIVE_SCOPE  = "https://www.googleapis.com/auth/drive";
 
 function buildCredentials(): object {
   const b64 = process.env.GOOGLE_SERVICE_ACCOUNT_B64;
@@ -61,7 +154,9 @@ function buildCredentials(): object {
   const rawKey = process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY ?? "";
   const private_key = rawKey.replace(/\\n/g, "\n");
   if (!client_email || !private_key.includes("BEGIN PRIVATE KEY")) {
-    throw new Error("Google 서비스 계정 설정이 없습니다. GOOGLE_SERVICE_ACCOUNT_B64를 Render 환경변수에 설정하세요.");
+    throw new Error(
+      "Google 서비스 계정 설정이 없습니다. GOOGLE_SERVICE_ACCOUNT_B64를 Render 환경변수에 설정하세요."
+    );
   }
   return { type: "service_account", client_email, private_key };
 }
@@ -81,13 +176,14 @@ export function makeDriveClient() {
   return google.drive({ version: "v3", auth: makeAuth(true) });
 }
 
-// 사용 가능한 Hermes 폴더 alias → folder ID 맵 (env에 등록된 것만)
+// ─── 유틸리티 ─────────────────────────────────────────────────────────────────
+
 export function getHermesFolderMap(): Record<string, string> {
   const raw: Record<string, string | undefined> = {
-    root: process.env.GOOGLE_DRIVE_HERMES_ROOT_FOLDER_ID,
-    discord: process.env.GOOGLE_DRIVE_HERMES_DISCORD_FOLDER_ID,
+    root:     process.env.GOOGLE_DRIVE_HERMES_ROOT_FOLDER_ID,
+    discord:  process.env.GOOGLE_DRIVE_HERMES_DISCORD_FOLDER_ID,
     marketer: process.env.GOOGLE_DRIVE_HERMES_MARKETER_FOLDER_ID,
-    report: process.env.GOOGLE_DRIVE_HERMES_REPORT_FOLDER_ID,
+    report:   process.env.GOOGLE_DRIVE_HERMES_REPORT_FOLDER_ID,
   };
   return Object.fromEntries(
     Object.entries(raw).filter(([, v]) => Boolean(v))
@@ -98,14 +194,11 @@ export function resolveFolderAlias(alias: string): string | null {
   return getHermesFolderMap()[alias] ?? null;
 }
 
-// Google Drive 폴더 URL에서 folderId 파싱
-// 예: https://drive.google.com/drive/folders/1aYyO3Xj... → 1aYyO3Xj...
 export function parseFolderIdFromUrl(url: string): string | null {
   const match = url.match(/\/folders\/([A-Za-z0-9_-]+)/);
   return match?.[1] ?? null;
 }
 
-// folderId, folderUrl, root 순서로 유효한 폴더 ID 반환
 export function resolveEffectiveFolderId(
   folderId?: string | null,
   folderUrl?: string | null
@@ -119,13 +212,11 @@ export function isValidSpreadsheetId(id: string): boolean {
   return typeof id === "string" && /^[A-Za-z0-9_-]{20,60}$/.test(id);
 }
 
-// A1 notation: 탭명!A1:Z100, A1:Z1000, SheetName!A:Z 등
 export function isValidRange(range: string): boolean {
-  return typeof range === "string" && range.length <= 200 && /^[A-Za-z0-9 _\-'!:.\u3131-\uD79D]+$/.test(range);
+  return typeof range === "string" && range.length <= 200 &&
+    /^[A-Za-z0-9 _\-'!:.ㄱ-힝]+$/.test(range);
 }
 
-// Google Sheets URL에서 spreadsheetId와 gid 추출
-// 허용 도메인: docs.google.com/spreadsheets, spreadsheets.google.com
 export function parseGoogleSheetUrl(url: string): { spreadsheetId: string; gid?: string } | null {
   if (typeof url !== "string") return null;
   if (!/^https:\/\/(docs\.google\.com\/spreadsheets|spreadsheets\.google\.com)/.test(url)) return null;
@@ -133,55 +224,29 @@ export function parseGoogleSheetUrl(url: string): { spreadsheetId: string; gid?:
   if (!idMatch) return null;
   const spreadsheetId = idMatch[1];
   const gidMatch = url.match(/[?&#]gid=(\d+)/);
-  const gid = gidMatch?.[1];
-  return { spreadsheetId, ...(gid ? { gid } : {}) };
+  return { spreadsheetId, ...(gidMatch ? { gid: gidMatch[1] } : {}) };
 }
 
-// spreadsheetId 또는 spreadsheetUrl에서 ID 확정. 둘 다 없으면 fallback(env) 사용
 export function resolveSpreadsheetId(
   spreadsheetId?: string | null,
   spreadsheetUrl?: string | null,
   fallback?: string,
 ): { id: string; gid?: string } | null {
-  if (spreadsheetId && isValidSpreadsheetId(spreadsheetId)) {
-    return { id: spreadsheetId };
-  }
+  if (spreadsheetId && isValidSpreadsheetId(spreadsheetId)) return { id: spreadsheetId };
   if (spreadsheetUrl) {
     const parsed = parseGoogleSheetUrl(spreadsheetUrl);
     if (parsed) return { id: parsed.spreadsheetId, gid: parsed.gid };
-    return null; // URL 형식이 잘못됨 → 명시적 오류 처리를 위해 null 반환
+    return null;
   }
-  if (fallback && isValidSpreadsheetId(fallback)) {
-    return { id: fallback };
-  }
+  if (fallback && isValidSpreadsheetId(fallback)) return { id: fallback };
   return null;
 }
 
-// dbqls110@gmail.com OAuth2 클라이언트 (Drive 파일 생성용)
-function makeOwnerOAuth2() {
-  const refreshToken = process.env.GOOGLE_DRIVE_OWNER_REFRESH_TOKEN;
-  if (!refreshToken) throw new Error("GOOGLE_DRIVE_OWNER_REFRESH_TOKEN이 설정되지 않았습니다.");
-  const oauth2 = new google.auth.OAuth2(
-    process.env.AUTH_GOOGLE_ID,
-    process.env.AUTH_GOOGLE_SECRET,
-  );
-  oauth2.setCredentials({ refresh_token: refreshToken });
-  return oauth2;
-}
-
-export function makeDriveClientAsOwner() {
-  return google.drive({ version: "v3", auth: makeOwnerOAuth2() });
-}
-
-export function makeSheetsClientAsOwner() {
-  return google.sheets({ version: "v4", auth: makeOwnerOAuth2() });
-}
-
 export const LIMITS = {
-  MAX_READ_ROWS: 1000,
-  MAX_WRITE_ROWS: 500,
-  MAX_COLS: 26,
-  MAX_TABS: 10,
-  MAX_TITLE_LEN: 100,
+  MAX_READ_ROWS:     1000,
+  MAX_WRITE_ROWS:    500,
+  MAX_COLS:          26,
+  MAX_TABS:          10,
+  MAX_TITLE_LEN:     100,
   MAX_INITIAL_CELLS: 13000,
 } as const;

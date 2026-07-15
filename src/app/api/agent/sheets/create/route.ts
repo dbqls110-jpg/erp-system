@@ -151,8 +151,8 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    // owner 계정(dbqls110@gmail.com)으로 Drive 클라이언트 생성
-    const ownerDrive = makeDriveClientAsOwner();
+    // owner 계정(dbqls110@gmail.com)으로 Drive 클라이언트 생성 (DB 토큰 우선)
+    const ownerDrive = await makeDriveClientAsOwner();
     // 데이터 쓰기는 서비스 계정 유지
     const sheets = makeSheetsClient();
 

@@ -1,21 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
-import { verifyAgentApiKey } from "@/lib/agentAuth";
+import { verifyBridgeApiKey } from "@/lib/agentAuth";
 import { prisma } from "@/lib/prisma";
 
 const ALLOWED_AGENT_TYPES = ["hermes", "marketer"] as const;
 
 // GET /api/agent/jobs/pending?agentType=xxx&limit=5
-// Python 브릿지가 주기적으로 폴링해 미처리 작업을 가져온다.
+// Python 브릿지가 재연결 시 한 번만 호출해 밀린 pending 작업을 복구한다.
+// agentType별 전용 키(HERMES_BRIDGE_API_KEY / MARKETER_BRIDGE_API_KEY)로 인증.
 export async function GET(req: NextRequest) {
-  if (!verifyAgentApiKey(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
   const { searchParams } = req.nextUrl;
   const agentType = searchParams.get("agentType") ?? "";
-  const limit = Math.min(parseInt(searchParams.get("limit") ?? "5"), 10);
 
   if (!ALLOWED_AGENT_TYPES.includes(agentType as (typeof ALLOWED_AGENT_TYPES)[number])) {
     return NextResponse.json({ error: "agentType은 hermes | marketer" }, { status: 400 });
   }
+
+  if (!verifyBridgeApiKey(req, agentType)) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const limit = Math.min(parseInt(searchParams.get("limit") ?? "10"), 20);
 
   const jobs = await prisma.agentJob.findMany({
     where: { agentType, status: "pending" },
