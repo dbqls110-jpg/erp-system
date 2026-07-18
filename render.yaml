@@ -17,3 +17,9 @@ services:
         sync: false
       - key: NEXTAUTH_URL
         sync: false
+      - key: HERMES_BRIDGE_API_KEY
+        sync: false
+      - key: MARKETER_BRIDGE_API_KEY
+        sync: false
+      - key: DRIVE_TOKEN_ENC_KEY
+        sync: false
