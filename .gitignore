@@ -33,6 +33,15 @@ yarn-error.log*
 # env files (can opt-in for committing if needed)
 .env*
 
+# agent_bridge local runtime files (contain secrets / local state)
+agent_bridge/hermes.env
+agent_bridge/marketer.env
+agent_bridge/*.log
+agent_bridge/*.lock
+agent_bridge/__pycache__/
+agent_bridge/**/__pycache__/
+agent_bridge/.pytest_cache/
+
 # vercel
 .vercel
 
