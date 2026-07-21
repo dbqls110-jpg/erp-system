@@ -1,4 +1,10 @@
 @echo off
+if not defined ERP_UTF8_RELAUNCHED (
+    chcp 65001 >nul
+    set ERP_UTF8_RELAUNCHED=1
+    cmd /c "%~f0" %*
+    exit /b %errorlevel%
+)
 setlocal enabledelayedexpansion
 :: ─────────────────────────────────────────────────────────
 :: ERP Hermes Bridge  (회사 PC용)

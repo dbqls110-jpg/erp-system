@@ -1,4 +1,10 @@
 @echo off
+if not defined ERP_UTF8_RELAUNCHED (
+    chcp 65001 >nul
+    set ERP_UTF8_RELAUNCHED=1
+    cmd /c "%~f0" %*
+    exit /b %errorlevel%
+)
 setlocal enabledelayedexpansion
 :: ─────────────────────────────────────────────────────────
 :: ERP Marketer Bridge — 설치 확인 스크립트 (가시적 창)
@@ -12,41 +18,42 @@ echo.
 
 :: ── Hermes 실행 파일 탐색 ──────────────────────────────────────────────────
 set HERMES_EXE=
-if defined HERMES_EXECUTABLE (
-    set HERMES_EXE=!HERMES_EXECUTABLE!
-    echo [1] HERMES_EXECUTABLE 환경변수: !HERMES_EXECUTABLE!
-) else (
-    where hermes >nul 2>&1
-    if not errorlevel 1 (
-        for /f "delims=" %%i in ('where hermes 2^>nul') do (
-            set HERMES_EXE=%%i
-            goto :found_in_path
-        )
-        :found_in_path
-        echo [1] PATH에서 hermes 발견: !HERMES_EXE!
-    ) else (
-        set HERMES_DEFAULT=%LOCALAPPDATA%\hermes\hermes-agent\venv\Scripts\hermes.exe
-        if exist "!HERMES_DEFAULT!" (
-            set HERMES_EXE=!HERMES_DEFAULT!
-            set "PATH=%LOCALAPPDATA%\hermes\hermes-agent\venv\Scripts;%PATH%"
-            echo [1] 알려진 위치에서 hermes 발견: !HERMES_EXE!
-        ) else (
-            echo [ERROR] hermes 실행 파일을 찾을 수 없습니다.
-            echo         확인한 경로: %LOCALAPPDATA%\hermes\hermes-agent\venv\Scripts\hermes.exe
-            echo         해결: HERMES_EXECUTABLE 환경변수 설정 또는 PATH 추가
-            goto :fail
-        )
-    )
-)
+if defined HERMES_EXECUTABLE goto :use_env_executable
+
+where hermes >nul 2>&1
+if errorlevel 1 goto :try_default_location
+
+for /f "delims=" %%i in ('where hermes 2^>nul') do set HERMES_EXE=%%i
+echo [1] PATH에서 hermes 발견: !HERMES_EXE!
+goto :hermes_found
+
+:use_env_executable
+set HERMES_EXE=!HERMES_EXECUTABLE!
+echo [1] HERMES_EXECUTABLE 환경변수: !HERMES_EXECUTABLE!
+goto :hermes_found
+
+:try_default_location
+set HERMES_DEFAULT=%LOCALAPPDATA%\hermes\hermes-agent\venv\Scripts\hermes.exe
+if not exist "!HERMES_DEFAULT!" goto :hermes_not_found
+set HERMES_EXE=!HERMES_DEFAULT!
+set "PATH=%LOCALAPPDATA%\hermes\hermes-agent\venv\Scripts;%PATH%"
+echo [1] 알려진 위치에서 hermes 발견: !HERMES_EXE!
+goto :hermes_found
+
+:hermes_not_found
+echo [ERROR] hermes 실행 파일을 찾을 수 없습니다.
+echo         확인한 경로: %LOCALAPPDATA%\hermes\hermes-agent\venv\Scripts\hermes.exe
+echo         해결: HERMES_EXECUTABLE 환경변수 설정 또는 PATH 추가
+goto :fail
+
+:hermes_found
 
 :: ── 버전 확인 ─────────────────────────────────────────────────────────────
 echo.
 echo [2] 버전 확인...
 "!HERMES_EXE!" --version
-if errorlevel 1 (
-    echo [ERROR] hermes --version 실패. Hermes가 정상 설치됐는지 확인하세요.
-    goto :fail
-)
+if errorlevel 1 echo [ERROR] hermes --version 실패. Hermes가 정상 설치됐는지 확인하세요.
+if errorlevel 1 goto :fail
 
 :: ── 로그인 상태 확인 ──────────────────────────────────────────────────────
 echo.
@@ -59,10 +66,8 @@ echo.
 echo [4] 테스트 쿼리 실행 중 (hermes chat -q "..." --quiet --source erp-marketer-check)...
 echo     응답:
 "!HERMES_EXE!" chat -q "ERP marketer bridge check: 숫자 42를 말해줘." --quiet --source erp-marketer-check
-if errorlevel 1 (
-    echo [ERROR] 테스트 쿼리 실패. hermes status 로 로그인 상태를 확인하세요.
-    goto :fail
-)
+if errorlevel 1 echo [ERROR] 테스트 쿼리 실패. hermes status 로 로그인 상태를 확인하세요.
+if errorlevel 1 goto :fail
 
 echo.
 echo ============================================================
