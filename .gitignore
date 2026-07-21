@@ -38,6 +38,7 @@ agent_bridge/hermes.env
 agent_bridge/marketer.env
 agent_bridge/*.log
 agent_bridge/*.lock
+agent_bridge/*.tmp
 agent_bridge/__pycache__/
 agent_bridge/**/__pycache__/
 agent_bridge/.pytest_cache/

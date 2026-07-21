@@ -62,7 +62,7 @@ exit /b 1
 
 :: ── 사전점검: visible python 창으로 preflight 실행 ───────────────────────────
 echo [사전점검] Hermes CLI 상태 확인 중...
-python -c "import sys; sys.path.insert(0,'%~dp0'); import preflight, logging; logging.basicConfig(stream=sys.stderr,level=logging.INFO,format='%%(message)s'); ok=preflight.run('hermes'); sys.exit(0 if ok else 1)"
+python -c "import sys; sys.path.insert(0, sys.argv[1]); import preflight, logging; logging.basicConfig(stream=sys.stderr,level=logging.INFO,format='%%(message)s'); ok=preflight.run('hermes'); sys.exit(0 if ok else 1)" "%~dp0\"
 if errorlevel 1 (
     echo [ERROR] 사전점검 실패 — 위 오류를 해결한 뒤 다시 실행하세요.
     echo         상세 진단: check_hermes.cmd 실행
@@ -71,27 +71,38 @@ if errorlevel 1 (
 )
 echo [OK] 사전점검 통과
 
-:: ── 중복 실행 방지 ──────────────────────────────────────────────────────────
+:: ── 중복 실행 방지 (lock의 PID가 실제 hermes client.py인지 명령줄로 검증) ──────
 set LOCKFILE=%~dp0hermes.lock
-if exist "%LOCKFILE%" (
-    set /p OLDPID=<"%LOCKFILE%"
-    tasklist /fi "pid eq !OLDPID!" /fo csv 2>nul | find /i "python" >nul
-    if not errorlevel 1 (
-        echo [INFO] Hermes 브릿지가 이미 실행 중입니다 (PID=!OLDPID!).
-        exit /b 0
-    )
-    del "%LOCKFILE%"
-)
+if not exist "%LOCKFILE%" goto :start_bridge
 
-:: ── 백그라운드 실행 (창 없음) ────────────────────────────────────────────────
-start "" /b pythonw client.py
-timeout /t 1 /nobreak >nul
+set /p OLDPID=<"%LOCKFILE%"
+set "OLDCMD="
+for /f "usebackq delims=" %%c in (`powershell -NoProfile -NonInteractive -Command "try { (Get-CimInstance Win32_Process -Filter 'ProcessId=!OLDPID!' -ErrorAction Stop).CommandLine } catch { '' }"`) do set "OLDCMD=%%c"
+echo !OLDCMD! | findstr /i "client.py" >nul
+if errorlevel 1 goto :stale_lock
+echo [INFO] Hermes 브릿지가 이미 실행 중입니다 (PID=!OLDPID!).
+exit /b 0
 
-for /f "tokens=2" %%p in ('tasklist /fi "imagename eq pythonw.exe" /fo csv /nh 2^>nul ^| findstr /i "pythonw"') do (
-    set NEWPID=%%~p
-    goto :got_pid
-)
-:got_pid
+:stale_lock
+del "%LOCKFILE%"
+
+:start_bridge
+:: ── 백그라운드 실행 (창 없음), PowerShell Start-Process -PassThru로 정확한 PID 캡처 ──
+:: PID는 파이프(for /f)가 아니라 임시 파일로 전달한다 — 백그라운드로 뜬 pythonw가
+:: for /f의 파이프 핸들을 상속해 EOF가 오지 않아 무한 대기하는 것을 방지하기 위함.
+set "PIDFILE=%~dp0hermes.pid.tmp"
+if exist "%PIDFILE%" del "%PIDFILE%"
+powershell -NoProfile -NonInteractive -Command "try { $p = Start-Process -FilePath 'pythonw' -ArgumentList 'client.py' -WindowStyle Hidden -RedirectStandardOutput 'hermes.log' -RedirectStandardError 'hermes_error.log' -PassThru -ErrorAction Stop; Set-Content -Path 'hermes.pid.tmp' -Value $p.Id -NoNewline } catch { }"
+
+set "NEWPID="
+if exist "%PIDFILE%" set /p NEWPID=<"%PIDFILE%"
+if exist "%PIDFILE%" del "%PIDFILE%"
+
+if defined NEWPID goto :bridge_started
+echo [ERROR] Hermes 브릿지 프로세스 시작 실패.
+exit /b 1
+
+:bridge_started
 echo !NEWPID!>"%LOCKFILE%"
 echo [OK] Hermes 브릿지 시작됨 (PID=!NEWPID!, 로그: hermes.log)
 endlocal
