@@ -3,8 +3,7 @@
  * 사용법: node scripts/seed-agents.mjs
  */
 import { PrismaClient } from "@prisma/client";
-import { PrismaNeon } from "@prisma/adapter-neon";
-import { neonConfig } from "@neondatabase/serverless";
+import { PrismaPg } from "@prisma/adapter-pg";
 import { readFileSync } from "fs";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
@@ -18,8 +17,7 @@ for (const line of lines) {
   if (m) process.env[m[1]] = m[2].replace(/^"|"$/g, "");
 }
 
-neonConfig.poolQueryViaFetch = true;
-const adapter = new PrismaNeon({ connectionString: process.env.DATABASE_URL });
+const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
 const prisma = new PrismaClient({ adapter });
 
 const hermesEmail = "ybsw1220@gmail.com";

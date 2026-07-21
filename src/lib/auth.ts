@@ -1,6 +1,6 @@
 import { NextAuthOptions } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
-import { neon } from "@neondatabase/serverless";
+import { prisma } from "@/lib/prisma";
 
 export const authOptions: NextAuthOptions = {
   secret: process.env.NEXTAUTH_SECRET ?? process.env.AUTH_SECRET,
@@ -21,14 +21,17 @@ export const authOptions: NextAuthOptions = {
       }
       if (account?.provider === "google" && profile?.email) {
         try {
-          const sql = neon(process.env.DATABASE_URL!);
-          const users = await sql`SELECT id, role, name, image FROM users WHERE email = ${profile.email}`;
+          const users = await prisma.$queryRaw<
+            Array<{ id: string; role: string; name: string | null; image: string | null }>
+          >`SELECT id, role, name, image FROM users WHERE email = ${profile.email}`;
           let dbUser = users[0];
 
           if (!dbUser) {
-            const countResult = await sql`SELECT COUNT(*) as count FROM users`;
+            const countResult = await prisma.$queryRaw<Array<{ count: bigint }>>`SELECT COUNT(*) as count FROM users`;
             const count = Number(countResult[0].count);
-            const newUsers = await sql`
+            const newUsers = await prisma.$queryRaw<
+              Array<{ id: string; role: string; name: string | null; image: string | null }>
+            >`
               INSERT INTO users (id, email, name, image, role, active, "createdAt", "updatedAt")
               VALUES (gen_random_uuid()::text, ${profile.email}, ${profile.name ?? null},
                 ${(profile as { picture?: string }).picture ?? null},
@@ -46,7 +49,7 @@ export const authOptions: NextAuthOptions = {
           // 출근 자동 기록 (당일 첫 로그인만)
           if (dbUser.role !== "pending") {
             const today = new Date().toISOString().split("T")[0];
-            await sql`
+            await prisma.$executeRaw`
               INSERT INTO attendances (id, "userId", date, "clockIn", "createdAt", "updatedAt")
               VALUES (gen_random_uuid()::text, ${dbUser.id}, ${today}, NOW(), NOW(), NOW())
               ON CONFLICT ("userId", date) DO NOTHING
