@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyAgentApiKey, verifyBridgeApiKey } from "@/lib/agentAuth";
 import { auditLog } from "@/lib/agentAudit";
 import { prisma } from "@/lib/prisma";
+import { getAgentUser } from "@/lib/agentApi";
 
 const VALID_STATUSES = ["accepted", "processing", "completed", "error"] as const;
 type ValidStatus = (typeof VALID_STATUSES)[number];
@@ -48,7 +49,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   // 먼저 job의 agentType을 조회해 키 검증
   const existing = await prisma.agentJob.findUnique({
     where: { id },
-    select: { id: true, agentType: true, status: true },
+    select: { id: true, agentType: true, status: true, sourceMessageId: true },
   });
   if (!existing) return NextResponse.json({ error: "작업을 찾을 수 없습니다." }, { status: 404 });
 
@@ -76,7 +77,67 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (output   !== undefined) updateData.output   = String(output).slice(0, 20000);
   if (errorMsg !== undefined) updateData.errorMsg = String(errorMsg).slice(0, 500);
 
-  const updated = await prisma.agentJob.update({ where: { id }, data: updateData });
+  // 이미 종료(completed/error)된 job에는 다시 전이하지 않는다 — 브릿지 재시작/재요청으로 인한
+  // PATCH 재전송이 들어와도 count=0이 되어 아무 부작용 없이 조용히 무시된다 (중복 답변 방지).
+  const { count } = await prisma.agentJob.updateMany({
+    where: { id, status: { notIn: ["completed", "error"] } },
+    data: updateData,
+  });
+
+  if (count === 0) {
+    const current = await prisma.agentJob.findUnique({ where: { id }, select: { status: true, updatedAt: true } });
+    return NextResponse.json({
+      jobId: id,
+      status: current?.status ?? existing.status,
+      updatedAt: current?.updatedAt,
+      duplicate: true,
+    });
+  }
+
+  // 메신저에서 온 job이 처음으로 completed 전이했으면 답변 메시지를 생성한다.
+  if (status === "completed" && existing.sourceMessageId) {
+    try {
+      await prisma.$transaction(async (tx) => {
+        const srcMessage = await tx.message.findUnique({
+          where: { id: existing.sourceMessageId! },
+          select: { conversationId: true },
+        });
+        if (!srcMessage) return;
+
+        const agentUser = await getAgentUser(existing.agentType);
+        if (!agentUser) return;
+
+        const replyContent = output !== undefined ? String(output).slice(0, 20000) : "";
+        const replyMessage = await tx.message.create({
+          data: {
+            conversationId: srcMessage.conversationId,
+            senderId: agentUser.id,
+            content: replyContent,
+          },
+        });
+        await tx.conversation.update({
+          where: { id: srcMessage.conversationId },
+          data: { lastMessageAt: new Date() },
+        });
+        await tx.agentMessageProcessing.updateMany({
+          where: { messageId: existing.sourceMessageId!, agentType: existing.agentType },
+          data: { status: "processed", processedAt: new Date(), resultMessageId: replyMessage.id },
+        });
+      });
+    } catch (e) {
+      // 답변 메시지 생성 실패는 job 자체의 completed 전이를 되돌리지 않는다 — 원인만 감사 로그에 남긴다.
+      await auditLog({
+        method: "PATCH",
+        endpoint: `/api/agent/jobs/${id}`,
+        action: "job_completed_reply_failed",
+        dryRun: false,
+        payload: { jobId: id, agentType: existing.agentType },
+        result: { error: e instanceof Error ? e.message : "unknown" },
+      });
+    }
+  }
+
+  const updated = await prisma.agentJob.findUnique({ where: { id }, select: { id: true, status: true, updatedAt: true } });
 
   await auditLog({
     method: "PATCH",
@@ -87,5 +148,5 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     result: { status },
   });
 
-  return NextResponse.json({ jobId: updated.id, status: updated.status, updatedAt: updated.updatedAt });
+  return NextResponse.json({ jobId: id, status: updated?.status, updatedAt: updated?.updatedAt });
 }

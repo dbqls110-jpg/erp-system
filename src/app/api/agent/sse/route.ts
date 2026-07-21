@@ -65,6 +65,13 @@ export async function GET(req: NextRequest) {
               return;
             }
 
+            if (job.userId !== (session.user as { id?: string }).id) {
+              send("error", { message: "권한이 없습니다." });
+              controller.close();
+              closed = true;
+              return;
+            }
+
             if (job.status !== lastStatus) {
               lastStatus = job.status;
               send("status", { jobId, status: job.status, updatedAt: job.updatedAt });

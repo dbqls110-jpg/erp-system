@@ -373,6 +373,8 @@ model AgentJob {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
+  sourceMessageId String? @unique // 메신저에서 발생한 job이면 원본 Message.id (없으면 메신저 외부 요청)
+
   deltas AgentJobDelta[]
 
   @@index([agentType, status, createdAt])
