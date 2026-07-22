@@ -43,6 +43,30 @@ interface ContextMenu {
   message: Message;
 }
 
+function MessageContent({ content }: { content: string }) {
+  const parts = content.split(/(https?:\/\/[^\s]+)/g);
+  return (
+    <span className="whitespace-pre-wrap break-words">
+      {parts.map((part, index) =>
+        /^https?:\/\//.test(part) ? (
+          <a
+            key={`${part}-${index}`}
+            href={part}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline underline-offset-2 break-all"
+            onClick={(event) => event.stopPropagation()}
+          >
+            {part}
+          </a>
+        ) : (
+          part
+        ),
+      )}
+    </span>
+  );
+}
+
 const COLOR_OPTIONS = [
   { value: "blue",   label: "파랑",   class: "bg-blue-500" },
   { value: "green",  label: "초록",   class: "bg-green-500" },
@@ -428,7 +452,7 @@ export function MessengerView({ myId, users }: { myId: string; users: User[] }) 
                           "px-3 py-2 rounded-2xl text-sm leading-relaxed select-text cursor-context-menu",
                           isMine ? "bg-deep-violet text-white rounded-tr-sm" : "bg-hint-of-sky text-midnight-charcoal rounded-tl-sm"
                         )}>
-                          {msg.content}
+                          <MessageContent content={msg.content} />
                         </div>
                         <span className="text-[10px] text-smoke-gray px-1">{timeStr(msg.createdAt)}</span>
                       </div>

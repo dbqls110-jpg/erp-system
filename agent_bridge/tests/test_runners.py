@@ -180,7 +180,7 @@ class TestRunnersUseHermesCli:
         job = self._make_hermes_job()
 
         with patch("hermes_cli.run_chat", return_value="안녕하세요, 무엇을 도와드릴까요?"), \
-             patch("runners.hermes._get_history_text", return_value=""):
+             patch("runners.hermes._get_job_context", return_value={}):
             chunks = list(hermes_runner.run(job))
 
         assert len(chunks) == 1
@@ -203,7 +203,7 @@ class TestRunnersUseHermesCli:
         job = self._make_hermes_job()
 
         with patch("hermes_cli.run_chat", side_effect=RuntimeError("hermes chat 종료 코드 1")), \
-             patch("runners.hermes._get_history_text", return_value=""):
+             patch("runners.hermes._get_job_context", return_value={}):
             with pytest.raises(RuntimeError, match="hermes"):
                 list(hermes_runner.run(job))
 
@@ -212,7 +212,7 @@ class TestRunnersUseHermesCli:
         job = self._make_hermes_job()
 
         with patch("hermes_cli.run_chat", side_effect=RuntimeError("hermes chat 응답 시간 초과 (180초)")), \
-             patch("runners.hermes._get_history_text", return_value=""):
+             patch("runners.hermes._get_job_context", return_value={}):
             with pytest.raises(RuntimeError, match="시간 초과"):
                 list(hermes_runner.run(job))
 
@@ -221,12 +221,53 @@ class TestRunnersUseHermesCli:
         job = self._make_hermes_job()
 
         with patch("hermes_cli.run_chat", side_effect=RuntimeError("hermes chat 종료 코드 1")), \
-             patch("runners.hermes._get_history_text", return_value=""):
+             patch("runners.hermes._get_job_context", return_value={}):
             with pytest.raises(RuntimeError) as exc_info:
                 list(hermes_runner.run(job))
 
         # stderr 원문 같은 내부 토큰이 노출되지 않아야 함
         assert "some-internal-error" not in str(exc_info.value)
+
+    def test_hermes_runner_binds_verified_requester_and_prefetched_data(self):
+        job = self._make_hermes_job()
+        context = {
+            "requester": {"id": "u1", "name": "테스트 직원", "role": "user"},
+            "data": {"attendance": {"todayRecord": {"date": "2026-07-22"}}},
+            "history": [],
+            "sources": [],
+        }
+
+        with patch("hermes_cli.run_chat", return_value="정상") as mock_chat, \
+             patch("runners.hermes._get_job_context", return_value=context):
+            list(hermes_runner.run(job))
+
+        query = mock_chat.call_args[0][0]
+        assert "테스트 직원" in query
+        assert "ERP userId=u1" in query
+        assert "Hermes 에이전트 계정으로 바꾸지 않는다" in query
+        assert "todayRecord" in query
+
+    def test_hermes_runner_appends_clickable_sources(self):
+        job = self._make_hermes_job()
+        context = {
+            "requester": {"id": "u1", "name": "테스트 직원", "role": "user"},
+            "data": {},
+            "history": [],
+            "sources": [{
+                "label": "ERP 근태 관리",
+                "url": "https://erp.example.com/attendance",
+                "recordCount": 3,
+            }],
+        }
+
+        with patch("hermes_cli.run_chat", return_value="답변 본문"), \
+             patch("runners.hermes._get_job_context", return_value=context):
+            output = list(hermes_runner.run(job))[0]
+
+        assert "답변 본문" in output
+        assert "출처" in output
+        assert "ERP 근태 관리 (3건 기준)" in output
+        assert "https://erp.example.com/attendance" in output
 
 
 # ─── 4. hermes_cli.run_chat subprocess 통합 테스트 (mock) ───────────────────
