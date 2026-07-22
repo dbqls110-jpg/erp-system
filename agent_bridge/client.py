@@ -225,6 +225,14 @@ def _parse_sse_line(line: str) -> tuple[Optional[str], Optional[str]]:
         return "data", line[5:].strip()
     return None, None
 
+
+def _iter_sse_lines(resp):
+    # requests defaults text/event-stream without a charset to ISO-8859-1.
+    # UTF-8 Korean bytes can decode to control characters that split a JSON
+    # data line in the middle, so force the server's actual encoding.
+    resp.encoding = "utf-8"
+    return resp.iter_lines(decode_unicode=True)
+
 def sse_loop():
     """SSE 스트림에 연결해 job 이벤트를 실시간 수신. 끊기면 백오프 후 재연결."""
     backoff_idx = 0
@@ -257,7 +265,7 @@ def sse_loop():
                 backoff_idx = 0
 
                 event_type = None
-                for raw_line in resp.iter_lines(decode_unicode=True):
+                for raw_line in _iter_sse_lines(resp):
                     if raw_line is None:
                         continue
                     field, val = _parse_sse_line(raw_line)

@@ -173,7 +173,26 @@ class TestNoPolling:
     def test_sse_loop_uses_iter_lines(self):
         """sse_loop가 SSE 스트림을 iter_lines로 처리함."""
         source = inspect.getsource(client.sse_loop)
-        assert "iter_lines" in source
+        helper_source = inspect.getsource(client._iter_sse_lines)
+        assert "_iter_sse_lines" in source
+        assert "iter_lines" in helper_source
+
+    def test_sse_lines_force_utf8_for_korean_json(self):
+        """Korean SSE data must stay on one valid JSON line."""
+        response = client.requests.Response()
+        response.status_code = 200
+        response.headers["Content-Type"] = "text/event-stream"
+        response._content = (
+            'event: job\n'
+            'data: {"jobId":"job-1","input":"연결 테스트"}\n\n'
+        ).encode("utf-8")
+        response._content_consumed = True
+
+        lines = list(client._iter_sse_lines(response))
+
+        assert response.encoding == "utf-8"
+        assert lines[1] == 'data: {"jobId":"job-1","input":"연결 테스트"}'
+        assert json.loads(lines[1][5:].strip())["input"] == "연결 테스트"
 
 
 # ─── 5. 재연결 시 recover_pending 호출 ─────────────────────────────────────
