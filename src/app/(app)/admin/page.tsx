@@ -7,6 +7,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { UserRoleSelect } from "./UserRoleSelect";
 import { LeaveBalanceInput } from "./LeaveBalanceInput";
 import { UserNameInput } from "./UserNameInput";
+import { DriveIndexPanel, type DriveIndexInitialStatus } from "./DriveIndexPanel";
 
 export default async function AdminPage() {
   const session = await getServerSession(authOptions);
@@ -14,18 +15,49 @@ export default async function AdminPage() {
 
   const year = new Date().getFullYear();
 
-  const users = await prisma.user.findMany({
-    orderBy: { createdAt: "asc" },
-    include: {
-      leaveBalances: { where: { year } },
+  const [users, indexFolders, indexedFileCount, indexChunkCount, indexStatusGroups] = await Promise.all([
+    prisma.user.findMany({
+      orderBy: { createdAt: "asc" },
+      include: { leaveBalances: { where: { year } } },
+    }),
+    prisma.driveIndexFolder.findMany({
+      orderBy: { createdAt: "asc" },
+      include: { _count: { select: { files: true } } },
+    }),
+    prisma.driveIndexFile.count({ where: { status: { not: "deleted" } } }),
+    prisma.driveIndexChunk.count(),
+    prisma.driveIndexFile.groupBy({ by: ["status"], _count: { _all: true } }),
+  ]);
+  const driveIndexStatus: DriveIndexInitialStatus = {
+    folders: indexFolders.map((folder) => ({
+      ...folder,
+      lastScannedAt: folder.lastScannedAt?.toISOString() ?? null,
+      createdAt: folder.createdAt.toISOString(),
+      updatedAt: folder.updatedAt.toISOString(),
+    })),
+    totals: {
+      files: indexedFileCount,
+      chunks: indexChunkCount,
+      byStatus: Object.fromEntries(indexStatusGroups.map((group) => [group.status, group._count._all])),
     },
-  });
+  };
 
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold text-deep-space-charcoal" style={{ fontFamily: "var(--font-plus-jakarta-sans)", letterSpacing: "-0.91px" }}>
         관리자
       </h1>
+
+      <Card className="border-ash-gray shadow-[var(--shadow-sm)]">
+        <CardHeader>
+          <CardTitle className="text-base font-semibold text-deep-space-charcoal" style={{ fontFamily: "var(--font-plus-jakarta-sans)" }}>
+            Google Drive AI 검색
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <DriveIndexPanel initialStatus={driveIndexStatus} />
+        </CardContent>
+      </Card>
 
       <Card className="border-ash-gray shadow-[var(--shadow-sm)]">
         <CardHeader>

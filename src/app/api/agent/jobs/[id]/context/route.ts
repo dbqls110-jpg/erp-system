@@ -7,6 +7,7 @@ import {
   getKstDateParts,
   type AgentContextTopic,
 } from "@/lib/agentJobContext";
+import { searchDriveIndex } from "@/lib/driveIndex";
 import { prisma } from "@/lib/prisma";
 
 interface SourceItem {
@@ -52,6 +53,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const data: Record<string, unknown> = {};
   const sources: SourceItem[] = [];
   const origin = process.env.NEXTAUTH_URL ?? req.nextUrl.origin;
+  const secretLikeQuery = /(api\s*key|api키|토큰|비밀번호|패스워드|secret|환경변수|인증키)/i.test(job.input);
+  const driveSearchPromise = secretLikeQuery
+    ? Promise.resolve([])
+    : searchDriveIndex(job.input, requester.role, 5).catch(() => []);
 
   const tasks: Partial<Record<AgentContextTopic, Promise<void>>> = {};
 
@@ -240,6 +245,23 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   }
 
   await Promise.all(Object.values(tasks));
+
+  const driveResults = await driveSearchPromise;
+  if (driveResults.length > 0) {
+    data.driveKnowledge = {
+      scope: "configured_drive_folders",
+      results: driveResults,
+    };
+    for (const result of driveResults) {
+      if (!result.url) continue;
+      sources.push({
+        label: `Google Drive · ${result.name}`,
+        url: result.url,
+        recordCount: 1,
+        asOf: result.modifiedTime ?? clock.asOf,
+      });
+    }
+  }
 
   let history: Array<{ role: "agent" | "user"; content: string; createdAt: Date }> = [];
   if (agentUser) {

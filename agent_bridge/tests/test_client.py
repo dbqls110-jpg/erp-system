@@ -382,3 +382,32 @@ class TestHeartbeatOperatingHours:
         # 1시간 이내 슬립 (영원히 잠들지 않음)
         assert sleep_calls[0] <= 3600, \
             f"quiet period sleep이 너무 깁니다: {sleep_calls[0]}초"
+
+
+# ─── 9. Drive 변경분 자동 색인 ─────────────────────────────────────────────
+
+class TestDriveIndexLoop:
+    def test_marketer_never_calls_drive_index(self):
+        with patch.object(client, "AGENT_TYPE", "marketer"), \
+             patch("client.requests.post") as mock_post:
+            client._drive_index_loop()
+        mock_post.assert_not_called()
+
+    def test_hermes_calls_drive_index_during_operating_hours(self):
+        response = MagicMock()
+        response.json.return_value = {
+            "folders": 1,
+            "scanned": 10,
+            "changed": 1,
+            "indexed": 1,
+            "remaining": 0,
+        }
+        with patch.object(client, "AGENT_TYPE", "hermes"), \
+             patch.object(client, "is_operating_hours", return_value=True), \
+             patch.object(client._hb_stop, "wait", side_effect=[False, True]), \
+             patch.object(client._hb_stop, "is_set", return_value=False), \
+             patch("client.requests.post", return_value=response) as mock_post:
+            client._drive_index_loop()
+
+        mock_post.assert_called_once()
+        assert mock_post.call_args[0][0].endswith("/api/agent/drive-index/sync")

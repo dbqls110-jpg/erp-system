@@ -31,7 +31,8 @@ AGENT_API_KEY = os.environ.get("ERP_AGENT_API_KEY", "")
 AGENT_TYPE    = os.environ.get("AGENT_TYPE", "hermes")
 OPEN_HOUR     = int(os.environ.get("AGENT_OPEN_HOUR",  str(DEFAULT_OPEN_HOUR)))
 CLOSE_HOUR    = int(os.environ.get("AGENT_CLOSE_HOUR", str(DEFAULT_CLOSE_HOUR)))
-VERSION       = "2.0.0"
+DRIVE_INDEX_SYNC_MINUTES = min(60, max(5, int(os.environ.get("DRIVE_INDEX_SYNC_MINUTES", "10"))))
+VERSION       = "2.1.0"
 
 KST = timezone(timedelta(hours=9))
 
@@ -113,6 +114,39 @@ def _heartbeat_loop():
             })
         except Exception as e:
             log.warning(f"하트비트 전송 실패: {e}")
+
+
+def _drive_index_loop():
+    """회사 Hermes PC에서만 Drive 변경분 색인을 주기적으로 요청한다."""
+    if AGENT_TYPE != "hermes":
+        return
+    if _hb_stop.wait(timeout=20):
+        return
+
+    interval_seconds = DRIVE_INDEX_SYNC_MINUTES * 60
+    while not _hb_stop.is_set():
+        if is_operating_hours():
+            try:
+                response = requests.post(
+                    f"{ERP_BASE_URL}/api/agent/drive-index/sync",
+                    headers=_BASE_HEADERS,
+                    json={},
+                    timeout=120,
+                )
+                response.raise_for_status()
+                result = response.json()
+                if result.get("folders", 0) > 0:
+                    log.info(
+                        "Drive 색인: 스캔 %s, 변경 %s, 색인 %s, 다음 회차 %s",
+                        result.get("scanned", 0),
+                        result.get("changed", 0),
+                        result.get("indexed", 0),
+                        result.get("remaining", 0),
+                    )
+            except Exception as e:
+                log.warning(f"Drive 색인 동기화 실패: {e}")
+        if _hb_stop.wait(timeout=interval_seconds):
+            return
 
 # ─── 중복 실행 방지 ──────────────────────────────────────────────────────────
 
@@ -319,6 +353,11 @@ def main():
     # 하트비트 스레드
     hb_thread = threading.Thread(target=_heartbeat_loop, daemon=True)
     hb_thread.start()
+
+    # 회사 Hermes만 10분 단위 Drive 변경분 색인. Marketer 브릿지는 호출하지 않는다.
+    if AGENT_TYPE == "hermes":
+        drive_index_thread = threading.Thread(target=_drive_index_loop, daemon=True)
+        drive_index_thread.start()
 
     # SSE 메인 루프 (블로킹)
     try:

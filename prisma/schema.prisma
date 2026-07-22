@@ -408,6 +408,67 @@ model AgentBridgeHeartbeat {
   @@map("agent_bridge_heartbeats")
 }
 
+// ─── Google Drive 검색 색인 ───────────────────────────────
+// 원본 파일은 Drive에 두고 검색에 필요한 텍스트 조각과 메타데이터만 저장한다.
+model DriveIndexFolder {
+  id            String   @id @default(cuid())
+  driveFolderId String   @unique
+  name          String
+  webViewLink   String?
+  active        Boolean  @default(true)
+  allowedRoles  String[] @default(["admin"])
+  lastScannedAt DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  files DriveIndexFile[]
+
+  @@index([active])
+  @@map("drive_index_folders")
+}
+
+model DriveIndexFile {
+  id            String   @id @default(cuid())
+  folderId      String
+  driveFileId   String
+  name          String
+  mimeType      String
+  webViewLink   String?
+  modifiedTime  DateTime?
+  sizeBytes     String?
+  status        String   @default("pending") // indexed | metadata_only | skipped | error | deleted
+  skipReason    String?
+  contentHash   String?
+  lastIndexedAt DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  folder DriveIndexFolder @relation(fields: [folderId], references: [id], onDelete: Cascade)
+  chunks DriveIndexChunk[]
+
+  @@unique([folderId, driveFileId])
+  @@index([driveFileId])
+  @@index([folderId, status])
+  @@index([modifiedTime])
+  @@map("drive_index_files")
+}
+
+model DriveIndexChunk {
+  id          String   @id @default(cuid())
+  fileId      String
+  chunkIndex  Int
+  content     String   @db.Text
+  contentHash String
+  charCount   Int
+  createdAt   DateTime @default(now())
+
+  file DriveIndexFile @relation(fields: [fileId], references: [id], onDelete: Cascade)
+
+  @@unique([fileId, chunkIndex])
+  @@index([fileId])
+  @@map("drive_index_chunks")
+}
+
 // ─── 명함 ─────────────────────────────────────────────────
 model BusinessCard {
   id         String   @id @default(cuid())
