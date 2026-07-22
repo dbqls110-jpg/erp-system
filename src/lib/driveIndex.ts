@@ -64,6 +64,80 @@ export interface DriveSearchResult {
   snippet: string;
 }
 
+export async function ensureDriveIndexSchema(): Promise<boolean> {
+  const rows = await prisma.$queryRaw<Array<{ tableName: string | null }>>`
+    SELECT to_regclass('public.drive_index_folders')::text AS "tableName"
+  `;
+  if (rows[0]?.tableName) return false;
+
+  // Render가 migration 명령을 건너뛴 환경에서도 새 기능만 안전하게 복구한다.
+  // 전부 IF NOT EXISTS인 순수 추가 작업이며 기존 ERP 테이블과 데이터는 건드리지 않는다.
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "drive_index_folders" (
+      "id" TEXT NOT NULL,
+      "driveFolderId" TEXT NOT NULL,
+      "name" TEXT NOT NULL,
+      "webViewLink" TEXT,
+      "active" BOOLEAN NOT NULL DEFAULT true,
+      "allowedRoles" TEXT[] NOT NULL DEFAULT ARRAY['admin']::TEXT[],
+      "lastScannedAt" TIMESTAMP(3),
+      "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "updatedAt" TIMESTAMP(3) NOT NULL,
+      CONSTRAINT "drive_index_folders_pkey" PRIMARY KEY ("id")
+    )
+  `);
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "drive_index_files" (
+      "id" TEXT NOT NULL,
+      "folderId" TEXT NOT NULL,
+      "driveFileId" TEXT NOT NULL,
+      "name" TEXT NOT NULL,
+      "mimeType" TEXT NOT NULL,
+      "webViewLink" TEXT,
+      "modifiedTime" TIMESTAMP(3),
+      "sizeBytes" TEXT,
+      "status" TEXT NOT NULL DEFAULT 'pending',
+      "skipReason" TEXT,
+      "contentHash" TEXT,
+      "lastIndexedAt" TIMESTAMP(3),
+      "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "updatedAt" TIMESTAMP(3) NOT NULL,
+      CONSTRAINT "drive_index_files_pkey" PRIMARY KEY ("id"),
+      CONSTRAINT "drive_index_files_folderId_fkey"
+        FOREIGN KEY ("folderId") REFERENCES "drive_index_folders"("id")
+        ON DELETE CASCADE ON UPDATE CASCADE
+    )
+  `);
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "drive_index_chunks" (
+      "id" TEXT NOT NULL,
+      "fileId" TEXT NOT NULL,
+      "chunkIndex" INTEGER NOT NULL,
+      "content" TEXT NOT NULL,
+      "contentHash" TEXT NOT NULL,
+      "charCount" INTEGER NOT NULL,
+      "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT "drive_index_chunks_pkey" PRIMARY KEY ("id"),
+      CONSTRAINT "drive_index_chunks_fileId_fkey"
+        FOREIGN KEY ("fileId") REFERENCES "drive_index_files"("id")
+        ON DELETE CASCADE ON UPDATE CASCADE
+    )
+  `);
+  const indexes = [
+    `CREATE UNIQUE INDEX IF NOT EXISTS "drive_index_folders_driveFolderId_key" ON "drive_index_folders"("driveFolderId")`,
+    `CREATE INDEX IF NOT EXISTS "drive_index_folders_active_idx" ON "drive_index_folders"("active")`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS "drive_index_files_folderId_driveFileId_key" ON "drive_index_files"("folderId", "driveFileId")`,
+    `CREATE INDEX IF NOT EXISTS "drive_index_files_driveFileId_idx" ON "drive_index_files"("driveFileId")`,
+    `CREATE INDEX IF NOT EXISTS "drive_index_files_folderId_status_idx" ON "drive_index_files"("folderId", "status")`,
+    `CREATE INDEX IF NOT EXISTS "drive_index_files_modifiedTime_idx" ON "drive_index_files"("modifiedTime")`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS "drive_index_chunks_fileId_chunkIndex_key" ON "drive_index_chunks"("fileId", "chunkIndex")`,
+    `CREATE INDEX IF NOT EXISTS "drive_index_chunks_fileId_idx" ON "drive_index_chunks"("fileId")`,
+    `CREATE INDEX IF NOT EXISTS "drive_index_chunks_fts_idx" ON "drive_index_chunks" USING GIN (to_tsvector('simple', "content"))`,
+  ];
+  for (const statement of indexes) await prisma.$executeRawUnsafe(statement);
+  return true;
+}
+
 export function classifyDriveFile(mimeType: string, sizeBytes?: string | null): DriveIndexMode {
   if (mimeType === DOC_MIME) return "document";
   if (mimeType === SHEET_MIME) return "sheet";
@@ -290,6 +364,7 @@ async function runDriveIndexSync(): Promise<DriveIndexSyncResult> {
     errors: 0,
     remaining: 0,
   };
+  await ensureDriveIndexSchema();
   const folders = await prisma.driveIndexFolder.findMany({ where: { active: true }, orderBy: { createdAt: "asc" } });
   result.folders = folders.length;
   if (folders.length === 0) return result;

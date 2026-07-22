@@ -2,7 +2,7 @@ import { getServerSession } from "next-auth";
 import { NextRequest, NextResponse } from "next/server";
 import { authOptions } from "@/lib/auth";
 import { makeDriveClientAsOwner, parseFolderIdFromUrl } from "@/lib/googleClient";
-import { DRIVE_INDEX_LIMITS } from "@/lib/driveIndex";
+import { DRIVE_INDEX_LIMITS, ensureDriveIndexSchema } from "@/lib/driveIndex";
 import { prisma } from "@/lib/prisma";
 
 async function requireAdmin() {
@@ -12,6 +12,7 @@ async function requireAdmin() {
 
 export async function GET() {
   if (!(await requireAdmin())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  await ensureDriveIndexSchema();
   const [folders, fileCount, chunkCount, statusGroups] = await Promise.all([
     prisma.driveIndexFolder.findMany({
       orderBy: { createdAt: "asc" },
@@ -34,6 +35,7 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   if (!(await requireAdmin())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  await ensureDriveIndexSchema();
   const body = await req.json().catch(() => ({}));
   const raw = String(body.folderUrl ?? body.folderId ?? "").trim();
   const driveFolderId = parseFolderIdFromUrl(raw) ?? (/^[A-Za-z0-9_-]{10,100}$/.test(raw) ? raw : null);
@@ -67,6 +69,7 @@ export async function POST(req: NextRequest) {
 
 export async function PATCH(req: NextRequest) {
   if (!(await requireAdmin())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  await ensureDriveIndexSchema();
   const body = await req.json().catch(() => ({}));
   const id = String(body.id ?? "");
   if (!id) return NextResponse.json({ error: "id가 필요합니다." }, { status: 400 });
