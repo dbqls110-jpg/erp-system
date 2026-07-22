@@ -203,7 +203,7 @@ export function MessengerView({ myId, users }: { myId: string; users: User[] }) 
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  }, [messages, agentPending]);
 
   // 컨텍스트 메뉴 외부 클릭 시 닫기
   useEffect(() => {
@@ -273,6 +273,13 @@ export function MessengerView({ myId, users }: { myId: string; users: User[] }) 
     setInput("");
     try {
       const result = await sendMessage(receiverId, text);
+      if (result?.jobId) {
+        // Show the typing state before conversation/message refresh requests.
+        setLastFailedSend(null);
+        sseReconnectRef.current = 0;
+        setAgentPending({ jobId: result.jobId, status: "pending" });
+      }
+
       const res = await fetch("/api/messenger/conversations");
       if (res.ok) {
         const convs: ConvItem[] = await res.json();
@@ -283,10 +290,6 @@ export function MessengerView({ myId, users }: { myId: string; users: User[] }) 
           await fetchMessages(found.conversationId);
 
           if (result?.jobId) {
-            // 신규 실시간 파이프라인 — SSE 왕복을 기다리지 않고 즉시 "작성 중" 표시(2초 이내 요건)
-            setLastFailedSend(null);
-            sseReconnectRef.current = 0;
-            setAgentPending({ jobId: result.jobId, status: "pending" });
             connectAgentSSE(result.jobId, found.conversationId, receiverId, text);
           }
         }
@@ -439,12 +442,29 @@ export function MessengerView({ myId, users }: { myId: string; users: User[] }) 
                       <AvatarFallback className="text-[9px] bg-hint-of-sky">{initials(selectedUser.name)}</AvatarFallback>
                     </Avatar>
                     <div className="max-w-[70%] space-y-0.5">
-                      <div className="px-3 py-2 rounded-2xl rounded-tl-sm text-sm leading-relaxed bg-hint-of-sky text-midnight-charcoal italic opacity-70">
+                      <div
+                        className="px-3 py-2 rounded-2xl rounded-tl-sm text-sm leading-relaxed bg-hint-of-sky text-midnight-charcoal opacity-80"
+                        role="status"
+                        aria-live="polite"
+                      >
                         {agentPending.status === "error"
                           ? "답변 생성 중 오류가 발생했습니다."
                           : agentPending.status === "waiting"
                           ? "브릿지 연결 대기 중입니다. 잠시 후 새로고침해서 확인해주세요."
-                          : `${selectedUser.name ?? "에이전트"}가 답변 작성 중...`}
+                          : (
+                            <span className="inline-flex items-center gap-1.5">
+                              <span>{selectedUser.name ?? "에이전트"}가 답변 작성 중</span>
+                              <span className="inline-flex items-end gap-0.5" aria-hidden="true">
+                                {[0, 1, 2].map((dot) => (
+                                  <span
+                                    key={dot}
+                                    className="h-1 w-1 rounded-full bg-current motion-safe:animate-bounce"
+                                    style={{ animationDelay: `${dot * 140}ms`, animationDuration: "700ms" }}
+                                  />
+                                ))}
+                              </span>
+                            </span>
+                          )}
                       </div>
                       {agentPending.status === "error" && lastFailedSend && (
                         <button
