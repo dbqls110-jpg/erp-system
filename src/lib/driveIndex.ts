@@ -351,6 +351,39 @@ export async function syncDriveIndex(): Promise<DriveIndexSyncResult> {
   }
 }
 
+async function registerConfiguredDriveIndexRoot(drive: drive_v3.Drive) {
+  const driveFolderId = (process.env.GOOGLE_DRIVE_HERMES_ROOT_FOLDER_ID ?? "").trim();
+  if (!driveFolderId) return null;
+
+  const response = await drive.files.get({
+    fileId: driveFolderId,
+    fields: "id,name,mimeType,webViewLink,trashed",
+    supportsAllDrives: true,
+  });
+  if (
+    !response.data.id ||
+    response.data.mimeType !== FOLDER_MIME ||
+    response.data.trashed === true
+  ) {
+    throw new Error("GOOGLE_DRIVE_HERMES_ROOT_FOLDER_ID가 활성 Google Drive 폴더가 아닙니다.");
+  }
+
+  return prisma.driveIndexFolder.upsert({
+    where: { driveFolderId },
+    create: {
+      driveFolderId,
+      name: response.data.name ?? "Hermes Drive",
+      webViewLink: response.data.webViewLink ?? null,
+      allowedRoles: ["admin", "user"],
+      active: true,
+    },
+    update: {
+      name: response.data.name ?? "Hermes Drive",
+      webViewLink: response.data.webViewLink ?? null,
+    },
+  });
+}
+
 async function runDriveIndexSync(): Promise<DriveIndexSyncResult> {
   const result: DriveIndexSyncResult = {
     ok: true,
@@ -365,11 +398,20 @@ async function runDriveIndexSync(): Promise<DriveIndexSyncResult> {
     remaining: 0,
   };
   await ensureDriveIndexSchema();
-  const folders = await prisma.driveIndexFolder.findMany({ where: { active: true }, orderBy: { createdAt: "asc" } });
+  let folders = await prisma.driveIndexFolder.findMany({ where: { active: true }, orderBy: { createdAt: "asc" } });
+  let drive: drive_v3.Drive | null = null;
+  if (folders.length === 0) {
+    const existingFolderCount = await prisma.driveIndexFolder.count();
+    if (existingFolderCount === 0 && process.env.GOOGLE_DRIVE_HERMES_ROOT_FOLDER_ID) {
+      drive = await makeDriveClientAsOwner();
+      const configuredRoot = await registerConfiguredDriveIndexRoot(drive);
+      if (configuredRoot) folders = [configuredRoot];
+    }
+  }
   result.folders = folders.length;
   if (folders.length === 0) return result;
 
-  const drive = await makeDriveClientAsOwner();
+  drive ??= await makeDriveClientAsOwner();
   let processingBudget = DRIVE_INDEX_LIMITS.maxChangedFilesPerSync;
 
   for (const folder of folders) {

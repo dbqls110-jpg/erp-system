@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { verifyAgentApiKey } from "@/lib/agentAuth";
+import { verifyAgentApiKey, verifyBridgeApiKey } from "@/lib/agentAuth";
 import { auditLog } from "@/lib/agentAudit";
 import {
   makeSheetsClient,
@@ -16,6 +16,7 @@ const AGENT_FOLDER_MAP: Record<string, string> = {
   marketer: "마케터",
   report: "보고서",
 };
+const ALLOWED_AGENT_TYPES = ["hermes", "marketer"] as const;
 
 function sanitizeTitle(raw: string, maxLen: number = LIMITS.MAX_TITLE_LEN): string {
   return raw
@@ -78,13 +79,14 @@ interface CreateBody {
 }
 
 export async function POST(req: NextRequest) {
-  if (!verifyAgentApiKey(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
   let body: CreateBody;
   try {
     body = await req.json();
   } catch {
-    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+    return NextResponse.json(
+      { error: "Invalid JSON body", code: "INVALID_JSON" },
+      { status: 400 },
+    );
   }
 
   const {
@@ -96,13 +98,29 @@ export async function POST(req: NextRequest) {
     data = {},
     dryRun = false,
   } = body;
+  const resolvedAgentType = String(agentType);
+  if (!ALLOWED_AGENT_TYPES.includes(resolvedAgentType as (typeof ALLOWED_AGENT_TYPES)[number])) {
+    return NextResponse.json(
+      { error: "agentType은 hermes | marketer 중 하나여야 합니다.", code: "INVALID_AGENT_TYPE" },
+      { status: 400 },
+    );
+  }
+  if (!verifyBridgeApiKey(req, resolvedAgentType) && !verifyAgentApiKey(req)) {
+    return NextResponse.json(
+      { error: "Unauthorized", code: "UNAUTHORIZED" },
+      { status: 401 },
+    );
+  }
 
   const rawSubfolder = folderName
     ? sanitizeTitle(String(folderName), 50)
-    : (AGENT_FOLDER_MAP[String(agentType)] ?? "Hermes");
+    : AGENT_FOLDER_MAP[resolvedAgentType];
 
   if (!rawSubfolder) {
-    return NextResponse.json({ error: "folderName이 유효하지 않습니다." }, { status: 400 });
+    return NextResponse.json(
+      { error: "folderName이 유효하지 않습니다.", code: "INVALID_FOLDER_NAME" },
+      { status: 400 },
+    );
   }
 
   const folderPath = `${ROOT_FOLDER_NAME}/${rawSubfolder}`;
@@ -112,11 +130,17 @@ export async function POST(req: NextRequest) {
     : generateTitle(sourcePrompt);
 
   if (!finalTitle) {
-    return NextResponse.json({ error: "title 또는 sourcePrompt가 필요합니다." }, { status: 400 });
+    return NextResponse.json(
+      { error: "title 또는 sourcePrompt가 필요합니다.", code: "INVALID_TITLE" },
+      { status: 400 },
+    );
   }
 
   if (!Array.isArray(tabs) || tabs.length === 0 || tabs.length > LIMITS.MAX_TABS) {
-    return NextResponse.json({ error: `tabs는 1~${LIMITS.MAX_TABS}개 배열이어야 합니다.` }, { status: 400 });
+    return NextResponse.json({
+      error: `tabs는 1~${LIMITS.MAX_TABS}개 배열이어야 합니다.`,
+      code: "INVALID_TABS",
+    }, { status: 400 });
   }
   const safeTabs = [...new Set(tabs.map((t) => String(t).trim()).filter(Boolean))];
   if (safeTabs.length === 0) safeTabs.push("Sheet1");
@@ -132,6 +156,7 @@ export async function POST(req: NextRequest) {
   if (totalCells > LIMITS.MAX_INITIAL_CELLS) {
     return NextResponse.json({
       error: `초기 데이터가 너무 큽니다. 최대 ${LIMITS.MAX_INITIAL_CELLS}개 셀.`,
+      code: "INITIAL_DATA_TOO_LARGE",
     }, { status: 400 });
   }
 
@@ -171,7 +196,12 @@ export async function POST(req: NextRequest) {
           }, { status: 503 });
         }
         const msg = e instanceof Error ? e.message : "unknown";
-        return NextResponse.json({ error: "루트 폴더 생성 실패", detail: msg, step: "root_folder" }, { status: 502 });
+        return NextResponse.json({
+          error: "루트 폴더 생성 실패",
+          code: "DRIVE_ROOT_FOLDER_FAILED",
+          detail: msg,
+          step: "root_folder",
+        }, { status: 502 });
       }
     }
 
@@ -189,7 +219,12 @@ export async function POST(req: NextRequest) {
         }, { status: 503 });
       }
       const msg = e instanceof Error ? e.message : "unknown";
-      return NextResponse.json({ error: "서브폴더 생성 실패", detail: msg, step: "subfolder" }, { status: 502 });
+      return NextResponse.json({
+        error: "서브폴더 생성 실패",
+        code: "DRIVE_SUBFOLDER_FAILED",
+        detail: msg,
+        step: "subfolder",
+      }, { status: 502 });
     }
 
     // 3. owner 계정으로 스프레드시트를 서브폴더에 직접 생성
@@ -214,7 +249,13 @@ export async function POST(req: NextRequest) {
         }, { status: 503 });
       }
       const msg = e instanceof Error ? e.message : "unknown";
-      return NextResponse.json({ error: "파일 생성 실패", detail: msg, step: "create_file", subFolderId }, { status: 502 });
+      return NextResponse.json({
+        error: "파일 생성 실패",
+        code: "DRIVE_FILE_CREATE_FAILED",
+        detail: msg,
+        step: "create_file",
+        subFolderId,
+      }, { status: 502 });
     }
     const url = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit`;
 
@@ -241,7 +282,14 @@ export async function POST(req: NextRequest) {
       });
     } catch (e) {
       const msg = e instanceof Error ? e.message : "unknown";
-      return NextResponse.json({ error: "탭 구성 실패", detail: msg, step: "configure_tabs", spreadsheetId, url }, { status: 502 });
+      return NextResponse.json({
+        error: "탭 구성 실패",
+        code: "SHEET_CONFIGURE_TABS_FAILED",
+        detail: msg,
+        step: "configure_tabs",
+        spreadsheetId,
+        url,
+      }, { status: 502 });
     }
 
     // 5. 탭별 초기 데이터 입력
@@ -268,7 +316,14 @@ export async function POST(req: NextRequest) {
         });
       } catch (e) {
         const msg = e instanceof Error ? e.message : "unknown";
-        return NextResponse.json({ error: "데이터 입력 실패", detail: msg, step: "write_data", spreadsheetId, url }, { status: 502 });
+        return NextResponse.json({
+          error: "데이터 입력 실패",
+          code: "SHEET_WRITE_DATA_FAILED",
+          detail: msg,
+          step: "write_data",
+          spreadsheetId,
+          url,
+        }, { status: 502 });
       }
     }
 
@@ -286,6 +341,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(result, { status: 201 });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Google API 오류";
-    return NextResponse.json({ error: "스프레드시트 생성 실패", detail: message }, { status: 502 });
+    return NextResponse.json({
+      error: "스프레드시트 생성 실패",
+      code: "SPREADSHEET_CREATE_FAILED",
+      detail: message,
+    }, { status: 502 });
   }
 }

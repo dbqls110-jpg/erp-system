@@ -32,7 +32,7 @@ AGENT_TYPE    = os.environ.get("AGENT_TYPE", "hermes")
 OPEN_HOUR     = int(os.environ.get("AGENT_OPEN_HOUR",  str(DEFAULT_OPEN_HOUR)))
 CLOSE_HOUR    = int(os.environ.get("AGENT_CLOSE_HOUR", str(DEFAULT_CLOSE_HOUR)))
 DRIVE_INDEX_SYNC_MINUTES = min(60, max(5, int(os.environ.get("DRIVE_INDEX_SYNC_MINUTES", "10"))))
-VERSION       = "2.1.0"
+VERSION       = "2.2.0"
 
 KST = timezone(timedelta(hours=9))
 

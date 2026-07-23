@@ -8,6 +8,7 @@ runners/ 검증 테스트
 import os
 import sys
 import inspect
+import json
 import subprocess
 from unittest.mock import patch, MagicMock
 from pathlib import Path
@@ -268,6 +269,94 @@ class TestRunnersUseHermesCli:
         assert "출처" in output
         assert "ERP 근태 관리 (3건 기준)" in output
         assert "https://erp.example.com/attendance" in output
+
+
+class TestStructuredSheetActions:
+    def _make_job(self, input_text="프로젝트 현황 스프레드시트를 만들어줘"):
+        from protocol import AgentJob
+        return AgentJob(
+            job_id="sheet-job",
+            agent_type="hermes",
+            user_id="u1",
+            input=input_text,
+        )
+
+    def test_detects_explicit_sheet_creation_request(self):
+        assert hermes_runner._is_sheet_creation_request("매출 현황 시트를 만들어줘")
+        assert hermes_runner._is_sheet_creation_request("Create a Google spreadsheet for expenses")
+
+    def test_does_not_execute_sheet_howto_question(self):
+        assert not hermes_runner._is_sheet_creation_request("시트 만드는 방법을 알려줘")
+        assert not hermes_runner._is_sheet_creation_request("스프레드시트를 만들 수 있어?")
+
+    def test_sheet_plan_forces_job_agent_type_and_limits_data(self):
+        raw = json.dumps({
+            "action": "create_spreadsheet",
+            "arguments": {
+                "agentType": "marketer",
+                "title": "프로젝트 현황",
+                "tabs": ["진행중"],
+                "data": {"진행중": [["프로젝트", "상태"], ["A", "진행"]]},
+            },
+        }, ensure_ascii=False)
+
+        plan = hermes_runner._parse_sheet_plan(raw, self._make_job())
+
+        assert plan["agentType"] == "hermes"
+        assert plan["title"] == "프로젝트 현황"
+        assert plan["data"]["진행중"][1] == ["A", "진행"]
+        assert "dryRun" not in plan
+        assert "folderName" not in plan
+
+    def test_runner_executes_structured_sheet_plan(self):
+        job = self._make_job()
+        raw_plan = json.dumps({
+            "action": "create_spreadsheet",
+            "arguments": {
+                "title": "프로젝트 현황",
+                "tabs": ["현황"],
+                "data": {},
+            },
+        }, ensure_ascii=False)
+        result = {
+            "title": "프로젝트 현황",
+            "folderPath": "Hermes 운영 시트/Hermes",
+            "url": "https://docs.google.com/spreadsheets/d/test-sheet-id/edit",
+        }
+
+        with patch("runners.hermes._get_job_context", return_value={"data": {}}), \
+             patch("hermes_cli.run_chat", return_value=raw_plan) as mock_chat, \
+             patch("runners.hermes._execute_sheet_plan", return_value=result) as mock_execute:
+            output = list(hermes_runner.run(job))[0]
+
+        assert mock_chat.call_args.kwargs["source"] == "erp-hermes-sheet-planner"
+        assert mock_execute.call_args[0][0]["agentType"] == "hermes"
+        assert "시트를 생성했습니다" in output
+        assert result["url"] in output
+
+    def test_api_error_message_uses_code_not_server_detail(self):
+        response = MagicMock()
+        response.status_code = 503
+        response.json.return_value = {
+            "error": "internal failure",
+            "detail": "sensitive-provider-diagnostic",
+            "code": "GOOGLE_AUTH_EXPIRED",
+            "step": "root_folder",
+        }
+
+        with patch("runners.hermes.requests.post", return_value=response):
+            with pytest.raises(hermes_runner.SheetActionError) as exc_info:
+                hermes_runner._execute_sheet_plan({
+                    "agentType": "hermes",
+                    "title": "테스트",
+                    "tabs": ["Sheet1"],
+                    "data": {},
+                })
+
+        message = hermes_runner._format_sheet_error(exc_info.value)
+        assert "GOOGLE_AUTH_EXPIRED" in message
+        assert "Drive 인증이 만료" in message
+        assert "sensitive-provider-diagnostic" not in message
 
 
 # ─── 4. hermes_cli.run_chat subprocess 통합 테스트 (mock) ───────────────────
