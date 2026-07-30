@@ -8,6 +8,7 @@
     "postinstall": "prisma generate",
     "start": "next start -p ${PORT:-3000}",
     "lint": "eslint",
+    "sheet:create": "node scripts/create-erp-sheet.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "render-build": "prisma generate && prisma migrate deploy && next build"
