@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { LogOut, Menu, Mail, ExternalLink, LayoutDashboard, MessageCircle } from "lucide-react";
 import { clockOut } from "@/app/actions/attendance";
 import { useCallback, useEffect, useState } from "react";
+import { useVisiblePolling } from "@/lib/useVisiblePolling";
 
 const pageTitle: Record<string, string> = {
   "/dashboard": "대시보드",
@@ -55,12 +56,13 @@ export function Header({ user, onMobileMenuOpen }: HeaderProps) {
       .catch(() => {});
   }, []);
 
-  // 페이지 이동 시 즉시 갱신 + 10초 폴링
+  // 페이지 이동 시 즉시 갱신
   useEffect(() => {
     refreshUnread();
-    const id = setInterval(refreshUnread, 30000);
-    return () => clearInterval(id);
   }, [pathname, refreshUnread]);
+
+  // 탭이 보이는 동안에만 30초 폴링 (백그라운드 탭이 DB를 깨우지 않도록)
+  useVisiblePolling(refreshUnread, 30000, { immediate: false });
   const title = Object.entries(pageTitle).find(([key]) => pathname === key || pathname.startsWith(key + "/"))?.[1] ?? "";
   const initials = user.name
     ? user.name.slice(0, 2).toUpperCase()

@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useVisiblePolling } from "@/lib/useVisiblePolling";
 import { cn } from "@/lib/utils";
 
 interface AgentStatusBadgeProps {
@@ -17,22 +18,24 @@ interface StatusData {
 export function AgentStatusBadge({ agentType, className }: AgentStatusBadgeProps) {
   const [status, setStatus] = useState<StatusData | null>(null);
 
+  const aliveRef = useRef(true);
   useEffect(() => {
-    let alive = true;
+    aliveRef.current = true;
+    return () => { aliveRef.current = false; };
+  }, []);
 
-    const check = async () => {
-      try {
-        const res = await fetch(`/api/agent/status?agentType=${encodeURIComponent(agentType)}`);
-        if (res.ok && alive) {
-          setStatus(await res.json());
-        }
-      } catch {}
-    };
-
-    check();
-    const id = setInterval(check, 30_000);
-    return () => { alive = false; clearInterval(id); };
+  const check = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/agent/status?agentType=${encodeURIComponent(agentType)}`);
+      if (res.ok && aliveRef.current) {
+        setStatus(await res.json());
+      }
+    } catch {}
   }, [agentType]);
+
+  // 마운트/agentType 변경 시 즉시 1회 + 탭이 보이는 동안에만 30초 폴링
+  // (백그라운드 탭이 DB를 깨우지 않도록)
+  useVisiblePolling(check, 30_000);
 
   if (!status) return null;
 

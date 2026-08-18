@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useState, useCallback } from "react";
+import { useVisiblePolling } from "@/lib/useVisiblePolling";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -34,11 +35,8 @@ export function LeaveAdminPanel({ requests: initial }: { requests: LeaveRequest[
     } catch {}
   }, []);
 
-  // 20초마다 새 신청 확인
-  useEffect(() => {
-    const id = setInterval(fetchPending, 20000);
-    return () => clearInterval(id);
-  }, [fetchPending]);
+  // 탭이 보이는 동안에만 20초마다 새 신청 확인
+  useVisiblePolling(fetchPending, 20000, { immediate: false });
 
   const handleApprove = async (id: string) => {
     setLoading(id + "-approve");
