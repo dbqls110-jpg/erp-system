@@ -295,10 +295,16 @@ export function MessengerView({ myId, users }: { myId: string; users: User[] }) 
     const text = input.trim();
     const receiverId = selectedUser.id;
     setInput("");
+    // "작성 중" 표시는 SSE 구독보다 먼저 켜지므로(2초 요건), 구독까지 실제로 도달했는지
+    // 따로 추적한다. 도달하지 못하면 타임아웃/재연결 로직이 아예 시작되지 않아
+    // 표시가 영구히 멈춘다.
+    let pendingJobId: string | null = null;
+    let subscribed = false;
     try {
       const result = await sendMessage(receiverId, text);
       if (result?.jobId) {
         // Show the typing state before conversation/message refresh requests.
+        pendingJobId = result.jobId;
         setLastFailedSend(null);
         sseReconnectRef.current = 0;
         setAgentPending({ jobId: result.jobId, status: "pending" });
@@ -315,6 +321,7 @@ export function MessengerView({ myId, users }: { myId: string; users: User[] }) 
 
           if (result?.jobId) {
             connectAgentSSE(result.jobId, found.conversationId, receiverId, text);
+            subscribed = true;
           }
         }
       }
@@ -322,6 +329,14 @@ export function MessengerView({ myId, users }: { myId: string; users: User[] }) 
       toast.error(err instanceof Error ? err.message : "전송 실패");
       setLastFailedSend({ receiverId, text });
     } finally {
+      if (pendingJobId && !subscribed) {
+        // 메시지 전송과 job 생성은 성공했고 답변도 DB에 저장된다. 이 탭이 실시간으로
+        // 받지 못할 뿐이므로 waiting(새로고침 안내)으로 내린다.
+        // error 로 두면 재시도 버튼이 떠서 같은 질문이 중복 전송된다.
+        const jobId = pendingJobId;
+        setLastFailedSend(null);
+        setAgentPending(prev => (prev && prev.jobId === jobId ? { jobId, status: "waiting" } : prev));
+      }
       setSending(false);
     }
   }
@@ -474,7 +489,7 @@ export function MessengerView({ myId, users }: { myId: string; users: User[] }) 
                         {agentPending.status === "error"
                           ? "답변 생성 중 오류가 발생했습니다."
                           : agentPending.status === "waiting"
-                          ? "브릿지 연결 대기 중입니다. 잠시 후 새로고침해서 확인해주세요."
+                          ? "답변을 실시간으로 받지 못했습니다. 답변은 저장되니 잠시 후 새로고침해서 확인해주세요."
                           : (
                             <span className="inline-flex items-center gap-1.5">
                               <span>{selectedUser.name ?? "에이전트"}가 답변 작성 중</span>

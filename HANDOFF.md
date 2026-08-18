@@ -91,6 +91,22 @@ Next.js 16 + Prisma 7 + PostgreSQL(Supabase) 기반 사내 ERP. 근태/휴가/�
 
 이후 Codex가 진행한 작업 (커밋 `d2ca522`~`0065629`): Drive 증분 검색 인덱싱, 에이전트 요청자 컨텍스트 바인딩 및 ERP 출처 인용, 시트 액션 실행, 브릿지 복구/워치독(`watch_bridge.ps1`, `install_watchdog.ps1`), 시트 생성 CLI(`npm run sheet:create`), SSE UTF-8 디코딩 수정.
 
+## 2026-08-18 작업 내용: 메신저 "작성 중" 표시가 멈추는 버그 수정
+
+`caaab8a`가 2초 요건을 맞추려고 `setAgentPending`을 대화 목록 갱신보다 앞으로 옮기면서 `connectAgentSSE` 호출과의 결합이 끊겼다. 그 결과 표시만 켜지고 구독은 안 되는 경로가 셋 생겼다.
+
+- `fetch("/api/messenger/conversations")` 가 throw → catch 가 `agentPending` 을 안 지움
+- 응답이 non-OK → `if (res.ok)` 블록 통째로 건너뜀 (catch 도 토스트도 없음)
+- `convs.find(...)` 가 undefined → 에이전트에게 보내는 첫 메시지에서 발생 가능
+
+타임아웃·자동재연결이 전부 `connectAgentSSE` 안에 있어서, 호출되지 않으면 상태를 바꿔줄 주체가 없다. 재시도 버튼은 `status === "error"` 일 때만 렌더되므로 셋 다 복구 수단이 없었다. 답변 자체는 정상 생성돼 DB에 저장되는데 화면만 영구히 "작성 중"으로 남았다.
+
+`handleSend` 가 `subscribed` 플래그로 구독 도달 여부를 추적하고, `finally` 에서 job 은 있는데 구독을 못 했으면 `waiting` 으로 내리도록 고쳤다.
+
+**`error` 가 아니라 `waiting` 인 이유:** 메시지 전송과 job 생성은 성공했고 답변도 저장된다. `error` 로 두면 재시도 버튼이 떠서 **같은 질문이 중복 전송**된다. `waiting` 안내 문구도 두 경로(SSE 타임아웃 / 구독 실패) 모두에 맞게 원인을 단정하지 않는 표현으로 바꿨다.
+
+⚠️ **이 수정은 타입체크·빌드·기존 테스트로만 확인했고 실제 브라우저 검증은 못 했다.** 저장소에 DOM 테스트 환경(jsdom 등)이 없어 자동 테스트를 붙이지 못했다. 아래 "남은 일" 의 e2e 테스트에서 같이 확인할 것.
+
 ## 남은 일
 
 1. **마케터 브릿지가 이 노트북에서 3주+ 꺼져 있음** — 필요하면 `check_marketer.cmd` → `start_marketer.cmd`.
