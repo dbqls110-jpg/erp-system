@@ -35,7 +35,7 @@ export function AgentStatusBadge({ agentType, className }: AgentStatusBadgeProps
 
   // 마운트/agentType 변경 시 즉시 1회 + 탭이 보이는 동안에만 30초 폴링
   // (백그라운드 탭이 DB를 깨우지 않도록)
-  useVisiblePolling(check, 30_000);
+  useVisiblePolling(check, 30_000, { refreshKey: agentType });
 
   if (!status) return null;
 

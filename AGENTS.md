@@ -20,6 +20,10 @@ This version has breaking changes — APIs, conventions, and file structure may 
 
 초기 1회 실행이 필요하면 훅의 `immediate` 옵션을 쓰세요. 컴포넌트 쪽에서 `useEffect(() => { fetchThing(); }, [fetchThing])`로 처리하면 `react-hooks/set-state-in-effect` lint 에러가 납니다.
 
+조회 대상이 바뀔 때 즉시 다시 불러야 하면 `refreshKey`에 그 대상을 나타내는 **원시값**을 넘기세요(예: `{ refreshKey: agentType }`). 객체나 함수를 넘기면 매 렌더마다 재실행됩니다.
+
+콜백은 훅 내부에서 ref로 보관하므로 메모이즈하지 않은 인라인 함수를 넘겨도 안전합니다.
+
 ## 3. DB 스키마는 migration 파일로만
 
 `prisma db push`, `prisma migrate reset` 금지. migration 파일을 작성하고 `prisma migrate deploy`를 쓰세요.

@@ -57,7 +57,12 @@ Next.js 16 + Prisma 7 + PostgreSQL(Supabase) 기반 사내 ERP. 근태/휴가/�
 
 가장 심한 건 `Header.tsx`였음 — `AppShell`을 통해 **모든 인증 페이지에 항상 마운트**되는데, 30초마다 `/api/messenger/unread`를 호출하고 이 라우트는 **호출당 DB 쿼리를 2번** 함(대화 목록 조회 + 안읽음 카운트). 탭 하나만 열어둬도 하루 2,880회 × 2쿼리.
 
-**신규 파일 `src/lib/useVisiblePolling.ts`** — 공용 훅. 기존 `MessengerView.tsx` 패턴(가시성 + 새벽 2~8시 중단)을 따르되, **탭으로 돌아오는 순간 즉시 1회 갱신**을 추가했습니다(`AutoRefresh.tsx`가 이미 쓰던 방식). `immediate` 옵션의 1회 실행은 "사용자가 화면을 연 시점"이므로 가시성·새벽시간 제한을 받지 않습니다.
+**신규 파일 `src/lib/useVisiblePolling.ts`** — 공용 훅. **탭이 보이는 동안에만 폴링**하고, **탭으로 돌아오는 순간 즉시 1회 갱신**합니다(`AutoRefresh.tsx`가 이미 쓰던 방식). `immediate` 옵션의 1회 실행은 "사용자가 화면을 연 시점"이므로 가시성 제한을 받지 않습니다.
+
+설계상 중요한 두 가지:
+
+- **콜백은 ref로 보관합니다.** 즉시 실행 effect의 deps에 `callback`을 넣으면, 메모이즈 안 된 인라인 콜백을 받았을 때 `fetch → setState → 리렌더 → 새 identity → fetch` 무한 요청 루프가 됩니다. 조회 대상이 바뀔 때 다시 부르려면 `refreshKey`에 **원시값**을 넘기세요(`AgentStatusBadge`가 `{ refreshKey: agentType }`으로 사용).
+- **`respectQuietHours`는 기본 false입니다.** 가시성 게이팅만으로 "아무도 안 보는 탭이 DB를 깨우는" 문제는 이미 해결됩니다. 탭이 보인다 = 사용자가 화면 앞에 있다는 뜻이라, 새벽 중단을 켜면 야근·시차 근무자에게는 화면이 멈춘 것처럼 보입니다. `MessengerView`를 나중에 이 훅으로 통일할 때는 기존 동작을 유지하려면 명시적으로 `true`를 넘기면 됩니다.
 
 **수정한 3곳:**
 
@@ -70,9 +75,10 @@ Next.js 16 + Prisma 7 + PostgreSQL(Supabase) 기반 사내 ERP. 근태/휴가/�
 **손대지 않은 것(하자 아님):**
 - `src/components/AutoRefresh.tsx` — 이미 `document.hidden` 체크 있음
 - `src/app/(app)/messenger/MessengerView.tsx` — 이미 `visibleRef` + `isQuietHours()` 있음. 동작 중인 실시간 파이프라인이라 리스크 피해서 그대로 둠 (그래서 `isQuietHours`가 훅과 중복 정의돼 있음 — 나중에 정리 가능)
+- `src/app/api/agent/sse/bridge/route.ts` — 서버 사이드 SSE 타이머라 브라우저 탭 가시성과 무관
 - `src/app/(app)/attendance/WorkingTimer.tsx` — 로컬 시계 계산만, fetch 없음
 
-**주의:** 새벽 2~8시에는 안읽음 배지·휴가 신청 목록·에이전트 상태 배지가 갱신되지 않습니다. 메신저가 이미 그렇게 동작하고 있어 맞춘 것입니다. 특정 화면에서 원치 않으면 해당 호출에 `{ respectQuietHours: false }`를 넘기면 됩니다.
+**동작 변화 범위:** 이번 변경은 **가시성 체크 추가가 전부**입니다. 탭이 보이는 동안에는 세 화면 모두 이전과 똑같은 주기로 갱신됩니다(초안에서는 새벽 2~8시 중단도 함께 적용했다가, 야간 근무 중인 관리자에게 승인 대기 목록이 안내 없이 멈춰 보이는 문제가 있어 되돌렸습니다).
 
 **`AgentStatusBadge`에서 걸렸던 lint:** 초기 1회 호출을 컴포넌트 쪽 `useEffect(() => { check(); }, [check])`로 두면 `react-hooks/set-state-in-effect`에 걸립니다. 그래서 초기 실행 책임을 훅 안으로 옮겼습니다. **같은 패턴을 다른 곳에 또 쓰지 마세요** — 훅의 `immediate`를 쓰면 됩니다.
 
