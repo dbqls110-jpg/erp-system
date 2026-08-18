@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { verifyBridgeApiKey } from "@/lib/agentAuth";
+import { hasAnyBridgeCredential, verifyBridgeApiKey } from "@/lib/agentAuth";
 import { prisma } from "@/lib/prisma";
 
 interface DeltaBody {
@@ -10,6 +10,12 @@ interface DeltaBody {
 // POST /api/agent/jobs/[id]/delta — 스트리밍 부분 출력 저장 (브릿지 전용)
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+
+  // 자격증명 없는 요청이 DB 를 건드리지 못하게 조회 전에 먼저 거른다.
+  // agentType 별 권한은 job 을 읽은 뒤 아래에서 다시 확인한다.
+  if (!hasAnyBridgeCredential(req)) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
 
   // job의 agentType 조회 후 브릿지 키 검증
   const job = await prisma.agentJob.findUnique({

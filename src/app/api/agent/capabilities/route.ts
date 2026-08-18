@@ -809,8 +809,8 @@ const CAPABILITIES = {
         },
         {
           method: "GET", path: "/api/agent/status",
-          description: "브릿지 온라인 여부 조회 (인증 불필요). lastSeenAt 기준 60초 내 = online",
-          auth: false, dryRun: false,
+          description: "브릿지 온라인 여부 조회 (세션 또는 브릿지 키 필요). lastSeenAt 기준 60초 내 = online",
+          auth: true, dryRun: false,
           params: [{ name: "agentType", type: "string", required: true }],
           response: { agentType: "string", online: "boolean", lastSeenAt: "string|null", version: "string|null" },
         },

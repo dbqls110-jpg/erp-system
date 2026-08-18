@@ -107,12 +107,28 @@ Next.js 16 + Prisma 7 + PostgreSQL(Supabase) 기반 사내 ERP. 근태/휴가/�
 
 ⚠️ **이 수정은 타입체크·빌드·기존 테스트로만 확인했고 실제 브라우저 검증은 못 했다.** 저장소에 DOM 테스트 환경(jsdom 등)이 없어 자동 테스트를 붙이지 못했다. 아래 "남은 일" 의 e2e 테스트에서 같이 확인할 것.
 
+## 2026-08-18 작업 내용: 인증 전 DB 접근 차단
+
+에이전트 라우트 일부가 대상 레코드의 `agentType` 을 알아야 키를 검증할 수 있다는 이유로 **인증보다 DB 조회를 먼저** 하고 있었다. 자격증명 없는 요청만으로 DB 쿼리를 무한히 유발할 수 있었고, 이 프로젝트는 이미 무료 플랜 컴퓨트 소진으로 DB 를 한 번 갈아엎었다(Neon → Supabase).
+
+`src/lib/agentAuth.ts` 에 `hasAnyBridgeCredential(req)` 사전 검사를 추가했다. 알려진 브릿지 키 중 **하나라도** 맞는지만 DB 없이 확인한다. `agentType` 별 정밀 검증은 레코드를 읽은 뒤 기존 `verifyBridgeApiKey(req, job.agentType)` 가 그대로 담당하므로, 마케터 키로 헤르메스 job 을 읽는 것은 여전히 막힌다.
+
+- `GET /api/agent/jobs/:id/context` — 조회 전 사전 검사 추가
+- `POST /api/agent/jobs/:id/delta` — 조회 전 사전 검사 추가
+- `GET /api/agent/status` — **완전 무인증이었던 것을 세션 또는 브릿지 키 필요로 변경.** 익명으로 DB 를 깨우는 데다 응답에 내부 호스트명(`DESKTOP-7H5PRQA` 등)과 브릿지 버전이 그대로 실려 나갔다. 실제 소비자는 로그인 상태의 `AgentStatusBadge` 와 브릿지뿐이라 영향 없음(브릿지는 POST 만 사용). `capabilities` 매니페스트의 `auth: false` 표기도 함께 정정.
+
+`src/__tests__/routeAuthOrder.test.ts` 가 `src/app/api` 전체를 훑어 핸들러에서 첫 `prisma` 접근보다 인증 검사가 먼저 나오는지 검사한다. 예외는 NextAuth 핸들러 하나뿐이고, 추가하려면 사유를 적어야 한다.
+
 ## 남은 일
 
 1. **마케터 브릿지가 이 노트북에서 3주+ 꺼져 있음** — 필요하면 `check_marketer.cmd` → `start_marketer.cmd`.
 2. **메신저 실시간 연동 end-to-end 테스트 미완료** — API 레벨로만 검증됨(약 19.9초, 목표 45초 이내). 실제 로그인한 브라우저로 확인 필요: 2초 내 "작성 중" 표시, 새로고침 없이 답변 자동 표시, 45초 이내 완료. 브릿지가 온라인이어야 신규 경로를 탑니다.
 3. **`MessengerView.tsx` lint 에러 2건** — 오탐이지만 폴링 구조를 `useVisiblePolling`으로 통일하면 같이 해소됨. 동작 중인 코드라 신중히.
-4. **`isQuietHours` 중복 정의** — `src/lib/useVisiblePolling.ts`와 `MessengerView.tsx` 두 곳. 3번과 함께 정리하면 됨.
+4. **Drive 동기화 뮤텍스가 프로세스 내부 한정** — `src/lib/driveIndex.ts:343` 의 `activeSync` 는 모듈 스코프 변수라 프로세스가 둘 이상이면 동시 실행을 못 막는다. 현재 Render 단일 인스턴스에서는 사실상 발생하지 않아 **의도적으로 미수정**으로 남겼다. 인스턴스를 늘리거나 배포 중 겹침이 문제가 되면 DB 기반 리스(예: 만료 시각이 있는 잠금 행)로 바꿀 것. 마이그레이션이 필요해서, 이미 미기록 마이그레이션이 하나 떠 있는 지금 시점에 얹지 않았다.
+
+5. **`isQuietHours` 중복 정의** — `src/lib/useVisiblePolling.ts`와 `MessengerView.tsx` 두 곳. 3번과 함께 정리하면 됨.
+
+6. **재무 열람 권한 정책이 저장소 내부에서 불일치** — `/api/finance-report` 는 non-admin 에게 403 인데, `/finance` 페이지는 예산·지출을 로그인한 전 직원에게 보여주고 `isAdmin` 은 쓰기 버튼만 가린다. 에이전트 컨텍스트 라우트는 페이지 쪽 동작을 따르고 있어 권한 상승은 아니지만, **어느 쪽이 의도인지 결정이 필요하다.** 기존 문제이고 이번에 손대지 않았다.
 
 ## 주요 파일 위치
 

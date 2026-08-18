@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { verifyBridgeApiKey } from "@/lib/agentAuth";
+import { hasAnyBridgeCredential, verifyBridgeApiKey } from "@/lib/agentAuth";
 import { getAgentUser } from "@/lib/agentApi";
 import {
   buildErpSourceUrl,
@@ -22,6 +22,11 @@ interface SourceItem {
 // never from model-controlled query parameters.
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+  // 자격증명 없는 요청이 DB 를 건드리지 못하게 조회 전에 먼저 거른다.
+  // agentType 별 권한은 job 을 읽은 뒤 아래에서 다시 확인한다.
+  if (!hasAnyBridgeCredential(req)) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   const job = await prisma.agentJob.findUnique({
     where: { id },
     select: {
