@@ -119,6 +119,20 @@ Next.js 16 + Prisma 7 + PostgreSQL(Supabase) 기반 사내 ERP. 근태/휴가/�
 
 `src/__tests__/routeAuthOrder.test.ts` 가 `src/app/api` 전체를 훑어 핸들러에서 첫 `prisma` 접근보다 인증 검사가 먼저 나오는지 검사한다. 예외는 NextAuth 핸들러 하나뿐이고, 추가하려면 사유를 적어야 한다.
 
+## 2026-08-18 작업 내용: 성능 점검 및 정리
+
+성능을 실측해본 결과 **코드 레벨에서 고칠 병목은 사실상 없었다.** 근거를 남겨두니 같은 조사를 반복하지 말 것.
+
+- **DB 규모가 작아 쿼리 최적화가 무의미하다.** conversations 5행, messages 339행, users 4명, expenses 43행. 메신저 안읽음 조회의 `participantA/participantB` OR 조건은 인덱스를 안 타고 Seq Scan 인데 실행 시간이 **0.072ms** 다. 인덱스를 추가해도 플래너가 안 쓴다. 규모가 수만 행대로 커지면 그때 `participantB` 단독 인덱스를 검토할 것.
+- **콜드스타트도 현재는 문제 아님.** 프로덕션 `/api/health` 실측 0.33~0.68s 로 웜 상태였다. Render 무료 플랜을 계속 쓴다면 유휴 시 스핀다운이 재발할 수 있는데, 그때는 `/api/health` 가 **DB 를 건드리지 않으므로** 업무시간대에만 외부에서 주기적으로 호출해 워밍하면 DB 를 깨우지 않고 콜드스타트만 막을 수 있다.
+- **페이지 쿼리는 이미 병렬화돼 있다.** `(app)` 하위 page.tsx 에 순차 `await prisma.*` 패턴 없음, 전부 `Promise.all`.
+
+고친 것:
+
+- **`/api/health` 가 인증 미들웨어에 걸려 307 리다이렉트되고 있었다.** 헬스체크 엔드포인트인데 세션이 없으면 `/login` 으로 튕겨서 외부 업타임 모니터나 keepalive 로 쓸 수 없었다. `src/proxy.ts` matcher 제외 목록에 `api/health` 추가.
+- **CSP 의 Neon 잔재 제거.** `next.config.ts` 의 `connect-src` 에 `https://*.neon.tech` 가 남아 있었다(Supabase 이전 후 미정리). 브라우저는 동일 출처로만 통신하므로 `'self'` 로 정리.
+- **`src/components/AutoRefresh.tsx` 삭제.** 참조 0건인 죽은 코드였다.
+
 ## 남은 일
 
 1. **마케터 브릿지가 이 노트북에서 3주+ 꺼져 있음** — 필요하면 `check_marketer.cmd` → `start_marketer.cmd`.

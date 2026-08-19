@@ -18,7 +18,8 @@ const securityHeaders = [
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: https://lh3.googleusercontent.com https://lh4.googleusercontent.com",
       "font-src 'self'",
-      "connect-src 'self' https://*.neon.tech",
+      // 브라우저는 동일 출처로만 통신한다(SSE 포함). DB 는 서버 사이드에서만 접근.
+      "connect-src 'self'",
       "frame-ancestors 'none'",
     ].join("; "),
   },

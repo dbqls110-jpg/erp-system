@@ -59,8 +59,6 @@ describe("클라이언트 폴러는 useVisiblePolling 을 거친다", () => {
     // 자체 visibleRef + isQuietHours 게이트를 이미 갖고 있음. 동작 중인 실시간
     // 파이프라인이라 리스크를 피해 그대로 뒀다. 훅으로 통일하면 여기서 지우면 됨.
     ["src/app/(app)/messenger/MessengerView.tsx", "자체 visibleRef 게이트 보유"],
-    // document.hidden + 입력중 여부를 이미 확인하고, 탭 복귀 시에도 갱신함
-    ["src/components/AutoRefresh.tsx", "자체 document.hidden 게이트 보유"],
   ]);
 
   function walk(dir: string, out: string[] = []): string[] {
