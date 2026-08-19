@@ -49,14 +49,6 @@ export default async function LeavePage() {
     }),
   ]);
 
-  // 관리자용: 직원별 전체 휴가 내역
-  const allUserRequests = isAdmin
-    ? await prisma.leaveRequest.findMany({
-        select: { id: true, userId: true, type: true, startDate: true, endDate: true, startTime: true, endTime: true, days: true, reason: true, status: true },
-        orderBy: { createdAt: "desc" },
-      })
-    : [];
-
   const r2 = (n: number) => Math.round(n * 100) / 100;
   const totalDays = balance?.totalDays ?? 15;
   const usedDays = r2(balance?.usedDays ?? 0);

@@ -9,7 +9,6 @@ import {
   Calendar,
   FolderKanban,
   CalendarDays,
-  CreditCard,
   Banknote,
   Settings,
   MessageCircle,

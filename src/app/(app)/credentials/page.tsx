@@ -1,13 +1,10 @@
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { KeyRound } from "lucide-react";
 import { CredentialTable } from "./CredentialTable";
 
+// 인증/권한은 (app)/layout.tsx 가 담당한다(세션 없으면 /login, pending 이면 /pending).
 export default async function CredentialsPage() {
-  await getServerSession(authOptions);
-
   const credentials = await prisma.credential.findMany({
     orderBy: [{ order: "asc" }, { createdAt: "asc" }],
   });

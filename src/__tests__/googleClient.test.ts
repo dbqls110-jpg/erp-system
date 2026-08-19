@@ -7,7 +7,7 @@
  * - clearDriveTokenCache: 캐시 초기화
  * - getDriveRefreshToken: env var 있으면 DB 조회 없이 반환
  */
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import {
   isInvalidGrantError,
   isTransientError,
