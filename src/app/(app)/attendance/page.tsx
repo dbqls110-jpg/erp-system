@@ -41,7 +41,8 @@ export default async function AttendancePage() {
     }),
     isAdmin
       ? prisma.attendance.findMany({
-          where: { date: today },
+          // AI 대화 파이프라인 제거로 에이전트 계정의 근태는 의미가 없어졌다
+          where: { date: today, user: { isAgent: false } },
           include: { user: { select: { name: true, email: true, isAgent: true } } },
           orderBy: { clockIn: "asc" },
         })

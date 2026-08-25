@@ -7,7 +7,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Send, MessageCircle, ArrowLeft, CalendarPlus } from "lucide-react";
-import { AgentStatusBadge } from "@/components/AgentStatusBadge";
 import { sendMessage } from "@/app/actions/message";
 import { createCalendarEvent } from "@/app/actions/calendar";
 import { toast } from "sonner";
@@ -103,12 +102,6 @@ export function MessengerView({ myId, users }: { myId: string; users: User[] }) 
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // 신규 실시간 에이전트 파이프라인: "작성 중" 표시 + SSE 구독 상태
-  const [agentPending, setAgentPending] = useState<{ jobId: string; status: "pending" | "waiting" | "error" } | null>(null);
-  const [lastFailedSend, setLastFailedSend] = useState<{ receiverId: string; text: string } | null>(null);
-  const sseRef = useRef<EventSource | null>(null);
-  const sseReconnectRef = useRef(0);
-
   // 우클릭 컨텍스트 메뉴
   const [contextMenu, setContextMenu] = useState<ContextMenu | null>(null);
   const contextMenuRef = useRef<HTMLDivElement>(null);
@@ -133,66 +126,6 @@ export function MessengerView({ myId, users }: { myId: string; users: User[] }) 
       if (res.ok) setMessages(await res.json());
     } catch {}
   }, []);
-
-  const closeAgentSSE = useCallback(() => {
-    sseRef.current?.close();
-    sseRef.current = null;
-  }, []);
-
-  // 재연결 시 자기 자신을 다시 호출해야 하는데, useCallback 상수를 정의 도중 참조하면
-  // "선언 전 접근" 오류가 나므로 항상 최신 함수를 가리키는 ref를 통해 간접 호출한다.
-  const connectAgentSSERef = useRef<
-    (jobId: string, convIdForRefresh: string, receiverId: string, text: string) => void
-  >(() => {});
-
-  // 신규 파이프라인 job을 SSE로 추적: status/completed/error/timeout 이벤트 기반(폴링 아님)
-  // receiverId/text는 재시도 버튼용으로 그대로 들고 다닌다(state 참조 대신 파라미터로 고정해 stale closure 방지)
-  const connectAgentSSE = useCallback((jobId: string, convIdForRefresh: string, receiverId: string, text: string) => {
-    sseRef.current?.close();
-    const es = new EventSource(`/api/agent/sse?jobId=${jobId}`);
-
-    es.addEventListener("status", () => {
-      setAgentPending((prev) => (prev && prev.jobId === jobId ? { ...prev, status: "pending" } : prev));
-    });
-
-    es.addEventListener("completed", () => {
-      es.close();
-      sseRef.current = null;
-      setAgentPending((prev) => (prev && prev.jobId === jobId ? null : prev));
-      fetchMessages(convIdForRefresh);
-      fetchConversations();
-    });
-
-    es.addEventListener("error", () => {
-      es.close();
-      sseRef.current = null;
-      setAgentPending((prev) => (prev && prev.jobId === jobId ? { jobId, status: "error" } : prev));
-      setLastFailedSend({ receiverId, text });
-    });
-
-    es.addEventListener("timeout", () => {
-      es.close();
-      sseRef.current = null;
-      if (sseReconnectRef.current < 3) {
-        sseReconnectRef.current += 1;
-        connectAgentSSERef.current(jobId, convIdForRefresh, receiverId, text);
-      } else {
-        // 브릿지가 오프라인이거나 응답이 오래 걸리는 경우 — 더 이상 자동 재연결하지 않고 대기 상태로 고정
-        setAgentPending((prev) => (prev && prev.jobId === jobId ? { jobId, status: "waiting" } : prev));
-      }
-    });
-
-    sseRef.current = es;
-  }, [fetchMessages, fetchConversations]);
-
-  useEffect(() => {
-    connectAgentSSERef.current = connectAgentSSE;
-  }, [connectAgentSSE]);
-
-  useEffect(() => {
-    // 대화 전환/언마운트 시 이전 job 추적 정리
-    return () => { closeAgentSSE(); };
-  }, [selectedConvId, closeAgentSSE]);
 
   // 탭 가시성 추적 (백그라운드 탭에서 폴링 중단)
   const visibleRef = useRef(true);
@@ -227,7 +160,7 @@ export function MessengerView({ myId, users }: { myId: string; users: User[] }) 
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, agentPending]);
+  }, [messages]);
 
   // 컨텍스트 메뉴 외부 클릭 시 닫기
   useEffect(() => {
@@ -282,9 +215,6 @@ export function MessengerView({ myId, users }: { myId: string; users: User[] }) 
     setSelectedConvId(existing?.conversationId ?? null);
     setMessages([]);
     setShowList(false);
-    closeAgentSSE();
-    setAgentPending(null);
-    setLastFailedSend(null);
     inputRef.current?.focus();
     if (existing) fetchMessages(existing.conversationId);
   }
@@ -295,20 +225,8 @@ export function MessengerView({ myId, users }: { myId: string; users: User[] }) 
     const text = input.trim();
     const receiverId = selectedUser.id;
     setInput("");
-    // "작성 중" 표시는 SSE 구독보다 먼저 켜지므로(2초 요건), 구독까지 실제로 도달했는지
-    // 따로 추적한다. 도달하지 못하면 타임아웃/재연결 로직이 아예 시작되지 않아
-    // 표시가 영구히 멈춘다.
-    let pendingJobId: string | null = null;
-    let subscribed = false;
     try {
-      const result = await sendMessage(receiverId, text);
-      if (result?.jobId) {
-        // Show the typing state before conversation/message refresh requests.
-        pendingJobId = result.jobId;
-        setLastFailedSend(null);
-        sseReconnectRef.current = 0;
-        setAgentPending({ jobId: result.jobId, status: "pending" });
-      }
+      await sendMessage(receiverId, text);
 
       const res = await fetch("/api/messenger/conversations");
       if (res.ok) {
@@ -318,36 +236,13 @@ export function MessengerView({ myId, users }: { myId: string; users: User[] }) 
         if (found) {
           setSelectedConvId(found.conversationId);
           await fetchMessages(found.conversationId);
-
-          if (result?.jobId) {
-            connectAgentSSE(result.jobId, found.conversationId, receiverId, text);
-            subscribed = true;
-          }
         }
       }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "전송 실패");
-      setLastFailedSend({ receiverId, text });
     } finally {
-      if (pendingJobId && !subscribed) {
-        // 메시지 전송과 job 생성은 성공했고 답변도 DB에 저장된다. 이 탭이 실시간으로
-        // 받지 못할 뿐이므로 waiting(새로고침 안내)으로 내린다.
-        // error 로 두면 재시도 버튼이 떠서 같은 질문이 중복 전송된다.
-        const jobId = pendingJobId;
-        setLastFailedSend(null);
-        setAgentPending(prev => (prev && prev.jobId === jobId ? { jobId, status: "waiting" } : prev));
-      }
       setSending(false);
     }
-  }
-
-  function handleRetryAgentSend() {
-    if (!lastFailedSend) return;
-    setAgentPending(null);
-    setInput(lastFailedSend.text);
-    setLastFailedSend(null);
-    // 사용자가 다시 전송 버튼을 눌러 명시적으로 재시도 (자동 재시도 아님)
-    inputRef.current?.focus();
   }
 
   const convUserIds = new Set(conversations.map(c => c.other.id));
@@ -440,9 +335,6 @@ export function MessengerView({ myId, users }: { myId: string; users: User[] }) 
                 </Avatar>
                 <div className="flex flex-col min-w-0">
                   <span className="text-sm font-semibold text-deep-space-charcoal">{selectedUser.name}</span>
-                  {selectedUser.isAgent && selectedUser.agentType && (
-                    <AgentStatusBadge agentType={selectedUser.agentType} />
-                  )}
                 </div>
                 <span className="text-xs text-smoke-gray ml-auto">메시지 우클릭 → 캘린더 등록</span>
               </div>
@@ -474,48 +366,6 @@ export function MessengerView({ myId, users }: { myId: string; users: User[] }) 
                     </div>
                   );
                 })}
-                {agentPending && (
-                  <div className="flex justify-start">
-                    <Avatar className="h-6 w-6 mr-2 shrink-0 mt-0.5">
-                      <AvatarImage src={selectedUser.image ?? undefined} />
-                      <AvatarFallback className="text-[9px] bg-hint-of-sky">{initials(selectedUser.name)}</AvatarFallback>
-                    </Avatar>
-                    <div className="max-w-[70%] space-y-0.5">
-                      <div
-                        className="px-3 py-2 rounded-2xl rounded-tl-sm text-sm leading-relaxed bg-hint-of-sky text-midnight-charcoal opacity-80"
-                        role="status"
-                        aria-live="polite"
-                      >
-                        {agentPending.status === "error"
-                          ? "답변 생성 중 오류가 발생했습니다."
-                          : agentPending.status === "waiting"
-                          ? "답변을 실시간으로 받지 못했습니다. 답변은 저장되니 잠시 후 새로고침해서 확인해주세요."
-                          : (
-                            <span className="inline-flex items-center gap-1.5">
-                              <span>{selectedUser.name ?? "에이전트"}가 답변 작성 중</span>
-                              <span className="inline-flex items-end gap-0.5" aria-hidden="true">
-                                {[0, 1, 2].map((dot) => (
-                                  <span
-                                    key={dot}
-                                    className="h-1 w-1 rounded-full bg-current motion-safe:animate-bounce"
-                                    style={{ animationDelay: `${dot * 140}ms`, animationDuration: "700ms" }}
-                                  />
-                                ))}
-                              </span>
-                            </span>
-                          )}
-                      </div>
-                      {agentPending.status === "error" && lastFailedSend && (
-                        <button
-                          onClick={handleRetryAgentSend}
-                          className="text-[11px] text-deep-violet underline px-1"
-                        >
-                          다시 시도
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                )}
                 <div ref={bottomRef} />
               </div>
 

@@ -56,3 +56,6 @@ next-env.d.ts
 # SQLite
 *.db
 *.db-journal
+
+# 보관본에 실제 시크릿이 딸려 들어가지 않도록
+archive/**/*.env

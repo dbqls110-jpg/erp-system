@@ -18,7 +18,7 @@ export function AppShell({ user, children }: AppShellProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
-    <div className="flex h-screen overflow-hidden bg-hint-of-sky">
+    <div className="flex h-screen overflow-hidden bg-background">
       {/* 데스크톱 사이드바 */}
       <div className="hidden lg:block shrink-0">
         <Sidebar role={user.role} />
@@ -39,7 +39,7 @@ export function AppShell({ user, children }: AppShellProps) {
 
       <div className="flex flex-col flex-1 overflow-hidden min-w-0">
         <Header user={user} onMobileMenuOpen={() => setMobileOpen(true)} />
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6">{children}</main>
+        <main className="@container/main flex-1 overflow-y-auto p-4 sm:p-6">{children}</main>
       </div>
     </div>
   );
