@@ -18,12 +18,25 @@ export interface ResultColumn {
   align?: "left" | "right";
 }
 
+/** 지도에 찍을 좌표. 좌표를 모르는 항목은 넣지 않는다. */
+export interface ResultPin {
+  id: string;
+  name: string;
+  lat: number;
+  lng: number;
+}
+
 export interface ResultTablePayload {
   title?: string;
   columns: ResultColumn[];
   rows: Record<string, string | number | null>[];
   /** 표 아래에 붙는 주의사항. 셀 안에 넣으면 표가 읽기 어려워진다. */
   notes?: string[];
+  /**
+   * 있으면 표 아래에 지도를 그린다. 없으면 지도를 아예 띄우지 않는다 —
+   * 위치가 무관한 질문(거래처 목록 등)에 빈 지도가 붙으면 방해만 된다.
+   */
+  pins?: ResultPin[];
 }
 
 export type Segment =

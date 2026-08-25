@@ -4,6 +4,7 @@ import { cn } from "@/lib/utils";
 import { AlertTriangle } from "lucide-react";
 
 import type { ResultColumn, ResultTablePayload } from "@/lib/messageSegments";
+import { VenueMap } from "@/components/map/VenueMap";
 
 function Cell({ value, column }: { value: unknown; column: ResultColumn }) {
   if (column.missing) {
@@ -16,7 +17,7 @@ function Cell({ value, column }: { value: unknown; column: ResultColumn }) {
 }
 
 export function ResultTable({ payload }: { payload: ResultTablePayload }) {
-  const { title, columns, rows, notes } = payload;
+  const { title, columns, rows, notes, pins } = payload;
 
   return (
     <div className="space-y-2">
@@ -64,6 +65,8 @@ export function ResultTable({ payload }: { payload: ResultTablePayload }) {
           </table>
         </div>
       )}
+
+      {pins && pins.length > 0 && <VenueMap pins={pins} />}
 
       {notes && notes.length > 0 && (
         <ul className="space-y-1">

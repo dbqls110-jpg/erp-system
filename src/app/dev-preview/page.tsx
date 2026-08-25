@@ -32,6 +32,12 @@ const SAMPLE = `11월 27일(토) 300명 조건으로 찾은 결과입니다.
     { "name": "강북청소년센터 강당", "district": "강북구", "capacity": 400, "price7h": null, "weekend": "가능", "meal": null, "phone": "02-6715-6600" },
     { "name": "양천구민회관", "district": "양천구", "capacity": 550, "price7h": "875,000원", "weekend": "미상", "meal": null, "phone": "02-2620-3114" }
   ],
+  "pins": [
+    { "id": "guro", "name": "구로구민회관 대공연장", "lat": 37.4954, "lng": 126.8874 },
+    { "id": "seongdong", "name": "성동문화회관 소극장", "lat": 37.5634, "lng": 127.0369 },
+    { "id": "gangbuk", "name": "강북청소년센터 강당", "lat": 37.6396, "lng": 127.0257 },
+    { "id": "yangcheon", "name": "양천구민회관", "lat": 37.5170, "lng": 126.8664 }
+  ],
   "notes": [
     "취식 가능 여부는 우리 DB 에 없는 항목입니다. 4곳 모두 전화 확인이 필요합니다.",
     "강북청소년센터 강당은 요금 정보가 비어 있어 문의가 필요합니다.",
