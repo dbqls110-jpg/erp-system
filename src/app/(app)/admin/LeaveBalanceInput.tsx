@@ -35,7 +35,7 @@ export function LeaveBalanceInput({ userId, year, totalDays, usedDays, pendingDa
   return (
     <div className="flex flex-col gap-1.5 text-xs">
       <div className="flex items-center gap-1">
-        <span className="text-smoke-gray">총</span>
+        <span className="text-muted-foreground">총</span>
         <Input
           type="number"
           value={days}
@@ -44,17 +44,17 @@ export function LeaveBalanceInput({ userId, year, totalDays, usedDays, pendingDa
           min="0"
           step="0.5"
         />
-        <span className="text-smoke-gray">일</span>
+        <span className="text-muted-foreground">일</span>
         <Button size="sm" variant="outline" className="h-7 px-2 text-xs" disabled={loading} onClick={handleSave}>
           저장
         </Button>
       </div>
       <div className="flex items-center gap-2 text-[11px]">
-        <span className="text-smoke-gray">사용 <span className="text-midnight-charcoal font-medium">{usedDays}일</span></span>
-        <span className="text-smoke-gray">·</span>
-        <span className="text-smoke-gray">대기 <span className="text-warm-fade font-medium">{pendingDays}일</span></span>
-        <span className="text-smoke-gray">·</span>
-        <span className="text-smoke-gray">잔여 <span className={`font-semibold ${remaining === 0 ? "text-destructive" : "text-deep-violet"}`}>{remaining}일</span></span>
+        <span className="text-muted-foreground">사용 <span className="text-foreground font-medium">{usedDays}일</span></span>
+        <span className="text-muted-foreground">·</span>
+        <span className="text-muted-foreground">대기 <span className="text-destructive font-medium">{pendingDays}일</span></span>
+        <span className="text-muted-foreground">·</span>
+        <span className="text-muted-foreground">잔여 <span className={`font-semibold ${remaining === 0 ? "text-destructive" : "text-primary"}`}>{remaining}일</span></span>
       </div>
     </div>
   );

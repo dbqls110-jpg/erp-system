@@ -51,27 +51,27 @@ export default async function EmployeeLeavePage({ params }: { params: Promise<{ 
     <div className="space-y-6">
       {/* 헤더 */}
       <div className="flex items-center gap-3">
-        <Link href="/leave" className="text-smoke-gray hover:text-midnight-charcoal transition-colors">
+        <Link href="/leave" className="text-muted-foreground hover:text-foreground transition-colors">
           <ChevronLeft size={20} />
         </Link>
         <div>
-          <h1 className="text-2xl font-bold text-deep-space-charcoal" style={{ fontFamily: "var(--font-plus-jakarta-sans)", letterSpacing: "-0.91px" }}>
+          <h1 className="text-2xl font-bold text-foreground" style={{ fontFamily: "var(--font-plus-jakarta-sans)", letterSpacing: "-0.91px" }}>
             {user.name ?? user.email} 휴가 현황
           </h1>
-          <p className="text-sm text-smoke-gray">{year}년 기준</p>
+          <p className="text-sm text-muted-foreground">{year}년 기준</p>
         </div>
       </div>
 
       {/* 요약 카드 4개 */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {[
-          { label: "총 부여", value: `${totalDays}일`, color: "text-deep-space-charcoal" },
-          { label: "사용 완료", value: `${usedDays}일`, color: "text-smoke-gray" },
-          { label: "승인 대기", value: `${pendingDays}일`, color: pendingDays > 0 ? "text-warm-fade" : "text-smoke-gray" },
-          { label: "사용 가능", value: `${remaining}일`, color: remaining <= 3 ? "text-destructive" : "text-deep-violet" },
+          { label: "총 부여", value: `${totalDays}일`, color: "text-foreground" },
+          { label: "사용 완료", value: `${usedDays}일`, color: "text-muted-foreground" },
+          { label: "승인 대기", value: `${pendingDays}일`, color: pendingDays > 0 ? "text-destructive" : "text-muted-foreground" },
+          { label: "사용 가능", value: `${remaining}일`, color: remaining <= 3 ? "text-destructive" : "text-primary" },
         ].map((item) => (
-          <Card key={item.label} className="border-ash-gray shadow-[var(--shadow-sm)]">
-            <CardHeader className="pb-1"><CardTitle className="text-xs font-medium text-smoke-gray">{item.label}</CardTitle></CardHeader>
+          <Card key={item.label} className="shadow-xs">
+            <CardHeader className="pb-1"><CardTitle className="text-xs font-medium text-muted-foreground">{item.label}</CardTitle></CardHeader>
             <CardContent><p className={`text-2xl font-bold ${item.color}`}>{item.value}</p></CardContent>
           </Card>
         ))}
@@ -81,38 +81,38 @@ export default async function EmployeeLeavePage({ params }: { params: Promise<{ 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* 왼쪽: 사용 현황 */}
         <div className="space-y-4">
-          <Card className="border-ash-gray shadow-[var(--shadow-sm)]">
+          <Card className="shadow-xs">
             <CardHeader>
-              <CardTitle className="text-sm font-semibold text-deep-space-charcoal" style={{ fontFamily: "var(--font-plus-jakarta-sans)" }}>
+              <CardTitle className="text-sm font-semibold text-foreground" style={{ fontFamily: "var(--font-plus-jakarta-sans)" }}>
                 사용률
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="flex justify-between text-sm mb-1">
-                <span className="text-smoke-gray">사용 {usedDays}일 / 총 {totalDays}일</span>
-                <span className="font-bold text-deep-violet">{usedPercent}%</span>
+                <span className="text-muted-foreground">사용 {usedDays}일 / 총 {totalDays}일</span>
+                <span className="font-bold text-primary">{usedPercent}%</span>
               </div>
-              <div className="w-full bg-ash-gray rounded-full h-2.5">
-                <div className="bg-deep-violet h-2.5 rounded-full transition-all" style={{ width: `${usedPercent}%` }} />
+              <div className="w-full bg-muted rounded-full h-2.5">
+                <div className="bg-primary h-2.5 rounded-full transition-all" style={{ width: `${usedPercent}%` }} />
               </div>
             </CardContent>
           </Card>
 
-          <Card className="border-ash-gray shadow-[var(--shadow-sm)]">
+          <Card className="shadow-xs">
             <CardHeader>
-              <CardTitle className="text-sm font-semibold text-deep-space-charcoal" style={{ fontFamily: "var(--font-plus-jakarta-sans)" }}>
+              <CardTitle className="text-sm font-semibold text-foreground" style={{ fontFamily: "var(--font-plus-jakarta-sans)" }}>
                 유형별 사용
               </CardTitle>
             </CardHeader>
             <CardContent>
               {Object.keys(byType).length === 0 ? (
-                <p className="text-sm text-smoke-gray">사용 내역 없음</p>
+                <p className="text-sm text-muted-foreground">사용 내역 없음</p>
               ) : (
                 <div className="space-y-2">
                   {Object.entries(byType).map(([type, days]) => (
                     <div key={type} className="flex justify-between text-sm">
-                      <span className="text-midnight-charcoal">{typeLabel[type] ?? type}</span>
-                      <span className="font-medium text-smoke-gray">{days}일</span>
+                      <span className="text-foreground">{typeLabel[type] ?? type}</span>
+                      <span className="font-medium text-muted-foreground">{days}일</span>
                     </div>
                   ))}
                 </div>
@@ -123,33 +123,33 @@ export default async function EmployeeLeavePage({ params }: { params: Promise<{ 
 
         {/* 오른쪽: 전체 신청 내역 */}
         <div className="lg:col-span-2">
-          <Card className="border-ash-gray shadow-[var(--shadow-sm)]">
+          <Card className="shadow-xs">
             <CardHeader>
-              <CardTitle className="text-base font-semibold text-deep-space-charcoal" style={{ fontFamily: "var(--font-plus-jakarta-sans)" }}>
+              <CardTitle className="text-base font-semibold text-foreground" style={{ fontFamily: "var(--font-plus-jakarta-sans)" }}>
                 전체 신청 내역 ({requests.length}건)
               </CardTitle>
             </CardHeader>
             <CardContent>
               {requests.length === 0 ? (
-                <p className="text-sm text-smoke-gray">신청 내역이 없습니다.</p>
+                <p className="text-sm text-muted-foreground">신청 내역이 없습니다.</p>
               ) : (
                 <div className="space-y-1">
                   {requests.map((r) => {
                     const s = statusLabel[r.status] ?? statusLabel.pending;
                     return (
-                      <div key={r.id} className="flex items-center justify-between py-2 border-b border-ash-gray last:border-0 text-sm">
+                      <div key={r.id} className="flex items-center justify-between py-2 border-b border-border last:border-0 text-sm">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-medium text-midnight-charcoal">{typeLabel[r.type]}</span>
-                          <span className="text-smoke-gray">
+                          <span className="font-medium text-foreground">{typeLabel[r.type]}</span>
+                          <span className="text-muted-foreground">
                             {r.startDate === r.endDate ? r.startDate : `${r.startDate} ~ ${r.endDate}`}
                             {r.type === "hourly" && r.startTime && r.endTime && (
-                              <span className="ml-1 text-electric-blue">({r.startTime}~{r.endTime})</span>
+                              <span className="ml-1 text-primary">({r.startTime}~{r.endTime})</span>
                             )}
                           </span>
-                          {r.reason && <span className="text-smoke-gray text-xs hidden sm:inline">· {r.reason}</span>}
+                          {r.reason && <span className="text-muted-foreground text-xs hidden sm:inline">· {r.reason}</span>}
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
-                          <span className="text-smoke-gray">{r.days}일</span>
+                          <span className="text-muted-foreground">{r.days}일</span>
                           <Badge variant="outline" className={s.class}>{s.label}</Badge>
                         </div>
                       </div>

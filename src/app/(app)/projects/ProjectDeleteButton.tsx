@@ -28,7 +28,7 @@ export function ProjectDeleteButton({ id, name }: { id: string; name: string }) 
       <Button
         variant="ghost"
         size="icon"
-        className="h-7 w-7 text-smoke-gray hover:text-red-500 hover:bg-red-50 shrink-0"
+        className="h-7 w-7 text-muted-foreground hover:text-red-500 hover:bg-red-50 shrink-0"
         onClick={(e) => { e.preventDefault(); e.stopPropagation(); setOpen(true); }}
       >
         <Trash2 size={13} />
@@ -37,12 +37,12 @@ export function ProjectDeleteButton({ id, name }: { id: string; name: string }) 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
-            <DialogTitle className="text-deep-space-charcoal" style={{ fontFamily: "var(--font-plus-jakarta-sans)" }}>
+            <DialogTitle className="text-foreground" style={{ fontFamily: "var(--font-plus-jakarta-sans)" }}>
               프로젝트 삭제
             </DialogTitle>
           </DialogHeader>
-          <p className="text-sm text-smoke-gray">
-            <span className="font-semibold text-midnight-charcoal">&ldquo;{name}&rdquo;</span> 프로젝트를 삭제하시겠습니까?<br />
+          <p className="text-sm text-muted-foreground">
+            <span className="font-semibold text-foreground">&ldquo;{name}&rdquo;</span> 프로젝트를 삭제하시겠습니까?<br />
             관련 체크리스트도 함께 삭제되며 복구할 수 없습니다.
           </p>
           <div className="flex justify-end gap-2 mt-2">

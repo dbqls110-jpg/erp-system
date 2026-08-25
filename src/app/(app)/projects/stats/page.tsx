@@ -77,28 +77,28 @@ export default async function ProjectStatsPage() {
   return (
     <div className="space-y-6 max-w-4xl">
       <div className="flex items-center gap-3">
-        <Link href="/projects" className="text-smoke-gray hover:text-midnight-charcoal transition-colors">
+        <Link href="/projects" className="text-muted-foreground hover:text-foreground transition-colors">
           <ChevronLeft size={20} />
         </Link>
-        <h1 className="text-2xl font-bold text-deep-space-charcoal" style={{ fontFamily: "var(--font-plus-jakarta-sans)", letterSpacing: "-0.91px" }}>
+        <h1 className="text-2xl font-bold text-foreground" style={{ fontFamily: "var(--font-plus-jakarta-sans)", letterSpacing: "-0.91px" }}>
           매출/매입 통계 ({year}년)
         </h1>
       </div>
 
       {/* 연간 요약 */}
       <div className="grid grid-cols-3 gap-4">
-        <Card className="border-ash-gray shadow-[var(--shadow-sm)]">
-          <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-smoke-gray">연 매출</CardTitle></CardHeader>
+        <Card className="shadow-xs">
+          <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">연 매출</CardTitle></CardHeader>
           <CardContent><p className="text-xl font-bold text-green-600">{totalRevenue.toLocaleString()}원</p></CardContent>
         </Card>
-        <Card className="border-ash-gray shadow-[var(--shadow-sm)]">
-          <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-smoke-gray">연 매입</CardTitle></CardHeader>
-          <CardContent><p className="text-xl font-bold text-warm-fade">{totalCost.toLocaleString()}원</p></CardContent>
+        <Card className="shadow-xs">
+          <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">연 매입</CardTitle></CardHeader>
+          <CardContent><p className="text-xl font-bold text-destructive">{totalCost.toLocaleString()}원</p></CardContent>
         </Card>
-        <Card className="border-ash-gray shadow-[var(--shadow-sm)]">
-          <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-smoke-gray">연 순이익</CardTitle></CardHeader>
+        <Card className="shadow-xs">
+          <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">연 순이익</CardTitle></CardHeader>
           <CardContent>
-            <p className={`text-xl font-bold ${totalProfit >= 0 ? "text-deep-violet" : "text-destructive"}`}>
+            <p className={`text-xl font-bold ${totalProfit >= 0 ? "text-primary" : "text-destructive"}`}>
               {totalProfit.toLocaleString()}원
             </p>
           </CardContent>

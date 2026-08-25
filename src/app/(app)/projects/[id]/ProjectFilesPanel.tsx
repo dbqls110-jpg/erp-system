@@ -76,21 +76,21 @@ export function ProjectFilesPanel({ projectId, files, hasDriveAccess }: Props) {
       />
 
       {files.length === 0 ? (
-        <p className="text-sm text-smoke-gray py-2">첨부된 파일이 없습니다.</p>
+        <p className="text-sm text-muted-foreground py-2">첨부된 파일이 없습니다.</p>
       ) : (
         <ul className="space-y-2">
           {files.map((file) => (
-            <li key={file.id} className="flex items-center gap-3 p-2.5 rounded-lg border border-ash-gray bg-canvas-white hover:bg-hint-of-sky/40 transition-colors">
-              <FileText size={16} className="text-smoke-gray shrink-0" />
+            <li key={file.id} className="flex items-center gap-3 p-2.5 rounded-lg border border-border bg-background hover:bg-muted/40 transition-colors">
+              <FileText size={16} className="text-muted-foreground shrink-0" />
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-midnight-charcoal truncate">{file.name}</p>
-                <p className="text-xs text-smoke-gray">{formatBytes(file.size)}</p>
+                <p className="text-sm font-medium text-foreground truncate">{file.name}</p>
+                <p className="text-xs text-muted-foreground">{formatBytes(file.size)}</p>
               </div>
               <a
                 href={file.driveUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-smoke-gray hover:text-deep-violet transition-colors shrink-0"
+                className="text-muted-foreground hover:text-primary transition-colors shrink-0"
                 title="Google Drive에서 열기"
               >
                 <ExternalLink size={15} />
@@ -98,7 +98,7 @@ export function ProjectFilesPanel({ projectId, files, hasDriveAccess }: Props) {
               <button
                 onClick={() => handleDelete(file)}
                 disabled={isPending && deletingId === file.id}
-                className="text-smoke-gray hover:text-destructive transition-colors shrink-0 disabled:opacity-50"
+                className="text-muted-foreground hover:text-destructive transition-colors shrink-0 disabled:opacity-50"
                 title="삭제"
               >
                 {isPending && deletingId === file.id ? (

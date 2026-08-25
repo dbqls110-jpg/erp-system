@@ -15,7 +15,7 @@ function toHref({ year, month }: { year: number; month: number }) {
   return `/finance?year=${year}&month=${month}`;
 }
 
-const navBtn = "h-8 w-8 flex items-center justify-center rounded-lg text-smoke-gray hover:text-midnight-charcoal hover:bg-hint-of-sky transition-colors";
+const navBtn = "h-8 w-8 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors";
 
 export function FinanceMonthNav({ year, month }: { year: number; month: number }) {
   const prev = prevMonth(year, month);
@@ -24,9 +24,9 @@ export function FinanceMonthNav({ year, month }: { year: number; month: number }
   const isCurrent = year === now.getFullYear() && month === now.getMonth() + 1;
 
   return (
-    <div className="flex items-center gap-1 border border-ash-gray rounded-lg px-1">
+    <div className="flex items-center gap-1 border border-border rounded-lg px-1">
       <Link href={toHref(prev)} className={navBtn}><ChevronLeft size={15} /></Link>
-      <span className="text-sm font-medium text-midnight-charcoal min-w-[76px] text-center py-1">
+      <span className="text-sm font-medium text-foreground min-w-[76px] text-center py-1">
         {year}년 {month}월
       </span>
       {isCurrent ? (

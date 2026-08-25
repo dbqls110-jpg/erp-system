@@ -21,7 +21,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { MENU_KEYS } from "@/lib/permissions"
+import { MENU_KEYS } from "@/lib/menu-keys"
 
 type AccessLevel = {
   id: string

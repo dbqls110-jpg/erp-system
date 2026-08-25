@@ -59,14 +59,14 @@ export function AttendanceAdminRow({ id, date, clockInIso, clockOutIso }: Props)
   if (editing) {
     return (
       <div className="flex items-center gap-2 text-xs">
-        <span className="text-smoke-gray">출근</span>
+        <span className="text-muted-foreground">출근</span>
         <Input type="time" value={ci} onChange={(e) => setCi(e.target.value)} className="h-6 text-xs w-28 px-1" />
-        <span className="text-smoke-gray">퇴근</span>
+        <span className="text-muted-foreground">퇴근</span>
         <Input type="time" value={co} onChange={(e) => setCo(e.target.value)} className="h-6 text-xs w-28 px-1" />
-        <button onClick={handleSave} disabled={savePending} className="text-deep-violet hover:opacity-70" title="저장">
+        <button onClick={handleSave} disabled={savePending} className="text-primary hover:opacity-70" title="저장">
           <Check size={14} />
         </button>
-        <button onClick={handleCancel} className="text-smoke-gray hover:text-destructive" title="취소">
+        <button onClick={handleCancel} className="text-muted-foreground hover:text-destructive" title="취소">
           <X size={14} />
         </button>
       </div>
@@ -75,10 +75,10 @@ export function AttendanceAdminRow({ id, date, clockInIso, clockOutIso }: Props)
 
   return (
     <div className="flex items-center gap-2">
-      <button onClick={() => setEditing(true)} className="text-smoke-gray hover:text-deep-violet transition-colors" title="수정">
+      <button onClick={() => setEditing(true)} className="text-muted-foreground hover:text-primary transition-colors" title="수정">
         <Pencil size={13} />
       </button>
-      <button onClick={handleDelete} disabled={delPending} className="text-smoke-gray hover:text-destructive transition-colors" title="삭제">
+      <button onClick={handleDelete} disabled={delPending} className="text-muted-foreground hover:text-destructive transition-colors" title="삭제">
         <Trash2 size={13} />
       </button>
     </div>

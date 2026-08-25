@@ -16,15 +16,15 @@ export function LoginForm() {
 
   return (
     <Card
-      className="shadow-[var(--shadow-subtle)] border-ash-gray"
+      className="shadow-[var(--shadow-subtle)] border-border"
       style={{ borderRadius: "12px" }}
     >
       <CardHeader className="text-center pb-4">
-        <div className="mx-auto mb-4 w-12 h-12 rounded-xl bg-deep-violet/10 flex items-center justify-center">
+        <div className="mx-auto mb-4 w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
           <span className="text-xl">🏢</span>
         </div>
         <CardTitle
-          className="text-2xl font-bold text-deep-space-charcoal"
+          className="text-2xl font-bold text-foreground"
           style={{
             fontFamily: "var(--font-plus-jakarta-sans)",
             letterSpacing: "-0.91px",
@@ -32,7 +32,7 @@ export function LoginForm() {
         >
           사내 ERP 시스템
         </CardTitle>
-        <CardDescription className="text-smoke-gray text-sm">
+        <CardDescription className="text-muted-foreground text-sm">
           구글 계정으로 로그인하세요
         </CardDescription>
       </CardHeader>
@@ -41,7 +41,7 @@ export function LoginForm() {
         <Button
           onClick={handleGoogleLogin}
           disabled={loading}
-          className="w-full h-11 gap-3 bg-dark-onyx text-white hover:bg-midnight-charcoal font-medium"
+          className="w-full h-11 gap-3 bg-dark-onyx text-white hover:bg-muted font-medium"
           style={{ borderRadius: "9px" }}
         >
           {loading ? (
@@ -69,7 +69,7 @@ export function LoginForm() {
           {loading ? "로그인 중..." : "Google로 로그인"}
         </Button>
 
-        <p className="text-xs text-center text-smoke-gray leading-relaxed">
+        <p className="text-xs text-center text-muted-foreground leading-relaxed">
           회사 구글 계정으로만 로그인 가능합니다.
           <br />
           최초 로그인 시 관리자 승인이 필요합니다.

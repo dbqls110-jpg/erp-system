@@ -22,9 +22,9 @@ export function RevenueCharts({ monthlyData, quarterlyData, yearlyData }: Props)
   return (
     <div className="space-y-6">
       {/* 월별 */}
-      <Card className="border-ash-gray shadow-[var(--shadow-sm)]">
+      <Card className="shadow-xs">
         <CardHeader>
-          <CardTitle className="text-sm font-medium text-smoke-gray">월별 매출/매입</CardTitle>
+          <CardTitle className="text-sm font-medium text-muted-foreground">월별 매출/매입</CardTitle>
         </CardHeader>
         <CardContent>
           <ResponsiveContainer width="100%" height={240}>
@@ -44,20 +44,20 @@ export function RevenueCharts({ monthlyData, quarterlyData, yearlyData }: Props)
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* 분기별 */}
-        <Card className="border-ash-gray shadow-[var(--shadow-sm)]">
+        <Card className="shadow-xs">
           <CardHeader>
-            <CardTitle className="text-sm font-medium text-smoke-gray">분기별 매출/매입</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">분기별 매출/매입</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
               {quarterlyData.map((q) => (
                 <div key={q.label} className="text-sm">
                   <div className="flex justify-between items-center mb-0.5">
-                    <span className="font-medium text-midnight-charcoal w-12">{q.label}</span>
+                    <span className="font-medium text-foreground w-12">{q.label}</span>
                     <div className="flex gap-4 text-xs">
                       <span className="text-green-600">매출 {q.revenue.toLocaleString()}원</span>
-                      <span className="text-warm-fade">매입 {q.cost.toLocaleString()}원</span>
-                      <span className={q.profit >= 0 ? "text-deep-violet" : "text-destructive"}>
+                      <span className="text-destructive">매입 {q.cost.toLocaleString()}원</span>
+                      <span className={q.profit >= 0 ? "text-primary" : "text-destructive"}>
                         순이익 {q.profit.toLocaleString()}원
                       </span>
                     </div>
@@ -69,23 +69,23 @@ export function RevenueCharts({ monthlyData, quarterlyData, yearlyData }: Props)
         </Card>
 
         {/* 연별 */}
-        <Card className="border-ash-gray shadow-[var(--shadow-sm)]">
+        <Card className="shadow-xs">
           <CardHeader>
-            <CardTitle className="text-sm font-medium text-smoke-gray">연간 매출/매입</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">연간 매출/매입</CardTitle>
           </CardHeader>
           <CardContent>
             {yearlyData.length === 0 ? (
-              <p className="text-sm text-smoke-gray">데이터가 없습니다.</p>
+              <p className="text-sm text-muted-foreground">데이터가 없습니다.</p>
             ) : (
               <div className="space-y-2">
                 {yearlyData.map((y) => (
                   <div key={y.label} className="text-sm">
                     <div className="flex justify-between items-center">
-                      <span className="font-medium text-midnight-charcoal w-14">{y.label}</span>
+                      <span className="font-medium text-foreground w-14">{y.label}</span>
                       <div className="flex gap-4 text-xs">
                         <span className="text-green-600">매출 {y.revenue.toLocaleString()}원</span>
-                        <span className="text-warm-fade">매입 {y.cost.toLocaleString()}원</span>
-                        <span className={y.profit >= 0 ? "text-deep-violet" : "text-destructive"}>
+                        <span className="text-destructive">매입 {y.cost.toLocaleString()}원</span>
+                        <span className={y.profit >= 0 ? "text-primary" : "text-destructive"}>
                           순이익 {y.profit.toLocaleString()}원
                         </span>
                       </div>

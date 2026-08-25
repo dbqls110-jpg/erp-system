@@ -6,8 +6,8 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 
 const roleConfig: Record<string, { label: string; class: string }> = {
-  admin: { label: "관리자", class: "bg-deep-violet/10 text-deep-violet border-deep-violet/20" },
-  user: { label: "직원", class: "bg-electric-blue/10 text-electric-blue border-electric-blue/20" },
+  admin: { label: "관리자", class: "bg-primary/10 text-primary border-primary/20" },
+  user: { label: "직원", class: "bg-primary/10 text-primary border-primary/20" },
   pending: { label: "승인 대기", class: "bg-yellow-50 text-yellow-700 border-yellow-200" },
 };
 

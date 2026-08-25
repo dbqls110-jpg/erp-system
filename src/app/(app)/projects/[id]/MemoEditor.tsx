@@ -53,8 +53,8 @@ export function MemoEditor({ projectId, memo }: { projectId: string; memo: strin
         </>
       ) : (
         <div className="flex items-start justify-between gap-2">
-          <p className="text-sm text-midnight-charcoal whitespace-pre-wrap flex-1">
-            {value || <span className="text-smoke-gray">메모 없음</span>}
+          <p className="text-sm text-foreground whitespace-pre-wrap flex-1">
+            {value || <span className="text-muted-foreground">메모 없음</span>}
           </p>
           <Button size="sm" variant="ghost" onClick={() => setEditing(true)} className="gap-1 shrink-0 h-7 px-2">
             <Pencil size={13} /> 편집

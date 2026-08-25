@@ -17,9 +17,9 @@ export function FinanceCharts({ categoryData, dailyData, budget, totalExpense }:
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
       {/* 도넛 차트 */}
       {categoryData.length > 0 && (
-        <Card className="border-ash-gray shadow-[var(--shadow-sm)]">
+        <Card className="shadow-xs">
           <CardHeader>
-            <CardTitle className="text-sm font-medium text-smoke-gray">카테고리별 지출</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">카테고리별 지출</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex items-center gap-4">
@@ -37,19 +37,19 @@ export function FinanceCharts({ categoryData, dailyData, budget, totalExpense }:
                 {categoryData.map((item) => (
                   <div key={item.name} className="flex items-center gap-2 text-xs">
                     <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: item.color }} />
-                    <span className="text-midnight-charcoal">{item.name}</span>
-                    <span className="text-smoke-gray">{item.value.toLocaleString()}원</span>
+                    <span className="text-foreground">{item.name}</span>
+                    <span className="text-muted-foreground">{item.value.toLocaleString()}원</span>
                   </div>
                 ))}
               </div>
             </div>
             {budget && (
               <div className="mt-3">
-                <div className="flex justify-between text-xs text-smoke-gray mb-1">
+                <div className="flex justify-between text-xs text-muted-foreground mb-1">
                   <span>예산 사용률</span><span>{usagePercent}%</span>
                 </div>
-                <div className="h-2 rounded-full bg-ash-gray overflow-hidden">
-                  <div className="h-full rounded-full bg-deep-violet transition-all" style={{ width: `${usagePercent}%` }} />
+                <div className="h-2 rounded-full bg-muted overflow-hidden">
+                  <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${usagePercent}%` }} />
                 </div>
               </div>
             )}
@@ -59,9 +59,9 @@ export function FinanceCharts({ categoryData, dailyData, budget, totalExpense }:
 
       {/* 라인 차트 */}
       {dailyData.length > 0 && (
-        <Card className="border-ash-gray shadow-[var(--shadow-sm)]">
+        <Card className="shadow-xs">
           <CardHeader>
-            <CardTitle className="text-sm font-medium text-smoke-gray">일별 지출 추이</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">일별 지출 추이</CardTitle>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={160}>

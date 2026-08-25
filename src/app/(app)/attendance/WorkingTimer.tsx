@@ -19,5 +19,5 @@ export function WorkingTimer({ clockInIso }: { clockInIso: string }) {
   }, [clockInIso]);
 
   if (!text) return null;
-  return <span className="text-xs text-electric-blue font-medium">{text}</span>;
+  return <span className="text-xs text-primary font-medium">{text}</span>;
 }
