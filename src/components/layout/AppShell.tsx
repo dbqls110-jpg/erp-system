@@ -12,16 +12,18 @@ interface AppShellProps {
     role: string;
   };
   children: React.ReactNode;
+  /** 서버에서 계산한 접근 가능 메뉴 key 목록 */
+  allowedMenus?: string[];
 }
 
-export function AppShell({ user, children }: AppShellProps) {
+export function AppShell({ user, children, allowedMenus }: AppShellProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
       {/* 데스크톱 사이드바 */}
       <div className="hidden lg:block shrink-0">
-        <Sidebar role={user.role} />
+        <Sidebar role={user.role} allowedMenus={allowedMenus} />
       </div>
 
       {/* 모바일 사이드바 오버레이 */}
@@ -32,7 +34,7 @@ export function AppShell({ user, children }: AppShellProps) {
             onClick={() => setMobileOpen(false)}
           />
           <div className="fixed inset-y-0 left-0 z-50 lg:hidden">
-            <Sidebar role={user.role} onClose={() => setMobileOpen(false)} />
+            <Sidebar role={user.role} allowedMenus={allowedMenus} onClose={() => setMobileOpen(false)} />
           </div>
         </>
       )}

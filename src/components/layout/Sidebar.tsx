@@ -25,6 +25,8 @@ interface NavItem {
   href: string;
   icon: React.ElementType;
   adminOnly?: boolean;
+  /** permissions.ts 의 MENU_KEYS 와 대응. 레벨별 접근 제어에 쓰인다. */
+  menuKey: string;
 }
 
 interface NavGroup {
@@ -35,50 +37,60 @@ interface NavGroup {
 
 const navGroups: NavGroup[] = [
   {
-    items: [{ label: "대시보드", href: "/dashboard", icon: LayoutDashboard }],
+    items: [{ label: "대시보드", href: "/dashboard", icon: LayoutDashboard, menuKey: "dashboard" }],
   },
   {
     label: "인사",
     items: [
-      { label: "근태 관리", href: "/attendance", icon: Clock },
-      { label: "휴가 관리", href: "/leave", icon: Calendar },
+      { label: "근태 관리", href: "/attendance", icon: Clock, menuKey: "attendance" },
+      { label: "휴가 관리", href: "/leave", icon: Calendar, menuKey: "leave" },
     ],
   },
   {
     label: "업무",
     items: [
-      { label: "프로젝트", href: "/projects", icon: FolderKanban },
-      { label: "캘린더", href: "/calendar", icon: CalendarDays },
-      { label: "메신저", href: "/messenger", icon: MessageCircle },
+      { label: "프로젝트", href: "/projects", icon: FolderKanban, menuKey: "projects" },
+      { label: "캘린더", href: "/calendar", icon: CalendarDays, menuKey: "calendar" },
+      { label: "메신저", href: "/messenger", icon: MessageCircle, menuKey: "messenger" },
     ],
   },
   {
     label: "회사",
     items: [
-      { label: "거래처", href: "/customers", icon: Building2 },
-      { label: "파트너", href: "/partners", icon: Handshake },
-      { label: "공간 DB", href: "/venues", icon: MapPin },
-      { label: "재무 관리", href: "/finance", icon: Banknote },
-      { label: "구글 시트", href: "/sheets", icon: Sheet },
-      { label: "ID 관리", href: "/credentials", icon: KeyRound },
+      { label: "거래처", href: "/customers", icon: Building2, menuKey: "customers" },
+      { label: "파트너", href: "/partners", icon: Handshake, menuKey: "partners" },
+      { label: "공간 DB", href: "/venues", icon: MapPin, menuKey: "venues" },
+      { label: "재무 관리", href: "/finance", icon: Banknote, menuKey: "finance" },
+      { label: "구글 시트", href: "/sheets", icon: Sheet, menuKey: "sheets" },
+      { label: "ID 관리", href: "/credentials", icon: KeyRound, menuKey: "credentials" },
     ],
   },
 ];
 
 /** 하단 밀착 그룹 (정본: mt-auto) */
 const navSecondary: NavItem[] = [
-  { label: "관리자", href: "/admin", icon: Settings, adminOnly: true },
+  { label: "관리자", href: "/admin", icon: Settings, adminOnly: true, menuKey: "admin" },
 ];
 
 interface SidebarProps {
   role?: string;
   onClose?: () => void;
+  /**
+   * 서버에서 계산한 접근 가능 메뉴 key 목록.
+   * undefined 면 제한하지 않는다(권한 설정 전 하위 호환 — 화면이 잠기면 안 된다).
+   */
+  allowedMenus?: string[];
 }
 
-export function Sidebar({ role, onClose }: SidebarProps) {
+export function Sidebar({ role, onClose, allowedMenus }: SidebarProps) {
   const pathname = usePathname();
 
-  const visible = (item: NavItem) => !(item.adminOnly && role !== "admin");
+  const allowed = allowedMenus ? new Set(allowedMenus) : null;
+  const visible = (item: NavItem) => {
+    if (item.adminOnly && role !== "admin") return false;
+    // allowedMenus 가 없으면 제한하지 않는다(설정 전 잠금 방지).
+    return allowed ? allowed.has(item.menuKey) : true;
+  };
   const isActive = (href: string) =>
     pathname === href || pathname.startsWith(href + "/");
 
