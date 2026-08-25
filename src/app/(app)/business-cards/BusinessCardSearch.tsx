@@ -36,70 +36,72 @@ export function BusinessCardSearch({ cards, isAdmin }: { cards: BusinessCard[]; 
   return (
     <div className="space-y-4">
       <div className="relative">
-        <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-smoke-gray" />
+        <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
         <Input
           placeholder="이름, 회사, 연락처, 이메일로 검색"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          className="pl-9 border-ash-gray text-sm"
+          className="pl-9 border-border text-sm"
         />
       </div>
 
       {filtered.length === 0 ? (
-        <Card className="border-ash-gray">
-          <CardContent className="py-16 flex flex-col items-center gap-3 text-center">
-            <CreditCard size={40} className="text-ash-gray" />
-            <p className="text-sm font-medium text-midnight-charcoal">
-              {query ? `"${query}"에 해당하는 명함이 없습니다` : "등록된 명함이 없습니다"}
-            </p>
-            <p className="text-xs text-smoke-gray">
-              {query ? "다른 검색어를 입력해 보세요" : "명함 등록 버튼으로 추가하세요"}
-            </p>
+        <Card className="shadow-xs">
+          <CardContent className="p-0">
+            <div className="flex flex-col items-center gap-3 py-12 text-center">
+              <CreditCard size={24} className="size-6 text-muted-foreground" />
+              <p className="text-sm font-medium text-foreground">
+                {query ? `"${query}"에 해당하는 명함이 없습니다` : "등록된 명함이 없습니다"}
+              </p>
+              <p className="text-sm text-muted-foreground">
+                {query ? "다른 검색어를 입력해 보세요" : "명함 등록 버튼으로 추가하세요"}
+              </p>
+            </div>
           </CardContent>
         </Card>
       ) : (
         <>
           {query && (
-            <p className="text-xs text-smoke-gray">{filtered.length}건 검색됨</p>
+            <p className="text-xs text-muted-foreground">{filtered.length}건 검색됨</p>
           )}
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
             {filtered.map((c) => (
-              <Card key={c.id} className="border-ash-gray shadow-[var(--shadow-sm)]">
+              <Card key={c.id} className="shadow-xs">
                 <CardContent className="pt-4">
                   <div className="flex items-start justify-between">
                     <div className="space-y-1 flex-1 min-w-0">
-                      <p className="font-semibold text-deep-space-charcoal" style={{ fontFamily: "var(--font-plus-jakarta-sans)" }}>
+                      <p className="font-semibold text-foreground" style={{ fontFamily: "var(--font-plus-jakarta-sans)" }}>
                         {c.name}
                       </p>
                       {c.jobTitle && (
-                        <p className="text-sm text-smoke-gray flex items-center gap-1">
+                        <p className="text-sm text-muted-foreground flex items-center gap-1">
                           <Briefcase size={12} /> {c.jobTitle}
                         </p>
                       )}
                       {c.company && (
-                        <p className="text-sm text-midnight-charcoal flex items-center gap-1">
+                        <p className="text-sm text-foreground flex items-center gap-1">
                           <Building size={12} /> {c.company}
                         </p>
                       )}
                       {c.phone && (
-                        <p className="text-sm text-smoke-gray flex items-center gap-1">
+                        <p className="text-sm text-muted-foreground flex items-center gap-1">
                           <Phone size={12} /> {c.phone}
                         </p>
                       )}
                       {c.email && (
-                        <p className="text-sm text-smoke-gray flex items-center gap-1 truncate">
+                        <p className="text-sm text-muted-foreground flex items-center gap-1 truncate">
                           <Mail size={12} /> {c.email}
                         </p>
                       )}
                       {c.address && (
-                        <p className="text-xs text-smoke-gray flex items-center gap-1">
+                        <p className="text-xs text-muted-foreground flex items-center gap-1">
                           <MapPin size={11} /> {c.address}
                         </p>
                       )}
                     </div>
                     {isAdmin && <CardDeleteButton id={c.id} name={c.name} />}
                   </div>
-                  <p className="text-xs text-smoke-gray mt-2 border-t border-ash-gray pt-2">
+                  <p className="text-xs text-muted-foreground mt-2 border-t border-border pt-2">
                     등록자: {c.user.name} · {new Date(c.createdAt).toLocaleDateString("ko-KR")}
                   </p>
                 </CardContent>
