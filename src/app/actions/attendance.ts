@@ -40,7 +40,7 @@ export async function manualClockIn() {
   });
   if (existing?.clockIn) return;
 
-  const record = await prisma.attendance.upsert({
+  await prisma.attendance.upsert({
     where: { userId_date: { userId: session.user.id, date: today } },
     update: { clockIn: new Date(), clockOut: null, workHours: null },
     create: { userId: session.user.id, date: today, clockIn: new Date() },

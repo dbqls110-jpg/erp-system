@@ -26,10 +26,9 @@ export async function GET() {
   }
 
   try {
-    const db = prisma as any;
     const [levels, menuAccess] = await Promise.all([
-      db.accessLevel.findMany({ orderBy: { rank: "desc" } }),
-      db.menuAccess.findMany(),
+      prisma.accessLevel.findMany({ orderBy: { rank: "desc" } }),
+      prisma.menuAccess.findMany(),
     ]);
 
     return NextResponse.json({ levels, menuAccess });
@@ -52,7 +51,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "name, key, and integer rank are required" }, { status: 400 });
     }
 
-    const level = await (prisma as any).accessLevel.create({
+    const level = await prisma.accessLevel.create({
       data: { name: body.name, key: body.key, rank: body.rank },
     });
 
@@ -76,7 +75,6 @@ export async function PATCH(request: Request) {
       menuKey?: unknown;
       levelKeys?: unknown;
     };
-    const db = prisma as any;
 
     if (body.menuKey !== undefined) {
       if (
@@ -87,19 +85,20 @@ export async function PATCH(request: Request) {
         return NextResponse.json({ error: "menuKey and levelKeys are required" }, { status: 400 });
       }
 
-      const levelKeys = [...new Set(body.levelKeys as string[])];
+      const menuKey = body.menuKey;
+      const levelKeys = [...new Set(body.levelKeys.filter(isNonEmptyString))];
 
-      await db.$transaction(async (transaction: any) => {
-        await transaction.menuAccess.deleteMany({ where: { menuKey: body.menuKey } });
+      await prisma.$transaction(async (transaction) => {
+        await transaction.menuAccess.deleteMany({ where: { menuKey } });
         if (levelKeys.length > 0) {
           await transaction.menuAccess.createMany({
-            data: levelKeys.map((levelKey) => ({ menuKey: body.menuKey, levelKey })),
+            data: levelKeys.map((levelKey) => ({ menuKey, levelKey })),
           });
         }
       });
 
       invalidateMenuAccessCache();
-      return NextResponse.json({ menuKey: body.menuKey, levelKeys });
+      return NextResponse.json({ menuKey, levelKeys });
     }
 
     if (!isNonEmptyString(body.id)) {
@@ -123,7 +122,7 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: "name or rank is required" }, { status: 400 });
     }
 
-    const level = await db.accessLevel.update({ where: { id: body.id }, data });
+    const level = await prisma.accessLevel.update({ where: { id: body.id }, data });
     return NextResponse.json(level);
   } catch (error) {
     console.error("[Access Levels PATCH Error]", error);
@@ -143,8 +142,7 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: "id is required" }, { status: 400 });
     }
 
-    const db = prisma as any;
-    const level = await db.accessLevel.findUnique({
+    const level = await prisma.accessLevel.findUnique({
       where: { id: body.id },
       select: { isSystem: true },
     });
@@ -156,7 +154,7 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: "System access levels cannot be deleted" }, { status: 400 });
     }
 
-    await db.accessLevel.delete({ where: { id: body.id } });
+    await prisma.accessLevel.delete({ where: { id: body.id } });
     invalidateMenuAccessCache();
     return NextResponse.json({ success: true });
   } catch (error) {

@@ -78,29 +78,45 @@ export default function VenuesPage() {
           <div className="flex flex-wrap items-center gap-3">
             <span className="w-20 shrink-0 text-sm text-muted-foreground">자치구</span>
             <select defaultValue="전체" className="h-8 rounded-2xl border border-transparent bg-input/50 px-3 text-sm text-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/30 w-44">
-
-                </select>
+              {districts.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
             <span className="w-20 shrink-0 text-sm text-muted-foreground">유형</span>
             <select defaultValue="전체" className="h-8 rounded-2xl border border-transparent bg-input/50 px-3 text-sm text-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/30 w-52">
-
-                </select>
+              {venueTypes.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
             <span className="w-20 shrink-0 text-sm text-muted-foreground">수용인원</span>
             <select defaultValue="전체" className="h-8 rounded-2xl border border-transparent bg-input/50 px-3 text-sm text-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/30 w-44">
-
-                </select>
+              {capacityOptions.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
             <span className="w-20 shrink-0 text-sm text-muted-foreground">주말이용</span>
             <select defaultValue="전체" className="h-8 rounded-2xl border border-transparent bg-input/50 px-3 text-sm text-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/30 w-44">
-
-                </select>
+              {weekendOptions.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
