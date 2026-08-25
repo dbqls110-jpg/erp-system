@@ -8,6 +8,7 @@ import { UserRoleSelect } from "./UserRoleSelect";
 import { LeaveBalanceInput } from "./LeaveBalanceInput";
 import { UserNameInput } from "./UserNameInput";
 import { DriveIndexPanel, type DriveIndexInitialStatus } from "./DriveIndexPanel";
+import AccessLevelPanel from "./AccessLevelPanel";
 
 export default async function AdminPage() {
   const session = await getServerSession(authOptions);
@@ -43,14 +44,14 @@ export default async function AdminPage() {
   };
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-deep-space-charcoal" style={{ fontFamily: "var(--font-plus-jakarta-sans)", letterSpacing: "-0.91px" }}>
-        관리자
-      </h1>
+    <div className="space-y-4">
+      <div>
+        <p className="mt-1 text-sm text-muted-foreground">Google Drive AI 검색과 사용자 관리 설정을 확인하고 관리합니다.</p>
+      </div>
 
-      <Card className="border-ash-gray shadow-[var(--shadow-sm)]">
+      <Card className="shadow-xs">
         <CardHeader>
-          <CardTitle className="text-base font-semibold text-deep-space-charcoal" style={{ fontFamily: "var(--font-plus-jakarta-sans)" }}>
+          <CardTitle className="text-base font-semibold text-foreground">
             Google Drive AI 검색
           </CardTitle>
         </CardHeader>
@@ -59,9 +60,9 @@ export default async function AdminPage() {
         </CardContent>
       </Card>
 
-      <Card className="border-ash-gray shadow-[var(--shadow-sm)]">
+      <Card className="shadow-xs">
         <CardHeader>
-          <CardTitle className="text-base font-semibold text-deep-space-charcoal" style={{ fontFamily: "var(--font-plus-jakarta-sans)" }}>
+          <CardTitle className="text-base font-semibold text-foreground">
             사용자 관리 ({users.length}명)
           </CardTitle>
         </CardHeader>
@@ -70,17 +71,17 @@ export default async function AdminPage() {
             {users.map((u) => {
               const balance = u.leaveBalances[0];
               return (
-                <div key={u.id} className="flex items-center justify-between py-3 border-b border-ash-gray last:border-0 gap-4 flex-wrap">
+                <div key={u.id} className="flex items-center justify-between py-3 border-b border-border last:border-0 gap-4 flex-wrap">
                   <div className="flex items-center gap-3">
                     <Avatar className="h-9 w-9">
                       <AvatarImage src={u.image ?? undefined} />
-                      <AvatarFallback className="bg-hint-of-sky text-midnight-charcoal text-sm">
+                      <AvatarFallback className="bg-muted text-foreground text-sm">
                         {(u.name ?? u.email ?? "?").slice(0, 2).toUpperCase()}
                       </AvatarFallback>
                     </Avatar>
                     <div>
                       <UserNameInput userId={u.id} name={u.name ?? ""} />
-                      <p className="text-xs text-smoke-gray">{u.email}</p>
+                      <p className="text-xs text-muted-foreground">{u.email}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
@@ -103,6 +104,9 @@ export default async function AdminPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* 권한 레벨 · 메뉴별 접근 설정 */}
+      <AccessLevelPanel />
     </div>
   );
 }
