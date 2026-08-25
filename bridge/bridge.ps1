@@ -41,8 +41,10 @@ $AgentType = $Config["AGENT_TYPE"]
 $ApiKey    = $Config["BRIDGE_API_KEY"]
 $Model     = if ($Config["CODEX_MODEL"]) { $Config["CODEX_MODEL"] } else { "gpt-5.6-luna" }
 $Effort    = if ($Config["CODEX_EFFORT"]) { $Config["CODEX_EFFORT"] } else { "xhigh" }
-$PollSec   = [int](if ($Config["POLL_INTERVAL_SEC"]) { $Config["POLL_INTERVAL_SEC"] } else { 5 })
-$BeatSec   = [int](if ($Config["HEARTBEAT_INTERVAL_SEC"]) { $Config["HEARTBEAT_INTERVAL_SEC"] } else { 30 })
+# 주의: PowerShell 에서 [int](if ...) 는 파싱되지 않는다. if 는 문이라 캐스트 안에
+# 넣으려면 $( ) 부분식으로 감싸야 한다.
+$PollSec   = [int]$(if ($Config["POLL_INTERVAL_SEC"]) { $Config["POLL_INTERVAL_SEC"] } else { 5 })
+$BeatSec   = [int]$(if ($Config["HEARTBEAT_INTERVAL_SEC"]) { $Config["HEARTBEAT_INTERVAL_SEC"] } else { 30 })
 
 if (-not $BaseUrl -or -not $AgentType -or -not $ApiKey) {
     Write-Log "ERP_BASE_URL / AGENT_TYPE / BRIDGE_API_KEY 를 bridge.env 에 채워야 합니다." "ERROR"
