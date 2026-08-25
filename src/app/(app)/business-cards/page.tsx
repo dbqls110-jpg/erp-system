@@ -14,11 +14,14 @@ export default async function BusinessCardsPage() {
   });
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
+      {/* 제목은 헤더바가 그리므로 설명 문구만 둔다 */}
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-deep-space-charcoal" style={{ fontFamily: "var(--font-plus-jakarta-sans)", letterSpacing: "-0.91px" }}>
-          명함 관리
-        </h1>
+        <div>
+          <p className="mt-1 text-sm text-muted-foreground">
+            수집한 명함과 담당자 연락처
+          </p>
+        </div>
         <CardCreateButton />
       </div>
 
