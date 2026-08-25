@@ -4,6 +4,8 @@ import { useRef, useState, useTransition } from "react";
 import { uploadProjectFile, deleteProjectFile } from "@/app/actions/projectFile";
 import { Button } from "@/components/ui/button";
 import { Upload, Trash2, ExternalLink, FileText, Loader2, AlertCircle } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { toneBadgeClass } from "@/lib/badge-tone";
 import { toast } from "sonner";
 
 interface ProjectFile {
@@ -11,6 +13,7 @@ interface ProjectFile {
   name: string;
   mimeType: string;
   driveUrl: string;
+  category: string | null;
   size: number | null;
   createdAt: Date;
 }
@@ -84,7 +87,12 @@ export function ProjectFilesPanel({ projectId, files, hasDriveAccess }: Props) {
               <FileText size={16} className="text-muted-foreground shrink-0" />
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-foreground truncate">{file.name}</p>
-                <p className="text-xs text-muted-foreground">{formatBytes(file.size)}</p>
+                <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  {file.category && (
+                    <Badge variant="outline" className={toneBadgeClass("blue")}>{file.category}</Badge>
+                  )}
+                  {formatBytes(file.size)}
+                </p>
               </div>
               <a
                 href={file.driveUrl}

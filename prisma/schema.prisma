@@ -164,6 +164,8 @@ model ProjectFile {
   name        String
   mimeType    String
   driveUrl    String
+  /** 파일명으로 판정한 종류(견적서·포스터 등). 판정 실패 시 null. */
+  category    String?
   size        Int?
   createdAt   DateTime @default(now())
 
