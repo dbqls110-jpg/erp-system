@@ -18,6 +18,7 @@ export const FILE_CATEGORIES: FileCategory[] = [
   { folder: "계약서", keywords: ["계약서", "계약", "contract", "agreement"] },
   { folder: "포스터", keywords: ["포스터", "poster"] },
   { folder: "제안서", keywords: ["제안서", "제안", "proposal"] },
+  { folder: "과업지시서", keywords: ["과업지시서", "과업", "지시서", "rfp", "scope"] },
   { folder: "정산서", keywords: ["정산서", "정산", "settlement", "invoice", "청구"] },
   { folder: "기획안", keywords: ["기획안", "기획", "plan"] },
   { folder: "도면", keywords: ["도면", "배치도", "레이아웃", "layout", "floorplan"] },

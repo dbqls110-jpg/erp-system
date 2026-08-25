@@ -153,6 +153,8 @@ model Project {
 
   checklistItems ChecklistItem[]
   files          ProjectFile[]
+  customers      ProjectCustomer[]
+  partners       ProjectPartner[]
 
   @@map("projects")
 }
@@ -514,4 +516,72 @@ model MenuAccess {
   @@unique([menuKey, levelKey])
   @@index([menuKey])
   @@map("menu_access")
+}
+
+model Customer {
+  id        String   @id @default(cuid())
+  name      String
+  manager   String?
+  phone     String?
+  email     String?
+  /** "고객사" | "협력사" | "공급사" */
+  category  String?
+  /** "거래중" | "보류" | "종료" */
+  status    String   @default("거래중")
+  memo      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  projects ProjectCustomer[]
+
+  @@index([status])
+  @@map("customers")
+}
+
+model Partner {
+  id             String   @id @default(cuid())
+  name           String
+  manager        String?
+  phone          String?
+  /** "진행중" | "만료" | "대기" */
+  contractStatus String   @default("대기")
+  contractStart  String?
+  contractEnd    String?
+  /** "월정산" | "건별" */
+  settlementType String?
+  memo           String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  projects ProjectPartner[]
+
+  @@index([contractStatus])
+  @@map("partners")
+}
+
+/** 프로젝트 ↔ 거래처 (다대다). 비고에 문자열로 적지 않고 관계로 잇는다. */
+model ProjectCustomer {
+  projectId  String
+  customerId String
+  createdAt  DateTime @default(now())
+
+  project  Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@id([projectId, customerId])
+  @@index([customerId])
+  @@map("project_customers")
+}
+
+model ProjectPartner {
+  projectId String
+  partnerId String
+  createdAt DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  partner Partner @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+
+  @@id([projectId, partnerId])
+  @@index([partnerId])
+  @@map("project_partners")
 }

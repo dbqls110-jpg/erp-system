@@ -11,8 +11,16 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { Badge } from "@/components/ui/badge"
+import { toneBadgeClass } from "@/lib/badge-tone"
+import { prisma } from "@/lib/prisma"
 
-export default function PartnersPage() {
+export default async function PartnersPage() {
+  const rows = await prisma.partner.findMany({
+    orderBy: { updatedAt: "desc" },
+    include: { _count: { select: { projects: true } } },
+  })
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -60,7 +68,7 @@ export default function PartnersPage() {
       </Card>
 
       <div className="flex items-center justify-between">
-        <p className="text-sm">총 <span className="font-semibold text-primary">0</span>건</p>
+        <p className="text-sm">총 <span className="font-semibold text-primary">{rows.length}</span>건</p>
         <div className="flex items-center gap-2">
           <Button variant="outline" className="h-8"><Download className="size-3.5" /> 엑셀 다운로드</Button>
           <select defaultValue="latest" className="h-8 rounded-2xl border border-transparent bg-input/50 px-3 text-sm text-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/30 w-32">
@@ -91,14 +99,36 @@ export default function PartnersPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                <TableRow>
-                  <TableCell colSpan={7} className="py-12 text-center">
-                    <div className="flex flex-col items-center gap-3">
-                      <Handshake className="size-6 text-muted-foreground" />
-                      <p className="text-sm text-muted-foreground">아직 등록된 항목이 없습니다</p>
-                    </div>
-                  </TableCell>
-                </TableRow>
+                {rows.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={8} className="py-12 text-center">
+                      <div className="flex flex-col items-center gap-3">
+                        <Handshake className="size-6 text-muted-foreground" />
+                        <p className="text-sm text-muted-foreground">아직 등록된 항목이 없습니다</p>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  rows.map((p) => (
+                    <TableRow key={p.id}>
+                      <TableCell className="font-medium">{p.name}</TableCell>
+                      <TableCell className="text-muted-foreground">{p.manager ?? "-"}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className={toneBadgeClass(p.contractStatus === "진행중" ? "green" : p.contractStatus === "만료" ? "gray" : "amber")}>
+                          {p.contractStatus}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground tabular-nums">
+                        {p.contractStart || p.contractEnd ? `${p.contractStart ?? ""} ~ ${p.contractEnd ?? ""}` : "-"}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">{p.settlementType ?? "-"}</TableCell>
+                      <TableCell className="text-muted-foreground">{p.phone ?? "-"}</TableCell>
+                      <TableCell className="tabular-nums text-muted-foreground">
+                        {p._count.projects > 0 ? `프로젝트 ${p._count.projects}건` : "-"}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
               </TableBody>
             </Table>
           </div>
