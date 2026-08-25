@@ -1,8 +1,7 @@
 "use server";
 
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { requireEditAccess } from "@/lib/actionGuards";
 import { revalidatePath } from "next/cache";
 
 export async function createCredential(data: {
@@ -14,8 +13,7 @@ export async function createCredential(data: {
   memo?: string;
   url?: string;
 }) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id) throw new Error("Unauthorized");
+  await requireEditAccess("credentials");
 
   await prisma.credential.create({
     data: {
@@ -44,8 +42,7 @@ export async function updateCredential(
     url?: string;
   }
 ) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id) throw new Error("Unauthorized");
+  await requireEditAccess("credentials");
 
   await prisma.credential.update({
     where: { id },
@@ -64,8 +61,7 @@ export async function updateCredential(
 }
 
 export async function deleteCredential(id: string) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id) throw new Error("Unauthorized");
+  await requireEditAccess("credentials");
 
   await prisma.credential.delete({ where: { id } });
   revalidatePath("/credentials");

@@ -107,7 +107,17 @@ function CredentialForm({
   );
 }
 
-export function CredentialTable({ initialData }: { initialData: Credential[] }) {
+export function CredentialTable({
+  initialData,
+  canEdit,
+}: {
+  initialData: Credential[];
+  /**
+   * 수정 권한. 서버 액션이 어차피 막지만, 눌러야만 오류가 나는 버튼을
+   * 남겨두면 권한이 없는 사람에게는 고장난 화면으로 보인다.
+   */
+  canEdit: boolean;
+}) {
   const [items, setItems] = useState<Credential[]>(initialData);
   const [search, setSearch] = useState("");
   const [visiblePw, setVisiblePw] = useState<Set<string>>(new Set());
@@ -202,9 +212,11 @@ export function CredentialTable({ initialData }: { initialData: Credential[] }) 
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
-        <Button size="sm" className="h-9 gap-1.5 py-2" onClick={() => setDialog({ mode: "add" })}>
-          <Plus className="size-3.5" /> 새로 만들기
-        </Button>
+        {canEdit && (
+          <Button size="sm" className="h-9 gap-1.5 py-2" onClick={() => setDialog({ mode: "add" })}>
+            <Plus className="size-3.5" /> 새로 만들기
+          </Button>
+        )}
       </div>
 
       <Card className="shadow-xs py-0">
@@ -274,23 +286,25 @@ export function CredentialTable({ initialData }: { initialData: Credential[] }) 
                           ) : <span className="text-muted-foreground">—</span>}
                         </TableCell>
                         <TableCell className="py-2.5">
-                          <div className="flex items-center gap-1.5">
-                            <button
-                              onClick={() => setDialog({ mode: "edit", item: c })}
-                              className="text-muted-foreground hover:text-primary transition-colors"
-                              title="수정"
-                            >
-                              <Pencil className="size-3.5" />
-                            </button>
-                            <button
-                              onClick={() => handleDelete(c.id)}
-                              disabled={deletingId === c.id}
-                              className="text-muted-foreground hover:text-destructive transition-colors"
-                              title="삭제"
-                            >
-                              <Trash2 className="size-3.5" />
-                            </button>
-                          </div>
+                          {canEdit && (
+                            <div className="flex items-center gap-1.5">
+                              <button
+                                onClick={() => setDialog({ mode: "edit", item: c })}
+                                className="text-muted-foreground hover:text-primary transition-colors"
+                                title="수정"
+                              >
+                                <Pencil className="size-3.5" />
+                              </button>
+                              <button
+                                onClick={() => handleDelete(c.id)}
+                                disabled={deletingId === c.id}
+                                className="text-muted-foreground hover:text-destructive transition-colors"
+                                title="삭제"
+                              >
+                                <Trash2 className="size-3.5" />
+                              </button>
+                            </div>
+                          )}
                         </TableCell>
                       </TableRow>
                     );
