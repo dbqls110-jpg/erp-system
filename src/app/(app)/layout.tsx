@@ -15,7 +15,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const allowedMenus = await getAccessibleMenus(session.user.id, session.user.role);
 
   return (
-    <AppShell user={session.user} allowedMenus={[...allowedMenus]}>
+    <AppShell user={session.user} userId={session.user.id} allowedMenus={[...allowedMenus]}>
       {children}
     </AppShell>
   );

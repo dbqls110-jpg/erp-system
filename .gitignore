@@ -62,3 +62,6 @@ archive/**/*.env
 
 # 브릿지 시크릿
 bridge/bridge.env
+
+# 파이썬 스크립트 캐시
+__pycache__/

@@ -13,21 +13,21 @@ import { createCalendarEvent } from "@/app/actions/calendar";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { toneBadgeClass } from "@/lib/badge-tone";
+import { MessageContent } from "@/components/messenger/MessageContent";
+import { useMessenger } from "@/lib/messenger-store";
+import { useVisiblePolling } from "@/lib/useVisiblePolling";
 
 interface User {
   id: string;
   name: string | null;
   image: string | null;
-  role: string;
+  /**
+   * 대화 목록 API 는 role 을 내려주지 않는다(상대를 표시하는 데 필요 없어서).
+   * 필수로 두면 conversations 에서 온 상대를 이 타입으로 못 받는다.
+   */
+  role?: string;
   isAgent?: boolean;
   agentType?: string | null;
-}
-
-interface ConvItem {
-  conversationId: string;
-  other: User;
-  lastMsg: { content: string; senderId: string; createdAt: string } | null;
-  unread: number;
 }
 
 interface Message {
@@ -42,30 +42,6 @@ interface ContextMenu {
   x: number;
   y: number;
   message: Message;
-}
-
-function MessageContent({ content }: { content: string }) {
-  const parts = content.split(/(https?:\/\/[^\s]+)/g);
-  return (
-    <span className="whitespace-pre-wrap break-words">
-      {parts.map((part, index) =>
-        /^https?:\/\//.test(part) ? (
-          <a
-            key={`${part}-${index}`}
-            href={part}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="underline underline-offset-2 break-all"
-            onClick={(event) => event.stopPropagation()}
-          >
-            {part}
-          </a>
-        ) : (
-          part
-        ),
-      )}
-    </span>
-  );
 }
 
 const COLOR_OPTIONS = [
@@ -94,7 +70,9 @@ function todayStr() {
 }
 
 export function MessengerView({ myId, users }: { myId: string; users: User[] }) {
-  const [conversations, setConversations] = useState<ConvItem[]>([]);
+  // 대화 목록은 AppShell 의 MessengerProvider 가 한 번만 폴링해 나눠준다.
+  // 여기서 또 폴링하면 플로팅 위젯 · 헤더와 합쳐 요청이 세 배가 된다.
+  const { conversations, refresh: refreshConversations } = useMessenger();
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [selectedConvId, setSelectedConvId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -115,13 +93,6 @@ export function MessengerView({ myId, users }: { myId: string; users: User[] }) 
   const [calColor, setCalColor] = useState("blue");
   const [calSaving, setCalSaving] = useState(false);
 
-  const fetchConversations = useCallback(async () => {
-    try {
-      const res = await fetch("/api/messenger/conversations");
-      if (res.ok) setConversations(await res.json());
-    } catch {}
-  }, []);
-
   const fetchMessages = useCallback(async (convId: string) => {
     try {
       const res = await fetch(`/api/messenger/messages?conversationId=${convId}`);
@@ -129,36 +100,12 @@ export function MessengerView({ myId, users }: { myId: string; users: User[] }) 
     } catch {}
   }, []);
 
-  // 탭 가시성 추적 (백그라운드 탭에서 폴링 중단)
-  const visibleRef = useRef(true);
-  useEffect(() => {
-    const onChange = () => { visibleRef.current = document.visibilityState === "visible"; };
-    document.addEventListener("visibilitychange", onChange);
-    return () => document.removeEventListener("visibilitychange", onChange);
-  }, []);
-
-  // 새벽 2시~오전 8시: 폴링 완전 중단 (Render 무료 시간 절약)
-  function isQuietHours() {
-    const h = new Date().getHours();
-    return h >= 2 && h < 8;
-  }
-
-  useEffect(() => {
-    if (!isQuietHours()) fetchConversations();
-    const id = setInterval(() => {
-      if (visibleRef.current && !isQuietHours()) fetchConversations();
-    }, 30000);
-    return () => clearInterval(id);
-  }, [fetchConversations]);
-
-  useEffect(() => {
-    if (!selectedConvId) return;
-    if (!isQuietHours()) fetchMessages(selectedConvId);
-    const id = setInterval(() => {
-      if (visibleRef.current && !isQuietHours()) fetchMessages(selectedConvId);
-    }, 8000);
-    return () => clearInterval(id);
-  }, [selectedConvId, fetchMessages]);
+  // 열려 있는 대화의 메시지만 자체 폴링한다. 대화 목록은 Provider 담당이다.
+  useVisiblePolling(
+    () => { if (selectedConvId) fetchMessages(selectedConvId); },
+    8000,
+    { refreshKey: selectedConvId },
+  );
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -230,16 +177,18 @@ export function MessengerView({ myId, users }: { myId: string; users: User[] }) 
     try {
       await sendMessage(receiverId, text);
 
+      // 첫 메시지면 대화가 방금 생겼으므로 id 를 찾아야 한다.
       const res = await fetch("/api/messenger/conversations");
       if (res.ok) {
-        const convs: ConvItem[] = await res.json();
-        setConversations(convs);
+        const convs: { conversationId: string; other: { id: string } }[] = await res.json();
         const found = convs.find(c => c.other.id === receiverId);
         if (found) {
           setSelectedConvId(found.conversationId);
           await fetchMessages(found.conversationId);
         }
       }
+      // 헤더 배지와 플로팅 위젯도 같이 최신화된다.
+      await refreshConversations();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "전송 실패");
     } finally {
