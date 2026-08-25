@@ -18,7 +18,7 @@ import { prisma } from "@/lib/prisma"
 export default async function CustomersPage() {
   const rows = await prisma.customer.findMany({
     orderBy: { updatedAt: "desc" },
-    include: { _count: { select: { projects: true } } },
+    include: { projects: { include: { project: { select: { id: true, name: true } } } } },
   })
 
   return (
@@ -135,7 +135,11 @@ export default async function CustomersPage() {
                         </Badge>
                       </TableCell>
                       <TableCell className="tabular-nums text-muted-foreground">
-                        {c._count.projects > 0 ? `프로젝트 ${c._count.projects}건` : "-"}
+                        {c.projects.length === 0 ? "-" : (
+                          <span title={c.projects.map((x) => x.project.name).join(", ")}>
+                            프로젝트 {c.projects.length}건
+                          </span>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))

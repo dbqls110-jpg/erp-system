@@ -18,6 +18,8 @@ export default async function AdminPage() {
 
   const [users, indexFolders, indexedFileCount, indexChunkCount, indexStatusGroups] = await Promise.all([
     prisma.user.findMany({
+      // 에이전트 계정은 직원이 아니다. 휴가·역할 설정 대상이 아니므로 목록에서 제외한다.
+      where: { isAgent: false },
       orderBy: { createdAt: "asc" },
       include: { leaveBalances: { where: { year } } },
     }),

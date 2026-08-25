@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChecklistPanel } from "./ChecklistPanel";
+import { ProjectLinksPanel } from "./ProjectLinksPanel";
 import { ProjectEditButton } from "./ProjectEditButton";
 import { ProjectDeleteButton } from "../ProjectDeleteButton";
 import { MemoEditor } from "./MemoEditor";
@@ -30,10 +31,18 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
     include: {
       checklistItems: { orderBy: { order: "asc" } },
       files: { orderBy: { createdAt: "desc" } },
+      customers: { include: { customer: { select: { id: true, name: true } } } },
+      partners: { include: { partner: { select: { id: true, name: true } } } },
     },
   });
 
   if (!project) notFound();
+
+  // 연결 후보 목록. 목록이 커지면 검색형으로 바꾼다.
+  const [allCustomers, allPartners] = await Promise.all([
+    prisma.customer.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
+    prisma.partner.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
+  ]);
 
   const s = statusConfig[project.status] ?? statusConfig.active;
 
@@ -89,6 +98,24 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
             <span className="font-bold text-primary">{project.progress}%</span>
           </div>
           <Progress value={project.progress} className="h-2" />
+        </CardContent>
+      </Card>
+
+      {/* 거래처 · 파트너 연결 */}
+      <Card className="shadow-xs">
+        <CardHeader>
+          <CardTitle className="text-base font-semibold text-foreground" style={{ fontFamily: "var(--font-plus-jakarta-sans)" }}>
+            거래처 · 파트너
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ProjectLinksPanel
+            projectId={project.id}
+            customers={project.customers.map((pc) => pc.customer)}
+            partners={project.partners.map((pp) => pp.partner)}
+            allCustomers={allCustomers}
+            allPartners={allPartners}
+          />
         </CardContent>
       </Card>
 

@@ -18,7 +18,7 @@ import { prisma } from "@/lib/prisma"
 export default async function PartnersPage() {
   const rows = await prisma.partner.findMany({
     orderBy: { updatedAt: "desc" },
-    include: { _count: { select: { projects: true } } },
+    include: { projects: { include: { project: { select: { id: true, name: true } } } } },
   })
 
   return (
@@ -124,7 +124,11 @@ export default async function PartnersPage() {
                       <TableCell className="text-muted-foreground">{p.settlementType ?? "-"}</TableCell>
                       <TableCell className="text-muted-foreground">{p.phone ?? "-"}</TableCell>
                       <TableCell className="tabular-nums text-muted-foreground">
-                        {p._count.projects > 0 ? `프로젝트 ${p._count.projects}건` : "-"}
+                        {p.projects.length === 0 ? "-" : (
+                          <span title={p.projects.map((x) => x.project.name).join(", ")}>
+                            프로젝트 {p.projects.length}건
+                          </span>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))
