@@ -22,30 +22,30 @@ interface CalEvent {
 }
 
 const COLOR_OPTIONS = [
-  { value: "gray",   label: "회색",   class: "bg-gray-400" },
-  { value: "blue",   label: "파랑",   class: "bg-blue-500" },
-  { value: "green",  label: "초록",   class: "bg-green-500" },
-  { value: "red",    label: "빨강",   class: "bg-red-500" },
-  { value: "yellow", label: "노랑",   class: "bg-yellow-400" },
-  { value: "purple", label: "보라",   class: "bg-purple-500" },
+  { value: "gray",   label: "회색",   class: "bg-muted-foreground" },
+  { value: "blue",   label: "파랑",   class: "bg-primary" },
+  { value: "green",  label: "초록",   class: "bg-primary" },
+  { value: "red",    label: "빨강",   class: "bg-destructive" },
+  { value: "yellow", label: "노랑",   class: "bg-muted-foreground" },
+  { value: "purple", label: "보라",   class: "bg-primary" },
 ];
 
 const TYPE_COLORS: Record<string, string> = {
-  announce: "bg-electric-blue/10 text-electric-blue",
-  deadline: "bg-warm-fade/10 text-warm-fade",
-  leave: "bg-deep-violet/10 text-deep-violet",
+  announce: "bg-primary/10 text-primary",
+  deadline: "bg-destructive/10 text-destructive",
+  leave: "bg-primary/10 text-primary",
 };
 
 const CUSTOM_COLORS: Record<string, string> = {
-  gray:   "bg-gray-100 text-gray-700",
-  blue:   "bg-blue-50 text-blue-700",
-  green:  "bg-green-50 text-green-700",
-  red:    "bg-red-50 text-red-700",
-  yellow: "bg-yellow-50 text-yellow-700",
-  purple: "bg-purple-50 text-purple-700",
+  gray:   "bg-muted text-muted-foreground",
+  blue:   "bg-primary/10 text-primary",
+  green:  "bg-primary/10 text-primary",
+  red:    "bg-destructive/10 text-destructive",
+  yellow: "bg-muted text-foreground",
+  purple: "bg-primary/10 text-primary",
 };
 
-const NOTION_STYLE = "bg-violet-50 text-violet-700 border border-violet-200/60";
+const NOTION_STYLE = "bg-primary/10 text-primary border border-primary/20";
 
 function eventTitle(e: CalEvent) {
   return e.type === "custom" && e.color === "red" ? `⭐ ${e.title}` : e.title;
@@ -192,26 +192,26 @@ export function CalendarView({ initialEvents, currentYear, currentMonth }: {
 
   return (
     <>
-      <Card className="border-ash-gray shadow-[var(--shadow-sm)]">
+      <Card className="shadow-xs">
         <CardContent className="p-4">
           <div className="flex items-center justify-between mb-4">
             <Button variant="ghost" size="sm" onClick={prevMonth} disabled={loading}><ChevronLeft size={16} /></Button>
-            <h2 className="text-lg font-bold text-deep-space-charcoal" style={{ fontFamily: "var(--font-plus-jakarta-sans)" }}>
-              {year}년 {month}월 {loading && <span className="text-xs text-smoke-gray font-normal">로딩 중...</span>}
+            <h2 className="text-lg font-bold text-foreground" style={{ fontFamily: "var(--font-plus-jakarta-sans)" }}>
+              {year}년 {month}월 {loading && <span className="text-xs text-muted-foreground font-normal">로딩 중…</span>}
             </h2>
             <Button variant="ghost" size="sm" onClick={nextMonth} disabled={loading}><ChevronRight size={16} /></Button>
           </div>
 
           <div className="grid grid-cols-7 mb-2">
             {["일", "월", "화", "수", "목", "금", "토"].map((d, i) => (
-              <div key={d} className={cn("text-center text-xs font-medium py-1", i === 0 ? "text-red-400" : i === 6 ? "text-blue-400" : "text-smoke-gray")}>
+              <div key={d} className={cn("text-center text-xs font-medium py-1", i === 0 ? "text-destructive" : i === 6 ? "text-primary" : "text-muted-foreground")}>
                 {d}
               </div>
             ))}
           </div>
 
-          <div className="grid grid-cols-7 gap-px bg-ash-gray rounded-lg overflow-hidden">
-            {blanks.map((i) => <div key={`b-${i}`} className="bg-canvas-white min-h-[80px]" />)}
+          <div className="grid grid-cols-7 gap-px bg-border rounded-lg overflow-hidden">
+            {blanks.map((i) => <div key={`b-${i}`} className="bg-background min-h-[80px]" />)}
             {days.map((day) => {
               const dateStr = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
               const dayEvents = getEventsForDay(day);
@@ -221,17 +221,17 @@ export function CalendarView({ initialEvents, currentYear, currentMonth }: {
               return (
                 <div
                   key={day}
-                  className="bg-canvas-white min-h-[80px] p-1 cursor-pointer hover:bg-hint-of-sky/40 transition-colors group"
+                  className="bg-background min-h-[80px] p-1 cursor-pointer hover:bg-muted/40 transition-colors group"
                   onClick={() => openDay(day)}
                 >
                   <div className="flex items-center justify-between mb-1">
                     <span className={cn(
                       "inline-flex w-6 h-6 items-center justify-center rounded-full text-xs font-medium",
-                      isToday ? "bg-deep-violet text-white" : dow === 0 ? "text-red-400" : dow === 6 ? "text-blue-400" : "text-midnight-charcoal"
+                      isToday ? "bg-primary text-primary-foreground" : dow === 0 ? "text-destructive" : dow === 6 ? "text-primary" : "text-foreground"
                     )}>
                       {day}
                     </span>
-                    <Plus size={11} className="text-smoke-gray opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+                    <Plus className="size-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
                   </div>
                   <div className="space-y-0.5">
                     {dayEvents.slice(0, 2).map((e, i) => {
@@ -264,20 +264,20 @@ export function CalendarView({ initialEvents, currentYear, currentMonth }: {
                         </div>
                       );
                     })}
-                    {dayEvents.length > 2 && <div className="text-[10px] text-smoke-gray">+{dayEvents.length - 2}개</div>}
+                    {dayEvents.length > 2 && <div className="text-[10px] text-muted-foreground">+{dayEvents.length - 2}개</div>}
                   </div>
                 </div>
               );
             })}
           </div>
 
-          <div className="flex flex-wrap gap-4 mt-4 text-xs text-smoke-gray">
-            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-electric-blue inline-block" />발표일</span>
-            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-warm-fade inline-block" />마감일</span>
-            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-deep-violet inline-block" />휴가</span>
-            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-500 inline-block" />직접 등록</span>
-            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-violet-400 inline-block" />Notion</span>
-            <span className="text-smoke-gray/70">날짜 클릭 시 일정 추가</span>
+          <div className="flex flex-wrap gap-4 mt-4 text-xs text-muted-foreground">
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-primary inline-block" />발표일</span>
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-destructive inline-block" />마감일</span>
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-primary inline-block" />휴가</span>
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-primary inline-block" />직접 등록</span>
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-primary inline-block" />Notion</span>
+            <span className="text-muted-foreground/70">날짜 클릭 시 일정 추가</span>
           </div>
         </CardContent>
       </Card>
@@ -333,7 +333,7 @@ export function CalendarView({ initialEvents, currentYear, currentMonth }: {
                 className="w-full gap-1 mt-2"
                 onClick={() => openCreate(modal.date)}
               >
-                <Plus size={13} /> 일정 추가
+                <Plus className="size-3.5" /> 일정 추가
               </Button>
             </div>
           )}
@@ -361,7 +361,7 @@ export function CalendarView({ initialEvents, currentYear, currentMonth }: {
                 />
               </div>
               <div className="space-y-1.5">
-                <Label>종료일 <span className="text-smoke-gray text-xs">(선택)</span></Label>
+                <Label>종료일 <span className="text-muted-foreground text-xs">(선택)</span></Label>
                 <Input
                   type="date"
                   value={endDate}
@@ -380,7 +380,7 @@ export function CalendarView({ initialEvents, currentYear, currentMonth }: {
                       className={cn(
                         "w-6 h-6 rounded-full transition-all",
                         c.class,
-                        color === c.value ? "ring-2 ring-offset-2 ring-midnight-charcoal scale-110" : "opacity-60 hover:opacity-100"
+                        color === c.value ? "ring-2 ring-offset-2 ring-foreground scale-110" : "opacity-60 hover:opacity-100"
                       )}
                     />
                   ))}
@@ -388,7 +388,7 @@ export function CalendarView({ initialEvents, currentYear, currentMonth }: {
               </div>
               <div className="flex gap-2 justify-end pt-1">
                 <Button variant="outline" size="sm" onClick={() => setModal({ mode: "closed" })}>취소</Button>
-                <Button size="sm" onClick={handleCreate} disabled={!title.trim() || saving}>
+                <Button size="sm" className="h-9 py-2" onClick={handleCreate} disabled={!title.trim() || saving}>
                   {saving ? "저장 중..." : "저장"}
                 </Button>
               </div>
@@ -418,7 +418,7 @@ export function CalendarView({ initialEvents, currentYear, currentMonth }: {
                 />
               </div>
               <div className="space-y-1.5">
-                <Label>종료일 <span className="text-smoke-gray text-xs">(선택)</span></Label>
+                <Label>종료일 <span className="text-muted-foreground text-xs">(선택)</span></Label>
                 <Input
                   type="date"
                   value={endDate}
@@ -437,7 +437,7 @@ export function CalendarView({ initialEvents, currentYear, currentMonth }: {
                       className={cn(
                         "w-6 h-6 rounded-full transition-all",
                         c.class,
-                        color === c.value ? "ring-2 ring-offset-2 ring-midnight-charcoal scale-110" : "opacity-60 hover:opacity-100"
+                        color === c.value ? "ring-2 ring-offset-2 ring-foreground scale-110" : "opacity-60 hover:opacity-100"
                       )}
                     />
                   ))}
@@ -445,7 +445,7 @@ export function CalendarView({ initialEvents, currentYear, currentMonth }: {
               </div>
               <div className="flex gap-2 justify-end pt-1">
                 <Button variant="outline" size="sm" onClick={() => setModal({ mode: "closed" })}>취소</Button>
-                <Button size="sm" onClick={handleUpdate} disabled={!title.trim() || saving}>
+                <Button size="sm" className="h-9 py-2" onClick={handleUpdate} disabled={!title.trim() || saving}>
                   {saving ? "저장 중..." : "수정"}
                 </Button>
               </div>
