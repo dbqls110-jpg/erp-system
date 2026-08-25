@@ -77,10 +77,8 @@ export default async function CalendarPage() {
   ];
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-deep-space-charcoal" style={{ fontFamily: "var(--font-plus-jakarta-sans)", letterSpacing: "-0.91px" }}>
-        캘린더
-      </h1>
+    <div className="space-y-4">
+      <div><p className="mt-1 text-sm text-muted-foreground">프로젝트와 휴가 일정을 한눈에 확인하세요.</p></div>
       <CalendarView initialEvents={events} currentYear={year} currentMonth={month} />
     </div>
   );

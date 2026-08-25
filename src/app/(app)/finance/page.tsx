@@ -1,8 +1,10 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { toneBadgeClass } from "@/lib/badge-tone";
+import { ReceiptText } from "lucide-react";
 import { FinanceCharts } from "./FinanceChartsWrapper";
 import { ExpenseAddButton } from "./ExpenseAddButton";
 import { BudgetSetButton } from "./BudgetSetButton";
@@ -90,11 +92,9 @@ export default async function FinancePage({
     .map(([date, amount]) => ({ date: date.slice(5), amount }));
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-deep-space-charcoal" style={{ fontFamily: "var(--font-plus-jakarta-sans)", letterSpacing: "-0.91px" }}>
-          재무 관리
-        </h1>
+        <div><p className="mt-1 text-sm text-muted-foreground">월별 예산과 지출 내역을 관리합니다.</p></div>
         <div className="flex items-center gap-3 flex-wrap">
           <FinanceMonthNav year={year} month={month} />
           {isAdmin && <BudgetSetButton year={year} month={month} currentAmount={budget?.amount} />}
@@ -103,40 +103,48 @@ export default async function FinancePage({
       </div>
 
       {/* 요약 카드 */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <Card className="border-ash-gray shadow-[var(--shadow-sm)]">
-          <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-smoke-gray">이번 달 예산</CardTitle></CardHeader>
-          <CardContent><p className="text-xl font-bold text-deep-space-charcoal">{budget ? `${budget.amount.toLocaleString()}원` : "미설정"}</p></CardContent>
+      <div className="grid grid-cols-1 gap-4 @xl/main:grid-cols-2 @5xl/main:grid-cols-4">
+        <Card className="@container/card h-full shadow-xs">
+          <CardHeader>
+            <CardDescription>이번 달 예산</CardDescription>
+            <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">{budget ? `${budget.amount.toLocaleString()}원` : "미설정"}</CardTitle>
+          </CardHeader>
         </Card>
-        <Card className="border-ash-gray shadow-[var(--shadow-sm)]">
-          <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-smoke-gray">고정비</CardTitle></CardHeader>
+        <Card className="@container/card h-full shadow-xs">
+          <CardHeader>
+            <CardDescription>고정비</CardDescription>
+            <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">{totalFixed.toLocaleString()}원</CardTitle>
+          </CardHeader>
           <CardContent>
-            <p className="text-xl font-bold text-midnight-charcoal">{totalFixed.toLocaleString()}원</p>
-            <p className="text-xs text-smoke-gray mt-1">{paidFixedCount}/{fixedExpenses.length}건 납부</p>
+            <p className="text-xs text-muted-foreground mt-1">{paidFixedCount}/{fixedExpenses.length}건 납부</p>
           </CardContent>
         </Card>
-        <Card className="border-ash-gray shadow-[var(--shadow-sm)]">
-          <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-smoke-gray">기타 지출</CardTitle></CardHeader>
+        <Card className="@container/card h-full shadow-xs">
+          <CardHeader>
+            <CardDescription>기타 지출</CardDescription>
+            <CardTitle className={`text-2xl font-semibold tabular-nums @[250px]/card:text-3xl ${totalOther > 0 ? "text-destructive" : "text-foreground"}`}>{totalOther.toLocaleString()}원</CardTitle>
+          </CardHeader>
           <CardContent>
-            <p className={`text-xl font-bold ${totalOther > 0 ? "text-warm-fade" : "text-deep-space-charcoal"}`}>{totalOther.toLocaleString()}원</p>
-            {budget && <p className="text-xs text-smoke-gray mt-1">예산의 {usagePercent}% 소진</p>}
+            {budget && <p className="text-xs text-muted-foreground mt-1">예산의 {usagePercent}% 소진</p>}
           </CardContent>
         </Card>
-        <Card className="border-ash-gray shadow-[var(--shadow-sm)]">
-          <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-smoke-gray">잔여 예산</CardTitle></CardHeader>
-          <CardContent>
-            <p className={`text-xl font-bold ${remaining !== null && remaining < 0 ? "text-destructive" : "text-deep-violet"}`}>
+        <Card className="@container/card h-full shadow-xs">
+          <CardHeader>
+            <CardDescription>잔여 예산</CardDescription>
+            <CardTitle className={`text-2xl font-semibold tabular-nums @[250px]/card:text-3xl ${remaining !== null && remaining < 0 ? "text-destructive" : "text-primary"}`}>
               {remaining !== null ? `${remaining.toLocaleString()}원` : "미설정"}
-            </p>
-            {remaining !== null && <p className="text-xs text-smoke-gray mt-1">고정비 포함 차감</p>}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {remaining !== null && <p className="text-xs text-muted-foreground mt-1">고정비 포함 차감</p>}
           </CardContent>
         </Card>
       </div>
 
       {/* 고정비 */}
-      <Card className="border-ash-gray shadow-[var(--shadow-sm)]">
+      <Card className="shadow-xs">
         <CardHeader>
-          <CardTitle className="text-base font-semibold text-deep-space-charcoal" style={{ fontFamily: "var(--font-plus-jakarta-sans)" }}>
+          <CardTitle className="text-base font-semibold text-foreground" style={{ fontFamily: "var(--font-plus-jakarta-sans)" }}>
             고정비 ({fixedExpenses.filter(f => checkedFixedIds.has(f.id)).length}/{fixedExpenses.length} 납부)
           </CardTitle>
         </CardHeader>
@@ -157,24 +165,27 @@ export default async function FinancePage({
       )}
 
       {/* 지출 내역 */}
-      <Card className="border-ash-gray shadow-[var(--shadow-sm)]">
+      <Card className="shadow-xs">
         <CardHeader>
-          <CardTitle className="text-base font-semibold text-deep-space-charcoal" style={{ fontFamily: "var(--font-plus-jakarta-sans)" }}>
+          <CardTitle className="text-base font-semibold text-foreground" style={{ fontFamily: "var(--font-plus-jakarta-sans)" }}>
             지출 내역
           </CardTitle>
         </CardHeader>
         <CardContent>
           {expenses.length === 0 ? (
-            <p className="text-sm text-smoke-gray">이번 달 지출 내역이 없습니다.</p>
+            <div className="flex flex-col items-center gap-3 py-12 text-center">
+              <ReceiptText className="size-6 text-muted-foreground" aria-hidden="true" />
+              <p className="text-sm text-muted-foreground">이번 달 지출 내역이 없습니다.</p>
+            </div>
           ) : (
             <div className="space-y-1">
               {expenses.map((e) => (
-                <div key={e.id} className="flex items-center justify-between py-2 border-b border-ash-gray last:border-0 text-sm">
+                <div key={e.id} className="flex items-center justify-between py-2 border-b border-border last:border-0 text-sm">
                   <div className="flex items-center gap-3">
-                    <span className="text-smoke-gray w-16">{e.date.slice(5)}</span>
-                    <span className="font-medium text-midnight-charcoal">{e.title}</span>
-                    <Badge variant="outline" className="text-xs">{categoryLabel[e.category]}</Badge>
-                    {e.memo && <span className="text-smoke-gray text-xs truncate max-w-xs">{e.memo}</span>}
+                    <span className="text-muted-foreground w-16">{e.date.slice(5)}</span>
+                    <span className="font-medium text-foreground">{e.title}</span>
+                    <Badge variant="outline" className={toneBadgeClass("blue")}>{categoryLabel[e.category]}</Badge>
+                    {e.memo && <span className="text-muted-foreground text-xs truncate max-w-xs">{e.memo}</span>}
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="font-medium">{e.amount.toLocaleString()}원</span>

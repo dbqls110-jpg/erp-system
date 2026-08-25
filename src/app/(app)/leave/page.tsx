@@ -1,8 +1,10 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { toneBadgeClass } from "@/lib/badge-tone";
+import { CalendarOff } from "lucide-react";
 import { LeaveApplyButton } from "./LeaveApplyButton";
 import { LeaveAdminPanel } from "./LeaveAdminPanel";
 import { LeaveCancelButton } from "./LeaveCancelButton";
@@ -12,10 +14,10 @@ import { LeaveHistoryButton } from "./LeaveHistoryModal";
 const typeLabel: Record<string, string> = {
   annual: "연차", half_am: "반차(오전)", half_pm: "반차(오후)", hourly: "시간차",
 };
-const statusLabel: Record<string, { label: string; class: string }> = {
-  pending: { label: "승인 대기", class: "bg-yellow-50 text-yellow-700 border-yellow-200" },
-  approved: { label: "승인", class: "bg-green-50 text-green-700 border-green-200" },
-  rejected: { label: "반려", class: "bg-red-50 text-red-700 border-red-200" },
+const statusLabel: Record<string, { label: string; tone: "amber" | "green" | "red" }> = {
+  pending: { label: "승인 대기", tone: "amber" },
+  approved: { label: "승인", tone: "green" },
+  rejected: { label: "반려", tone: "red" },
 };
 
 export default async function LeavePage() {
@@ -57,29 +59,27 @@ export default async function LeavePage() {
   const isOverused = totalDays - usedDays - pendingDays < 0;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-deep-space-charcoal" style={{ fontFamily: "var(--font-plus-jakarta-sans)", letterSpacing: "-0.91px" }}>
-          휴가 관리
-        </h1>
+        <div>
+          <p className="mt-1 text-sm text-muted-foreground">휴가를 신청하고 사용 현황과 신청 내역을 확인하세요.</p>
+        </div>
         <LeaveApplyButton />
       </div>
 
       {/* 내 휴가 현황 */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 gap-4 @xl/main:grid-cols-2 @5xl/main:grid-cols-4">
         {[
-          { label: "총 부여 휴가", value: `${totalDays}일`, color: "text-deep-space-charcoal" },
-          { label: "사용 완료", value: `${usedDays}일`, color: "text-smoke-gray" },
-          { label: "승인 대기", value: `${pendingDays}일`, color: pendingDays > 0 ? "text-warm-fade" : "text-smoke-gray" },
-          { label: "사용 가능", value: `${remaining}일`, color: isOverused ? "text-destructive" : "text-deep-violet" },
+          { label: "총 부여 휴가", value: `${totalDays}일`, color: "text-foreground" },
+          { label: "사용 완료", value: `${usedDays}일`, color: "text-muted-foreground" },
+          { label: "승인 대기", value: `${pendingDays}일`, color: pendingDays > 0 ? "text-destructive" : "text-muted-foreground" },
+          { label: "사용 가능", value: `${remaining}일`, color: isOverused ? "text-destructive" : "text-primary" },
         ].map((item) => (
-          <Card key={item.label} className="border-ash-gray shadow-[var(--shadow-sm)]">
-            <CardHeader className="pb-1">
-              <CardTitle className="text-xs font-medium text-smoke-gray">{item.label}</CardTitle>
+          <Card key={item.label} className="@container/card h-full shadow-xs">
+            <CardHeader>
+              <CardDescription>{item.label}</CardDescription>
+              <CardTitle className={`text-2xl font-semibold tabular-nums @[250px]/card:text-3xl ${item.color}`}>{item.value}</CardTitle>
             </CardHeader>
-            <CardContent>
-              <p className={`text-2xl font-bold ${item.color}`}>{item.value}</p>
-            </CardContent>
           </Card>
         ))}
       </div>
@@ -90,21 +90,24 @@ export default async function LeavePage() {
       )}
 
       {/* 전체 직원 휴가 현황 */}
-      <Card className="border-ash-gray shadow-[var(--shadow-sm)]">
+      <Card className="shadow-xs py-0">
         <CardHeader>
-          <CardTitle className="text-base font-semibold text-deep-space-charcoal" style={{ fontFamily: "var(--font-plus-jakarta-sans)" }}>
+          <CardTitle className="text-base font-semibold text-foreground">
             전체 직원 휴가 현황
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-0">
           {allRequests.length === 0 ? (
-            <p className="text-sm text-smoke-gray">승인된 휴가가 없습니다.</p>
+            <div className="flex flex-col items-center gap-3 py-12 text-center">
+              <CalendarOff className="size-6 text-muted-foreground" />
+              <p className="text-sm text-muted-foreground">승인된 휴가가 없습니다.</p>
+            </div>
           ) : (
             <div className="space-y-1">
               {allRequests.map((r) => {
                 const req = r as typeof r & { user: { name: string | null }; startTime: string | null; endTime: string | null };
                 return (
-                  <div key={r.id} className="flex items-center justify-between py-2 border-b border-ash-gray last:border-0 text-sm">
+                  <div key={r.id} className="flex items-center justify-between py-2 border-b border-border last:border-0 text-sm">
                     <div className="flex items-center gap-3 flex-wrap">
                       {isAdmin ? (
                         <LeaveHistoryButton
@@ -112,19 +115,19 @@ export default async function LeavePage() {
                           name={req.user.name ?? "직원"}
                         />
                       ) : (
-                        <span className="font-medium text-midnight-charcoal w-16 shrink-0">{req.user.name ?? "직원"}</span>
+                        <span className="font-medium text-foreground w-16 shrink-0">{req.user.name ?? "직원"}</span>
                       )}
-                      <span className="text-smoke-gray">{typeLabel[r.type]}</span>
-                      <span className="text-smoke-gray">
+                      <span className="text-muted-foreground">{typeLabel[r.type]}</span>
+                      <span className="text-muted-foreground">
                         {r.startDate === r.endDate ? r.startDate : `${r.startDate} ~ ${r.endDate}`}
                         {r.type === "hourly" && req.startTime && req.endTime && (
-                          <span className="ml-1 text-electric-blue">({req.startTime}~{req.endTime})</span>
+                          <span className="ml-1 text-primary">({req.startTime}~{req.endTime})</span>
                         )}
                       </span>
-                      {r.reason && <span className="text-smoke-gray hidden sm:inline">· {r.reason}</span>}
+                      {r.reason && <span className="text-muted-foreground hidden sm:inline">· {r.reason}</span>}
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
-                      <span className="text-smoke-gray">{Math.round(r.days * 100) / 100}일</span>
+                      <span className="text-muted-foreground">{Math.round(r.days * 100) / 100}일</span>
                       {isAdmin && <LeaveDeleteButton id={r.id} />}
                     </div>
                   </div>
@@ -136,34 +139,37 @@ export default async function LeavePage() {
       </Card>
 
       {/* 내 휴가 신청 내역 */}
-      <Card className="border-ash-gray shadow-[var(--shadow-sm)]">
+      <Card className="shadow-xs py-0">
         <CardHeader>
-          <CardTitle className="text-base font-semibold text-deep-space-charcoal" style={{ fontFamily: "var(--font-plus-jakarta-sans)" }}>
+          <CardTitle className="text-base font-semibold text-foreground">
             내 휴가 신청 내역
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-0">
           {myRequests.length === 0 ? (
-            <p className="text-sm text-smoke-gray">신청 내역이 없습니다.</p>
+            <div className="flex flex-col items-center gap-3 py-12 text-center">
+              <CalendarOff className="size-6 text-muted-foreground" />
+              <p className="text-sm text-muted-foreground">신청 내역이 없습니다.</p>
+            </div>
           ) : (
             <div className="space-y-1">
               {myRequests.map((r) => {
                 const s = statusLabel[r.status] ?? statusLabel.pending;
                 return (
-                  <div key={r.id} className="flex items-center justify-between py-2 border-b border-ash-gray last:border-0 text-sm">
+                  <div key={r.id} className="flex items-center justify-between py-2 border-b border-border last:border-0 text-sm">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-medium text-midnight-charcoal">{typeLabel[r.type]}</span>
-                      <span className="text-smoke-gray">
+                      <span className="font-medium text-foreground">{typeLabel[r.type]}</span>
+                      <span className="text-muted-foreground">
                         {r.startDate === r.endDate ? r.startDate : `${r.startDate} ~ ${r.endDate}`}
                         {r.type === "hourly" && r.startTime && r.endTime && (
-                          <span className="ml-1 text-electric-blue">({r.startTime}~{r.endTime})</span>
+                          <span className="ml-1 text-primary">({r.startTime}~{r.endTime})</span>
                         )}
                       </span>
-                      {r.reason && <span className="text-smoke-gray hidden sm:inline">· {r.reason}</span>}
+                      {r.reason && <span className="text-muted-foreground hidden sm:inline">· {r.reason}</span>}
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="text-smoke-gray">{Math.round(r.days * 100) / 100}일</span>
-                      <Badge variant="outline" className={s.class}>{s.label}</Badge>
+                      <span className="text-muted-foreground">{Math.round(r.days * 100) / 100}일</span>
+                      <Badge variant="outline" className={toneBadgeClass(s.tone)}>{s.label}</Badge>
                       {r.status === "pending" && <LeaveCancelButton id={r.id} />}
                       {isAdmin && <LeaveDeleteButton id={r.id} />}
                     </div>
