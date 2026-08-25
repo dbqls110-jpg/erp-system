@@ -1,14 +1,15 @@
-import { Building2, Download, Plus, RefreshCw } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+import { Building2, Download, Plus, RefreshCw } from "lucide-react"
+
+import { Button } from "@/components/ui/button"
+import { Card, CardContent } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
+} from "@/components/ui/select"
 import {
   Table,
   TableBody,
@@ -16,7 +17,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
+} from "@/components/ui/table"
 
 export default function CustomersPage() {
   return (
@@ -27,10 +28,12 @@ export default function CustomersPage() {
         </div>
         <div className="flex gap-2">
           <Button variant="outline" className="h-9 py-2">
-            <RefreshCw className="size-3.5" /> 새로고침
+            <RefreshCw className="size-3.5" />
+            새로고침
           </Button>
           <Button className="h-9 py-2">
-            <Plus className="size-3.5" /> 등록
+            <Plus className="size-3.5" />
+            등록
           </Button>
         </div>
       </div>
@@ -39,38 +42,43 @@ export default function CustomersPage() {
         <CardContent className="space-y-3 pt-(--card-spacing)">
           <div className="flex flex-wrap items-center gap-3">
             <span className="w-20 shrink-0 text-sm text-muted-foreground">분류</span>
-            <Select defaultValue="all-category">
+            <Select defaultValue="all">
               <SelectTrigger className="h-8 w-36">
                 <SelectValue placeholder="전체" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all-category">전체</SelectItem>
+                <SelectItem value="all">전체</SelectItem>
                 <SelectItem value="customer">고객사</SelectItem>
                 <SelectItem value="partner">협력사</SelectItem>
                 <SelectItem value="supplier">공급사</SelectItem>
               </SelectContent>
             </Select>
           </div>
+
           <div className="flex flex-wrap items-center gap-3">
             <span className="w-20 shrink-0 text-sm text-muted-foreground">상태</span>
-            <Select defaultValue="all-status">
+            <Select defaultValue="all">
               <SelectTrigger className="h-8 w-36">
                 <SelectValue placeholder="전체" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all-status">전체</SelectItem>
+                <SelectItem value="all">전체</SelectItem>
                 <SelectItem value="active">거래중</SelectItem>
                 <SelectItem value="pending">보류</SelectItem>
-                <SelectItem value="ended">종료</SelectItem>
+                <SelectItem value="closed">종료</SelectItem>
               </SelectContent>
             </Select>
           </div>
+
           <div className="flex flex-wrap items-center gap-3">
             <span className="w-20 shrink-0 text-sm text-muted-foreground">검색키워드</span>
-            <Input className="h-8 w-64" placeholder="회사명, 담당자" />
+            <Input className="h-8 w-64" placeholder="회사명, 담당자 검색" />
           </div>
+
           <div className="flex justify-end gap-2">
-            <Button variant="outline" className="h-8">초기화</Button>
+            <Button variant="outline" className="h-8">
+              초기화
+            </Button>
             <Button className="h-8">조회</Button>
           </div>
         </CardContent>
@@ -82,15 +90,16 @@ export default function CustomersPage() {
         </p>
         <div className="flex items-center gap-2">
           <Button variant="outline" className="h-8">
-            <Download className="size-3.5" /> 엑셀 다운로드
+            <Download className="size-3.5" />
+            엑셀 다운로드
           </Button>
-          <Select defaultValue="updated-desc">
-            <SelectTrigger className="h-8 w-32">
+          <Select defaultValue="updated">
+            <SelectTrigger className="h-8 w-36">
               <SelectValue placeholder="정렬" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="updated-desc">최종수정일순</SelectItem>
-              <SelectItem value="name-asc">회사명순</SelectItem>
+              <SelectItem value="updated">최종수정일순</SelectItem>
+              <SelectItem value="name">회사명순</SelectItem>
             </SelectContent>
           </Select>
           <Select defaultValue="10">
@@ -136,5 +145,5 @@ export default function CustomersPage() {
         </CardContent>
       </Card>
     </div>
-  );
+  )
 }

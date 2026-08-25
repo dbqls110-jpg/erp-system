@@ -151,15 +151,15 @@ export function AdminMonthlyPanel() {
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle className="text-base font-semibold text-foreground flex items-center gap-2" style={{ fontFamily: "var(--font-plus-jakarta-sans)" }}>
-            <Users className="size-3.5 text-primary" />
+            <Users className="size-4 text-primary" />
             전체 직원 월별 근태
           </CardTitle>
           <div className="flex items-center gap-1">
-            <Button variant="ghost" size="sm" onClick={prevMonth} disabled={loading}><ChevronLeft className="size-3.5" /></Button>
+            <Button variant="ghost" size="sm" className="h-9 py-2" onClick={prevMonth} disabled={loading}><ChevronLeft className="size-3.5" /></Button>
             <span className="text-sm font-medium text-foreground min-w-[80px] text-center">
               {year}년 {month}월{loading && " …"}
             </span>
-            <Button variant="ghost" size="sm" onClick={nextMonth} disabled={loading}><ChevronRight className="size-3.5" /></Button>
+            <Button variant="ghost" size="sm" className="h-9 py-2" onClick={nextMonth} disabled={loading}><ChevronRight className="size-3.5" /></Button>
           </div>
         </div>
       </CardHeader>

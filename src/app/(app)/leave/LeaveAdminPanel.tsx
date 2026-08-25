@@ -91,7 +91,7 @@ export function LeaveAdminPanel({ requests: initial }: { requests: LeaveRequest[
                 disabled={!!loading} onClick={() => handleReject(r.id)}>
                 {loading === r.id + "-reject" ? "처리 중…" : "반려"}
               </Button>
-              <Button size="sm" className="bg-primary text-white hover:bg-rich-plum border-0"
+              <Button size="sm" className="bg-primary text-white hover:bg-primary/90 border-0"
                 disabled={!!loading} onClick={() => handleApprove(r.id)}>
                 {loading === r.id + "-approve" ? "처리 중…" : "승인"}
               </Button>
