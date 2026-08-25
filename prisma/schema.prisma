@@ -177,6 +177,8 @@ model ChecklistItem {
   projectId String
   content   String
   isDone    Boolean  @default(false)
+  /** 체크한 시각. 체크 해제하면 null 로 되돌린다. */
+  completedAt DateTime?
   order     Int      @default(0)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

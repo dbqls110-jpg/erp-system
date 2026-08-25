@@ -88,7 +88,7 @@ export function LeaveAdminPanel({ requests: initial }: { requests: LeaveRequest[
               </p>
             </div>
             <div className="flex gap-2">
-              <Button size="sm" variant="outline" className="text-destructive border-destructive/30 hover:bg-destructive/5"
+              <Button size="sm" variant="outline" className="h-9 py-2 text-destructive border-destructive/30 hover:bg-destructive/5"
                 disabled={!!loading} onClick={() => handleReject(r.id)}>
                 {loading === r.id + "-reject" ? "처리 중…" : "반려"}
               </Button>

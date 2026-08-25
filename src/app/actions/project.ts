@@ -81,7 +81,11 @@ export async function toggleChecklistItem(itemId: string, projectId: string) {
 
   await prisma.checklistItem.update({
     where: { id: itemId },
-    data: { isDone: !item.isDone },
+    data: {
+      isDone: !item.isDone,
+      // 체크한 시점을 남긴다. 해제하면 지워서 "언제 완료했는지"가 항상 현재 상태와 맞게 유지된다.
+      completedAt: !item.isDone ? new Date() : null,
+    },
   });
   await updateProgress(projectId);
   revalidatePath(`/projects/${projectId}`);

@@ -12,6 +12,7 @@ interface ChecklistItem {
   id: string;
   content: string;
   isDone: boolean;
+  completedAt: Date | string | null;
 }
 
 export function ChecklistPanel({ projectId, items }: { projectId: string; items: ChecklistItem[] }) {
@@ -64,6 +65,11 @@ export function ChecklistPanel({ projectId, items }: { projectId: string; items:
           <span className={cn("flex-1 text-sm", item.isDone ? "line-through text-muted-foreground" : "text-foreground")}>
             {item.content}
           </span>
+          {item.isDone && item.completedAt && (
+            <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+              {new Date(item.completedAt).toLocaleDateString("ko-KR", { month: "numeric", day: "numeric" })}
+            </span>
+          )}
           <button onClick={() => handleDelete(item.id)} className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-opacity">
             <Trash2 size={14} />
           </button>
