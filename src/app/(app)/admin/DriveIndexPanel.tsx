@@ -3,6 +3,7 @@
 import { useCallback, useState } from "react";
 import { ExternalLink, FolderSearch, Pause, Play, Plus, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
+import { toneBadgeClass } from "@/lib/badge-tone";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -81,7 +82,7 @@ export function DriveIndexPanel({ initialStatus }: { initialStatus: DriveIndexIn
       toast.success(
         data.busy
           ? "이미 동기화가 진행 중입니다."
-          : `동기화 완료: ${data.indexed}개 색인, ${data.remaining}개 다음 회차`,
+          : `${data.indexed}개 색인, ${data.remaining}개 다음 회차`,
       );
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "동기화 실패");
@@ -124,6 +125,10 @@ export function DriveIndexPanel({ initialStatus }: { initialStatus: DriveIndexIn
 
   return (
     <div className="space-y-4">
+      <div>
+        <p className="mt-1 text-sm text-muted-foreground">Google Drive 폴더를 등록하고 색인 동기화 상태를 관리합니다.</p>
+      </div>
+
       <div className="flex flex-col sm:flex-row gap-2">
         <Input
           value={folderUrl}
@@ -132,51 +137,53 @@ export function DriveIndexPanel({ initialStatus }: { initialStatus: DriveIndexIn
           placeholder="Google Drive 폴더 URL"
           className="flex-1"
         />
-        <Button onClick={addFolder} disabled={adding || !folderUrl.trim()}>
-          <Plus size={14} /> {adding ? "확인 중" : "폴더 추가"}
+        <Button className="h-9 py-2" onClick={addFolder} disabled={adding || !folderUrl.trim()}>
+          <Plus className="size-3.5" /> {adding ? "확인 중" : "폴더 추가"}
         </Button>
-        <Button variant="outline" onClick={syncNow} disabled={syncing || !status.folders.some((folder) => folder.active)}>
-          <RefreshCw size={14} className={syncing ? "animate-spin" : ""} /> {syncing ? "동기화 중" : "지금 동기화"}
+        <Button className="h-9 py-2" variant="outline" onClick={syncNow} disabled={syncing || !status.folders.some((folder) => folder.active)}>
+          <RefreshCw className={syncing ? "size-3.5 animate-spin" : "size-3.5"} /> {syncing ? "동기화 중" : "지금 동기화"}
         </Button>
       </div>
 
       <div className="flex flex-wrap gap-2 text-xs">
-        <Badge variant="outline">파일 {status.totals.files}</Badge>
-        <Badge variant="outline">검색 조각 {status.totals.chunks}</Badge>
-        <Badge variant="outline">색인 완료 {status.totals.byStatus.indexed ?? 0}</Badge>
-        <Badge variant="outline">내용 제외 {status.totals.byStatus.skipped ?? 0}</Badge>
-        <span className="text-smoke-gray self-center">원본은 Drive에 유지 · 변경 파일만 10분마다 갱신</span>
+        <Badge variant="outline" className={toneBadgeClass("blue")}>파일 {status.totals.files}</Badge>
+        <Badge variant="outline" className={toneBadgeClass("blue")}>검색 조각 {status.totals.chunks}</Badge>
+        <Badge variant="outline" className={toneBadgeClass("green")}>색인 완료 {status.totals.byStatus.indexed ?? 0}</Badge>
+        <Badge variant="outline" className={toneBadgeClass("amber")}>내용 제외 {status.totals.byStatus.skipped ?? 0}</Badge>
+        <span className="text-muted-foreground self-center">원본은 Drive에 유지 · 변경 파일만 10분마다 갱신</span>
       </div>
 
       {status.folders.length === 0 ? (
-        <div className="py-6 text-center text-sm text-smoke-gray border border-dashed border-ash-gray rounded-md">
-          <FolderSearch size={24} className="mx-auto mb-2 opacity-50" />
-          색인할 회사 Drive 폴더를 추가하세요.
+        <div className="flex flex-col items-center gap-3 py-12 text-center">
+          <FolderSearch className="size-6 text-muted-foreground" />
+          <p className="text-sm text-muted-foreground">색인할 회사 Drive 폴더를 추가하세요.</p>
         </div>
       ) : (
-        <div className="divide-y divide-ash-gray border-y border-ash-gray">
+        <div className="divide-y divide-border border-y border-border">
           {status.folders.map((folder) => (
             <div key={folder.id} className="flex items-center gap-3 py-3">
-              <FolderSearch size={16} className="text-deep-violet shrink-0" />
+              <FolderSearch size={16} className="text-primary shrink-0" />
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
                   <span className="font-medium text-sm truncate">{folder.name}</span>
                   {folder.webViewLink && (
-                    <a href={folder.webViewLink} target="_blank" rel="noopener noreferrer" className="text-electric-blue" title="Drive에서 열기">
+                    <a href={folder.webViewLink} target="_blank" rel="noopener noreferrer" className="text-primary" title="Drive에서 열기">
                       <ExternalLink size={13} />
                     </a>
                   )}
                 </div>
-                <p className="text-xs text-smoke-gray">
+                <p className="text-xs text-muted-foreground">
                   파일 {folder._count.files}개 · {formatDate(folder.lastScannedAt)} · 권한 {folder.allowedRoles.join(", ")}
                 </p>
               </div>
               <Button variant="ghost" size="sm" onClick={() => toggleEmployeeAccess(folder)}>
                 {folder.allowedRoles.includes("user") ? "직원 검색 허용" : "관리자만"}
               </Button>
-              <Badge variant={folder.active ? "default" : "secondary"}>{folder.active ? "자동 동기화" : "중지"}</Badge>
+              <Badge variant="outline" className={toneBadgeClass(folder.active ? "green" : "gray")}>
+                {folder.active ? "자동 동기화" : "중지"}
+              </Badge>
               <Button variant="ghost" size="icon" onClick={() => toggleFolder(folder)} title={folder.active ? "동기화 중지" : "동기화 재개"}>
-                {folder.active ? <Pause size={14} /> : <Play size={14} />}
+                {folder.active ? <Pause className="size-3.5" /> : <Play className="size-3.5" />}
               </Button>
             </div>
           ))}
