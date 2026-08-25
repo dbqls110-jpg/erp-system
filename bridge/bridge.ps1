@@ -57,6 +57,13 @@ if (-not $codex) {
     Write-Log "codex 를 PATH 에서 찾을 수 없습니다. Codex CLI 설치를 확인하세요." "ERROR"
     exit 1
 }
+# Get-Command 이 codex.ps1(스크립트)을 집어줄 수 있는데, Start-Process 는 그것을
+# 실행하지 못한다("%1 is not a valid Win32 application"). 같은 폴더의 .cmd 래퍼를 쓴다.
+$CodexExe = $codex.Source
+if ($CodexExe -like "*.ps1") {
+    $cmdWrapper = [IO.Path]::ChangeExtension($CodexExe, ".cmd")
+    if (Test-Path -LiteralPath $cmdWrapper) { $CodexExe = $cmdWrapper }
+}
 $CodexVersion = (& codex --version 2>&1 | Select-Object -First 1)
 Write-Log "브릿지 시작 | agentType=$AgentType | $CodexVersion | model=$Model effort=$Effort"
 
@@ -83,17 +90,38 @@ function Send-Heartbeat {
 
 function Invoke-Codex {
     param([string]$Prompt)
-    # 프롬프트를 임시 파일로 넘긴다. 명령줄에 직접 넣으면 한글·따옴표에서 깨진다.
-    $tmp = Join-Path $env:TEMP ("codex-" + [guid]::NewGuid().ToString() + ".txt")
+    # 프롬프트는 stdin 으로 넘긴다.
+    # 인자로 주면 Start-Process 가 공백에서 쪼개 "unexpected argument '은?'" 같은
+    # 오류가 난다. codex exec 는 PROMPT 를 생략하면 stdin 에서 읽는다.
+    $inFile  = Join-Path $env:TEMP ("codex-" + [guid]::NewGuid().ToString() + ".txt")
+    $outFile = "$inFile.out"
+    $errFile = "$inFile.err"
     try {
-        Set-Content -LiteralPath $tmp -Value $Prompt -Encoding utf8
-        $out = & codex exec -m $Model -c "model_reasoning_effort=`"$Effort`"" -c 'plugins={}' `
-                    -s read-only --skip-git-repo-check (Get-Content -Raw -LiteralPath $tmp) 2>&1
-        return ($out | Out-String)
+        # BOM 없는 UTF-8 로 쓴다. BOM 이 붙으면 프롬프트 첫 글자가 깨진다.
+        [IO.File]::WriteAllText($inFile, $Prompt, (New-Object Text.UTF8Encoding $false))
+
+        # stderr 를 파일로 분리한다. 2>&1 로 합치면 $ErrorActionPreference="Stop" 아래에서
+        # PowerShell 이 네이티브 프로그램의 stderr 첫 줄을 예외로 승격시킨다. Codex 는
+        # 시작 배너를 stderr 로 내보내므로 정상 실행이 실패로 둔갑한다.
+        $p = Start-Process -FilePath $CodexExe -NoNewWindow -Wait -PassThru `
+            -ArgumentList @(
+                "exec", "-m", $Model,
+                "-c", "model_reasoning_effort=`"$Effort`"",
+                "-c", "plugins={}",
+                "-s", "read-only", "--skip-git-repo-check"
+            ) -RedirectStandardInput $inFile -RedirectStandardOutput $outFile -RedirectStandardError $errFile
+
+        $stdout = if (Test-Path -LiteralPath $outFile) { Get-Content -Raw -LiteralPath $outFile -Encoding utf8 } else { "" }
+        if ($p.ExitCode -ne 0) {
+            $stderr = if (Test-Path -LiteralPath $errFile) { Get-Content -Raw -LiteralPath $errFile -Encoding utf8 } else { "" }
+            throw "codex exec 종료코드 $($p.ExitCode): $stderr"
+        }
+        return $stdout
     } finally {
-        Remove-Item -LiteralPath $tmp -ErrorAction SilentlyContinue
+        Remove-Item -LiteralPath $inFile, $outFile, $errFile -ErrorAction SilentlyContinue
     }
 }
+
 
 # ------------------------------------------------------------------ 본 루프
 $lastBeat = [datetime]::MinValue
