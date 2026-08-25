@@ -1,6 +1,5 @@
 import { prisma } from "@/lib/prisma";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { KeyRound } from "lucide-react";
 import { CredentialTable } from "./CredentialTable";
 
 // 인증/권한은 (app)/layout.tsx 가 담당한다(세션 없으면 /login, pending 이면 /pending).
@@ -10,22 +9,16 @@ export default async function CredentialsPage() {
   });
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-3">
-        <KeyRound size={22} className="text-deep-violet" />
-        <h1
-          className="text-2xl font-bold text-deep-space-charcoal"
-          style={{ fontFamily: "var(--font-plus-jakarta-sans)", letterSpacing: "-0.91px" }}
-        >
-          ID 관리
-        </h1>
+    <div className="space-y-4">
+      <div>
+        <p className="mt-1 text-sm text-muted-foreground">등록된 인증 정보를 관리합니다.</p>
       </div>
 
-      <Card className="border-ash-gray shadow-[var(--shadow-sm)]">
+      <Card className="shadow-xs">
         <CardHeader className="pb-3">
-          <CardTitle className="text-base font-semibold text-deep-space-charcoal" style={{ fontFamily: "var(--font-plus-jakarta-sans)" }}>
+          <CardTitle className="text-base font-semibold text-foreground" style={{ fontFamily: "var(--font-plus-jakarta-sans)" }}>
             ID Database
-            <span className="ml-2 text-xs font-normal text-smoke-gray">{credentials.length}개</span>
+            <span className="ml-2 text-xs font-normal text-muted-foreground">{credentials.length}개</span>
           </CardTitle>
         </CardHeader>
         <CardContent>
