@@ -7,9 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Trash2, CheckSquare, Square, Pencil } from "lucide-react";
+import { Plus, Trash2, CheckSquare, Square, Pencil, Receipt } from "lucide-react";
 import { toast } from "sonner";
-import { toneBadgeClass } from "@/lib/badge-tone";
 import {
   createFixedExpense,
   updateFixedExpense,
@@ -128,7 +127,10 @@ export function FixedExpensePanel({ items, checkedIds, year, month, isAdmin }: P
     <>
       <div className="space-y-4">
         {items.length === 0 ? (
-          <p className="text-sm text-muted-foreground py-2">등록된 고정비 항목이 없습니다.</p>
+          <div className="flex flex-col items-center gap-3 py-12 text-center">
+            <Receipt className="size-6 text-muted-foreground" />
+            <p className="text-sm text-muted-foreground">등록된 고정비 항목이 없습니다.</p>
+          </div>
         ) : (
           <>
             {items.map((item) => {
@@ -146,14 +148,14 @@ export function FixedExpensePanel({ items, checkedIds, year, month, isAdmin }: P
                       className="text-muted-foreground hover:text-primary transition-colors disabled:opacity-50 shrink-0"
                     >
                       {checked
-                        ? <CheckSquare size={18} className="text-primary" />
-                        : <Square size={18} />
+                        ? <CheckSquare className="size-3.5 text-primary" />
+                        : <Square className="size-3.5" />
                       }
                     </button>
                     <span className={`font-medium ${checked ? "line-through text-muted-foreground" : "text-foreground"}`}>
                       {item.name}
                     </span>
-                    <Badge variant="outline" className={`text-xs ${toneBadgeClass("gray")}`}>{CATEGORY_LABELS[item.category]}</Badge>
+                    <Badge variant="outline" className="text-xs">{CATEGORY_LABELS[item.category]}</Badge>
                     <span className="text-muted-foreground text-xs">매달 {item.dayOfMonth}일</span>
                   </div>
                   <div className="flex items-center gap-2">
@@ -191,7 +193,7 @@ export function FixedExpensePanel({ items, checkedIds, year, month, isAdmin }: P
             variant="outline"
             size="sm"
             onClick={openCreate}
-            className="h-9 py-2 gap-1.5 mt-2"
+            className="gap-1.5 mt-2 h-9 py-2"
           >
             <Plus className="size-3.5" /> 고정비 항목 추가
           </Button>
@@ -239,7 +241,7 @@ export function FixedExpensePanel({ items, checkedIds, year, month, isAdmin }: P
             <div className="flex gap-2 justify-end pt-1">
               <Button variant="outline" size="sm" onClick={() => setOpen(false)}>취소</Button>
               <Button size="sm" onClick={handleSave} disabled={!name.trim() || !amount || saving} className="h-9 py-2">
-                {saving ? "저장 중..." : "저장"}
+                {saving ? "저장 중…" : "저장"}
               </Button>
             </div>
           </div>

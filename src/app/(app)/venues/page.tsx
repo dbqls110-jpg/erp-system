@@ -21,31 +21,31 @@ import {
 
 const districts = [
   "전체",
-  "종로구",
-  "중구",
-  "용산구",
-  "성동구",
-  "광진구",
-  "동대문구",
-  "중랑구",
-  "성북구",
+  "강남구",
+  "강동구",
   "강북구",
-  "도봉구",
-  "노원구",
-  "은평구",
-  "서대문구",
-  "마포구",
-  "양천구",
   "강서구",
+  "관악구",
+  "광진구",
   "구로구",
   "금천구",
-  "영등포구",
+  "노원구",
+  "도봉구",
+  "동대문구",
   "동작구",
-  "관악구",
+  "마포구",
+  "서대문구",
   "서초구",
-  "강남구",
+  "성동구",
+  "성북구",
   "송파구",
-  "강동구",
+  "양천구",
+  "영등포구",
+  "용산구",
+  "은평구",
+  "종로구",
+  "중구",
+  "중랑구",
 ]
 
 const venueTypes = [
@@ -58,7 +58,7 @@ const venueTypes = [
   "전시장·컨벤션",
 ]
 
-const capacityRanges = ["전체", "100명 미만", "100~300", "300~500", "500명 이상"]
+const capacityOptions = ["전체", "100명 미만", "100~300", "300~500", "500명 이상"]
 const weekendOptions = ["전체", "가능", "불가", "사전협의"]
 
 export default function VenuesPage() {
@@ -85,8 +85,8 @@ export default function VenuesPage() {
           <div className="flex flex-wrap items-center gap-3">
             <span className="w-20 shrink-0 text-sm text-muted-foreground">자치구</span>
             <Select defaultValue="전체">
-              <SelectTrigger className="h-8 w-48">
-                <SelectValue placeholder="전체" />
+              <SelectTrigger className="h-8 w-44">
+                <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 {districts.map((district) => (
@@ -101,8 +101,8 @@ export default function VenuesPage() {
           <div className="flex flex-wrap items-center gap-3">
             <span className="w-20 shrink-0 text-sm text-muted-foreground">유형</span>
             <Select defaultValue="전체">
-              <SelectTrigger className="h-8 w-48">
-                <SelectValue placeholder="전체" />
+              <SelectTrigger className="h-8 w-52">
+                <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 {venueTypes.map((venueType) => (
@@ -117,13 +117,13 @@ export default function VenuesPage() {
           <div className="flex flex-wrap items-center gap-3">
             <span className="w-20 shrink-0 text-sm text-muted-foreground">수용인원</span>
             <Select defaultValue="전체">
-              <SelectTrigger className="h-8 w-48">
-                <SelectValue placeholder="전체" />
+              <SelectTrigger className="h-8 w-44">
+                <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {capacityRanges.map((capacityRange) => (
-                  <SelectItem key={capacityRange} value={capacityRange}>
-                    {capacityRange}
+                {capacityOptions.map((capacity) => (
+                  <SelectItem key={capacity} value={capacity}>
+                    {capacity}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -133,13 +133,13 @@ export default function VenuesPage() {
           <div className="flex flex-wrap items-center gap-3">
             <span className="w-20 shrink-0 text-sm text-muted-foreground">주말이용</span>
             <Select defaultValue="전체">
-              <SelectTrigger className="h-8 w-48">
-                <SelectValue placeholder="전체" />
+              <SelectTrigger className="h-8 w-44">
+                <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {weekendOptions.map((weekendOption) => (
-                  <SelectItem key={weekendOption} value={weekendOption}>
-                    {weekendOption}
+                {weekendOptions.map((weekend) => (
+                  <SelectItem key={weekend} value={weekend}>
+                    {weekend}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -171,16 +171,16 @@ export default function VenuesPage() {
           </Button>
           <Select defaultValue="latest">
             <SelectTrigger className="h-8 w-32">
-              <SelectValue placeholder="정렬" />
+              <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="latest">최신순</SelectItem>
+              <SelectItem value="latest">최신 등록순</SelectItem>
               <SelectItem value="name">공간명순</SelectItem>
             </SelectContent>
           </Select>
           <Select defaultValue="10">
             <SelectTrigger className="h-8 w-28">
-              <SelectValue placeholder="10개씩 보기" />
+              <SelectValue />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="10">10개씩 보기</SelectItem>
@@ -224,3 +224,4 @@ export default function VenuesPage() {
     </div>
   )
 }
+

@@ -47,16 +47,14 @@ export function BusinessCardSearch({ cards, isAdmin }: { cards: BusinessCard[]; 
 
       {filtered.length === 0 ? (
         <Card className="shadow-xs">
-          <CardContent className="p-0">
-            <div className="flex flex-col items-center gap-3 py-12 text-center">
-              <CreditCard size={24} className="size-6 text-muted-foreground" />
-              <p className="text-sm font-medium text-foreground">
-                {query ? `"${query}"에 해당하는 명함이 없습니다` : "등록된 명함이 없습니다"}
-              </p>
-              <p className="text-sm text-muted-foreground">
-                {query ? "다른 검색어를 입력해 보세요" : "명함 등록 버튼으로 추가하세요"}
-              </p>
-            </div>
+          <CardContent className="flex flex-col items-center gap-3 py-12 text-center">
+            <CreditCard className="size-6 text-muted-foreground" />
+            <p className="text-sm text-muted-foreground">
+              {query ? `"${query}"에 해당하는 명함이 없습니다` : "등록된 명함이 없습니다"}
+            </p>
+            <p className="text-sm text-muted-foreground">
+              {query ? "다른 검색어를 입력해 보세요" : "명함 등록 버튼으로 추가하세요"}
+            </p>
           </CardContent>
         </Card>
       ) : (
