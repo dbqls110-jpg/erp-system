@@ -40,7 +40,7 @@ $BaseUrl   = $Config["ERP_BASE_URL"]
 $AgentType = $Config["AGENT_TYPE"]
 $ApiKey    = $Config["BRIDGE_API_KEY"]
 $Model     = if ($Config["CODEX_MODEL"]) { $Config["CODEX_MODEL"] } else { "gpt-5.6-luna" }
-$Effort    = if ($Config["CODEX_EFFORT"]) { $Config["CODEX_EFFORT"] } else { "high" }
+$Effort    = if ($Config["CODEX_EFFORT"]) { $Config["CODEX_EFFORT"] } else { "xhigh" }
 $PollSec   = [int](if ($Config["POLL_INTERVAL_SEC"]) { $Config["POLL_INTERVAL_SEC"] } else { 5 })
 $BeatSec   = [int](if ($Config["HEARTBEAT_INTERVAL_SEC"]) { $Config["HEARTBEAT_INTERVAL_SEC"] } else { 30 })
 

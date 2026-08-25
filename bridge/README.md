@@ -44,12 +44,14 @@ ERP 쪽에서도 하트비트로 상태가 보인다. 브릿지가 오류를 만
 
 - 5초마다 처리할 작업이 있는지 확인
 - 30초마다 하트비트 전송 (상태·모델·추론강도, 오류가 있으면 오류 요약까지)
-- 작업을 받으면 `codex exec -m gpt-5.6-luna -c model_reasoning_effort="high"` 로 처리
+- 작업을 받으면 `codex exec -m gpt-5.6-luna -c model_reasoning_effort="xhigh"` 로 처리
 - 네트워크가 끊겨도 죽지 않고 다음 주기에 재시도
 
 ## 주의
 
 - `bridge.env` 는 **커밋하지 않는다**. `.gitignore` 에 등록돼 있다.
-- 추론강도는 `high` 다. `xhigh` 는 품질이 조금 오르지만 눈에 띄게 느려서 자동화에는 맞지 않는다.
+- 추론강도는 `xhigh` 다. 실측해 보니 느려질 거라는 예상과 달랐다 — 같은 계산 문제로
+  medium 15초 / high 16초 / xhigh 18초였고, 쉬운 질문에서는 셋 다 4~5초로 차이가 없었다.
+  3초를 더 쓰는 대신 출력이 가장 정제돼 있어 `xhigh` 를 쓴다.
   유효값: `none · minimal · low · medium · high · xhigh` (`max` 는 없는 값이라 넣으면 medium 으로 떨어진다)
 - Codex CLI 는 이 PC 에 로그인된 세션을 쓴다. 로그아웃하면 브릿지도 답을 못 만든다.
