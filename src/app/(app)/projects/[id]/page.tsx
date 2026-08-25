@@ -38,7 +38,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
   const s = statusConfig[project.status] ?? statusConfig.active;
 
   return (
-    <div className="space-y-6 max-w-3xl">
+    <div className="space-y-4 max-w-3xl">
       {/* 브레드크럼 */}
       <nav className="flex items-center gap-1.5 text-sm text-muted-foreground">
         <Link href="/projects" className="hover:text-foreground transition-colors">프로젝트</Link>
@@ -49,7 +49,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
       <div className="flex items-start justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 mb-1">
-            <h1 className="text-2xl font-bold text-foreground" style={{ fontFamily: "var(--font-plus-jakarta-sans)", letterSpacing: "-0.91px" }}>
+            <h1 className="text-xl font-semibold tracking-tight text-foreground">
               {project.name}
             </h1>
             <Badge variant="outline" className={s.class}>{s.label}</Badge>
