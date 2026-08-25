@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { ChevronLeft, ChevronRight, Users, Pencil, Check, X } from "lucide-react";
 import Link from "next/link";
 import { adminUpdateAttendance } from "@/app/actions/attendance";
+import { toneBadgeClass } from "@/lib/badge-tone";
 import { toast } from "sonner";
 
 interface AttendanceRecord {
@@ -63,19 +64,19 @@ function AttendanceRow({ r, onSaved }: { r: AttendanceRecord; onSaved: () => voi
   };
 
   return (
-    <div className="flex items-center justify-between px-4 py-2 text-xs text-smoke-gray bg-gray-50/50 border-b border-ash-gray last:border-0">
-      <span className="font-medium text-midnight-charcoal w-24 shrink-0">{r.date}</span>
+    <div className="flex items-center justify-between px-4 py-2 text-xs text-muted-foreground bg-muted/50 border-b border-border last:border-0">
+      <span className="font-medium text-foreground w-24 shrink-0">{r.date}</span>
       {editing ? (
         <div className="flex items-center gap-2 flex-1">
-          <span className="text-smoke-gray">출근</span>
+          <span className="text-muted-foreground">출근</span>
           <Input type="time" value={ci} onChange={(e) => setCi(e.target.value)} className="h-6 text-xs w-28 px-1" />
-          <span className="text-smoke-gray">퇴근</span>
+          <span className="text-muted-foreground">퇴근</span>
           <Input type="time" value={co} onChange={(e) => setCo(e.target.value)} className="h-6 text-xs w-28 px-1" />
-          <button onClick={handleSave} disabled={saving} className="text-deep-violet hover:opacity-70">
-            <Check size={13} />
+          <button onClick={handleSave} disabled={saving} className="text-primary hover:opacity-70">
+            <Check className="size-3.5" />
           </button>
-          <button onClick={handleCancel} className="text-smoke-gray hover:text-destructive">
-            <X size={13} />
+          <button onClick={handleCancel} className="text-muted-foreground hover:text-destructive">
+            <X className="size-3.5" />
           </button>
         </div>
       ) : (
@@ -85,8 +86,8 @@ function AttendanceRow({ r, onSaved }: { r: AttendanceRecord; onSaved: () => voi
           {r.workHours != null && (
             <Badge variant="outline" className="text-[10px] py-0">{r.workHours.toFixed(1)}h</Badge>
           )}
-          <button onClick={() => setEditing(true)} className="text-smoke-gray hover:text-deep-violet transition-colors" title="수정">
-            <Pencil size={12} />
+          <button onClick={() => setEditing(true)} className="text-muted-foreground hover:text-primary transition-colors" title="수정">
+            <Pencil className="size-3.5" />
           </button>
         </div>
       )}
@@ -146,53 +147,56 @@ export function AdminMonthlyPanel() {
   };
 
   return (
-    <Card className="border-ash-gray shadow-[var(--shadow-sm)]">
+    <Card className="shadow-xs">
       <CardHeader>
         <div className="flex items-center justify-between">
-          <CardTitle className="text-base font-semibold text-deep-space-charcoal flex items-center gap-2" style={{ fontFamily: "var(--font-plus-jakarta-sans)" }}>
-            <Users size={16} className="text-deep-violet" />
+          <CardTitle className="text-base font-semibold text-foreground flex items-center gap-2" style={{ fontFamily: "var(--font-plus-jakarta-sans)" }}>
+            <Users className="size-3.5 text-primary" />
             전체 직원 월별 근태
           </CardTitle>
           <div className="flex items-center gap-1">
-            <Button variant="ghost" size="sm" onClick={prevMonth} disabled={loading}><ChevronLeft size={14} /></Button>
-            <span className="text-sm font-medium text-midnight-charcoal min-w-[80px] text-center">
+            <Button variant="ghost" size="sm" onClick={prevMonth} disabled={loading}><ChevronLeft className="size-3.5" /></Button>
+            <span className="text-sm font-medium text-foreground min-w-[80px] text-center">
               {year}년 {month}월{loading && " …"}
             </span>
-            <Button variant="ghost" size="sm" onClick={nextMonth} disabled={loading}><ChevronRight size={14} /></Button>
+            <Button variant="ghost" size="sm" onClick={nextMonth} disabled={loading}><ChevronRight className="size-3.5" /></Button>
           </div>
         </div>
       </CardHeader>
       <CardContent>
         {summaries.length === 0 && !loading ? (
-          <p className="text-sm text-smoke-gray text-center py-4">해당 월 근태 기록이 없습니다.</p>
+          <div className="flex flex-col items-center gap-3 py-12 text-center">
+            <Users className="size-6 text-muted-foreground" />
+            <p className="text-sm text-muted-foreground">해당 월 근태 기록이 없습니다.</p>
+          </div>
         ) : (
           <div className="space-y-2">
             {summaries.map((s) => (
-              <div key={s.user.id} className="border border-ash-gray rounded-lg overflow-hidden">
+              <div key={s.user.id} className="border border-border rounded-lg overflow-hidden">
                 <button
-                  className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition-colors text-left"
+                  className="w-full flex items-center justify-between px-4 py-3 hover:bg-muted transition-colors text-left"
                   onClick={() => setExpanded(expanded === s.user.id ? null : s.user.id)}
                 >
                   <div className="flex items-center gap-1.5">
                     <Link
                       href={`/attendance/${s.user.id}?year=${year}&month=${month}`}
                       onClick={(e) => e.stopPropagation()}
-                      className="text-sm font-medium text-midnight-charcoal hover:text-deep-violet transition-colors underline-offset-2 hover:underline"
+                      className="text-sm font-medium text-foreground hover:text-primary transition-colors underline-offset-2 hover:underline"
                     >
                       {s.user.name ?? s.user.email}
                     </Link>
                     {s.user.isAgent && (
-                      <Badge className="bg-violet-100 text-violet-600 border-violet-200 text-[10px] py-0 px-1.5">AI</Badge>
+                      <Badge variant="outline" className={`${toneBadgeClass("purple")} text-[10px] py-0 px-1.5`}>AI</Badge>
                     )}
                   </div>
-                  <div className="flex items-center gap-3 text-xs text-smoke-gray">
+                  <div className="flex items-center gap-3 text-xs text-muted-foreground">
                     <Badge variant="outline" className="text-xs">{s.workDays}일 출근</Badge>
-                    <span className="font-medium text-midnight-charcoal">{s.totalHours.toFixed(1)}h</span>
+                    <span className="font-medium text-foreground">{s.totalHours.toFixed(1)}h</span>
                     <span>{expanded === s.user.id ? "▲" : "▼"}</span>
                   </div>
                 </button>
                 {expanded === s.user.id && (
-                  <div className="border-t border-ash-gray">
+                  <div className="border-t border-border">
                     {s.records.map((r) => (
                       <AttendanceRow key={r.id} r={r} onSaved={() => setRefreshKey((k) => k + 1)} />
                     ))}
