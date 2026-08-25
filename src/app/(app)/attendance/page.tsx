@@ -1,8 +1,9 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { toneBadgeClass } from "@/lib/badge-tone";
 import { format, startOfMonth, endOfMonth } from "date-fns";
 import { ko } from "date-fns/locale";
 import { Clock } from "lucide-react";
@@ -54,11 +55,11 @@ export default async function AttendancePage() {
   const working = !!todayRecord?.clockIn && !todayRecord?.clockOut;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-deep-space-charcoal" style={{ fontFamily: "var(--font-plus-jakarta-sans)", letterSpacing: "-0.91px" }}>
-          근태 관리
-        </h1>
+        <div>
+          <p className="mt-1 text-sm text-muted-foreground">오늘과 이번 달 근태 현황을 확인할 수 있습니다.</p>
+        </div>
         <ClockButtons
           hasClockIn={!!todayRecord?.clockIn}
           hasClockOut={!!todayRecord?.clockOut}
@@ -66,19 +67,21 @@ export default async function AttendancePage() {
       </div>
 
       {/* 오늘 현황 */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <Card className="border-ash-gray shadow-[var(--shadow-sm)]">
-          <CardHeader className="pb-2 flex flex-row items-center justify-between">
-            <CardTitle className="text-sm font-medium text-smoke-gray">오늘 출근</CardTitle>
-            <Clock size={16} className="text-deep-violet" />
+      <div className="grid grid-cols-1 gap-4 @xl/main:grid-cols-3">
+        <Card className="@container/card h-full shadow-xs">
+          <CardHeader>
+            <CardDescription>오늘 출근</CardDescription>
+            <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
+              {todayRecord?.clockIn ? format(new Date(todayRecord.clockIn), "HH:mm") : "—"}
+            </CardTitle>
+            <CardAction className="flex items-center gap-2">
+              <Clock className="size-3.5 text-primary" />
+              {late && (
+                <Badge variant="outline" className={`${toneBadgeClass("amber")} text-xs`}>지각</Badge>
+              )}
+            </CardAction>
           </CardHeader>
           <CardContent>
-            <div className="flex items-center gap-2">
-              <p className="text-2xl font-bold text-deep-space-charcoal">
-                {todayRecord?.clockIn ? format(new Date(todayRecord.clockIn), "HH:mm") : "—"}
-              </p>
-              {late && <Badge className="bg-orange-100 text-orange-600 border-orange-200 text-xs">지각</Badge>}
-            </div>
             {working && todayRecord?.clockIn && (
               <div className="mt-1">
                 <WorkingTimer clockInIso={new Date(todayRecord.clockIn).toISOString()} />
@@ -87,64 +90,69 @@ export default async function AttendancePage() {
           </CardContent>
         </Card>
 
-        <Card className="border-ash-gray shadow-[var(--shadow-sm)]">
-          <CardHeader className="pb-2 flex flex-row items-center justify-between">
-            <CardTitle className="text-sm font-medium text-smoke-gray">오늘 퇴근</CardTitle>
-            <Clock size={16} className="text-electric-blue" />
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center gap-2">
-              <p className="text-2xl font-bold text-deep-space-charcoal">
-                {todayRecord?.clockOut
-                  ? format(new Date(todayRecord.clockOut), "HH:mm")
-                  : todayRecord?.clockIn ? "근무 중" : "—"}
-              </p>
+        <Card className="@container/card h-full shadow-xs">
+          <CardHeader>
+            <CardDescription>오늘 퇴근</CardDescription>
+            <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
+              {todayRecord?.clockOut
+                ? format(new Date(todayRecord.clockOut), "HH:mm")
+                : todayRecord?.clockIn ? "근무 중" : "—"}
+            </CardTitle>
+            <CardAction className="flex items-center gap-2">
+              <Clock className="size-3.5 text-primary" />
               {isOvertime(todayRecord?.clockOut ?? null) && (
-                <Badge className="bg-purple-100 text-purple-600 border-purple-200 text-xs">야근</Badge>
+                <Badge variant="outline" className={`${toneBadgeClass("purple")} text-xs`}>야근</Badge>
               )}
-            </div>
-          </CardContent>
+            </CardAction>
+          </CardHeader>
         </Card>
 
-        <Card className="border-ash-gray shadow-[var(--shadow-sm)]">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-smoke-gray">이번 달 총 근무</CardTitle>
+        <Card className="@container/card h-full shadow-xs">
+          <CardHeader>
+            <CardDescription>이번 달 총 근무</CardDescription>
+            <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
+              {totalWorkHours.toFixed(1)}시간
+            </CardTitle>
           </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold text-deep-space-charcoal">{totalWorkHours.toFixed(1)}시간</p>
-          </CardContent>
         </Card>
       </div>
 
       {/* 관리자: 오늘 전체 현황 */}
       {isAdmin && (
-        <Card className="border-ash-gray shadow-[var(--shadow-sm)]">
+        <Card className="shadow-xs">
           <CardHeader>
-            <CardTitle className="text-base font-semibold text-deep-space-charcoal" style={{ fontFamily: "var(--font-plus-jakarta-sans)" }}>
+            <CardTitle className="text-base font-semibold text-foreground" style={{ fontFamily: "var(--font-plus-jakarta-sans)" }}>
               오늘 직원 현황
             </CardTitle>
           </CardHeader>
           <CardContent>
             {allRecords.length === 0 ? (
-              <p className="text-sm text-smoke-gray">오늘 출근한 직원이 없습니다.</p>
+              <div className="flex flex-col items-center gap-3 py-12 text-center">
+                <Clock className="size-6 text-muted-foreground" />
+                <p className="text-sm text-muted-foreground">오늘 출근한 직원이 없습니다.</p>
+              </div>
             ) : (
               <div className="space-y-2">
                 {(allRecords as Array<{ id: string; date: string; user: { name: string | null; email: string; isAgent: boolean }; clockIn: Date | null; clockOut: Date | null; workHours: number | null }>).map((r) => (
-                  <div key={r.id} className="flex items-center justify-between py-2 border-b border-ash-gray last:border-0">
+                  <div key={r.id} className="flex items-center justify-between py-2 border-b border-border last:border-0">
                     <div className="flex items-center gap-1.5">
-                      <span className="text-sm font-medium text-midnight-charcoal">{r.user.name ?? r.user.email}</span>
+                      <span className="text-sm font-medium text-foreground">{r.user.name ?? r.user.email}</span>
                       {r.user.isAgent && (
-                        <Badge className="bg-violet-100 text-violet-600 border-violet-200 text-[10px] py-0 px-1.5">AI</Badge>
+                        <Badge variant="outline" className={`${toneBadgeClass("purple")} text-[10px] py-0 px-1.5`}>AI</Badge>
                       )}
                     </div>
-                    <div className="flex items-center gap-3 text-sm text-smoke-gray">
+                    <div className="flex items-center gap-3 text-sm text-muted-foreground">
                       <div className="flex items-center gap-1.5">
                         <span>출근 {r.clockIn ? format(new Date(r.clockIn), "HH:mm") : "—"}</span>
-                        {isLate(r.clockIn) && <Badge className="bg-orange-100 text-orange-600 border-orange-200 text-[10px] py-0">지각</Badge>}
+                        {isLate(r.clockIn) && (
+                          <Badge variant="outline" className={`${toneBadgeClass("amber")} text-[10px] py-0`}>지각</Badge>
+                        )}
                       </div>
                       <div className="flex items-center gap-1.5">
                         <span>퇴근 {r.clockOut ? format(new Date(r.clockOut), "HH:mm") : "근무 중"}</span>
-                        {isOvertime(r.clockOut) && <Badge className="bg-purple-100 text-purple-600 border-purple-200 text-[10px] py-0">야근</Badge>}
+                        {isOvertime(r.clockOut) && (
+                          <Badge variant="outline" className={`${toneBadgeClass("purple")} text-[10px] py-0`}>야근</Badge>
+                        )}
                       </div>
                       {r.workHours && <Badge variant="outline">{r.workHours.toFixed(1)}h</Badge>}
                       <AttendanceAdminRow
@@ -166,15 +174,18 @@ export default async function AttendancePage() {
       {isAdmin && <AdminMonthlyPanel />}
 
       {/* 이번 달 기록 */}
-      <Card className="border-ash-gray shadow-[var(--shadow-sm)]">
+      <Card className="shadow-xs">
         <CardHeader>
-          <CardTitle className="text-base font-semibold text-deep-space-charcoal" style={{ fontFamily: "var(--font-plus-jakarta-sans)" }}>
+          <CardTitle className="text-base font-semibold text-foreground" style={{ fontFamily: "var(--font-plus-jakarta-sans)" }}>
             {format(now, "M월", { locale: ko })} 근태 기록
           </CardTitle>
         </CardHeader>
         <CardContent>
           {monthlyRecords.length === 0 ? (
-            <p className="text-sm text-smoke-gray">이번 달 기록이 없습니다.</p>
+            <div className="flex flex-col items-center gap-3 py-12 text-center">
+              <Clock className="size-6 text-muted-foreground" />
+              <p className="text-sm text-muted-foreground">이번 달 기록이 없습니다.</p>
+            </div>
           ) : (
             <div className="space-y-1">
               {monthlyRecords.map((r) => {
@@ -184,25 +195,29 @@ export default async function AttendancePage() {
                 const late = isLate(ci);
                 const ot = isOvertime(co);
                 return (
-                  <div key={r.id} className="flex items-center justify-between py-2 border-b border-ash-gray last:border-0 text-sm">
+                  <div key={r.id} className="flex items-center justify-between py-2 border-b border-border last:border-0 text-sm">
                     <div className="flex items-center gap-2">
                       {missingClockOut && (
-                        <span className="w-1.5 h-1.5 rounded-full bg-yellow-400 shrink-0" title="퇴근 미기록" />
+                        <span className="size-1.5 rounded-full bg-muted-foreground shrink-0" title="퇴근 미기록" />
                       )}
-                      <span className="font-medium text-midnight-charcoal">
+                      <span className="font-medium text-foreground">
                         {format(new Date(r.date), "M/d (eee)", { locale: ko })}
                       </span>
                     </div>
-                    <div className="flex items-center gap-2 text-smoke-gray flex-wrap justify-end">
+                    <div className="flex items-center gap-2 text-muted-foreground flex-wrap justify-end">
                       <div className="flex items-center gap-1.5">
                         <span>출근 {ci ? format(ci, "HH:mm") : "—"}</span>
-                        {late && <Badge className="bg-orange-100 text-orange-600 border-orange-200 text-[10px] py-0">지각</Badge>}
+                        {late && (
+                          <Badge variant="outline" className={`${toneBadgeClass("amber")} text-[10px] py-0`}>지각</Badge>
+                        )}
                       </div>
                       <div className="flex items-center gap-1.5">
-                        <span className={missingClockOut ? "text-yellow-500 font-medium" : ""}>
+                        <span className={missingClockOut ? "text-muted-foreground font-medium" : ""}>
                           퇴근 {co ? format(co, "HH:mm") : "미기록"}
                         </span>
-                        {ot && <Badge className="bg-purple-100 text-purple-600 border-purple-200 text-[10px] py-0">야근</Badge>}
+                        {ot && (
+                          <Badge variant="outline" className={`${toneBadgeClass("purple")} text-[10px] py-0`}>야근</Badge>
+                        )}
                       </div>
                       <span className="w-14 text-right">{r.workHours ? `${r.workHours.toFixed(1)}h` : "—"}</span>
                       {isAdmin && (
