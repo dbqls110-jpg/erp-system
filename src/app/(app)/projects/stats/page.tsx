@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { RevenueCharts } from "./RevenueChartsWrapper";
 import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
@@ -75,33 +75,37 @@ export default async function ProjectStatsPage() {
   const totalProfit = totalRevenue - totalCost;
 
   return (
-    <div className="space-y-6 max-w-4xl">
+    <div className="space-y-4 max-w-4xl">
       <div className="flex items-center gap-3">
         <Link href="/projects" className="text-muted-foreground hover:text-foreground transition-colors">
-          <ChevronLeft size={20} />
+          <ChevronLeft className="size-5" />
         </Link>
-        <h1 className="text-2xl font-bold text-foreground" style={{ fontFamily: "var(--font-plus-jakarta-sans)", letterSpacing: "-0.91px" }}>
-          매출/매입 통계 ({year}년)
-        </h1>
+        <div>
+          <p className="mt-1 text-sm text-muted-foreground">매출과 매입, 순이익을 연도별로 확인할 수 있습니다.</p>
+        </div>
       </div>
 
       {/* 연간 요약 */}
-      <div className="grid grid-cols-3 gap-4">
-        <Card className="shadow-xs">
-          <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">연 매출</CardTitle></CardHeader>
-          <CardContent><p className="text-xl font-bold text-green-600">{totalRevenue.toLocaleString()}원</p></CardContent>
+      <div className="grid grid-cols-1 gap-4 @xl/main:grid-cols-3">
+        <Card className="@container/card h-full shadow-xs">
+          <CardHeader>
+            <CardDescription>연 매출</CardDescription>
+            <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl text-primary">{totalRevenue.toLocaleString()}원</CardTitle>
+          </CardHeader>
         </Card>
-        <Card className="shadow-xs">
-          <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">연 매입</CardTitle></CardHeader>
-          <CardContent><p className="text-xl font-bold text-destructive">{totalCost.toLocaleString()}원</p></CardContent>
+        <Card className="@container/card h-full shadow-xs">
+          <CardHeader>
+            <CardDescription>연 매입</CardDescription>
+            <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl text-destructive">{totalCost.toLocaleString()}원</CardTitle>
+          </CardHeader>
         </Card>
-        <Card className="shadow-xs">
-          <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">연 순이익</CardTitle></CardHeader>
-          <CardContent>
-            <p className={`text-xl font-bold ${totalProfit >= 0 ? "text-primary" : "text-destructive"}`}>
+        <Card className="@container/card h-full shadow-xs">
+          <CardHeader>
+            <CardDescription>연 순이익</CardDescription>
+            <CardTitle className={`text-2xl font-semibold tabular-nums @[250px]/card:text-3xl ${totalProfit >= 0 ? "text-primary" : "text-destructive"}`}>
               {totalProfit.toLocaleString()}원
-            </p>
-          </CardContent>
+            </CardTitle>
+          </CardHeader>
         </Card>
       </div>
 
@@ -109,3 +113,4 @@ export default async function ProjectStatsPage() {
     </div>
   );
 }
+

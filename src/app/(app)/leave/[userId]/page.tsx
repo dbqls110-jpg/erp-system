@@ -2,18 +2,19 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { notFound, redirect } from "next/navigation";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ChevronLeft } from "lucide-react";
+import { CalendarOff, ChevronLeft } from "lucide-react";
+import { toneBadgeClass } from "@/lib/badge-tone";
 import Link from "next/link";
 
 const typeLabel: Record<string, string> = {
   annual: "연차", half_am: "반차(오전)", half_pm: "반차(오후)", hourly: "시간차",
 };
-const statusLabel: Record<string, { label: string; class: string }> = {
-  pending: { label: "승인 대기", class: "bg-yellow-50 text-yellow-700 border-yellow-200" },
-  approved: { label: "승인", class: "bg-green-50 text-green-700 border-green-200" },
-  rejected: { label: "반려", class: "bg-red-50 text-red-700 border-red-200" },
+const statusLabel: Record<string, { label: string; tone: "amber" | "green" | "red" }> = {
+  pending: { label: "승인 대기", tone: "amber" },
+  approved: { label: "승인", tone: "green" },
+  rejected: { label: "반려", tone: "red" },
 };
 
 export default async function EmployeeLeavePage({ params }: { params: Promise<{ userId: string }> }) {
@@ -48,31 +49,30 @@ export default async function EmployeeLeavePage({ params }: { params: Promise<{ 
   }, {} as Record<string, number>);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* 헤더 */}
       <div className="flex items-center gap-3">
         <Link href="/leave" className="text-muted-foreground hover:text-foreground transition-colors">
           <ChevronLeft size={20} />
         </Link>
         <div>
-          <h1 className="text-2xl font-bold text-foreground" style={{ fontFamily: "var(--font-plus-jakarta-sans)", letterSpacing: "-0.91px" }}>
-            {user.name ?? user.email} 휴가 현황
-          </h1>
-          <p className="text-sm text-muted-foreground">{year}년 기준</p>
+          <p className="mt-1 text-sm text-muted-foreground">{user.name ?? user.email}님의 {year}년 휴가 현황입니다.</p>
         </div>
       </div>
 
       {/* 요약 카드 4개 */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 gap-4 @xl/main:grid-cols-2 @5xl/main:grid-cols-4">
         {[
           { label: "총 부여", value: `${totalDays}일`, color: "text-foreground" },
           { label: "사용 완료", value: `${usedDays}일`, color: "text-muted-foreground" },
           { label: "승인 대기", value: `${pendingDays}일`, color: pendingDays > 0 ? "text-destructive" : "text-muted-foreground" },
           { label: "사용 가능", value: `${remaining}일`, color: remaining <= 3 ? "text-destructive" : "text-primary" },
         ].map((item) => (
-          <Card key={item.label} className="shadow-xs">
-            <CardHeader className="pb-1"><CardTitle className="text-xs font-medium text-muted-foreground">{item.label}</CardTitle></CardHeader>
-            <CardContent><p className={`text-2xl font-bold ${item.color}`}>{item.value}</p></CardContent>
+          <Card key={item.label} className="@container/card h-full shadow-xs">
+            <CardHeader>
+              <CardDescription>{item.label}</CardDescription>
+              <CardTitle className={`text-2xl font-semibold tabular-nums @[250px]/card:text-3xl ${item.color}`}>{item.value}</CardTitle>
+            </CardHeader>
           </Card>
         ))}
       </div>
@@ -93,7 +93,7 @@ export default async function EmployeeLeavePage({ params }: { params: Promise<{ 
                 <span className="font-bold text-primary">{usedPercent}%</span>
               </div>
               <div className="w-full bg-muted rounded-full h-2.5">
-                <div className="bg-primary h-2.5 rounded-full transition-all" style={{ width: `${usedPercent}%` }} />
+                <div className={`bg-primary h-2.5 rounded-full transition-all w-[${usedPercent}%]`} />
               </div>
             </CardContent>
           </Card>
@@ -106,7 +106,10 @@ export default async function EmployeeLeavePage({ params }: { params: Promise<{ 
             </CardHeader>
             <CardContent>
               {Object.keys(byType).length === 0 ? (
-                <p className="text-sm text-muted-foreground">사용 내역 없음</p>
+                <div className="flex flex-col items-center gap-3 py-12 text-center">
+                  <CalendarOff className="size-6 text-muted-foreground" />
+                  <p className="text-sm text-muted-foreground">사용 내역 없음</p>
+                </div>
               ) : (
                 <div className="space-y-2">
                   {Object.entries(byType).map(([type, days]) => (
@@ -131,7 +134,10 @@ export default async function EmployeeLeavePage({ params }: { params: Promise<{ 
             </CardHeader>
             <CardContent>
               {requests.length === 0 ? (
-                <p className="text-sm text-muted-foreground">신청 내역이 없습니다.</p>
+                <div className="flex flex-col items-center gap-3 py-12 text-center">
+                  <CalendarOff className="size-6 text-muted-foreground" />
+                  <p className="text-sm text-muted-foreground">신청 내역이 없습니다.</p>
+                </div>
               ) : (
                 <div className="space-y-1">
                   {requests.map((r) => {
@@ -145,12 +151,12 @@ export default async function EmployeeLeavePage({ params }: { params: Promise<{ 
                             {r.type === "hourly" && r.startTime && r.endTime && (
                               <span className="ml-1 text-primary">({r.startTime}~{r.endTime})</span>
                             )}
+                            {r.reason && <span className="text-muted-foreground text-xs hidden sm:inline">· {r.reason}</span>}
                           </span>
-                          {r.reason && <span className="text-muted-foreground text-xs hidden sm:inline">· {r.reason}</span>}
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
                           <span className="text-muted-foreground">{r.days}일</span>
-                          <Badge variant="outline" className={s.class}>{s.label}</Badge>
+                          <Badge variant="outline" className={toneBadgeClass(s.tone)}>{s.label}</Badge>
                         </div>
                       </div>
                     );
