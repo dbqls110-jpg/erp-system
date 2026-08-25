@@ -64,8 +64,6 @@ export function ProjectEditButton({ project }: { project: Project }) {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
-                <Label>발표일</Label>
-                <Input type="date" name="announceDate" defaultValue={project.announceDate ?? ""} />
               </div>
               <div className="space-y-1">
                 <Label>마감일</Label>

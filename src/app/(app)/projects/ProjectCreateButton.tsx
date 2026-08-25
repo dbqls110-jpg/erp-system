@@ -47,8 +47,6 @@ export function ProjectCreateButton() {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
-                <Label>발표일</Label>
-                <Input type="date" name="announceDate" />
               </div>
               <div className="space-y-1">
                 <Label>마감일</Label>

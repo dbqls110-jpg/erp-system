@@ -272,7 +272,6 @@ export function CalendarView({ initialEvents, currentYear, currentMonth }: {
           </div>
 
           <div className="flex flex-wrap gap-4 mt-4 text-xs text-muted-foreground">
-            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-primary inline-block" />발표일</span>
             <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-destructive inline-block" />마감일</span>
             <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-primary inline-block" />휴가</span>
             <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-primary inline-block" />직접 등록</span>

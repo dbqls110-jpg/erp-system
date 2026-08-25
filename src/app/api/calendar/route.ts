@@ -53,7 +53,6 @@ export async function GET(req: NextRequest) {
   const events = [
     ...projects.flatMap((p) => {
       const evts = [];
-      if (p.announceDate) evts.push({ date: p.announceDate, title: `📢 ${p.name} 발표`, type: "announce", id: p.id });
       if (p.deadline) evts.push({ date: p.deadline, title: `🎯 ${p.name} 마감`, type: "deadline", id: p.id });
       return evts;
     }),
