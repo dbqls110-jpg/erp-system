@@ -80,7 +80,7 @@ function CredentialForm({
             <button
               type="button"
               onClick={() => setShowPw((v) => !v)}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-smoke-gray hover:text-midnight-charcoal"
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
             >
               {showPw ? <EyeOff size={14} /> : <Eye size={14} />}
             </button>
@@ -192,7 +192,7 @@ export function CredentialTable({ initialData }: { initialData: Credential[] }) 
     <>
       <div className="flex items-center gap-3 mb-4">
         <div className="relative flex-1 max-w-xs">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-smoke-gray" />
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
           <Input
             className="pl-8 h-9 text-sm"
             placeholder="서비스명, 회사, 구분 검색..."
@@ -205,13 +205,13 @@ export function CredentialTable({ initialData }: { initialData: Credential[] }) 
         </Button>
       </div>
 
-      <div className="rounded-lg border border-ash-gray overflow-hidden">
+      <div className="rounded-lg border border-border overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="bg-gray-50 border-b border-ash-gray">
+            <thead className="bg-gray-50 border-b border-border">
               <tr>
                 {["서비스명", "회사", "구분", "아이디", "비밀번호", "비고", "링크", ""].map((h) => (
-                  <th key={h} className="text-left px-3 py-2.5 text-xs font-medium text-smoke-gray whitespace-nowrap">
+                  <th key={h} className="text-left px-3 py-2.5 text-xs font-medium text-muted-foreground whitespace-nowrap">
                     {h}
                   </th>
                 ))}
@@ -220,7 +220,7 @@ export function CredentialTable({ initialData }: { initialData: Credential[] }) 
             <tbody>
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="text-center py-10 text-smoke-gray text-sm">
+                  <td colSpan={8} className="text-center py-10 text-muted-foreground text-sm">
                     {search ? "검색 결과가 없습니다." : "등록된 계정이 없습니다."}
                   </td>
                 </tr>
@@ -229,23 +229,23 @@ export function CredentialTable({ initialData }: { initialData: Credential[] }) 
                   const pwVisible = visiblePw.has(c.id);
                   const catCls = c.category ? (CATEGORY_COLORS[c.category] ?? "bg-gray-50 text-gray-600 border-gray-200") : "";
                   return (
-                    <tr key={c.id} className="border-b border-ash-gray last:border-0 hover:bg-gray-50/50 transition-colors">
-                      <td className="px-3 py-2.5 font-medium text-midnight-charcoal whitespace-nowrap">{c.name}</td>
-                      <td className="px-3 py-2.5 text-smoke-gray whitespace-nowrap">{c.company ?? "—"}</td>
+                    <tr key={c.id} className="border-b border-border last:border-0 hover:bg-gray-50/50 transition-colors">
+                      <td className="px-3 py-2.5 font-medium text-foreground whitespace-nowrap">{c.name}</td>
+                      <td className="px-3 py-2.5 text-muted-foreground whitespace-nowrap">{c.company ?? "—"}</td>
                       <td className="px-3 py-2.5">
                         {c.category ? (
                           <Badge variant="outline" className={`text-xs ${catCls}`}>{c.category}</Badge>
-                        ) : <span className="text-smoke-gray">—</span>}
+                        ) : <span className="text-muted-foreground">—</span>}
                       </td>
                       <td className="px-3 py-2.5">
                         {c.username ? (
                           <div className="flex items-center gap-1.5">
                             <span className="font-mono text-xs">{c.username}</span>
-                            <button onClick={() => copyToClipboard(c.username!, "아이디")} className="text-smoke-gray hover:text-deep-violet transition-colors">
+                            <button onClick={() => copyToClipboard(c.username!, "아이디")} className="text-muted-foreground hover:text-primary transition-colors">
                               <Copy size={11} />
                             </button>
                           </div>
-                        ) : <span className="text-smoke-gray">—</span>}
+                        ) : <span className="text-muted-foreground">—</span>}
                       </td>
                       <td className="px-3 py-2.5">
                         {c.password ? (
@@ -253,29 +253,29 @@ export function CredentialTable({ initialData }: { initialData: Credential[] }) 
                             <span className="font-mono text-xs">
                               {pwVisible ? c.password : "••••••••"}
                             </span>
-                            <button onClick={() => togglePw(c.id)} className="text-smoke-gray hover:text-deep-violet transition-colors">
+                            <button onClick={() => togglePw(c.id)} className="text-muted-foreground hover:text-primary transition-colors">
                               {pwVisible ? <EyeOff size={11} /> : <Eye size={11} />}
                             </button>
-                            <button onClick={() => copyToClipboard(c.password!, "비밀번호")} className="text-smoke-gray hover:text-deep-violet transition-colors">
+                            <button onClick={() => copyToClipboard(c.password!, "비밀번호")} className="text-muted-foreground hover:text-primary transition-colors">
                               <Copy size={11} />
                             </button>
                           </div>
-                        ) : <span className="text-smoke-gray">—</span>}
+                        ) : <span className="text-muted-foreground">—</span>}
                       </td>
-                      <td className="px-3 py-2.5 text-smoke-gray max-w-[120px] truncate">{c.memo ?? "—"}</td>
+                      <td className="px-3 py-2.5 text-muted-foreground max-w-[120px] truncate">{c.memo ?? "—"}</td>
                       <td className="px-3 py-2.5">
                         {c.url ? (
-                          <a href={c.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-deep-violet hover:underline text-xs truncate max-w-[140px]">
+                          <a href={c.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-primary hover:underline text-xs truncate max-w-[140px]">
                             {c.url.replace(/^https?:\/\//, "").split("/")[0]}
                             <ExternalLink size={10} className="shrink-0" />
                           </a>
-                        ) : <span className="text-smoke-gray">—</span>}
+                        ) : <span className="text-muted-foreground">—</span>}
                       </td>
                       <td className="px-3 py-2.5">
                         <div className="flex items-center gap-1.5">
                           <button
                             onClick={() => setDialog({ mode: "edit", item: c })}
-                            className="text-smoke-gray hover:text-deep-violet transition-colors"
+                            className="text-muted-foreground hover:text-primary transition-colors"
                             title="수정"
                           >
                             <Pencil size={13} />
@@ -283,7 +283,7 @@ export function CredentialTable({ initialData }: { initialData: Credential[] }) 
                           <button
                             onClick={() => handleDelete(c.id)}
                             disabled={deletingId === c.id}
-                            className="text-smoke-gray hover:text-destructive transition-colors"
+                            className="text-muted-foreground hover:text-destructive transition-colors"
                             title="삭제"
                           >
                             <Trash2 size={13} />
