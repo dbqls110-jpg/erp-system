@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -11,6 +12,7 @@ import { sendMessage } from "@/app/actions/message";
 import { createCalendarEvent } from "@/app/actions/calendar";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { toneBadgeClass } from "@/lib/badge-tone";
 
 interface User {
   id: string;
@@ -251,44 +253,47 @@ export function MessengerView({ myId, users }: { myId: string; users: User[] }) 
 
   return (
     <>
-      <div className="flex h-full bg-canvas-white">
+      <div className="flex h-full bg-background">
         {/* 왼쪽 패널 */}
         <div className={cn(
-          "w-full sm:w-72 shrink-0 border-r border-ash-gray flex flex-col",
+          "w-full sm:w-72 shrink-0 border-r border-border flex flex-col",
           !showList && "hidden sm:flex"
         )}>
-          <div className="h-14 px-4 flex items-center border-b border-ash-gray shrink-0">
-            <MessageCircle size={16} className="text-deep-violet mr-2" />
-            <h2 className="text-sm font-semibold text-deep-space-charcoal">메신저</h2>
+          <div className="h-14 px-4 flex items-center border-b border-border shrink-0">
+            <MessageCircle size={16} className="text-primary mr-2" />
+            <h2 className="text-sm font-semibold text-foreground">메신저</h2>
           </div>
           <div className="flex-1 overflow-y-auto">
             {recentUsers.length === 0 && otherUsers.length === 0 && (
-              <p className="text-sm text-smoke-gray px-4 py-6">다른 직원이 없습니다.</p>
+              <div className="flex flex-col items-center gap-3 py-12 text-center">
+                <MessageCircle className="size-6 text-muted-foreground" />
+                <p className="text-sm text-muted-foreground">다른 직원이 없습니다.</p>
+              </div>
             )}
             {recentUsers.length > 0 && (
               <div>
-                <p className="text-[10px] font-semibold text-smoke-gray uppercase tracking-wider px-4 pt-3 pb-1">최근 대화</p>
+                <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider px-4 pt-3 pb-1">최근 대화</p>
                 {conversations.map((conv) => (
                   <button key={conv.conversationId} onClick={() => selectUser(conv.other)}
-                    className={cn("w-full flex items-center gap-3 px-4 py-3 hover:bg-hint-of-sky/50 transition-colors text-left", selectedUser?.id === conv.other.id && "bg-accent")}>
+                    className={cn("w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/50 transition-colors text-left", selectedUser?.id === conv.other.id && "bg-accent")}>
                     <div className="relative shrink-0">
                       <Avatar className="h-9 w-9">
                         <AvatarImage src={conv.other.image ?? undefined} />
-                        <AvatarFallback className="text-xs bg-hint-of-sky">{initials(conv.other.name)}</AvatarFallback>
+                        <AvatarFallback className="text-xs bg-muted">{initials(conv.other.name)}</AvatarFallback>
                       </Avatar>
                       {conv.unread > 0 && (
-                        <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-0.5 rounded-full bg-warm-fade text-white text-[9px] flex items-center justify-center font-bold">
+                        <Badge variant="outline" className={cn("absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-0.5 rounded-full text-[9px] font-bold", toneBadgeClass("red"))}>
                           {conv.unread > 9 ? "9+" : conv.unread}
-                        </span>
+                        </Badge>
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium text-midnight-charcoal truncate">{conv.other.name ?? "직원"}</span>
-                        {conv.lastMsg && <span className="text-[10px] text-smoke-gray shrink-0 ml-1">{timeStr(conv.lastMsg.createdAt)}</span>}
+                        <span className="text-sm font-medium text-foreground truncate">{conv.other.name ?? "직원"}</span>
+                        {conv.lastMsg && <span className="text-[10px] text-muted-foreground shrink-0 ml-1">{timeStr(conv.lastMsg.createdAt)}</span>}
                       </div>
                       {conv.lastMsg && (
-                        <p className={cn("text-xs truncate", conv.unread > 0 ? "text-midnight-charcoal font-medium" : "text-smoke-gray")}>
+                        <p className={cn("text-xs truncate", conv.unread > 0 ? "text-foreground font-medium" : "text-muted-foreground")}>
                           {conv.lastMsg.senderId === myId ? "나: " : ""}{conv.lastMsg.content}
                         </p>
                       )}
@@ -299,15 +304,15 @@ export function MessengerView({ myId, users }: { myId: string; users: User[] }) 
             )}
             {otherUsers.length > 0 && (
               <div>
-                <p className="text-[10px] font-semibold text-smoke-gray uppercase tracking-wider px-4 pt-3 pb-1">전체 직원</p>
+                <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider px-4 pt-3 pb-1">전체 직원</p>
                 {otherUsers.map((user) => (
                   <button key={user.id} onClick={() => selectUser(user)}
-                    className={cn("w-full flex items-center gap-3 px-4 py-3 hover:bg-hint-of-sky/50 transition-colors text-left", selectedUser?.id === user.id && "bg-accent")}>
+                    className={cn("w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/50 transition-colors text-left", selectedUser?.id === user.id && "bg-accent")}>
                     <Avatar className="h-9 w-9 shrink-0">
                       <AvatarImage src={user.image ?? undefined} />
-                      <AvatarFallback className="text-xs bg-hint-of-sky">{initials(user.name)}</AvatarFallback>
+                      <AvatarFallback className="text-xs bg-muted">{initials(user.name)}</AvatarFallback>
                     </Avatar>
-                    <span className="text-sm font-medium text-midnight-charcoal truncate">{user.name ?? "직원"}</span>
+                    <span className="text-sm font-medium text-foreground truncate">{user.name ?? "직원"}</span>
                   </button>
                 ))}
               </div>
@@ -318,30 +323,33 @@ export function MessengerView({ myId, users }: { myId: string; users: User[] }) 
         {/* 오른쪽 채팅 패널 */}
         <div className={cn("flex-1 flex flex-col", showList && "hidden sm:flex")}>
           {!selectedUser ? (
-            <div className="flex-1 flex flex-col items-center justify-center text-smoke-gray gap-2">
-              <MessageCircle size={40} className="opacity-30" />
-              <p className="text-sm">왼쪽에서 직원을 선택하세요</p>
-              <p className="text-xs opacity-60">메시지 우클릭 → 캘린더 등록 가능</p>
+            <div className="flex flex-1 flex-col items-center justify-center gap-3 py-12 text-center">
+              <MessageCircle className="size-6 text-muted-foreground" />
+              <p className="text-sm text-muted-foreground">왼쪽에서 직원을 선택하세요</p>
+              <p className="text-xs text-muted-foreground/60">메시지 우클릭 → 캘린더 등록 가능</p>
             </div>
           ) : (
             <>
-              <div className="h-14 px-4 flex items-center gap-3 border-b border-ash-gray shrink-0">
-                <button onClick={() => setShowList(true)} className="sm:hidden text-smoke-gray hover:text-midnight-charcoal mr-1">
-                  <ArrowLeft size={18} />
+              <div className="h-14 px-4 flex items-center gap-3 border-b border-border shrink-0">
+                <button onClick={() => setShowList(true)} className="sm:hidden text-muted-foreground hover:text-foreground mr-1">
+                  <ArrowLeft className="size-3.5" />
                 </button>
                 <Avatar className="h-8 w-8">
                   <AvatarImage src={selectedUser.image ?? undefined} />
-                  <AvatarFallback className="text-xs bg-hint-of-sky">{initials(selectedUser.name)}</AvatarFallback>
+                  <AvatarFallback className="text-xs bg-muted">{initials(selectedUser.name)}</AvatarFallback>
                 </Avatar>
                 <div className="flex flex-col min-w-0">
-                  <span className="text-sm font-semibold text-deep-space-charcoal">{selectedUser.name}</span>
+                  <span className="text-sm font-semibold text-foreground">{selectedUser.name}</span>
                 </div>
-                <span className="text-xs text-smoke-gray ml-auto">메시지 우클릭 → 캘린더 등록</span>
+                <span className="text-xs text-muted-foreground ml-auto">메시지 우클릭 → 캘린더 등록</span>
               </div>
 
               <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
                 {messages.length === 0 && (
-                  <p className="text-xs text-smoke-gray text-center py-8">아직 메시지가 없습니다. 첫 메시지를 보내보세요!</p>
+                  <div className="flex flex-col items-center gap-3 py-12 text-center">
+                    <MessageCircle className="size-6 text-muted-foreground" />
+                    <p className="text-sm text-muted-foreground">아직 메시지가 없습니다. 첫 메시지를 보내보세요!</p>
+                  </div>
                 )}
                 {messages.map((msg) => {
                   const isMine = msg.senderId === myId;
@@ -351,17 +359,17 @@ export function MessengerView({ myId, users }: { myId: string; users: User[] }) 
                       {!isMine && (
                         <Avatar className="h-6 w-6 mr-2 shrink-0 mt-0.5">
                           <AvatarImage src={selectedUser.image ?? undefined} />
-                          <AvatarFallback className="text-[9px] bg-hint-of-sky">{initials(selectedUser.name)}</AvatarFallback>
+                          <AvatarFallback className="text-[9px] bg-muted">{initials(selectedUser.name)}</AvatarFallback>
                         </Avatar>
                       )}
                       <div className={cn("max-w-[70%] space-y-0.5", isMine && "items-end flex flex-col")}>
                         <div className={cn(
                           "px-3 py-2 rounded-2xl text-sm leading-relaxed select-text cursor-context-menu",
-                          isMine ? "bg-deep-violet text-white rounded-tr-sm" : "bg-hint-of-sky text-midnight-charcoal rounded-tl-sm"
+                          isMine ? "bg-primary text-primary-foreground rounded-tr-sm" : "bg-muted text-foreground rounded-tl-sm"
                         )}>
                           <MessageContent content={msg.content} />
                         </div>
-                        <span className="text-[10px] text-smoke-gray px-1">{timeStr(msg.createdAt)}</span>
+                        <span className="text-[10px] text-muted-foreground px-1">{timeStr(msg.createdAt)}</span>
                       </div>
                     </div>
                   );
@@ -369,7 +377,7 @@ export function MessengerView({ myId, users }: { myId: string; users: User[] }) 
                 <div ref={bottomRef} />
               </div>
 
-              <div className="px-4 py-3 border-t border-ash-gray shrink-0">
+              <div className="px-4 py-3 border-t border-border shrink-0">
                 <div className="flex gap-2">
                   <Input
                     ref={inputRef}
@@ -381,8 +389,8 @@ export function MessengerView({ myId, users }: { myId: string; users: User[] }) 
                     disabled={sending}
                   />
                   <Button size="icon" onClick={handleSend} disabled={!input.trim() || sending}
-                    className="bg-deep-violet hover:bg-deep-violet/90 text-white shrink-0" style={{ borderRadius: "9px" }}>
-                    <Send size={15} />
+                    className="h-9 py-2 bg-primary hover:bg-primary/90 text-primary-foreground shrink-0">
+                    <Send className="size-3.5" />
                   </Button>
                 </div>
               </div>
@@ -395,14 +403,14 @@ export function MessengerView({ myId, users }: { myId: string; users: User[] }) 
       {contextMenu && (
         <div
           ref={contextMenuRef}
-          className="fixed z-50 bg-popover border border-ash-gray rounded-lg shadow-lg py-1 min-w-[160px]"
+          className="fixed z-50 bg-popover border border-border rounded-lg shadow-lg py-1 min-w-[160px]"
           style={{ top: contextMenu.y, left: contextMenu.x }}
         >
           <button
             onClick={() => openCalModal(contextMenu.message)}
-            className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-midnight-charcoal hover:bg-hint-of-sky transition-colors"
+            className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors"
           >
-            <CalendarPlus size={14} className="text-deep-violet" />
+            <CalendarPlus className="size-3.5 text-primary" />
             캘린더에 등록
           </button>
         </div>
@@ -413,7 +421,7 @@ export function MessengerView({ myId, users }: { myId: string; users: User[] }) 
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <CalendarPlus size={16} className="text-deep-violet" />
+              <CalendarPlus size={16} className="text-primary" />
               캘린더에 일정 등록
             </DialogTitle>
           </DialogHeader>
@@ -446,7 +454,7 @@ export function MessengerView({ myId, users }: { myId: string; users: User[] }) 
                     className={cn(
                       "w-6 h-6 rounded-full transition-all",
                       c.class,
-                      calColor === c.value ? "ring-2 ring-offset-2 ring-midnight-charcoal scale-110" : "opacity-60 hover:opacity-100"
+                      calColor === c.value ? "ring-2 ring-offset-2 ring-foreground scale-110" : "opacity-60 hover:opacity-100"
                     )}
                   />
                 ))}
