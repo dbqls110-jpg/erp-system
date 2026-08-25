@@ -12,7 +12,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   // 사이드바는 클라이언트 컴포넌트라 DB 를 직접 읽을 수 없다.
   // 접근 가능한 메뉴를 서버에서 계산해 내려준다.
-  const allowedMenus = await getAccessibleMenus(session.user.id);
+  const allowedMenus = await getAccessibleMenus(session.user.id, session.user.role);
 
   return (
     <AppShell user={session.user} allowedMenus={[...allowedMenus]}>

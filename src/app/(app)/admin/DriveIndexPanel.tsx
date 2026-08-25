@@ -3,10 +3,10 @@
 import { useCallback, useState } from "react";
 import { ExternalLink, FolderSearch, Pause, Play, Plus, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
-import { toneBadgeClass } from "@/lib/badge-tone";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { toneBadgeClass } from "@/lib/badge-tone";
 
 interface IndexFolder {
   id: string;
@@ -82,7 +82,7 @@ export function DriveIndexPanel({ initialStatus }: { initialStatus: DriveIndexIn
       toast.success(
         data.busy
           ? "이미 동기화가 진행 중입니다."
-          : `${data.indexed}개 색인, ${data.remaining}개 다음 회차`,
+          : `동기화 완료: ${data.indexed}개 색인, ${data.remaining}개 다음 회차`,
       );
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "동기화 실패");
@@ -126,7 +126,7 @@ export function DriveIndexPanel({ initialStatus }: { initialStatus: DriveIndexIn
   return (
     <div className="space-y-4">
       <div>
-        <p className="mt-1 text-sm text-muted-foreground">Google Drive 폴더를 등록하고 색인 동기화 상태를 관리합니다.</p>
+        <p className="mt-1 text-sm text-muted-foreground">Google Drive 폴더를 등록하고 변경된 파일을 주기적으로 색인합니다.</p>
       </div>
 
       <div className="flex flex-col sm:flex-row gap-2">
@@ -149,7 +149,7 @@ export function DriveIndexPanel({ initialStatus }: { initialStatus: DriveIndexIn
         <Badge variant="outline" className={toneBadgeClass("blue")}>파일 {status.totals.files}</Badge>
         <Badge variant="outline" className={toneBadgeClass("blue")}>검색 조각 {status.totals.chunks}</Badge>
         <Badge variant="outline" className={toneBadgeClass("green")}>색인 완료 {status.totals.byStatus.indexed ?? 0}</Badge>
-        <Badge variant="outline" className={toneBadgeClass("amber")}>내용 제외 {status.totals.byStatus.skipped ?? 0}</Badge>
+        <Badge variant="outline" className={toneBadgeClass("gray")}>내용 제외 {status.totals.byStatus.skipped ?? 0}</Badge>
         <span className="text-muted-foreground self-center">원본은 Drive에 유지 · 변경 파일만 10분마다 갱신</span>
       </div>
 

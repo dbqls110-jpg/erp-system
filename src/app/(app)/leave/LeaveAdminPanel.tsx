@@ -5,6 +5,7 @@ import { useVisiblePolling } from "@/lib/useVisiblePolling";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { toneBadgeClass } from "@/lib/badge-tone";
 import { approveLeave, rejectLeave } from "@/app/actions/leave";
 import { toast } from "sonner";
 

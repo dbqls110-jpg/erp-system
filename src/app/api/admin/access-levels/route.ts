@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { invalidateMenuAccessCache } from "@/lib/permissions";
 
 type AccessLevelInput = {
   name?: unknown;
@@ -55,6 +56,7 @@ export async function POST(request: Request) {
       data: { name: body.name, key: body.key, rank: body.rank },
     });
 
+    invalidateMenuAccessCache();
     return NextResponse.json(level, { status: 201 });
   } catch (error) {
     console.error("[Access Levels POST Error]", error);
@@ -96,6 +98,7 @@ export async function PATCH(request: Request) {
         }
       });
 
+      invalidateMenuAccessCache();
       return NextResponse.json({ menuKey: body.menuKey, levelKeys });
     }
 
@@ -154,6 +157,7 @@ export async function DELETE(request: Request) {
     }
 
     await db.accessLevel.delete({ where: { id: body.id } });
+    invalidateMenuAccessCache();
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("[Access Levels DELETE Error]", error);
