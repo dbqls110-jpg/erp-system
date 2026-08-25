@@ -52,7 +52,7 @@ export default async function ProjectsPage({
 
       {projects.length === 0 ? (
         <Card>
-          <CardContent className="p-0">
+          <CardContent>
             <div className="flex flex-col items-center gap-3 py-12 text-center">
               <FolderOpen className="size-6 text-muted-foreground" />
               <p className="text-sm text-muted-foreground">

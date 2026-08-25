@@ -4,13 +4,6 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import {
   Table,
   TableBody,
   TableCell,
@@ -40,26 +33,20 @@ export default function PartnersPage() {
         <CardContent className="space-y-3 pt-(--card-spacing)">
           <div className="flex flex-wrap items-center gap-3">
             <span className="w-20 shrink-0 text-sm text-muted-foreground">계약상태</span>
-            <Select defaultValue="all-status">
-              <SelectTrigger className="h-8 w-36"><SelectValue placeholder="전체" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all-status">전체</SelectItem>
-                <SelectItem value="active">진행중</SelectItem>
-                <SelectItem value="expired">만료</SelectItem>
-                <SelectItem value="pending">대기</SelectItem>
-              </SelectContent>
-            </Select>
+            <select defaultValue="all-status" className="h-8 rounded-2xl border border-transparent bg-input/50 px-3 text-sm text-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/30 w-36">
+                  <option value="all-status">전체</option>
+                  <option value="active">진행중</option>
+                  <option value="expired">만료</option>
+                  <option value="pending">대기</option>
+                </select>
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <span className="w-20 shrink-0 text-sm text-muted-foreground">정산방식</span>
-            <Select defaultValue="all-settlement">
-              <SelectTrigger className="h-8 w-36"><SelectValue placeholder="전체" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all-settlement">전체</SelectItem>
-                <SelectItem value="monthly">월정산</SelectItem>
-                <SelectItem value="per-case">건별</SelectItem>
-              </SelectContent>
-            </Select>
+            <select defaultValue="all-settlement" className="h-8 rounded-2xl border border-transparent bg-input/50 px-3 text-sm text-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/30 w-36">
+                  <option value="all-settlement">전체</option>
+                  <option value="monthly">월정산</option>
+                  <option value="per-case">건별</option>
+                </select>
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <span className="w-20 shrink-0 text-sm text-muted-foreground">검색키워드</span>
@@ -76,21 +63,15 @@ export default function PartnersPage() {
         <p className="text-sm">총 <span className="font-semibold text-primary">0</span>건</p>
         <div className="flex items-center gap-2">
           <Button variant="outline" className="h-8"><Download className="size-3.5" /> 엑셀 다운로드</Button>
-          <Select defaultValue="latest">
-            <SelectTrigger className="h-8 w-32"><SelectValue placeholder="정렬" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="latest">최종수정일순</SelectItem>
-              <SelectItem value="name">파트너사명순</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select defaultValue="10">
-            <SelectTrigger className="h-8 w-28"><SelectValue placeholder="10개씩 보기" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="10">10개씩 보기</SelectItem>
-              <SelectItem value="20">20개씩 보기</SelectItem>
-              <SelectItem value="50">50개씩 보기</SelectItem>
-            </SelectContent>
-          </Select>
+          <select defaultValue="latest" className="h-8 rounded-2xl border border-transparent bg-input/50 px-3 text-sm text-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/30 w-32">
+                  <option value="latest">최종수정일순</option>
+                  <option value="name">파트너사명순</option>
+                </select>
+          <select defaultValue="10" className="h-8 rounded-2xl border border-transparent bg-input/50 px-3 text-sm text-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/30 w-28">
+                  <option value="10">10개씩 보기</option>
+                  <option value="20">20개씩 보기</option>
+                  <option value="50">50개씩 보기</option>
+                </select>
         </div>
       </div>
 

@@ -90,13 +90,13 @@ export default async function LeavePage() {
       )}
 
       {/* 전체 직원 휴가 현황 */}
-      <Card className="shadow-xs py-0">
+      <Card className="shadow-xs">
         <CardHeader>
           <CardTitle className="text-base font-semibold text-foreground">
             전체 직원 휴가 현황
           </CardTitle>
         </CardHeader>
-        <CardContent className="p-0">
+        <CardContent>
           {allRequests.length === 0 ? (
             <div className="flex flex-col items-center gap-3 py-12 text-center">
               <CalendarOff className="size-6 text-muted-foreground" />
@@ -139,13 +139,13 @@ export default async function LeavePage() {
       </Card>
 
       {/* 내 휴가 신청 내역 */}
-      <Card className="shadow-xs py-0">
+      <Card className="shadow-xs">
         <CardHeader>
           <CardTitle className="text-base font-semibold text-foreground">
             내 휴가 신청 내역
           </CardTitle>
         </CardHeader>
-        <CardContent className="p-0">
+        <CardContent>
           {myRequests.length === 0 ? (
             <div className="flex flex-col items-center gap-3 py-12 text-center">
               <CalendarOff className="size-6 text-muted-foreground" />

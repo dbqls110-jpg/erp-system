@@ -4,13 +4,6 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import {
   Table,
   TableBody,
   TableCell,
@@ -84,66 +77,30 @@ export default function VenuesPage() {
         <CardContent className="space-y-3 pt-(--card-spacing)">
           <div className="flex flex-wrap items-center gap-3">
             <span className="w-20 shrink-0 text-sm text-muted-foreground">자치구</span>
-            <Select defaultValue="전체">
-              <SelectTrigger className="h-8 w-44">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {districts.map((district) => (
-                  <SelectItem key={district} value={district}>
-                    {district}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <select defaultValue="전체" className="h-8 rounded-2xl border border-transparent bg-input/50 px-3 text-sm text-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/30 w-44">
+
+                </select>
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
             <span className="w-20 shrink-0 text-sm text-muted-foreground">유형</span>
-            <Select defaultValue="전체">
-              <SelectTrigger className="h-8 w-52">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {venueTypes.map((venueType) => (
-                  <SelectItem key={venueType} value={venueType}>
-                    {venueType}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <select defaultValue="전체" className="h-8 rounded-2xl border border-transparent bg-input/50 px-3 text-sm text-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/30 w-52">
+
+                </select>
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
             <span className="w-20 shrink-0 text-sm text-muted-foreground">수용인원</span>
-            <Select defaultValue="전체">
-              <SelectTrigger className="h-8 w-44">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {capacityOptions.map((capacity) => (
-                  <SelectItem key={capacity} value={capacity}>
-                    {capacity}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <select defaultValue="전체" className="h-8 rounded-2xl border border-transparent bg-input/50 px-3 text-sm text-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/30 w-44">
+
+                </select>
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
             <span className="w-20 shrink-0 text-sm text-muted-foreground">주말이용</span>
-            <Select defaultValue="전체">
-              <SelectTrigger className="h-8 w-44">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {weekendOptions.map((weekend) => (
-                  <SelectItem key={weekend} value={weekend}>
-                    {weekend}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <select defaultValue="전체" className="h-8 rounded-2xl border border-transparent bg-input/50 px-3 text-sm text-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/30 w-44">
+
+                </select>
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
@@ -169,25 +126,15 @@ export default function VenuesPage() {
             <Download className="size-3.5" />
             엑셀 다운로드
           </Button>
-          <Select defaultValue="latest">
-            <SelectTrigger className="h-8 w-32">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="latest">최신 등록순</SelectItem>
-              <SelectItem value="name">공간명순</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select defaultValue="10">
-            <SelectTrigger className="h-8 w-28">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="10">10개씩 보기</SelectItem>
-              <SelectItem value="20">20개씩 보기</SelectItem>
-              <SelectItem value="50">50개씩 보기</SelectItem>
-            </SelectContent>
-          </Select>
+          <select defaultValue="latest" className="h-8 rounded-2xl border border-transparent bg-input/50 px-3 text-sm text-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/30 w-32">
+                  <option value="latest">최신 등록순</option>
+                  <option value="name">공간명순</option>
+                </select>
+          <select defaultValue="10" className="h-8 rounded-2xl border border-transparent bg-input/50 px-3 text-sm text-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/30 w-28">
+                  <option value="10">10개씩 보기</option>
+                  <option value="20">20개씩 보기</option>
+                  <option value="50">50개씩 보기</option>
+                </select>
         </div>
       </div>
 
