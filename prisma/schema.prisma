@@ -14,23 +14,23 @@ model User {
   name          String?
   image         String?
   role          String    @default("pending") // "admin" | "user" | "pending"
-  isAgent       Boolean   @default(false)     // true = Agent bot
-  agentType     String?                        // "hermes" | "marketer" | null
+  isAgent       Boolean   @default(false) // true = Agent bot
+  agentType     String? // "hermes" | "marketer" | null
   active        Boolean   @default(true)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-  accounts      Account[]
-  sessions      Session[]
-  attendances   Attendance[]
-  leaveBalances LeaveBalance[]
-  leaveRequests LeaveRequest[]
-  expenses      Expense[]
-  businessCards   BusinessCard[]
-  calendarEvents    CalendarEvent[]
-  conversationsAsA  Conversation[]  @relation("ConvA")
-  conversationsAsB  Conversation[]  @relation("ConvB")
-  sentMessages      Message[]       @relation("MessageSender")
+  accounts         Account[]
+  sessions         Session[]
+  attendances      Attendance[]
+  leaveBalances    LeaveBalance[]
+  leaveRequests    LeaveRequest[]
+  expenses         Expense[]
+  businessCards    BusinessCard[]
+  calendarEvents   CalendarEvent[]
+  conversationsAsA Conversation[]  @relation("ConvA")
+  conversationsAsB Conversation[]  @relation("ConvB")
+  sentMessages     Message[]       @relation("MessageSender")
 
   @@map("users")
 }
@@ -80,7 +80,7 @@ model VerificationToken {
 model Attendance {
   id        String    @id @default(cuid())
   userId    String
-  date      String    // "YYYY-MM-DD"
+  date      String // "YYYY-MM-DD"
   clockIn   DateTime?
   clockOut  DateTime?
   workHours Float?
@@ -115,16 +115,16 @@ model LeaveBalance {
 model LeaveRequest {
   id           String   @id @default(cuid())
   userId       String
-  type         String   // "annual" | "half_am" | "half_pm" | "hourly"
-  startDate    String   // "YYYY-MM-DD"
-  endDate      String   // "YYYY-MM-DD"
+  type         String // "annual" | "half_am" | "half_pm" | "hourly"
+  startDate    String // "YYYY-MM-DD"
+  endDate      String // "YYYY-MM-DD"
   startTime    String?
   endTime      String?
   days         Float
   reason       String?
   status       String   @default("pending") // "pending" | "approved" | "rejected"
   adminNote    String?
-  notionPageId String?  // Notion page ID (승인 시 생성)
+  notionPageId String? // Notion page ID (승인 시 생성)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -146,8 +146,8 @@ model Project {
   progress     Float    @default(0)
   assignee     String?
   memo         String?
-  revenue      Float?   // 매출
-  cost         Float?   // 매입
+  revenue      Float? // 매출
+  cost         Float? // 매입
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -166,7 +166,9 @@ model ProjectFile {
   name        String
   mimeType    String
   driveUrl    String
-  /** 파일명으로 판정한 종류(견적서·포스터 등). 판정 실패 시 null. */
+  /**
+   * 파일명으로 판정한 종류(견적서·포스터 등). 판정 실패 시 null.
+   */
   category    String?
   size        Int?
   createdAt   DateTime @default(now())
@@ -177,15 +179,17 @@ model ProjectFile {
 }
 
 model ChecklistItem {
-  id        String   @id @default(cuid())
-  projectId String
-  content   String
-  isDone    Boolean  @default(false)
-  /** 체크한 시각. 체크 해제하면 null 로 되돌린다. */
+  id          String    @id @default(cuid())
+  projectId   String
+  content     String
+  isDone      Boolean   @default(false)
+  /**
+   * 체크한 시각. 체크 해제하면 null 로 되돌린다.
+   */
   completedAt DateTime?
-  order     Int      @default(0)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  order       Int       @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
@@ -197,8 +201,8 @@ model FixedExpense {
   id         String   @id @default(cuid())
   name       String
   amount     Float
-  dayOfMonth Int      // 매달 몇일
-  category   String   // "rent" | "salary" | "telecom" | "supplies" | "food" | "other"
+  dayOfMonth Int // 매달 몇일
+  category   String // "rent" | "salary" | "telecom" | "supplies" | "food" | "other"
   order      Int      @default(0)
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
@@ -222,12 +226,12 @@ model Budget {
 model Expense {
   id             String   @id @default(cuid())
   userId         String
-  date           String   // "YYYY-MM-DD"
+  date           String // "YYYY-MM-DD"
   title          String
-  category       String   // "rent" | "salary" | "telecom" | "supplies" | "food" | "other"
+  category       String // "rent" | "salary" | "telecom" | "supplies" | "food" | "other"
   amount         Float
   memo           String?
-  fixedExpenseId String?  // 고정비에서 생성된 경우
+  fixedExpenseId String? // 고정비에서 생성된 경우
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
@@ -240,11 +244,11 @@ model Expense {
 
 // ─── 메신저 ───────────────────────────────────────────────
 model Conversation {
-  id           String    @id @default(cuid())
-  participantA String
-  participantB String
+  id            String   @id @default(cuid())
+  participantA  String
+  participantB  String
   lastMessageAt DateTime @default(now())
-  createdAt    DateTime  @default(now())
+  createdAt     DateTime @default(now())
 
   userA    User      @relation("ConvA", fields: [participantA], references: [id], onDelete: Cascade)
   userB    User      @relation("ConvB", fields: [participantB], references: [id], onDelete: Cascade)
@@ -255,12 +259,12 @@ model Conversation {
 }
 
 model Message {
-  id             String       @id @default(cuid())
+  id             String    @id @default(cuid())
   conversationId String
   senderId       String
   content        String
   readAt         DateTime?
-  createdAt      DateTime     @default(now())
+  createdAt      DateTime  @default(now())
 
   conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   sender       User         @relation("MessageSender", fields: [senderId], references: [id], onDelete: Cascade)
@@ -273,12 +277,12 @@ model Message {
 // ─── Agent 감사 로그 ──────────────────────────────────────
 model AgentAuditLog {
   id        String   @id @default(cuid())
-  method    String   // GET | POST | PATCH
-  endpoint  String   // /api/agent/projects
-  action    String   // create_project | update_project | send_message ...
+  method    String // GET | POST | PATCH
+  endpoint  String // /api/agent/projects
+  action    String // create_project | update_project | send_message ...
   dryRun    Boolean  @default(false)
-  payload   Json?    // 요청 내용
-  result    Json?    // 결과 (dryRun이면 예상 결과)
+  payload   Json? // 요청 내용
+  result    Json? // 결과 (dryRun이면 예상 결과)
   createdAt DateTime @default(now())
 
   @@index([createdAt])
@@ -289,11 +293,11 @@ model AgentAuditLog {
 model CalendarEvent {
   id           String   @id @default(cuid())
   title        String
-  date         String   // "YYYY-MM-DD"
-  endDate      String?  // "YYYY-MM-DD"
+  date         String // "YYYY-MM-DD"
+  endDate      String? // "YYYY-MM-DD"
   color        String   @default("gray") // "gray" | "blue" | "green" | "red" | "yellow" | "purple"
   createdBy    String
-  notionPageId String?  // Notion page ID (양방향 동기화용)
+  notionPageId String? // Notion page ID (양방향 동기화용)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -305,13 +309,13 @@ model CalendarEvent {
 // ─── ID 데이터베이스 ──────────────────────────────────────
 model Credential {
   id        String   @id @default(cuid())
-  name      String   // 서비스명
-  company   String?  // 회사
-  category  String?  // 구분 (나라장터, Google, Naver, etc.)
-  username  String?  // 아이디
-  password  String?  // 비밀번호
-  memo      String?  // 비고
-  url       String?  // 링크
+  name      String // 서비스명
+  company   String? // 회사
+  category  String? // 구분 (나라장터, Google, Naver, etc.)
+  username  String? // 아이디
+  password  String? // 비밀번호
+  memo      String? // 비고
+  url       String? // 링크
   order     Int      @default(0)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -337,10 +341,10 @@ model SheetLink {
 model AgentMessageProcessing {
   id              String    @id @default(cuid())
   messageId       String
-  agentType       String    // "hermes" | "marketer"
+  agentType       String // "hermes" | "marketer"
   status          String    @default("processed") // "processing" | "processed" | "error"
   processedAt     DateTime?
-  resultMessageId String?   // 답장 messageId
+  resultMessageId String? // 답장 messageId
   error           String?
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
@@ -353,10 +357,10 @@ model AgentMessageProcessing {
 // ─── Agent 기억 ───────────────────────────────────────────
 model AgentMemory {
   id        String   @id @default(cuid())
-  agentType String   // "hermes" | "marketer"
-  source    String   // "discord" | "erp" | "manual"
-  title     String   // 짧은 제목/키워드 (최대 100자)
-  content   String   // 요약된 운영 규칙
+  agentType String // "hermes" | "marketer"
+  source    String // "discord" | "erp" | "manual"
+  title     String // 짧은 제목/키워드 (최대 100자)
+  content   String // 요약된 운영 규칙
   tags      String[] // 태그 배열 (선택)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -368,12 +372,12 @@ model AgentMemory {
 // ─── Agent 실시간 작업 큐 ────────────────────────────────
 model AgentJob {
   id          String    @id @default(cuid())
-  agentType   String    // "hermes" | "marketer"
-  userId      String    // 요청자 userId
+  agentType   String // "hermes" | "marketer"
+  userId      String // 요청자 userId
   status      String    @default("pending") // "pending" | "accepted" | "processing" | "completed" | "error"
-  input       String    // 작업 내용 (메시지 또는 task)
-  output      String?   // 최종 응답
-  errorMsg    String?   // 오류 메시지
+  input       String // 작업 내용 (메시지 또는 task)
+  output      String? // 최종 응답
+  errorMsg    String? // 오류 메시지
   claimedAt   DateTime? // 브릿지가 수락한 시각
   completedAt DateTime?
   createdAt   DateTime  @default(now())
@@ -391,8 +395,8 @@ model AgentJob {
 model AgentJobDelta {
   id        String   @id @default(cuid())
   jobId     String
-  seq       Int      // 순서 번호 (0부터)
-  content   String   // 부분 출력 텍스트
+  seq       Int // 순서 번호 (0부터)
+  content   String // 부분 출력 텍스트
   createdAt DateTime @default(now())
 
   job AgentJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
@@ -404,21 +408,29 @@ model AgentJobDelta {
 
 // ─── Agent 브릿지 하트비트 ──────────────────────────────
 model AgentBridgeHeartbeat {
-  id        String   @id @default(cuid())
-  agentType String   @unique // "hermes" | "marketer"
-  lastSeenAt DateTime @default(now())
-  version   String?
-  hostname  String?
-  /** 브릿지가 마지막으로 보고한 상태: "idle" | "working" | "error" */
-  status    String?
-  /** 마지막 오류 요약. 회사 PC 로그를 직접 볼 수 없으므로 여기로 올려 받는다. */
-  lastError String?
-  /** 오류 발생 시각 */
+  id          String    @id @default(cuid())
+  agentType   String    @unique // "hermes" | "marketer"
+  lastSeenAt  DateTime  @default(now())
+  version     String?
+  hostname    String?
+  /**
+   * 브릿지가 마지막으로 보고한 상태: "idle" | "working" | "error"
+   */
+  status      String?
+  /**
+   * 마지막 오류 요약. 회사 PC 로그를 직접 볼 수 없으므로 여기로 올려 받는다.
+   */
+  lastError   String?
+  /**
+   * 오류 발생 시각
+   */
   lastErrorAt DateTime?
-  /** 브릿지가 쓰는 모델·추론강도. 설정이 의도대로인지 확인용. */
-  model     String?
-  effort    String?
-  updatedAt DateTime @updatedAt
+  /**
+   * 브릿지가 쓰는 모델·추론강도. 설정이 의도대로인지 확인용.
+   */
+  model       String?
+  effort      String?
+  updatedAt   DateTime  @updatedAt
 
   @@map("agent_bridge_heartbeats")
 }
@@ -426,15 +438,15 @@ model AgentBridgeHeartbeat {
 // ─── Google Drive 검색 색인 ───────────────────────────────
 // 원본 파일은 Drive에 두고 검색에 필요한 텍스트 조각과 메타데이터만 저장한다.
 model DriveIndexFolder {
-  id            String   @id @default(cuid())
-  driveFolderId String   @unique
+  id            String    @id @default(cuid())
+  driveFolderId String    @unique
   name          String
   webViewLink   String?
-  active        Boolean  @default(true)
-  allowedRoles  String[] @default(["admin"])
+  active        Boolean   @default(true)
+  allowedRoles  String[]  @default(["admin"])
   lastScannedAt DateTime?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
   files DriveIndexFile[]
 
@@ -443,7 +455,7 @@ model DriveIndexFolder {
 }
 
 model DriveIndexFile {
-  id            String   @id @default(cuid())
+  id            String    @id @default(cuid())
   folderId      String
   driveFileId   String
   name          String
@@ -451,14 +463,14 @@ model DriveIndexFile {
   webViewLink   String?
   modifiedTime  DateTime?
   sizeBytes     String?
-  status        String   @default("pending") // indexed | metadata_only | skipped | error | deleted
+  status        String    @default("pending") // indexed | metadata_only | skipped | error | deleted
   skipReason    String?
   contentHash   String?
   lastIndexedAt DateTime?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
-  folder DriveIndexFolder @relation(fields: [folderId], references: [id], onDelete: Cascade)
+  folder DriveIndexFolder  @relation(fields: [folderId], references: [id], onDelete: Cascade)
   chunks DriveIndexChunk[]
 
   @@unique([folderId, driveFileId])
@@ -517,9 +529,17 @@ model AccessLevel {
 }
 
 model MenuAccess {
-  id        String   @id @default(cuid())
-  menuKey   String
-  levelKey  String
+  id       String @id @default(cuid())
+  menuKey  String
+  levelKey String
+
+  /// 메뉴에 들어갈 수 있는지. 기존 행은 전부 접근 허용이었으므로 기본값이 true 다.
+  canView Boolean @default(true)
+
+  /// 메뉴 안에서 자료를 고칠 수 있는지. 접근보다 좁은 권한이라 기본값은 false 다.
+  /// canView 없이 canEdit 만 켜지는 조합은 의미가 없으므로 화면에서 막는다.
+  canEdit Boolean @default(false)
+
   createdAt DateTime @default(now())
 
   @@unique([menuKey, levelKey])
@@ -533,9 +553,13 @@ model Customer {
   manager   String?
   phone     String?
   email     String?
-  /** "고객사" | "협력사" | "공급사" */
+  /**
+   * "고객사" | "협력사" | "공급사"
+   */
   category  String?
-  /** "거래중" | "보류" | "종료" */
+  /**
+   * "거래중" | "보류" | "종료"
+   */
   status    String   @default("거래중")
   memo      String?
   createdAt DateTime @default(now())
@@ -552,11 +576,15 @@ model Partner {
   name           String
   manager        String?
   phone          String?
-  /** "진행중" | "만료" | "대기" */
+  /**
+   * "진행중" | "만료" | "대기"
+   */
   contractStatus String   @default("대기")
   contractStart  String?
   contractEnd    String?
-  /** "월정산" | "건별" */
+  /**
+   * "월정산" | "건별"
+   */
   settlementType String?
   memo           String?
   createdAt      DateTime @default(now())
@@ -568,7 +596,9 @@ model Partner {
   @@map("partners")
 }
 
-/** 프로젝트 ↔ 거래처 (다대다). 비고에 문자열로 적지 않고 관계로 잇는다. */
+/**
+ * 프로젝트 ↔ 거래처 (다대다). 비고에 문자열로 적지 않고 관계로 잇는다.
+ */
 model ProjectCustomer {
   projectId  String
   customerId String

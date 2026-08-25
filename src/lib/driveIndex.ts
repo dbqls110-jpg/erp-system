@@ -505,6 +505,12 @@ interface DriveSearchRow {
 export async function searchDriveIndex(query: string, role: string, limit = 5): Promise<DriveSearchResult[]> {
   const tokens = extractDriveSearchTokens(query);
   if (tokens.length === 0) return [];
+
+  // allowedRoles 에는 폴더를 만들 때 "admin" 또는 "직원 전체"를 뜻하는 "user" 가
+  // 저장돼 있다. 조직 레벨(manager/member/partner)이 생기면서 role 값이 바뀌었으므로
+  // 관리자가 아닌 레벨은 저장된 "user" 표식과도 맞춰본다. 그러지 않으면 기존 폴더가
+  // 전부 검색에서 사라진다.
+  const roleKeys = role === "admin" ? ["admin"] : [role, "user"];
   const conditions = tokens.flatMap((token) => [
     Prisma.sql`file."name" ILIKE ${`%${token}%`}`,
     Prisma.sql`chunk."content" ILIKE ${`%${token}%`}`,
@@ -521,7 +527,7 @@ export async function searchDriveIndex(query: string, role: string, limit = 5): 
     JOIN "drive_index_folders" folder ON folder."id" = file."folderId"
     LEFT JOIN "drive_index_chunks" chunk ON chunk."fileId" = file."id"
     WHERE folder."active" = true
-      AND ${role} = ANY(folder."allowedRoles")
+      AND folder."allowedRoles" && ${roleKeys}::text[]
       AND file."status" IN ('indexed', 'metadata_only', 'skipped')
       AND (${Prisma.join(conditions, " OR ")})
     ORDER BY
