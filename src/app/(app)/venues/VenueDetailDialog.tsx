@@ -65,6 +65,7 @@ interface Venue {
   rentalItems: string | null;
   phone: string | null;
   reserveUrl: string | null;
+  reserveMethod: string | null;
   lat: number | null;
   lng: number | null;
   calledAt: string | null;
@@ -180,6 +181,43 @@ function getApiError(response: Response) {
     .catch(() => "공간 정보를 불러오지 못했습니다.");
 }
 
+function ReserveInfo({ reserveMethod, reserveUrl }: { reserveMethod: string | null; reserveUrl: string | null }) {
+  const online = reserveMethod === "온라인예약";
+
+  if (online && reserveUrl) {
+    return (
+      <a className="text-primary underline-offset-4 hover:underline" href={reserveUrl} target="_blank" rel="noreferrer">
+        온라인 예약
+      </a>
+    );
+  }
+  if (online) {
+    return <span className="text-muted-foreground">온라인예약 · 주소 미상</span>;
+  }
+  if (reserveUrl) {
+    if (reserveMethod) {
+      return (
+        <>
+          <span className="text-muted-foreground">{reserveMethod === "확인필요" ? "확인 필요" : reserveMethod}</span>
+          <span className="text-muted-foreground"> · </span>
+          <a className="text-primary underline-offset-4 hover:underline" href={reserveUrl} target="_blank" rel="noreferrer">
+            안내
+          </a>
+        </>
+      );
+    }
+    return (
+      <a className="text-primary underline-offset-4 hover:underline" href={reserveUrl} target="_blank" rel="noreferrer">
+        안내 페이지
+      </a>
+    );
+  }
+  if (reserveMethod && reserveMethod !== "확인필요") {
+    return <span className="text-muted-foreground">{reserveMethod}</span>;
+  }
+  return <span className="text-muted-foreground">확인 필요</span>;
+}
+
 export function VenueDetailDialog({
   venueId,
   onClose,
@@ -281,19 +319,10 @@ function VenueDetailContent({ detail }: { detail: VenueDetailResponse }) {
         <DialogDescription>
           {[venue.district, venue.type, venue.address].filter(hasValue).join(" · ")}
         </DialogDescription>
-        {(venue.phone || venue.reserveUrl) && (
+        {(venue.phone || venue.reserveMethod || venue.reserveUrl) && (
           <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
             {venue.phone && <a className="text-primary underline-offset-4 hover:underline" href={`tel:${venue.phone}`}>{venue.phone}</a>}
-            {venue.reserveUrl && (
-              <a
-                className="text-primary underline-offset-4 hover:underline"
-                href={venue.reserveUrl}
-                target="_blank"
-                rel="noreferrer"
-              >
-                예약 페이지
-              </a>
-            )}
+            <ReserveInfo reserveMethod={venue.reserveMethod} reserveUrl={venue.reserveUrl} />
           </div>
         )}
       </DialogHeader>

@@ -131,8 +131,12 @@ function trustClass(trust: ResolvedPriceView["trust"]) {
 /**
  * 신청 방법.
  *
- * 예약 URL 이 있는 3,414곳 중 절반 넘게가 실제로는 전화로만 받는다. 전부 "예약"
- * 링크로 보여 주면 눌러 봐야 예약이 안 되는 안내 페이지가 열린다.
+ * 예약 URL 이 있는 3,414곳 중 1,712곳이 실제로는 전화로만 받는다. 전부 "예약" 링크로
+ * 보여 주면 눌러 봐야 예약이 안 되는 안내 페이지가 열린다. 그래서 접수 방법과
+ * 안내 페이지를 나눠 보여 준다 — 링크가 없어지는 것이 아니라 무엇인지 밝히는 것이다.
+ *
+ * 온라인예약인데 주소를 모르는 곳도 67곳 있다. 그냥 "온라인예약" 이라고만 두면
+ * 눌러 보고 왜 안 눌리는지 묻게 된다.
  */
 function ReserveCell({ venue }: { venue: CandidateVenue }) {
   const method = venue.reserveMethod;
@@ -145,16 +149,29 @@ function ReserveCell({ venue }: { venue: CandidateVenue }) {
       </a>
     );
   }
-  if (method && method !== "확인필요") {
-    // 링크가 있어도 실제 접수는 다른 경로다. 방법을 글자로 알려 주는 편이 정직하다.
-    return <span className="text-muted-foreground">{method}</span>;
+  if (online) {
+    return <span className="text-muted-foreground">온라인예약 · 주소 미상</span>;
   }
   if (venue.reserveUrl) {
+    if (method) {
+      return (
+        <>
+          <span className="text-muted-foreground">{method === "확인필요" ? "확인 필요" : method}</span>
+          <span className="text-muted-foreground"> · </span>
+          <a href={venue.reserveUrl} target="_blank" rel="noreferrer" className="text-primary hover:underline">
+            안내
+          </a>
+        </>
+      );
+    }
     return (
       <a href={venue.reserveUrl} target="_blank" rel="noreferrer" className="text-primary hover:underline">
         안내 페이지
       </a>
     );
+  }
+  if (method && method !== "확인필요") {
+    return <span className="text-muted-foreground">{method}</span>;
   }
   return <span className="text-muted-foreground">확인 필요</span>;
 }
