@@ -130,9 +130,19 @@ async function main() {
     // 원본이 옮겨지는 것이 아니라 바로가기만 생긴다. 원본은 상대 드라이브에 남고,
     // 그쪽에서 지우면 우리 폴더에서도 사라진다. 정리한 것처럼 보이지만 아니다.
     if (meta.data.ownedByMe === false) {
-      const owner = meta.data.owners?.[0]?.emailAddress ?? "?";
-      console.log(`  건너뜀: ${link.name} — 남의 소유(${owner}). 공유 문서함에 그대로 둔다.`);
+      const owner = meta.data.owners?.[0]?.emailAddress ?? "(알 수 없음)";
+      // 옮기지는 못해도 화면에 표시는 남긴다. 그래야 "왜 이것만 정리가 안 됐지"를
+      // 다시 묻지 않는다. 설명란에는 사람이 쓴 메모가 있어 건드리지 않는다.
+      if (!DRY_RUN && link.externalOwner !== owner) {
+        await prisma.sheetLink.update({ where: { id: link.id }, data: { externalOwner: owner } });
+      }
+      console.log(`  건너뜀: ${link.name} — 외부 소유(${owner}). 표시만 남긴다.`);
       continue;
+    }
+
+    // 우리 것으로 넘어왔으면 표시를 지운다. 낡은 경고가 남아 있으면 더 헷갈린다.
+    if (!DRY_RUN && link.externalOwner) {
+      await prisma.sheetLink.update({ where: { id: link.id }, data: { externalOwner: null } });
     }
 
     const where = await pathOf(drive, fileId).catch(() => "(알 수 없음)");
