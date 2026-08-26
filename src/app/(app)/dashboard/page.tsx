@@ -1,6 +1,7 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { getAccessibleMenus } from "@/lib/permissions";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Clock, FolderKanban, Banknote, Calendar, CalendarCheck, Palmtree } from "lucide-react";
 import { format } from "date-fns";
@@ -19,6 +20,12 @@ export default async function DashboardPage() {
 
   const weekLater = format(new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000), "yyyy-MM-dd");
 
+  // 대시보드는 전원이 들어오는 화면이라 여기서 집계를 그대로 보여주면 메뉴 권한이
+  // 무의미해진다. 실제로 사원·파트너에게 회사 예산이 그대로 보이고 있었다.
+  // 위젯마다 해당 메뉴 접근 권한이 있을 때만 값을 계산하고 내보낸다.
+  const allowed = await getAccessibleMenus(session!.user.id, session!.user.role);
+  const canSee = (menuKey: string) => allowed.has(menuKey);
+
   // 근태 쿼리 2개 → 1개로 통합 (today 포함 이번달 전체)
   const [monthlyAttendance, activeProjects, budget, expenses, upcomingEvents, leaveBalance, fixedExpenses] = await Promise.all([
     prisma.attendance.findMany({
@@ -26,20 +33,29 @@ export default async function DashboardPage() {
       select: { date: true, clockIn: true, clockOut: true },
       orderBy: { date: "desc" },
     }),
-    prisma.project.count({ where: { status: "active" } }),
-    prisma.budget.findUnique({ where: { year_month: { year, month } }, select: { amount: true } }),
-    prisma.expense.aggregate({ where: { date: { gte: monthStart }, fixedExpenseId: null }, _sum: { amount: true } }),
-    prisma.project.findMany({
-      where: { status: "active", deadline: { gte: today, lte: weekLater } },
-      select: { id: true, name: true, deadline: true },
-      orderBy: { deadline: "asc" },
-      take: 5,
-    }),
+    canSee("projects") ? prisma.project.count({ where: { status: "active" } }) : 0,
+    canSee("finance")
+      ? prisma.budget.findUnique({ where: { year_month: { year, month } }, select: { amount: true } })
+      : null,
+    canSee("finance")
+      ? prisma.expense.aggregate({
+          where: { date: { gte: monthStart }, fixedExpenseId: null },
+          _sum: { amount: true },
+        })
+      : { _sum: { amount: 0 } },
+    canSee("projects")
+      ? prisma.project.findMany({
+          where: { status: "active", deadline: { gte: today, lte: weekLater } },
+          select: { id: true, name: true, deadline: true },
+          orderBy: { deadline: "asc" },
+          take: 5,
+        })
+      : [],
     prisma.leaveBalance.findUnique({
       where: { userId_year: { userId: session!.user.id, year } },
       select: { totalDays: true, usedDays: true, pendingDays: true },
     }),
-    prisma.fixedExpense.aggregate({ _sum: { amount: true } }),
+    canSee("finance") ? prisma.fixedExpense.aggregate({ _sum: { amount: true } }) : { _sum: { amount: 0 } },
   ]);
 
   const attendance = monthlyAttendance.find((r) => r.date === today) ?? null;
@@ -55,6 +71,7 @@ export default async function DashboardPage() {
   const widgets = [
     {
       href: "/attendance",
+      menuKey: "attendance",
       title: "오늘 출근",
       icon: <Clock size={16} className="text-primary" />,
       value: attendance?.clockIn ? format(new Date(attendance.clockIn), "HH:mm") : "미출근",
@@ -64,6 +81,7 @@ export default async function DashboardPage() {
     },
     {
       href: "/projects",
+      menuKey: "projects",
       title: "진행 중 프로젝트",
       icon: <FolderKanban size={16} className="text-primary" />,
       value: `${activeProjects}건`,
@@ -71,6 +89,7 @@ export default async function DashboardPage() {
     },
     {
       href: "/finance",
+      menuKey: "finance",
       title: "이번 달 잔여 예산",
       icon: <Banknote size={16} className="text-primary" />,
       value: remaining !== null ? `${remaining.toLocaleString()}원` : "미설정",
@@ -78,6 +97,7 @@ export default async function DashboardPage() {
     },
     {
       href: "/calendar",
+      menuKey: "projects",
       title: "이번 주 마감",
       icon: <Calendar size={16} className="text-destructive" />,
       value: `${upcomingEvents.length}건`,
@@ -85,6 +105,7 @@ export default async function DashboardPage() {
     },
     {
       href: "/attendance",
+      menuKey: "attendance",
       title: "이번달 근무일수",
       icon: <CalendarCheck size={16} className="text-primary" />,
       value: `${workDaysCount}일`,
@@ -92,12 +113,15 @@ export default async function DashboardPage() {
     },
     {
       href: "/leave",
+      menuKey: "leave",
       title: "잔여 휴가",
       icon: <Palmtree size={16} className="text-primary" />,
       value: remainingLeave !== null ? `${remainingLeave}일` : "미설정",
       sub: leaveBalance ? `총 ${leaveBalance.totalDays}일 중 ${leaveBalance.usedDays}일 사용` : "휴가 잔여일 미설정",
     },
   ];
+
+  const visibleWidgets = widgets.filter((w) => canSee(w.menuKey));
 
   return (
     <div className="space-y-4">
@@ -106,7 +130,7 @@ export default async function DashboardPage() {
       </div>
 
       <div className="grid grid-cols-1 gap-4 @xl/main:grid-cols-3">
-        {widgets.map((w) => (
+        {visibleWidgets.map((w) => (
           <Link key={w.href + w.title} href={w.href}>
             <Card className="@container/card h-full shadow-xs transition-all hover:border-primary/20 hover:shadow-sm cursor-pointer">
               <CardHeader>

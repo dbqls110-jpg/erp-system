@@ -1,3 +1,6 @@
+import { getServerSession } from "next-auth";
+import { requireMenuAccess } from "@/lib/permissions";
+import { authOptions } from "@/lib/auth";
 import { Download, Handshake, Plus, RefreshCw } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -16,6 +19,9 @@ import { toneBadgeClass } from "@/lib/badge-tone"
 import { prisma } from "@/lib/prisma"
 
 export default async function PartnersPage() {
+  // 사이드바에서 메뉴를 숨기는 것만으로는 못 막는다. 주소를 직접 치면 그냥 열린다.
+  const session = await getServerSession(authOptions);
+  await requireMenuAccess(session!.user.id, "partners", session!.user.role);
   const rows = await prisma.partner.findMany({
     orderBy: { updatedAt: "desc" },
     include: { projects: { include: { project: { select: { id: true, name: true } } } } },

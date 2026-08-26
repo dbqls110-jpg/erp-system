@@ -86,3 +86,20 @@ export async function requireMenuEdit(userId: string, menuKey: string, role?: st
     throw new Error("수정 권한이 없습니다.");
   }
 }
+
+/**
+ * 페이지 진입 가드. 접근 권한이 없으면 대시보드로 돌려보낸다.
+ *
+ * 사이드바에서 메뉴를 숨기는 것만으로는 아무것도 막지 못한다. 주소를 직접 치면
+ * 그냥 열리기 때문이다. 서버 컴포넌트 맨 위에서 이 함수를 부르는 것이 실제 차단이다.
+ *
+ * 대시보드로 보내는 이유는 404 나 오류 화면보다 낫기 때문이다. 권한이 없는 것은
+ * 잘못이 아니라 정상 상태다.
+ */
+export async function requireMenuAccess(userId: string, menuKey: string, role?: string) {
+  const { role: resolved, menuAccess } = await getUserAndMenuAccess(userId, role);
+  if (resolved === undefined || !resolveMenuAccess(resolved, menuKey, menuAccess).view) {
+    const { redirect } = await import("next/navigation");
+    redirect("/dashboard");
+  }
+}

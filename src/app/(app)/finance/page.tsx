@@ -1,4 +1,5 @@
 import { getServerSession } from "next-auth";
+import { requireMenuAccess } from "@/lib/permissions";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -30,6 +31,7 @@ export default async function FinancePage({
 }) {
   const params = await searchParams;
   const session = await getServerSession(authOptions);
+  await requireMenuAccess(session!.user.id, "finance", session!.user.role);
   const isAdmin = session?.user?.role === "admin";
   const now = new Date();
   const year = params.year ? parseInt(params.year) : now.getFullYear();

@@ -1,4 +1,5 @@
 import { getServerSession } from "next-auth";
+import { requireMenuAccess } from "@/lib/permissions";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { canEditMenu } from "@/lib/permissions";
@@ -8,6 +9,7 @@ import { CredentialTable } from "./CredentialTable";
 // 인증/권한은 (app)/layout.tsx 가 담당한다(세션 없으면 /login, pending 이면 /pending).
 export default async function CredentialsPage() {
   const session = await getServerSession(authOptions);
+  await requireMenuAccess(session!.user.id, "credentials", session!.user.role);
   const canEdit = session?.user?.id
     ? await canEditMenu(session.user.id, "credentials", session.user.role)
     : false;

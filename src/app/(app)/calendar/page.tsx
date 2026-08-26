@@ -1,8 +1,14 @@
+import { getServerSession } from "next-auth";
+import { requireMenuAccess } from "@/lib/permissions";
+import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getNotionEvents } from "@/lib/notion";
 import { CalendarView } from "./CalendarView";
 
 export default async function CalendarPage() {
+  // 사이드바에서 메뉴를 숨기는 것만으로는 못 막는다. 주소를 직접 치면 그냥 열린다.
+  const session = await getServerSession(authOptions);
+  await requireMenuAccess(session!.user.id, "calendar", session!.user.role);
   const now = new Date();
   const year = now.getFullYear();
   const month = now.getMonth() + 1;

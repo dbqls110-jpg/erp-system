@@ -1,4 +1,5 @@
 import { getServerSession } from "next-auth";
+import { requireMenuAccess } from "@/lib/permissions";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -26,6 +27,7 @@ export default async function ProjectsPage({
   const currentFilter = ["active", "completed", "on_hold"].includes(status ?? "") ? status! : "all";
 
   const session = await getServerSession(authOptions);
+  await requireMenuAccess(session!.user.id, "projects", session!.user.role);
   const isAdmin = session?.user?.role === "admin";
 
   const whereStatus = currentFilter === "all" ? {} : { status: currentFilter };

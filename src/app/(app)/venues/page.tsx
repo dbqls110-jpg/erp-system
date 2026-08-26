@@ -1,3 +1,6 @@
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
+import { requireMenuAccess } from "@/lib/permissions";
 import { Download, MapPin, Plus, RefreshCw } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -54,7 +57,11 @@ const venueTypes = [
 const capacityOptions = ["전체", "100명 미만", "100~300", "300~500", "500명 이상"]
 const weekendOptions = ["전체", "가능", "불가", "사전협의"]
 
-export default function VenuesPage() {
+export default async function VenuesPage() {
+  // 사이드바에서 메뉴를 숨기는 것만으로는 못 막는다. 주소를 직접 치면 그냥 열린다.
+  const session = await getServerSession(authOptions);
+  await requireMenuAccess(session!.user.id, "venues", session!.user.role);
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
