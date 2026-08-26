@@ -38,6 +38,9 @@ interface MessengerContextValue {
   /** 우하단 플로팅 위젯 상태 */
   dockOpen: boolean;
   setDockOpen: (open: boolean) => void;
+  /** 위젯에서 ERP 비서 대화를 열고 있는지. 사람 대화와 배타적이다. */
+  assistantOpen: boolean;
+  setAssistantOpen: (open: boolean) => void;
   /** 특정 상대와의 대화를 위젯에서 연다. 다른 화면에서 "메시지 보내기"로 진입할 때 쓴다. */
   openDockWith: (user: MessengerUser) => void;
   dockTarget: MessengerUser | null;
@@ -61,6 +64,7 @@ export function MessengerProvider({ children }: { children: React.ReactNode }) {
   const [users, setUsers] = useState<MessengerUser[]>([]);
   const [dockOpen, setDockOpen] = useState(false);
   const [dockTarget, setDockTarget] = useState<MessengerUser | null>(null);
+  const [assistantOpen, setAssistantOpenState] = useState(false);
   const usersLoaded = useRef(false);
 
   const refresh = useCallback(async () => {
@@ -89,8 +93,14 @@ export function MessengerProvider({ children }: { children: React.ReactNode }) {
       });
   }, []);
 
+  const setAssistantOpen = useCallback((open: boolean) => {
+    setAssistantOpenState(open);
+    if (open) setDockTarget(null);
+  }, []);
+
   const openDockWith = useCallback(
     (user: MessengerUser) => {
+      setAssistantOpenState(false);
       setDockTarget(user);
       setDockOpen(true);
       loadUsers();
@@ -112,11 +122,24 @@ export function MessengerProvider({ children }: { children: React.ReactNode }) {
       loadUsers,
       dockOpen,
       setDockOpen,
+      assistantOpen,
+      setAssistantOpen,
       openDockWith,
       dockTarget,
       setDockTarget,
     }),
-    [conversations, unreadTotal, refresh, users, loadUsers, dockOpen, openDockWith, dockTarget],
+    [
+      conversations,
+      unreadTotal,
+      refresh,
+      users,
+      loadUsers,
+      dockOpen,
+      assistantOpen,
+      setAssistantOpen,
+      openDockWith,
+      dockTarget,
+    ],
   );
 
   return <MessengerContext.Provider value={value}>{children}</MessengerContext.Provider>;

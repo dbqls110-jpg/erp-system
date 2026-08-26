@@ -5,12 +5,13 @@ import Link from "next/link";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ArrowLeft, Maximize2, MessageCircle, Send, X } from "lucide-react";
+import { ArrowLeft, Maximize2, MessageCircle, Send, Sparkles, X } from "lucide-react";
 import { sendMessage } from "@/app/actions/message";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useMessenger, type ConvItem, type MessengerUser } from "@/lib/messenger-store";
 import { useVisiblePolling } from "@/lib/useVisiblePolling";
+import { AssistantPanel } from "./AssistantPanel";
 import { MessageContent } from "./MessageContent";
 
 interface Message {
@@ -48,6 +49,8 @@ export function MessengerDock({ myId }: { myId: string }) {
     loadUsers,
     dockOpen,
     setDockOpen,
+    assistantOpen,
+    setAssistantOpen,
     dockTarget,
     setDockTarget,
   } = useMessenger();
@@ -169,7 +172,19 @@ export function MessengerDock({ myId }: { myId: string }) {
     <div className="fixed right-5 bottom-5 z-40 flex h-[32rem] max-h-[calc(100vh-2.5rem)] w-[22rem] max-w-[calc(100vw-2.5rem)] flex-col overflow-hidden rounded-2xl border border-border bg-background shadow-xl">
       {/* 헤더 */}
       <div className="flex h-12 shrink-0 items-center gap-2 border-b border-border px-3">
-        {dockTarget ? (
+        {assistantOpen ? (
+          <>
+            <button
+              onClick={() => setAssistantOpen(false)}
+              aria-label="대화 목록으로"
+              className="text-muted-foreground hover:text-foreground"
+            >
+              <ArrowLeft className="size-4" />
+            </button>
+            <Sparkles className="size-4 text-primary" />
+            <span className="truncate text-sm font-medium">ERP 비서</span>
+          </>
+        ) : dockTarget ? (
           <>
             <button
               onClick={backToList}
@@ -211,9 +226,23 @@ export function MessengerDock({ myId }: { myId: string }) {
         </div>
       </div>
 
-      {!dockTarget ? (
+      {assistantOpen ? (
+        <AssistantPanel />
+      ) : !dockTarget ? (
         /* 대화 목록 */
         <div className="flex-1 overflow-y-auto">
+          <button
+            onClick={() => setAssistantOpen(true)}
+            className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left transition-colors hover:bg-muted/50"
+          >
+            <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+              <Sparkles className="size-4" />
+            </div>
+            <div className="min-w-0">
+              <p className="truncate text-sm font-medium">ERP 비서</p>
+              <p className="truncate text-xs text-muted-foreground">무엇이든 물어보세요</p>
+            </div>
+          </button>
           {conversations.length === 0 && otherUsers.length === 0 && (
             <div className="flex flex-col items-center gap-3 py-12 text-center">
               <MessageCircle className="size-6 text-muted-foreground" />
