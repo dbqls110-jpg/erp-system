@@ -105,16 +105,17 @@ export default async function CustomersPage() {
       <Card className="shadow-xs py-0">
         <CardContent className="p-0">
           <div className="overflow-x-auto">
-            <Table className="[&_:is(th,td)]:px-4">
+            <Table className="mx-auto w-auto table-auto [&_:is(th,td)]:px-4 [&_:is(th,td)]:py-3">
               <TableHeader>
                 <TableRow>
-                  <TableHead className="whitespace-nowrap">회사명</TableHead>
+                  {/* 회사명은 상호가 길어질 수 있어 남는 폭을 맡긴다. */}
+                  <TableHead className="w-full whitespace-nowrap">회사명</TableHead>
                   <TableHead className="whitespace-nowrap">담당자</TableHead>
                   <TableHead className="whitespace-nowrap">연락처</TableHead>
                   <TableHead className="whitespace-nowrap">이메일</TableHead>
                   <TableHead className="whitespace-nowrap">분류</TableHead>
                   <TableHead className="whitespace-nowrap">상태</TableHead>
-                  <TableHead className="w-full">최종수정일</TableHead>
+                  <TableHead className="whitespace-nowrap text-right">최종수정일</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -140,7 +141,7 @@ export default async function CustomersPage() {
                           {c.status}
                         </Badge>
                       </TableCell>
-                      <TableCell className="tabular-nums text-muted-foreground">
+                      <TableCell className="text-right tabular-nums text-muted-foreground">
                         {c.projects.length === 0 ? "-" : (
                           <span title={c.projects.map((x) => x.project.name).join(", ")}>
                             프로젝트 {c.projects.length}건

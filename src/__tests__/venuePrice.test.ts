@@ -164,4 +164,10 @@ describe("trustPenalty — 못 믿는 요금이 앞자리를 차지하면 안 �
     expect(trustPenalty("estimated")).toBeLessThan(trustPenalty("unreliable"));
     expect(trustPenalty("unreliable")).toBeLessThan(trustPenalty("unknown"));
   });
+
+  it("요금 미상은 확인 전화 메모 수준의 작은 벌점만 받는다", () => {
+    // priceTrust 가중치 0.9를 곱해도 0.18이라 지역 불일치 가중치 0.25보다 작다.
+    expect(trustPenalty("unknown")).toBe(0.2);
+    expect(trustPenalty("unreliable")).toBe(0.1);
+  });
 });

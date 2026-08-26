@@ -79,6 +79,55 @@ describe("요금 신뢰도가 순위에 반영된다", () => {
     expect(r.warnings.join()).toContain("근거 불확실");
   });
 
+  it("예산을 넣어도 요금 미상 공간은 후보에 남는다", () => {
+    // 요금을 모르는 것은 확인할 일이지, 예산 초과가 확정된 것이 아니므로 후보에서 빼지 않는다.
+    const { candidates, blocked } = rankVenues(
+      [venue({ id: "unknown-price", price: null, price4h: null, priceConfidence: null })],
+      { people: 250, budget: 500_000, hours: 4 },
+    );
+
+    expect(candidates.map((result) => result.venue.id)).toEqual(["unknown-price"]);
+    expect(blocked).toHaveLength(0);
+  });
+
+  it("확인된 요금이 같은 조건의 요금 미상보다 앞선다", () => {
+    const unknown = venue({ id: "unknown-price", price: null, price4h: null, priceConfidence: null });
+    const confirmed = venue({ id: "confirmed-price", price4h: 250_000, priceConfidence: "근거일치" });
+    const { candidates } = rankVenues([unknown, confirmed], { people: 300, budget: 500_000, hours: 4 });
+
+    expect(candidates.map((result) => result.venue.id)).toEqual(["confirmed-price", "unknown-price"]);
+  });
+
+  it("정원과 지역이 좋은 요금 미상이 정원 미달 확인 요금보다 앞선다", () => {
+    const unknown = venue({
+      id: "right-capacity-unknown-price",
+      capacityMax: 350,
+      price: null,
+      price4h: null,
+      priceConfidence: null,
+    });
+    const confirmed = venue({
+      id: "short-capacity-confirmed-price",
+      capacityMax: 200,
+      price4h: 250_000,
+      priceConfidence: "근거일치",
+    });
+    const { candidates } = rankVenues([confirmed, unknown], { people: 350, budget: 500_000, hours: 4 });
+
+    expect(candidates.map((result) => result.venue.id)).toEqual([
+      "right-capacity-unknown-price",
+      "short-capacity-confirmed-price",
+    ]);
+  });
+
+  it("근거 불확실 요금이 완전 미상 요금보다 앞선다", () => {
+    const unknown = venue({ id: "unknown-price", price: null, price4h: null, priceConfidence: null });
+    const unreliable = venue({ id: "unreliable-price", price4h: 250_000, priceConfidence: "근거불일치" });
+    const { candidates } = rankVenues([unknown, unreliable], { people: 300, budget: 500_000, hours: 4 });
+
+    expect(candidates.map((result) => result.venue.id)).toEqual(["unreliable-price", "unknown-price"]);
+  });
+
   it("확인된 요금이 예산을 크게 넘으면 제외한다", () => {
     const r = matchVenue(venue({ price4h: 5_000_000, priceConfidence: "근거일치" }), {
       budget: 500_000,
@@ -106,6 +155,12 @@ describe("정원 — 완화된 규칙", () => {
     const r = matchVenue(venue({ capacityMax: 295 }), { people: 300 });
     expect(r.blockers).toEqual([]);
     expect(r.warnings.some((w) => w.includes("좌석배치"))).toBe(true);
+  });
+
+  it("요청보다 정원이 많으면 정원 여유 없음 경고를 붙이지 않는다", () => {
+    const r = matchVenue(venue({ capacityMax: 370 }), { people: 350 });
+
+    expect(r.warnings.some((w) => w.includes("정원 여유 없음"))).toBe(false);
   });
 
   it("정원 미상은 맨 뒤로 밀리되 후보에는 남는다", () => {

@@ -661,17 +661,17 @@ export function PartnerTable({
       <Card className="shadow-xs py-0">
         <CardContent className="p-0">
           <div className="overflow-x-auto">
-            <Table className="[&_:is(th,td)]:px-4">
+            <Table className="mx-auto w-auto table-auto [&_:is(th,td)]:px-4 [&_:is(th,td)]:py-3">
               <TableHeader>
                 <TableRow>
                   <TableHead className="whitespace-nowrap">이름</TableHead>
                   <TableHead className="whitespace-nowrap">직업</TableHead>
                   <TableHead className="whitespace-nowrap">거래상태</TableHead>
-                  <TableHead className="whitespace-nowrap">단가</TableHead>
+                  {/* 내용 기준으로 배치해 값 사이의 불필요한 간격을 줄인다. 남는 폭은 단가처럼
+                      실제 내용이 길어질 수 있는 열 하나에만 맡기고, 빈 프로젝트 열에는 주지 않는다. */}
+                  <TableHead className="w-full whitespace-nowrap text-right">단가</TableHead>
                   <TableHead className="whitespace-nowrap">정산방식</TableHead>
                   <TableHead className="whitespace-nowrap">연락처</TableHead>
-                  {/* 남는 폭을 이 칸이 가져간다. 안 그러면 여덟 칸이 화면 전체에
-                      균등하게 퍼져 값끼리 멀리 떨어진다. */}
                   <TableHead className="whitespace-nowrap">진행한 프로젝트</TableHead>
                   {canEdit && <TableHead className="w-24 whitespace-nowrap" />}
                 </TableRow>
@@ -724,7 +724,7 @@ export function PartnerTable({
                           {p.contractStatus}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-muted-foreground tabular-nums">
+                      <TableCell className="text-right text-muted-foreground tabular-nums">
                         {p.rates.length === 0 ? (
                           formatRate(p.rate, p.rateUnit)
                         ) : (
@@ -733,7 +733,7 @@ export function PartnerTable({
                           // 하나뿐인 파트너는 자연히 한 줄로 끝난다.
                           <div className="space-y-0.5">
                             {p.rates.map((rate) => (
-                              <div key={rate.id} className="flex gap-2 whitespace-nowrap">
+                              <div key={rate.id} className="flex justify-end gap-2 whitespace-nowrap">
                                 <span className="min-w-16 text-muted-foreground">{rate.item}</span>
                                 <span className="tabular-nums text-foreground">
                                   {rate.amount.toLocaleString()}원 / {rate.unit}

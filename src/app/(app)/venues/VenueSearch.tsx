@@ -121,7 +121,7 @@ const TRUST_LABEL: Record<ResolvedPriceView["trust"], string> = {
 };
 
 function trustClass(trust: ResolvedPriceView["trust"]) {
-  return trust === "unreliable" || trust === "unknown"
+  return trust === "unreliable"
     ? "text-destructive"
     : trust === "confirmed"
       ? "text-foreground"
@@ -352,14 +352,15 @@ export function VenueSearch({ districts, venueTypes }: VenueSearchProps) {
       <Card ref={tableRef} className="py-0 shadow-xs">
         <CardContent className="p-0">
           <div className="overflow-x-auto">
-            <Table className="[&_:is(th,td)]:px-4">
+            <Table className="mx-auto w-auto table-auto [&_:is(th,td)]:px-4 [&_:is(th,td)]:py-3">
               <TableHeader>
                 <TableRow>
-                  <TableHead className="whitespace-nowrap">공간명</TableHead>
+                  {/* 공간명은 긴 이름이 들어올 수 있어 남는 폭을 맡긴다. */}
+                  <TableHead className="w-full whitespace-nowrap">공간명</TableHead>
                   <TableHead className="whitespace-nowrap">자치구</TableHead>
                   <TableHead className="whitespace-nowrap">유형</TableHead>
-                  <TableHead className="whitespace-nowrap">정원</TableHead>
-                  <TableHead className="whitespace-nowrap">요금 (4시간 기준)</TableHead>
+                  <TableHead className="whitespace-nowrap text-right">정원</TableHead>
+                  <TableHead className="whitespace-nowrap text-right">요금 (4시간 기준)</TableHead>
                   <TableHead className="whitespace-nowrap">전화</TableHead>
                   <TableHead className="whitespace-nowrap">신청 방법</TableHead>
                 </TableRow>
@@ -388,8 +389,8 @@ export function VenueSearch({ districts, venueTypes }: VenueSearchProps) {
                         </TableCell>
                         <TableCell>{displayValue(venue.district)}</TableCell>
                         <TableCell>{displayValue(venue.type)}</TableCell>
-                        <TableCell className="whitespace-nowrap">{displayCapacity(venue.capacityMin, venue.capacityMax)}</TableCell>
-                        <TableCell className="whitespace-nowrap">
+                        <TableCell className="whitespace-nowrap text-right tabular-nums">{displayCapacity(venue.capacityMin, venue.capacityMax)}</TableCell>
+                        <TableCell className="whitespace-nowrap text-right tabular-nums">
                           <span className={trustClass(price.trust)}>{price.label}</span>
                           {!price.free && (
                             <span className="ml-1 text-xs text-muted-foreground">({TRUST_LABEL[price.trust]})</span>

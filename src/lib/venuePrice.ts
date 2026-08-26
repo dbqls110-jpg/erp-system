@@ -204,7 +204,13 @@ export function estimateForHours(resolved: ResolvedPrice, hours?: number): numbe
   return Math.round((resolved.amount * hours) / BASE_HOURS / 1000) * 1000;
 }
 
-/** 정렬용 점수. 낮을수록 믿을 만하다. 못 믿는 요금이 앞자리를 차지하면 안 된다. */
+/**
+ * 정렬용 점수. 낮을수록 믿을 만하다.
+ *
+ * 요금 미상은 확인 전화가 필요한 비고이지 결격 사유가 아니다. unknown을 0.2로 두면
+ * venueMatch의 priceTrust 가중치 0.9와 곱한 감점이 0.18이라 지역 불일치(0.25)보다도
+ * 작다. 그래서 정원과 지역이 좋은 공간이 요금을 모른다는 이유만으로 크게 밀리지 않는다.
+ */
 export function trustPenalty(trust: PriceTrust): number {
-  return trust === "confirmed" ? 0 : trust === "estimated" ? 0.3 : trust === "unreliable" ? 0.8 : 1;
+  return trust === "confirmed" ? 0 : trust === "estimated" ? 0.05 : trust === "unreliable" ? 0.1 : 0.2;
 }

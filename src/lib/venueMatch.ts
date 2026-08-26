@@ -22,8 +22,6 @@ import {
 export const THRESHOLDS = {
   /** 이보다 정원이 모자라면 후보에서 뺀다. 0.85 = 15% 미달까지 허용. */
   capacityFloor: 0.85,
-  /** 정원이 요청보다 이 비율 미만으로 여유로우면 "여유 없음" 경고. */
-  capacityTight: 1.1,
   /** 예산을 이 비율까지 넘는 것은 경고만. 그 이상은 제외. */
   budgetTolerance: 1.15,
   /** 적합도 가중치. 낮을수록 좋은 점수다. */
@@ -131,7 +129,8 @@ export function matchVenue(venue: VenueLike, query: MatchQuery): MatchResult {
       warnings.push(`정원 ${cap}명 — ${query.people - cap}명 부족, 좌석배치 확인 필요`);
       capacityScore = 1 + ((query.people - cap) / query.people) * 3;
     } else {
-      if (cap < query.people * THRESHOLDS.capacityTight) warnings.push(`정원 여유 없음(${cap}명)`);
+      // 요청 인원 이상이면 실제로 수용 가능한 후보다. 가까운 여유를 경고로 표시하면
+      // 사장님 화면에서 350명 요청·370명 공간 같은 정상 후보가 문제처럼 보인다.
       capacityScore = Math.min(0.9, ((cap - query.people) / query.people) * 0.3);
     }
   } else if (cap !== null) {

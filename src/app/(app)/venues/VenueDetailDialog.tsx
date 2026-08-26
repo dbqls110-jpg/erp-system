@@ -101,6 +101,14 @@ const TRUST_LABEL: Record<PriceTrust, string> = {
   unknown: "요금 미상",
 };
 
+function priceTrustClass(trust: PriceTrust) {
+  return trust === "unreliable"
+    ? "text-destructive"
+    : trust === "confirmed"
+      ? "text-foreground"
+      : "text-muted-foreground";
+}
+
 const FACILITIES: Array<{ key: keyof Venue; label: string }> = [
   { key: "beam", label: "빔프로젝터" },
   { key: "sound", label: "음향" },
@@ -293,7 +301,6 @@ export function VenueDetailDialog({
 
 function VenueDetailContent({ detail }: { detail: VenueDetailResponse }) {
   const { venue, price, groups } = detail;
-  const trustIsUncertain = price.trust === "unreliable" || price.trust === "unknown";
   const capacity = formatCapacity(venue.capacityMin, venue.capacityMax);
   const availabilityRows = [
     { label: "토요일", value: venue.saturday },
@@ -334,9 +341,12 @@ function VenueDetailContent({ detail }: { detail: VenueDetailResponse }) {
               <p className="text-sm font-medium text-primary">전화 확인: {formatWon(venue.calledPrice)}</p>
             )}
             <h3 className="text-sm font-semibold">요금</h3>
-            <p className="text-2xl font-semibold tracking-tight">{price.label}</p>
+            <p className={`text-2xl font-semibold tracking-tight ${priceTrustClass(price.trust)}`}>{price.label}</p>
           </div>
-          <Badge variant={trustIsUncertain ? "destructive" : price.trust === "confirmed" ? "default" : "outline"}>
+          <Badge
+            variant={price.trust === "unreliable" ? "destructive" : price.trust === "confirmed" ? "default" : "outline"}
+            className={price.trust === "unknown" ? "text-muted-foreground" : undefined}
+          >
             {TRUST_LABEL[price.trust]}
           </Badge>
         </div>
@@ -358,7 +368,7 @@ function VenueDetailContent({ detail }: { detail: VenueDetailResponse }) {
           </div>
         )}
         {price.warnings.length > 0 && (
-          <ul className="list-disc space-y-1 pl-5 text-sm text-destructive">
+          <ul className={`list-disc space-y-1 pl-5 text-sm ${price.trust === "unknown" ? "text-muted-foreground" : "text-destructive"}`}>
             {price.warnings.map((warning) => <li key={warning}>{warning}</li>)}
           </ul>
         )}
