@@ -11,6 +11,7 @@
  */
 import "dotenv/config";
 import fs from "node:fs";
+import crypto from "node:crypto";
 import path from "node:path";
 import { google } from "googleapis";
 
@@ -41,16 +42,52 @@ function stamp() {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
 }
 
-async function makeDriveClientAsOwner() {
-  const refreshToken = process.env.GOOGLE_DRIVE_OWNER_REFRESH_TOKEN;
-  if (!refreshToken) {
-    throw new Error("GOOGLE_DRIVE_OWNER_REFRESH_TOKEN 이 .env 에 없습니다.");
+/**
+ * 앱과 같은 순서로 토큰을 찾는다. DB 에 저장된 것을 먼저 보고 없으면 env 로 넘어간다.
+ * env 에는 만료된 값이 남아 있을 수 있어 그걸 먼저 보면 인증이 실패한다.
+ */
+async function getRefreshToken() {
+  const encKey =
+    process.env.DRIVE_TOKEN_ENC_KEY ?? process.env.NEXTAUTH_SECRET ?? process.env.AUTH_SECRET;
+
+  if (encKey) {
+    const { PrismaClient } = await import("@prisma/client");
+    const { PrismaPg } = await import("@prisma/adapter-pg");
+    const prisma = new PrismaClient({
+      adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }),
+    });
+    try {
+      const record = await prisma.agentAuditLog.findFirst({
+        where: { action: "drive_oauth_active" },
+        orderBy: { createdAt: "desc" },
+        select: { result: true },
+      });
+      const enc = record?.result?.enc;
+      if (enc) {
+        const key = crypto.createHash("sha256").update(encKey).digest();
+        const buf = Buffer.from(enc, "base64");
+        const decipher = crypto.createDecipheriv("aes-256-gcm", key, buf.subarray(0, 12));
+        decipher.setAuthTag(buf.subarray(12, 28));
+        return Buffer.concat([decipher.update(buf.subarray(28)), decipher.final()]).toString("utf8");
+      }
+    } catch {
+      // 복호화 실패나 DB 접속 실패는 아래 env 폴백으로 넘긴다.
+    } finally {
+      await prisma.$disconnect();
+    }
   }
+
+  const envToken = process.env.GOOGLE_DRIVE_OWNER_REFRESH_TOKEN;
+  if (envToken) return envToken;
+  throw new Error("Drive refresh token 을 찾지 못했습니다. DRIVE_TOKEN_ENC_KEY 를 확인하세요.");
+}
+
+async function makeDriveClientAsOwner() {
   const oauth2 = new google.auth.OAuth2(
     process.env.AUTH_GOOGLE_ID,
     process.env.AUTH_GOOGLE_SECRET,
   );
-  oauth2.setCredentials({ refresh_token: refreshToken });
+  oauth2.setCredentials({ refresh_token: await getRefreshToken() });
   return google.drive({ version: "v3", auth: oauth2 });
 }
 
