@@ -2,15 +2,18 @@ import { prisma } from "@/lib/prisma";
 import { addMonthSheet, type MonthReportData } from "@/lib/sheets";
 
 /**
- * 월별 재무 시트를 빠짐없이 만든다.
+ * 끝난 달의 재무를 시트로 옮긴다.
  *
  * 예전에는 관리자가 /api/finance-report 를 직접 호출해야만 그 달 탭이 생겼다.
  * 아무도 부르지 않으면 아무 일도 안 일어나므로 실제로 7월과 8월이 통째로 비어
  * 있었다. 사람이 기억해서 눌러야 하는 자동화는 자동화가 아니다.
  *
- * 자료가 있는 첫 달부터 이번 달까지 훑어 없는 탭을 만든다. addMonthSheet 는
- * 탭이 있으면 내용만 덮으므로 여러 번 돌려도 안전하고, 이번 달은 돌 때마다
- * 최신 상태로 갱신된다.
+ * 대상은 "끝난 달"까지다. 이번 달은 아직 지출이 쌓이는 중이라 시트로 옮기지
+ * 않는다. 재무 시트는 달을 마감하고 정리하는 자료이지 실시간 현황판이 아니다.
+ * 진행 중인 달은 ERP 재무 화면에서 본다.
+ *
+ * 빠진 달이 여러 개면 한꺼번에 채운다. 한동안 아무도 안 열어 봤더라도 다음에
+ * 열었을 때 밀린 달이 전부 정리된다.
  */
 
 const CATEGORY_LABEL: Record<string, string> = {
@@ -26,8 +29,25 @@ const CATEGORY_COLOR: Record<string, string> = {
 };
 
 const SYNC_ACTION = "finance_sheet_sync";
-/** 하루에 한 번이면 충분하다. 매 페이지 열람마다 구글을 두드릴 이유가 없다. */
-const THROTTLE_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * 재무 시트는 달이 끝난 뒤 정리하는 자료다. 그래서 "며칠에 한 번" 같은 주기가
+ * 아니라 달 단위로 판단한다. 어느 달까지 옮겼는지를 기록해 두고, 아직 안 옮긴
+ * 달이 생겼을 때만 움직인다.
+ *
+ * 이렇게 하면 달이 바뀌고 처음 재무 페이지를 열 때 지난 달이 한 번 마감된다.
+ * 그 뒤로는 같은 달 안에서 몇 번을 열어도 구글을 두드리지 않는다.
+ */
+function monthKey(year: number, month: number) {
+  return `${year}-${String(month).padStart(2, "0")}`;
+}
+
+/** 마감 대상인 마지막 달 = 지난 달. 이번 달은 아직 쌓이는 중이다. */
+function lastClosedMonth(now = new Date()) {
+  const year = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear();
+  const month = now.getMonth() === 0 ? 12 : now.getMonth();
+  return { year, month };
+}
 
 /** 한 달치 보고 데이터를 만든다. 수동 호출 라우트와 자동 생성이 같은 것을 쓴다. */
 export async function buildMonthReport(year: number, month: number): Promise<MonthReportData> {
@@ -98,22 +118,27 @@ export interface SyncResult {
 }
 
 /**
- * 빠진 달을 채운다.
+ * 아직 안 옮긴 달을 시트로 옮긴다.
  *
- * @param force 하루 한 번 제한을 무시한다. 사람이 버튼을 눌렀을 때 쓴다.
+ * @param force 이미 마감했더라도 다시 만든다. 사람이 직접 다시 뽑을 때 쓴다.
  */
 export async function syncMissingMonthSheets(force = false): Promise<SyncResult> {
   const spreadsheetId = process.env.GOOGLE_SHEET_ID;
   if (!spreadsheetId) return { created: [], skipped: 0, reason: "GOOGLE_SHEET_ID 없음" };
 
+  const closed = lastClosedMonth();
+  const closedKey = monthKey(closed.year, closed.month);
+
   if (!force) {
     const last = await prisma.agentAuditLog.findFirst({
       where: { action: SYNC_ACTION },
       orderBy: { createdAt: "desc" },
-      select: { createdAt: true },
+      select: { result: true },
     });
-    if (last && Date.now() - last.createdAt.getTime() < THROTTLE_MS) {
-      return { created: [], skipped: 0, reason: "최근에 이미 확인함" };
+    const done = (last?.result as { closedThrough?: string } | null)?.closedThrough;
+    // 지난 달까지 이미 옮겼으면 할 일이 없다. 달이 바뀌어야 다시 움직인다.
+    if (done && done >= closedKey) {
+      return { created: [], skipped: 0, reason: `${done} 까지 이미 마감함` };
     }
   }
 
@@ -135,23 +160,22 @@ export async function syncMissingMonthSheets(force = false): Promise<SyncResult>
   const meta = await sheets.spreadsheets.get({ spreadsheetId, fields: "sheets.properties.title" });
   const existing = new Set(meta.data.sheets?.map((s) => s.properties?.title).filter(Boolean) as string[]);
 
-  const now = new Date();
   const created: string[] = [];
   let skipped = 0;
 
+  // 자료가 있는 첫 달부터 지난 달까지. 이번 달은 넣지 않는다.
   let year = first.year;
   let month = first.month;
-  while (year < now.getFullYear() || (year === now.getFullYear() && month <= now.getMonth() + 1)) {
+  while (year < closed.year || (year === closed.year && month <= closed.month)) {
     const title = `${year}.${String(month).padStart(2, "0")} 재무 관리`;
-    const isCurrentMonth = year === now.getFullYear() && month === now.getMonth() + 1;
 
-    // 지난 달은 이미 있으면 건드리지 않는다. 사람이 손으로 고쳐 둔 것을 덮으면
-    // 안 되기 때문이다. 이번 달은 아직 쌓이는 중이라 매번 최신으로 갱신한다.
-    if (existing.has(title) && !isCurrentMonth) {
+    // 이미 있는 탭은 건드리지 않는다. 마감한 달을 덮으면 사람이 손으로 고쳐 둔
+    // 내용이 사라진다. 다시 뽑고 싶으면 그 탭을 지우고 force 로 돌리면 된다.
+    if (existing.has(title)) {
       skipped += 1;
     } else {
       await addMonthSheet(spreadsheetId, await buildMonthReport(year, month));
-      if (!existing.has(title)) created.push(title);
+      created.push(title);
     }
 
     month += 1;
@@ -163,7 +187,8 @@ export async function syncMissingMonthSheets(force = false): Promise<SyncResult>
       method: "POST",
       endpoint: "/lib/financeSheet",
       action: SYNC_ACTION,
-      result: { created, skipped },
+      // 어느 달까지 마감했는지를 남긴다. 다음 실행이 이 값을 보고 건너뛴다.
+      result: { created, skipped, closedThrough: closedKey },
     },
   });
 

@@ -35,12 +35,14 @@ export default async function FinancePage({
   const session = await getServerSession(authOptions);
   await requireMenuAccess(session!.user.id, "finance", session!.user.role);
 
-  // 월별 재무 시트를 빠짐없이 채운다. 예전에는 관리자가 API 를 직접 호출해야만
-  // 그 달 탭이 생겨서 7월과 8월이 통째로 비어 있었다. 사람이 기억해서 눌러야 하는
+  // 끝난 달의 재무를 시트로 옮긴다. 예전에는 관리자가 API 를 직접 호출해야만 그 달
+  // 탭이 생겨서 7월과 8월이 통째로 비어 있었다. 사람이 기억해서 눌러야 하는
   // 자동화는 자동화가 아니다.
   //
-  // after() 로 응답을 보낸 뒤에 돌린다. 여기서 기다리면 구글 왕복만큼 화면이 늦게
-  // 뜬다. 안에서 하루 한 번으로 제한하므로 페이지를 여러 번 열어도 한 번만 돈다.
+  // 달 단위로 판단한다. 달이 바뀌고 처음 이 화면을 열 때 지난 달이 마감되고,
+  // 그 뒤로는 같은 달 안에서 몇 번을 열어도 구글을 두드리지 않는다.
+  //
+  // after() 로 응답을 보낸 뒤에 돌린다. 여기서 기다리면 구글 왕복만큼 화면이 늦게 뜬다.
   after(async () => {
     try {
       await syncMissingMonthSheets();
