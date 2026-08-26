@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { UserRoleSelect } from "./UserRoleSelect";
+import { UserExternalLink } from "./UserExternalLink";
 import { LeaveBalanceInput } from "./LeaveBalanceInput";
 import { UserNameInput } from "./UserNameInput";
 import { DriveIndexPanel, type DriveIndexInitialStatus } from "./DriveIndexPanel";
@@ -16,12 +17,29 @@ export default async function AdminPage() {
 
   const year = new Date().getFullYear();
 
-  const [users, indexFolders, indexedFileCount, indexChunkCount, indexStatusGroups] = await Promise.all([
+  const [users, partners, customers, indexFolders, indexedFileCount, indexChunkCount, indexStatusGroups] = await Promise.all([
     prisma.user.findMany({
       // 에이전트 계정은 직원이 아니다. 휴가·역할 설정 대상이 아니므로 목록에서 제외한다.
       where: { isAgent: false },
       orderBy: { createdAt: "asc" },
-      include: { leaveBalances: { where: { year } } },
+      select: {
+        id: true,
+        image: true,
+        name: true,
+        email: true,
+        role: true,
+        partnerId: true,
+        customerId: true,
+        leaveBalances: { where: { year } },
+      },
+    }),
+    prisma.partner.findMany({
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
+    }),
+    prisma.customer.findMany({
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
     }),
     prisma.driveIndexFolder.findMany({
       orderBy: { createdAt: "asc" },
@@ -98,6 +116,14 @@ export default async function AdminPage() {
                       userId={u.id}
                       currentRole={u.role}
                       isCurrentUser={u.id === session.user.id}
+                    />
+                    <UserExternalLink
+                      userId={u.id}
+                      isCurrentUser={u.id === session.user.id}
+                      partnerId={u.partnerId}
+                      customerId={u.customerId}
+                      partners={partners}
+                      customers={customers}
                     />
                   </div>
                 </div>

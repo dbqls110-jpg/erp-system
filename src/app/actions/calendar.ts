@@ -19,13 +19,29 @@ async function requireCalendarEditor() {
   return viewer;
 }
 
+async function normalizeProjectId(projectId?: string | null) {
+  const normalizedProjectId = projectId?.trim() || null;
+  if (!normalizedProjectId) return null;
+
+  // 일정이 외부에 노출되기 전에 실제 프로젝트에 연결됐는지 확인해야 잘못된 링크를 막을 수 있다.
+  const project = await prisma.project.findUnique({
+    where: { id: normalizedProjectId },
+    select: { id: true },
+  });
+  if (!project) throw new Error("프로젝트를 찾을 수 없습니다.");
+
+  return normalizedProjectId;
+}
+
 export async function createCalendarEvent(data: {
   title: string;
   date: string;
   endDate?: string;
   color: string;
+  projectId?: string | null;
 }) {
   const session = await requireCalendarEditor();
+  const projectId = await normalizeProjectId(data.projectId);
 
   const event = await prisma.calendarEvent.create({
     data: {
@@ -33,6 +49,7 @@ export async function createCalendarEvent(data: {
       date: data.date,
       endDate: data.endDate || null,
       color: data.color,
+      projectId,
       createdBy: session.id,
     },
   });
@@ -51,7 +68,7 @@ export async function createCalendarEvent(data: {
 
 export async function updateCalendarEvent(
   id: string,
-  data: { title: string; date: string; endDate?: string; color: string }
+  data: { title: string; date: string; endDate?: string; color: string; projectId?: string | null }
 ) {
   const session = await requireCalendarEditor();
 
@@ -62,6 +79,8 @@ export async function updateCalendarEvent(
     throw new Error("수정 권한이 없습니다.");
   }
 
+  const projectId = await normalizeProjectId(data.projectId);
+
   await prisma.calendarEvent.update({
     where: { id },
     data: {
@@ -69,6 +88,7 @@ export async function updateCalendarEvent(
       date: data.date,
       endDate: data.endDate || null,
       color: data.color,
+      projectId,
     },
   });
 

@@ -19,6 +19,7 @@ interface CalEvent {
   id: string;
   endDate?: string;
   color?: string;
+  projectId?: string | null;
 }
 
 const COLOR_OPTIONS = [
@@ -48,7 +49,9 @@ const CUSTOM_COLORS: Record<string, string> = {
 const NOTION_STYLE = "bg-primary/10 text-primary border border-primary/20";
 
 function eventTitle(e: CalEvent) {
-  return e.type === "custom" && e.color === "red" ? `⭐ ${e.title}` : e.title;
+  const linkMark = e.projectId ? "🔗 " : "";
+  const highlightMark = e.type === "custom" && e.color === "red" ? "⭐ " : "";
+  return `${linkMark}${highlightMark}${e.title}`;
 }
 
 type ModalState =
@@ -57,10 +60,11 @@ type ModalState =
   | { mode: "detail"; date: string; events: CalEvent[] }
   | { mode: "edit"; event: CalEvent };
 
-export function CalendarView({ initialEvents, currentYear, currentMonth }: {
+export function CalendarView({ initialEvents, currentYear, currentMonth, projectOptions }: {
   initialEvents: CalEvent[];
   currentYear: number;
   currentMonth: number;
+  projectOptions: { id: string; name: string }[];
 }) {
   const [year, setYear] = useState(currentYear);
   const [month, setMonth] = useState(currentMonth);
@@ -72,6 +76,7 @@ export function CalendarView({ initialEvents, currentYear, currentMonth }: {
   const [title, setTitle] = useState("");
   const [endDate, setEndDate] = useState("");
   const [color, setColor] = useState("blue");
+  const [projectId, setProjectId] = useState("");
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
@@ -125,7 +130,7 @@ export function CalendarView({ initialEvents, currentYear, currentMonth }: {
   }
 
   function openCreate(date: string) {
-    setTitle(""); setEndDate(""); setColor("blue");
+    setTitle(""); setEndDate(""); setColor("blue"); setProjectId("");
     setModal({ mode: "create", date });
   }
 
@@ -133,6 +138,7 @@ export function CalendarView({ initialEvents, currentYear, currentMonth }: {
     setTitle(event.title);
     setEndDate(event.endDate ?? "");
     setColor(event.color ?? "blue");
+    setProjectId(event.projectId ?? "");
     setModal({ mode: "edit", event });
   }
 
@@ -141,7 +147,7 @@ export function CalendarView({ initialEvents, currentYear, currentMonth }: {
     if (modal.mode !== "create") return;
     setSaving(true);
     try {
-      await createCalendarEvent({ title: title.trim(), date: modal.date, endDate: endDate || undefined, color });
+      await createCalendarEvent({ title: title.trim(), date: modal.date, endDate: endDate || undefined, color, projectId });
       toast.success("일정이 추가됐습니다.");
       await fetchEvents(year, month);
       setModal({ mode: "closed" });
@@ -162,6 +168,7 @@ export function CalendarView({ initialEvents, currentYear, currentMonth }: {
         date: modal.event.date,
         endDate: endDate || undefined,
         color,
+        projectId,
       });
       toast.success("일정이 수정됐습니다.");
       await fetchEvents(year, month);
@@ -369,6 +376,20 @@ export function CalendarView({ initialEvents, currentYear, currentMonth }: {
                 />
               </div>
               <div className="space-y-1.5">
+                <Label>프로젝트</Label>
+                <select
+                  value={projectId}
+                  onChange={(e) => setProjectId(e.target.value)}
+                  className="h-8 rounded-2xl border border-transparent bg-input/50 px-3 text-sm text-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/30"
+                >
+                  <option value="">연결 안 함 (내부 전용)</option>
+                  {projectOptions.map((project) => (
+                    <option key={project.id} value={project.id}>{project.name}</option>
+                  ))}
+                </select>
+                <p className="text-[11px] text-muted-foreground">프로젝트를 고르면 그 프로젝트의 파트너·거래처도 이 일정을 봅니다.</p>
+              </div>
+              <div className="space-y-1.5">
                 <Label>색상</Label>
                 <div className="flex gap-2">
                   {COLOR_OPTIONS.map((c) => (
@@ -424,6 +445,20 @@ export function CalendarView({ initialEvents, currentYear, currentMonth }: {
                   min={modal.event.date}
                   onChange={(e) => setEndDate(e.target.value)}
                 />
+              </div>
+              <div className="space-y-1.5">
+                <Label>프로젝트</Label>
+                <select
+                  value={projectId}
+                  onChange={(e) => setProjectId(e.target.value)}
+                  className="h-8 rounded-2xl border border-transparent bg-input/50 px-3 text-sm text-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/30"
+                >
+                  <option value="">연결 안 함 (내부 전용)</option>
+                  {projectOptions.map((project) => (
+                    <option key={project.id} value={project.id}>{project.name}</option>
+                  ))}
+                </select>
+                <p className="text-[11px] text-muted-foreground">프로젝트를 고르면 그 프로젝트의 파트너·거래처도 이 일정을 봅니다.</p>
               </div>
               <div className="space-y-1.5">
                 <Label>색상</Label>

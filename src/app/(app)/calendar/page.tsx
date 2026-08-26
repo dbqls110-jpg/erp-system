@@ -27,7 +27,7 @@ export default async function CalendarPage() {
   const month = now.getMonth() + 1;
   const monthStr = String(month).padStart(2, "0");
 
-  const [projects, leaves, customEvents, notionEvents] = await Promise.all([
+  const [projects, projectOptions, leaves, customEvents, notionEvents] = await Promise.all([
     prisma.project.findMany({
       where: {
         status: "active",
@@ -43,6 +43,11 @@ export default async function CalendarPage() {
       },
       select: { id: true, name: true, announceDate: true, deadline: true },
     }),
+    prisma.project.findMany({
+      where: { status: "active" },
+      orderBy: { name: "asc" },
+      select: { id: true, name: true },
+    }),
     showLeaves(viewer)
       ? prisma.leaveRequest.findMany({
           where: {
@@ -54,7 +59,7 @@ export default async function CalendarPage() {
       : [],
     prisma.calendarEvent.findMany({
       where: { AND: [{ date: { gte: `${year}-${monthStr}-01` } }, calendarWhereFor(viewer)] },
-      select: { id: true, title: true, date: true, endDate: true, color: true, notionPageId: true },
+      select: { id: true, title: true, date: true, endDate: true, color: true, notionPageId: true, projectId: true },
     }),
     showNotionEvents(viewer) ? getNotionEvents(year, month).catch(() => []) : [],
   ]);
@@ -89,6 +94,7 @@ export default async function CalendarPage() {
       id: e.id,
       endDate: e.endDate ?? undefined,
       color: e.color,
+      projectId: e.projectId,
     })),
     ...notionEvents
       .filter((e) => !linkedNotionIds.has(e.notionId))
@@ -104,7 +110,7 @@ export default async function CalendarPage() {
   return (
     <div className="space-y-4">
       <div><p className="mt-1 text-sm text-muted-foreground">프로젝트와 휴가 일정을 한눈에 확인하세요.</p></div>
-      <CalendarView initialEvents={events} currentYear={year} currentMonth={month} />
+      <CalendarView initialEvents={events} currentYear={year} currentMonth={month} projectOptions={projectOptions} />
     </div>
   );
 }
