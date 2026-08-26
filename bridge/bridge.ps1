@@ -67,7 +67,30 @@ if ($CodexExe -like "*.ps1") {
 $CodexVersion = (& codex --version 2>&1 | Select-Object -First 1)
 Write-Log "브릿지 시작 | agentType=$AgentType | $CodexVersion | model=$Model effort=$Effort"
 
-$Headers = @{ "Authorization" = "Bearer $ApiKey"; "Content-Type" = "application/json" }
+$Headers = @{ "Authorization" = "Bearer $ApiKey" }
+
+<#
+.SYNOPSIS
+    ERP API 에 JSON 본문을 보낸다.
+.DESCRIPTION
+    Invoke-RestMethod 에 문자열을 그대로 넘기면 PowerShell 5.1 이 본문을 ASCII 로
+    인코딩해 한글이 전부 "?" 가 된다. 실제로 Codex 답변의 한글이 통째로 깨져 왔다.
+
+    UTF-8 바이트 배열로 넘기면 PowerShell 이 변환하지 않고 그대로 실어 보낸다.
+    Content-Type 에 charset 을 명시해 서버가 어떻게 읽을지도 못 박는다.
+#>
+function Invoke-ErpApi {
+    param(
+        [Parameter(Mandatory)][string]$Method,
+        [Parameter(Mandatory)][string]$Uri,
+        [Parameter(Mandatory)][hashtable]$Payload,
+        [int]$TimeoutSec = 30
+    )
+    $json  = $Payload | ConvertTo-Json -Compress
+    $bytes = [Text.Encoding]::UTF8.GetBytes($json)
+    return Invoke-RestMethod -Method $Method -Uri $Uri -Headers $Headers `
+        -ContentType "application/json; charset=utf-8" -Body $bytes -TimeoutSec $TimeoutSec
+}
 
 function Send-Heartbeat {
     param([string]$Status = "idle", [string]$LastError = $null)
@@ -81,8 +104,8 @@ function Send-Heartbeat {
     }
     if ($LastError) { $payload["lastError"] = $LastError }
     try {
-        Invoke-RestMethod -Method Post -Uri "$BaseUrl/api/agent/bridge/heartbeat" `
-            -Headers $Headers -Body ($payload | ConvertTo-Json -Compress) -TimeoutSec 30 | Out-Null
+        Invoke-ErpApi -Method Post -Uri "$BaseUrl/api/agent/bridge/heartbeat" `
+            -Payload $payload | Out-Null
     } catch {
         Write-Log "하트비트 전송 실패: $($_.Exception.Message)" "WARN"
     }
@@ -165,27 +188,22 @@ while ($true) {
         Write-Log "작업 수신: $jobId"
         Send-Heartbeat -Status "working"
 
-        Invoke-RestMethod -Method Patch -Uri "$BaseUrl/api/agent/bridge/jobs/$jobId" `
-            -Headers $Headers -Body (@{ status = "processing" } | ConvertTo-Json -Compress) `
-            -TimeoutSec 30 | Out-Null
+        Invoke-ErpApi -Method Patch -Uri "$BaseUrl/api/agent/bridge/jobs/$jobId" `
+            -Payload @{ status = "processing" } | Out-Null
 
         $sw = [System.Diagnostics.Stopwatch]::StartNew()
         try {
             $answer = Invoke-Codex -Prompt $res.job.input
             $sw.Stop()
-            Invoke-RestMethod -Method Patch -Uri "$BaseUrl/api/agent/bridge/jobs/$jobId" `
-                -Headers $Headers `
-                -Body (@{ status = "completed"; output = $answer } | ConvertTo-Json -Compress) `
-                -TimeoutSec 60 | Out-Null
+            Invoke-ErpApi -Method Patch -Uri "$BaseUrl/api/agent/bridge/jobs/$jobId" `
+                -Payload @{ status = "completed"; output = $answer } -TimeoutSec 60 | Out-Null
             Write-Log "완료: $jobId ($([int]$sw.Elapsed.TotalSeconds)초)"
         } catch {
             $sw.Stop()
             $msg = $_.Exception.Message
             Write-Log "작업 실패: $jobId - $msg" "ERROR"
-            Invoke-RestMethod -Method Patch -Uri "$BaseUrl/api/agent/bridge/jobs/$jobId" `
-                -Headers $Headers `
-                -Body (@{ status = "error"; errorMsg = $msg } | ConvertTo-Json -Compress) `
-                -TimeoutSec 30 | Out-Null
+            Invoke-ErpApi -Method Patch -Uri "$BaseUrl/api/agent/bridge/jobs/$jobId" `
+                -Payload @{ status = "error"; errorMsg = $msg } | Out-Null
             Send-Heartbeat -Status "error" -LastError $msg
         }
         $lastBeat = Get-Date
