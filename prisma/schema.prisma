@@ -626,6 +626,7 @@ model Partner {
   updatedAt      DateTime @updatedAt
 
   projects ProjectPartner[]
+  rates    PartnerRate[]
 
   @@index([contractStatus])
   @@map("partners")
@@ -751,4 +752,38 @@ model Venue {
   @@index([type])
   @@index([capacityMax])
   @@map("venues")
+}
+
+/// 파트너의 작업 항목별 단가.
+///
+/// 단가를 한 값으로만 두면 디자이너처럼 일마다 값이 다른 사람을 담을 수 없다.
+/// 포스터 50만, 리플렛 30만, 리사이징 5만이 전부 다른 단가다. 실제로 그 지적을
+/// 받고 표를 나눴다.
+///
+/// Partner.rate 는 대표 단가로 남겨 둔다. 항목이 하나뿐인 파트너에게 표를 하나 더
+/// 열게 하는 것은 번거롭고, 목록에서 한눈에 볼 값도 필요하다.
+model PartnerRate {
+  id        String @id @default(cuid())
+  partnerId String
+
+  /// 작업 이름. 예: 포스터, 리플렛, 리사이징, 현장 진행
+  item String
+
+  amount Int
+  /// "건당" | "일당" | "시간당"
+  unit   String  @default("건당")
+  memo   String?
+
+  /// 목록에서 보일 순서. 자주 쓰는 항목을 위로 올릴 수 있게 한다.
+  order Int @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  partner Partner @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+
+  /// 같은 파트너에게 같은 항목이 두 번 생기면 어느 쪽이 맞는지 알 수 없다.
+  @@unique([partnerId, item])
+  @@index([partnerId])
+  @@map("partner_rates")
 }
