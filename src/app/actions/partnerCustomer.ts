@@ -2,6 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { requireEditAccess } from "@/lib/actionGuards";
+import { syncPartnersToSheet } from "@/lib/partnerSheet";
 import { revalidatePath } from "next/cache";
 
 
@@ -62,6 +63,33 @@ export async function deleteCustomer(id: string) {
   revalidatePath("/customers");
 }
 
+/**
+ * 파트너가 바뀔 때마다 구글 시트를 DB 와 같게 맞춘다.
+ *
+ * DB 쓰기가 끝난 뒤에 부른다. 시트가 실패해도 등록을 되돌리지 않는다 —
+ * 정본은 DB 이고, 시트 하나 때문에 파트너를 못 만드는 편이 더 나쁘다.
+ * 대신 실패 이유는 서버 로그에 남겨 나중에 원인을 볼 수 있게 한다.
+ */
+async function syncPartnerSheet() {
+  const partners = await prisma.partner.findMany({
+    orderBy: { createdAt: "asc" },
+    include: { projects: { include: { project: { select: { name: true } } } } },
+  });
+  const result = await syncPartnersToSheet(
+    partners.map((p) => ({
+      name: p.name,
+      job: p.job,
+      contractStatus: p.contractStatus,
+      settlementType: p.settlementType,
+      phone: p.phone,
+      projectNames: p.projects.map((x) => x.project.name),
+      memo: p.memo,
+      createdAt: p.createdAt,
+    })),
+  );
+  if (!result.ok) console.warn("[파트너 시트 동기화 실패]", result.reason);
+}
+
 /* ---------------------------------- 파트너 --------------------------------- */
 
 export async function createPartner(data: {
@@ -89,6 +117,7 @@ export async function createPartner(data: {
       memo: data.memo?.trim() || null,
     },
   });
+  await syncPartnerSheet();
   revalidatePath("/partners");
 }
 
@@ -112,12 +141,14 @@ export async function updatePartner(
       Object.entries(data).map(([k, v]) => [k, typeof v === "string" ? v.trim() || null : v]),
     ),
   });
+  await syncPartnerSheet();
   revalidatePath("/partners");
 }
 
 export async function deletePartner(id: string) {
   await requireEditAccess("partners");
   await prisma.partner.delete({ where: { id } });
+  await syncPartnerSheet();
   revalidatePath("/partners");
 }
 
