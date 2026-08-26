@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   parseProposals,
+  stripProposals,
   validateProposal,
   fieldLabel,
   type Proposal,
@@ -113,5 +114,35 @@ describe("fieldLabel", () => {
 
   it("모르는 칸은 원래 이름을 그대로 준다", () => {
     expect(fieldLabel("venue", "unknown")).toBe("unknown");
+  });
+});
+
+describe("stripProposals — 본문에서 제안 블록 빼기", () => {
+  it("제안 블록을 지우고 사람이 읽을 말만 남긴다", () => {
+    const answer = "구로구민회관에 전화하신 내용을 이렇게 기록할까요?\n\n" + fence(VALID);
+    const body = stripProposals(answer);
+    expect(body).toBe("구로구민회관에 전화하신 내용을 이렇게 기록할까요?");
+    expect(body).not.toContain("erp-update");
+    expect(body).not.toContain("calledPrice");
+  });
+
+  it("제안이 여러 개여도 전부 지운다", () => {
+    expect(stripProposals(fence(VALID) + "\n중간 설명\n" + fence(VALID))).toBe("중간 설명");
+  });
+
+  it("제안만 있는 답변은 빈 문자열이 된다", () => {
+    // 본문이 비면 말풍선을 아예 그리지 않는다. 빈 회색 상자가 남으면 안 된다.
+    expect(stripProposals(fence(VALID))).toBe("");
+  });
+
+  it("제안이 없는 답변은 그대로 둔다", () => {
+    expect(stripProposals("구로구민회관 전화번호는 02-860-3114 입니다.")).toBe(
+      "구로구민회관 전화번호는 02-860-3114 입니다.",
+    );
+  });
+
+  it("깨진 JSON 블록도 본문에서 지운다", () => {
+    // parseProposals 는 카드로 만들지 못한다. 본문에 남기면 사람이 JSON 조각을 본다.
+    expect(stripProposals("확인해 주세요\n" + fence('{"target":"venue","id":'))).toBe("확인해 주세요");
   });
 });

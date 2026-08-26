@@ -165,3 +165,16 @@ export function fieldLabel(target: ProposalTarget, field: string): string {
   const allowed = EDITABLE_FIELDS[target] as Record<string, string>;
   return allowed[field] ?? field;
 }
+
+/**
+ * 답변 본문에서 제안 블록을 뺀다.
+ *
+ * 제안은 카드로 따로 그린다. 본문에 JSON 이 그대로 남으면 사람은 카드와 같은
+ * 내용을 두 번 보게 되고, 그중 하나는 읽을 수 없는 모양이다.
+ */
+export function stripProposals(answer: string): string {
+  // replace 는 전역 정규식의 lastIndex 를 스스로 되돌리지만, 이 상수를 exec 로
+  // 쓰는 곳(parseProposals)과 같은 객체라 들어올 때 한 번 맞춰 둔다.
+  PROPOSAL_FENCE.lastIndex = 0;
+  return answer.replace(PROPOSAL_FENCE, "").replace(/\n{3,}/g, "\n\n").trim();
+}

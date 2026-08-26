@@ -12,6 +12,13 @@
  * 코드 여기저기에 숫자를 흩뿌리면 나중에 어디를 고쳐야 할지 알 수 없다.
  */
 
+import {
+  estimateForHours,
+  resolvePrice,
+  trustPenalty,
+  type ResolvedPrice,
+} from "@/lib/venuePrice";
+
 export const THRESHOLDS = {
   /** 이보다 정원이 모자라면 후보에서 뺀다. 0.85 = 15% 미달까지 허용. */
   capacityFloor: 0.85,
@@ -20,7 +27,7 @@ export const THRESHOLDS = {
   /** 예산을 이 비율까지 넘는 것은 경고만. 그 이상은 제외. */
   budgetTolerance: 1.15,
   /** 적합도 가중치. 낮을수록 좋은 점수다. */
-  weights: { capacity: 1, trust: 1.2, price: 0.5, distance: 0.25 },
+  weights: { capacity: 1, trust: 1.2, price: 0.5, distance: 0.25, priceTrust: 0.9 },
 } as const;
 
 export interface VenueLike {
@@ -34,6 +41,11 @@ export interface VenueLike {
   priceBasis: string | null;
   priceSource: string | null;
   baseHours: number | null;
+  price4h: number | null;
+  priceConfidence: string | null;
+  priceMin: number | null;
+  priceMax: number | null;
+  areaM2: number | null;
   commercialUse: string | null;
   saturday: string | null;
   sunday: string | null;
@@ -75,21 +87,8 @@ export interface MatchResult {
   warnings: string[];
   /** 요청한 시간 기준으로 환산한 대략적인 총액. 모르면 null. */
   estimate: number | null;
-}
-
-/**
- * 요청한 시간에 맞춘 총액을 어림한다.
- *
- * 요금은 공간마다 기준시간이 달라("1시간", "4시간", "1일") 액수만으로 비교할 수 없다.
- * 기준시간을 모르면 환산하지 않는다 — 모르는 값을 그럴듯한 숫자로 바꾸면
- * 비교가 조용히 틀어진다.
- */
-export function estimateTotal(venue: VenueLike, hours?: number): number | null {
-  if (venue.price === null) return null;
-  if (!hours || !venue.baseHours || venue.baseHours <= 0) return venue.price;
-
-  const blocks = Math.ceil(hours / venue.baseHours);
-  return venue.price * blocks;
+  /** 요금을 어떻게 읽었는지. 화면이 금액과 함께 근거를 보여줄 수 있게 넘긴다. */
+  price: ResolvedPrice;
 }
 
 function dayField(venue: VenueLike, day: MatchQuery["dayOfWeek"]) {
@@ -140,13 +139,22 @@ export function matchVenue(venue: VenueLike, query: MatchQuery): MatchResult {
   }
 
   // ── 예산 ────────────────────────────────────────────────
-  const estimate = estimateTotal(venue, query.hours);
+  const price = resolvePrice(venue);
+  const estimate = estimateForHours(price, query.hours);
+  warnings.push(...price.warnings);
+
   let priceScore = 0.5; // 요금 미상
 
   if (query.budget && estimate !== null) {
     const ratio = estimate / query.budget;
     if (ratio > THRESHOLDS.budgetTolerance) {
-      blockers.push(`예산 초과(약 ${estimate.toLocaleString()}원)`);
+      // 못 믿는 요금으로는 후보를 자르지 않는다. ㎡당 단가를 면적으로 곱한 값처럼
+      // 우리가 계산한 숫자 때문에 멀쩡한 공간이 목록에서 사라지면 안 된다.
+      if (price.trust === "confirmed" || price.trust === "estimated") {
+        blockers.push(`예산 초과(약 ${estimate.toLocaleString()}원)`);
+      } else {
+        warnings.push(`예산을 크게 넘을 수 있음(약 ${estimate.toLocaleString()}원, 근거 불확실)`);
+      }
     } else if (ratio > 1) {
       // 추정가는 우리가 계산한 값이라 딱 잘라 버리지 않는다.
       warnings.push(`예산 ${(estimate - query.budget).toLocaleString()}원 초과(추정)`);
@@ -203,9 +211,12 @@ export function matchVenue(venue: VenueLike, query: MatchQuery): MatchResult {
     capacityScore * w.capacity +
     trustScore * w.trust +
     priceScore * w.price +
-    distanceScore * w.distance;
+    distanceScore * w.distance +
+    // 요금을 얼마나 믿는지를 점수에 넣는다. 이게 없으면 "13원" 처럼 검증이 덜 된
+    // 값이 가장 싸 보여서 목록 맨 위를 차지한다. 실제로 그랬다.
+    trustPenalty(price.trust) * w.priceTrust;
 
-  return { venue, score: Math.round(score * 1000) / 1000, blockers, warnings, estimate };
+  return { venue, score: Math.round(score * 1000) / 1000, blockers, warnings, estimate, price };
 }
 
 /**

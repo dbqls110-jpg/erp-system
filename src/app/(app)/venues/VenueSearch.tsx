@@ -1,8 +1,9 @@
 "use client";
 
-import { Fragment, useState } from "react";
+import { Fragment, useRef, useState } from "react";
 
 import { VenueMap } from "@/components/map/VenueMap";
+import { VenueDetailDialog } from "./VenueDetailDialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -19,6 +20,7 @@ import type { MatchQuery } from "@/lib/venueMatch";
 type DayOfWeek = NonNullable<MatchQuery["dayOfWeek"]>;
 
 interface FormState {
+  name: string;
   people: string;
   budget: string;
   hours: string;
@@ -41,8 +43,16 @@ interface CandidateVenue {
   capacityMax: number | null;
   phone: string | null;
   reserveUrl: string | null;
+  reserveMethod: string | null;
   lat: number | null;
   lng: number | null;
+}
+
+/** 요금을 어떻게 읽었는지. 서버(@/lib/venuePrice)가 판단해서 내려준다. */
+interface ResolvedPriceView {
+  label: string;
+  trust: "confirmed" | "estimated" | "unreliable" | "unknown";
+  free: boolean;
 }
 
 interface SearchResult {
@@ -51,9 +61,12 @@ interface SearchResult {
     score: number;
     warnings: string[];
     estimate: number | null;
+    price: ResolvedPriceView;
   }>;
   blockedCount: number;
   total: number;
+  offset: number;
+  limit: number;
 }
 
 interface VenueSearchProps {
@@ -61,7 +74,10 @@ interface VenueSearchProps {
   venueTypes: string[];
 }
 
+const PAGE_SIZE = 20;
+
 const initialForm: FormState = {
+  name: "",
   people: "",
   budget: "",
   hours: "",
@@ -91,8 +107,56 @@ function displayCapacity(min: number | null, max: number | null) {
   return `${(max ?? min)!.toLocaleString()}명`;
 }
 
-function displayEstimate(estimate: number | null) {
-  return estimate === null ? "미상" : `${estimate.toLocaleString()}원 (추정)`;
+/**
+ * 요금 신뢰도를 사람 말로.
+ *
+ * "추정" 한 마디로 뭉뚱그렸더니 ㎡당 단가를 총액으로 읽은 13원짜리와, 근거를 확인한
+ * 40만원짜리가 화면에서 똑같아 보였다. 얼마나 믿을 수 있는지는 금액만큼 중요하다.
+ */
+const TRUST_LABEL: Record<ResolvedPriceView["trust"], string> = {
+  confirmed: "확인",
+  estimated: "추정",
+  unreliable: "근거 불확실",
+  unknown: "요금 미상",
+};
+
+function trustClass(trust: ResolvedPriceView["trust"]) {
+  return trust === "unreliable" || trust === "unknown"
+    ? "text-destructive"
+    : trust === "confirmed"
+      ? "text-foreground"
+      : "text-muted-foreground";
+}
+
+/**
+ * 신청 방법.
+ *
+ * 예약 URL 이 있는 3,414곳 중 절반 넘게가 실제로는 전화로만 받는다. 전부 "예약"
+ * 링크로 보여 주면 눌러 봐야 예약이 안 되는 안내 페이지가 열린다.
+ */
+function ReserveCell({ venue }: { venue: CandidateVenue }) {
+  const method = venue.reserveMethod;
+  const online = method === "온라인예약";
+
+  if (online && venue.reserveUrl) {
+    return (
+      <a href={venue.reserveUrl} target="_blank" rel="noreferrer" className="text-primary hover:underline">
+        온라인 예약
+      </a>
+    );
+  }
+  if (method && method !== "확인필요") {
+    // 링크가 있어도 실제 접수는 다른 경로다. 방법을 글자로 알려 주는 편이 정직하다.
+    return <span className="text-muted-foreground">{method}</span>;
+  }
+  if (venue.reserveUrl) {
+    return (
+      <a href={venue.reserveUrl} target="_blank" rel="noreferrer" className="text-primary hover:underline">
+        안내 페이지
+      </a>
+    );
+  }
+  return <span className="text-muted-foreground">확인 필요</span>;
 }
 
 export function VenueSearch({ districts, venueTypes }: VenueSearchProps) {
@@ -100,12 +164,20 @@ export function VenueSearch({ districts, venueTypes }: VenueSearchProps) {
   const [result, setResult] = useState<SearchResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [openVenueId, setOpenVenueId] = useState<string | null>(null);
+  const tableRef = useRef<HTMLDivElement>(null);
 
   function setField<Key extends keyof FormState>(key: Key, value: FormState[Key]) {
     setForm((current) => ({ ...current, [key]: value }));
   }
 
-  async function search() {
+  /**
+   * offset 을 인자로 받는다.
+   *
+   * form 을 고쳐 다시 검색하는 것과 다음 장으로 넘어가는 것은 다른 일이다. 페이지
+   * 번호를 상태로 두면 조건을 바꿨을 때 3페이지에 머문 채 결과가 갈리는 일이 생긴다.
+   */
+  async function search(offset = 0) {
     const body: Record<string, unknown> = {
       needs: {
         parking: form.parking,
@@ -114,12 +186,14 @@ export function VenueSearch({ districts, venueTypes }: VenueSearchProps) {
         sound: form.sound,
       },
       commercial: form.commercial,
-      limit: 20,
+      limit: PAGE_SIZE,
+      offset,
     };
 
     const people = numberOrUndefined(form.people);
     const budget = numberOrUndefined(form.budget);
     const hours = numberOrUndefined(form.hours);
+    if (form.name.trim()) body.name = form.name.trim();
     if (people !== undefined) body.people = people;
     if (budget !== undefined) body.budget = budget;
     if (hours !== undefined) body.hours = hours;
@@ -138,6 +212,8 @@ export function VenueSearch({ districts, venueTypes }: VenueSearchProps) {
       const payload = (await response.json()) as SearchResult & { error?: string };
       if (!response.ok) throw new Error(payload.error ?? "검색하지 못했습니다.");
       setResult(payload);
+      // 다음 장으로 넘어가면 표 위쪽이 화면 밖에 있다. 목록 맨 위로 올려 준다.
+      if (offset > 0) tableRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     } catch (searchError) {
       setResult(null);
       setError(searchError instanceof Error ? searchError.message : "검색하지 못했습니다.");
@@ -165,6 +241,18 @@ export function VenueSearch({ districts, venueTypes }: VenueSearchProps) {
 
       <Card className="shadow-xs">
         <CardContent className="space-y-4 pt-(--card-spacing)">
+          <label className="block space-y-1.5 text-sm">
+            <span className="block text-muted-foreground">공간명</span>
+            <Input
+              value={form.name}
+              onChange={(event) => setField("name", event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") void search(0);
+              }}
+              placeholder="예: 구로구민회관 · 아트홀 (일부만 입력해도 됩니다)"
+            />
+          </label>
+
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             <label className="space-y-1.5 text-sm">
               <span className="block text-muted-foreground">인원</span>
@@ -221,7 +309,7 @@ export function VenueSearch({ districts, venueTypes }: VenueSearchProps) {
 
           <div className="flex flex-wrap justify-end gap-2">
             <Button type="button" variant="outline" onClick={reset}>초기화</Button>
-            <Button type="button" onClick={() => void search()} disabled={isLoading}>
+            <Button type="button" onClick={() => void search(0)} disabled={isLoading}>
               {isLoading ? "검색 중..." : "검색"}
             </Button>
           </div>
@@ -231,11 +319,20 @@ export function VenueSearch({ districts, venueTypes }: VenueSearchProps) {
 
       {result && (
         <p className="text-sm">
-          후보 <span className="font-semibold text-primary">{result.total}</span>곳 · 조건에 안 맞아 제외 <span className="font-semibold">{result.blockedCount}</span>곳
+          후보 <span className="font-semibold text-primary">{result.total.toLocaleString()}</span>곳 · 조건에 안 맞아 제외{" "}
+          <span className="font-semibold">{result.blockedCount.toLocaleString()}</span>곳
+          {result.total > 0 && (
+            // 3,721곳이라고만 적어 두고 20줄만 보여 주면 나머지가 어디 갔는지 알 수 없다.
+            <span className="text-muted-foreground">
+              {" · "}
+              {(result.offset + 1).toLocaleString()}~
+              {Math.min(result.offset + result.limit, result.total).toLocaleString()}번째 표시
+            </span>
+          )}
         </p>
       )}
 
-      <Card className="py-0 shadow-xs">
+      <Card ref={tableRef} className="py-0 shadow-xs">
         <CardContent className="p-0">
           <div className="overflow-x-auto">
             <Table className="[&_:is(th,td)]:px-4">
@@ -245,9 +342,9 @@ export function VenueSearch({ districts, venueTypes }: VenueSearchProps) {
                   <TableHead className="whitespace-nowrap">자치구</TableHead>
                   <TableHead className="whitespace-nowrap">유형</TableHead>
                   <TableHead className="whitespace-nowrap">정원</TableHead>
-                  <TableHead className="whitespace-nowrap">추정 총액</TableHead>
+                  <TableHead className="whitespace-nowrap">요금 (4시간 기준)</TableHead>
                   <TableHead className="whitespace-nowrap">전화</TableHead>
-                  <TableHead className="whitespace-nowrap">예약</TableHead>
+                  <TableHead className="whitespace-nowrap">신청 방법</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -260,19 +357,32 @@ export function VenueSearch({ districts, venueTypes }: VenueSearchProps) {
                     <TableCell colSpan={7} className="py-12 text-center text-sm text-muted-foreground">조건에 맞는 후보가 없습니다. 제외 사유를 확인하거나 조건을 완화해 보세요.</TableCell>
                   </TableRow>
                 ) : (
-                  result.candidates.map(({ venue, warnings, estimate }) => (
+                  result.candidates.map(({ venue, warnings, price }) => (
                     <Fragment key={venue.id}>
                       <TableRow>
-                        <TableCell className="font-medium">{displayValue(venue.name)}</TableCell>
+                        <TableCell className="font-medium">
+                          <button
+                            type="button"
+                            onClick={() => setOpenVenueId(venue.id)}
+                            className="text-left hover:text-primary hover:underline"
+                          >
+                            {displayValue(venue.name)}
+                          </button>
+                        </TableCell>
                         <TableCell>{displayValue(venue.district)}</TableCell>
                         <TableCell>{displayValue(venue.type)}</TableCell>
                         <TableCell className="whitespace-nowrap">{displayCapacity(venue.capacityMin, venue.capacityMax)}</TableCell>
-                        <TableCell className="whitespace-nowrap">{displayEstimate(estimate)}</TableCell>
+                        <TableCell className="whitespace-nowrap">
+                          <span className={trustClass(price.trust)}>{price.label}</span>
+                          {!price.free && (
+                            <span className="ml-1 text-xs text-muted-foreground">({TRUST_LABEL[price.trust]})</span>
+                          )}
+                        </TableCell>
                         <TableCell className="whitespace-nowrap">
                           {venue.phone ? <a href={`tel:${venue.phone.replace(/[^\d+]/g, "")}`} className="hover:text-primary">{venue.phone}</a> : "미상"}
                         </TableCell>
                         <TableCell className="whitespace-nowrap">
-                          {venue.reserveUrl ? <a href={venue.reserveUrl} target="_blank" rel="noreferrer" className="text-primary hover:underline">예약</a> : "미상"}
+                          <ReserveCell venue={venue} />
                         </TableCell>
                       </TableRow>
                       {warnings.length > 0 && (
@@ -289,10 +399,38 @@ export function VenueSearch({ districts, venueTypes }: VenueSearchProps) {
         </CardContent>
       </Card>
 
+      {result && result.total > result.limit && (
+        <div className="flex items-center justify-between gap-3">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={result.offset === 0 || isLoading}
+            onClick={() => void search(Math.max(0, result.offset - result.limit))}
+          >
+            이전
+          </Button>
+          <span className="text-sm text-muted-foreground">
+            {Math.floor(result.offset / result.limit) + 1} / {Math.ceil(result.total / result.limit)} 쪽
+          </span>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={result.offset + result.limit >= result.total || isLoading}
+            onClick={() => void search(result.offset + result.limit)}
+          >
+            다음
+          </Button>
+        </div>
+      )}
+
       <div className="space-y-2">
         <h2 className="text-sm font-semibold">지도</h2>
         <VenueMap pins={pins} />
       </div>
+
+      <VenueDetailDialog venueId={openVenueId} onClose={() => setOpenVenueId(null)} />
     </div>
   );
 }

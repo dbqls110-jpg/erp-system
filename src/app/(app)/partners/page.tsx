@@ -10,13 +10,21 @@ export default async function PartnersPage() {
   const session = await getServerSession(authOptions);
   await requireMenuAccess(session!.user.id, "partners", session!.user.role);
 
-  const [rows, canEdit] = await Promise.all([
+  const [rows, projects, canEdit] = await Promise.all([
     prisma.partner.findMany({
       orderBy: { updatedAt: "desc" },
       include: {
         projects: { include: { project: { select: { id: true, name: true } } } },
         rates: { orderBy: { order: "asc" } },
+        payments: {
+          orderBy: { createdAt: "desc" },
+          include: { project: { select: { id: true, name: true } } },
+        },
       },
+    }),
+    prisma.project.findMany({
+      orderBy: { name: "asc" },
+      select: { id: true, name: true },
     }),
     canEditMenu(session!.user.id, "partners", session!.user.role),
   ]);
@@ -41,7 +49,18 @@ export default async function PartnersPage() {
       unit: rate.unit,
       memo: rate.memo,
     })),
+    payments: p.payments.map((payment) => ({
+      id: payment.id,
+      item: payment.item,
+      amount: payment.amount,
+      unit: payment.unit,
+      quantity: payment.quantity,
+      paidOn: payment.paidOn,
+      memo: payment.memo,
+      projectId: payment.projectId,
+      projectName: payment.project?.name ?? null,
+    })),
   }));
 
-  return <PartnerTable initialData={partners} canEdit={canEdit} />;
+  return <PartnerTable initialData={partners} canEdit={canEdit} projects={projects} />;
 }

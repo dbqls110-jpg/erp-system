@@ -2,8 +2,10 @@
 /**
  * 공간 DB 원본 파일을 구글 드라이브에 백업한다.
  *
- * 넘겨받은 CSV/엑셀은 사장님 PC 한 곳에만 있다. ERP 에 적재하기 전 단계라
- * 그 PC 가 잘못되면 되돌릴 방법이 없으므로 원본 그대로 드라이브에 올려 둔다.
+ * 넘겨받은 CSV/엑셀은 사장님 PC 한 곳에만 있다. 그 PC 의 outputs 폴더에는 작업
+ * 중에 만든 백업 CSV 가 수백 개 쌓여 있어 어느 것이 정본인지 사람이 구분하기
+ * 어렵다. 정본만 골라 드라이브에 날짜별로 올려 두고, 적재는 그쪽에서 읽는다
+ * (scripts/import-venues.mjs).
  *
  * 사용법:
  *   node scripts/backup-venue-db.mjs            실제 업로드
@@ -11,16 +13,17 @@
  */
 import "dotenv/config";
 import fs from "node:fs";
-import crypto from "node:crypto";
 import path from "node:path";
-import { google } from "googleapis";
+import {
+  ROOT_FOLDER_NAME,
+  SNAPSHOT_FOLDER_NAME,
+  VENUE_FOLDER_NAME,
+  findFileInFolder,
+  findOrCreateFolder,
+  makeDriveClient,
+} from "./lib/drive.mjs";
 
 const DRY_RUN = process.argv.includes("--dry-run");
-
-const ROOT_FOLDER_NAME = "천우영 시스템";
-const PROJECT_FOLDER_NAME = "공간 DB";
-/** 매번 덮어쓰지 않고 받은 날짜별로 쌓는다. 원본 이력이 남아야 되돌릴 수 있다. */
-const SNAPSHOT_FOLDER_NAME = "원본 스냅샷";
 
 const SOURCE_DIR = String.raw`C:\Users\cybjs\Documents\Codex\seoul-db\outputs`;
 const FILES = [
@@ -28,6 +31,13 @@ const FILES = [
     name: "seoul_rental_spaces_integrated_clean.csv",
     mimeType: "text/csv",
     note: "정본 CSV (utf-8-sig, 3721행 x 150열)",
+  },
+  {
+    // 좌표를 빼먹으면 드라이브에서 적재했을 때 지도에 핀이 하나도 안 찍힌다.
+    // 다시 지오코딩하면 카카오 쿼터를 또 쓴다.
+    name: "venue_coordinates.csv",
+    mimeType: "text/csv",
+    note: "지오코딩 결과 (좌표)",
   },
   {
     name: "서울경기_대관공간_DB_0826_0133.xlsx",
@@ -42,81 +52,9 @@ function stamp() {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
 }
 
-/**
- * 앱과 같은 순서로 토큰을 찾는다. DB 에 저장된 것을 먼저 보고 없으면 env 로 넘어간다.
- * env 에는 만료된 값이 남아 있을 수 있어 그걸 먼저 보면 인증이 실패한다.
- */
-async function getRefreshToken() {
-  const encKey =
-    process.env.DRIVE_TOKEN_ENC_KEY ?? process.env.NEXTAUTH_SECRET ?? process.env.AUTH_SECRET;
-
-  if (encKey) {
-    const { PrismaClient } = await import("@prisma/client");
-    const { PrismaPg } = await import("@prisma/adapter-pg");
-    const prisma = new PrismaClient({
-      adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }),
-    });
-    try {
-      const record = await prisma.agentAuditLog.findFirst({
-        where: { action: "drive_oauth_active" },
-        orderBy: { createdAt: "desc" },
-        select: { result: true },
-      });
-      const enc = record?.result?.enc;
-      if (enc) {
-        const key = crypto.createHash("sha256").update(encKey).digest();
-        const buf = Buffer.from(enc, "base64");
-        const decipher = crypto.createDecipheriv("aes-256-gcm", key, buf.subarray(0, 12));
-        decipher.setAuthTag(buf.subarray(12, 28));
-        return Buffer.concat([decipher.update(buf.subarray(28)), decipher.final()]).toString("utf8");
-      }
-    } catch {
-      // 복호화 실패나 DB 접속 실패는 아래 env 폴백으로 넘긴다.
-    } finally {
-      await prisma.$disconnect();
-    }
-  }
-
-  const envToken = process.env.GOOGLE_DRIVE_OWNER_REFRESH_TOKEN;
-  if (envToken) return envToken;
-  throw new Error("Drive refresh token 을 찾지 못했습니다. DRIVE_TOKEN_ENC_KEY 를 확인하세요.");
-}
-
-async function makeDriveClientAsOwner() {
-  const oauth2 = new google.auth.OAuth2(
-    process.env.AUTH_GOOGLE_ID,
-    process.env.AUTH_GOOGLE_SECRET,
-  );
-  oauth2.setCredentials({ refresh_token: await getRefreshToken() });
-  return google.drive({ version: "v3", auth: oauth2 });
-}
-
-/** 이름이 같은 폴더가 있으면 재사용한다. 실행할 때마다 폴더가 늘어나면 안 된다. */
-async function findOrCreateFolder(drive, name, parentId) {
-  const escaped = name.replace(/'/g, "\\'");
-  const q = [
-    `name = '${escaped}'`,
-    "mimeType = 'application/vnd.google-apps.folder'",
-    "trashed = false",
-    parentId ? `'${parentId}' in parents` : "'root' in parents",
-  ].join(" and ");
-
-  const res = await drive.files.list({ q, fields: "files(id, name)", spaces: "drive" });
-  if (res.data.files?.length) return res.data.files[0].id;
-
-  const created = await drive.files.create({
-    requestBody: {
-      name,
-      mimeType: "application/vnd.google-apps.folder",
-      parents: parentId ? [parentId] : undefined,
-    },
-    fields: "id",
-  });
-  return created.data.id;
-}
-
 async function main() {
-  console.log(`대상 폴더: ${ROOT_FOLDER_NAME} > ${PROJECT_FOLDER_NAME} > ${SNAPSHOT_FOLDER_NAME} > ${stamp()}\n`);
+  const today = stamp();
+  console.log(`대상 폴더: ${ROOT_FOLDER_NAME} > ${VENUE_FOLDER_NAME} > ${SNAPSHOT_FOLDER_NAME} > ${today}\n`);
 
   const targets = [];
   for (const f of FILES) {
@@ -136,17 +74,38 @@ async function main() {
     return;
   }
 
-  const drive = await makeDriveClientAsOwner();
+  const drive = await makeDriveClient();
   const rootId = await findOrCreateFolder(drive, ROOT_FOLDER_NAME);
-  const projectId = await findOrCreateFolder(drive, PROJECT_FOLDER_NAME, rootId);
-  const snapshotId = await findOrCreateFolder(drive, SNAPSHOT_FOLDER_NAME, projectId);
-  const dateId = await findOrCreateFolder(drive, stamp(), snapshotId);
+  const venueId = await findOrCreateFolder(drive, VENUE_FOLDER_NAME, rootId);
+  const snapshotId = await findOrCreateFolder(drive, SNAPSHOT_FOLDER_NAME, venueId);
+  const dateId = await findOrCreateFolder(drive, today, snapshotId);
 
   console.log("");
   for (const t of targets) {
+    const media = { mimeType: t.mimeType, body: fs.createReadStream(t.full) };
+
+    // 같은 날 두 번 돌리는 일이 있다. 드라이브는 이름이 같아도 파일을 또 만들기
+    // 때문에, 그대로 두면 폴더 안에 같은 이름이 여러 개 남고 적재가 어느 것을
+    // 읽을지 알 수 없게 된다. 있으면 새 버전으로 덮는다(파일 ID 는 그대로).
+    const existing = await findFileInFolder(drive, t.name, dateId);
+    if (existing) {
+      if (Number(existing.size) === t.size) {
+        console.log(`  그대로: ${t.name} (내용 같음)`);
+        continue;
+      }
+      const res = await drive.files.update({
+        fileId: existing.id,
+        media,
+        fields: "id, name, webViewLink",
+      });
+      console.log(`  새 버전: ${res.data.name}`);
+      console.log(`        ${res.data.webViewLink}`);
+      continue;
+    }
+
     const res = await drive.files.create({
       requestBody: { name: t.name, parents: [dateId] },
-      media: { mimeType: t.mimeType, body: fs.createReadStream(t.full) },
+      media,
       fields: "id, name, size, webViewLink",
     });
     console.log(`  올림: ${res.data.name}`);

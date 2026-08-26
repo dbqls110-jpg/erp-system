@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { estimateTotal, matchVenue, rankVenues, THRESHOLDS, type VenueLike } from "@/lib/venueMatch";
+import { matchVenue, rankVenues, THRESHOLDS, type VenueLike } from "@/lib/venueMatch";
 
 function venue(over: Partial<VenueLike> = {}): VenueLike {
   return {
@@ -13,6 +13,11 @@ function venue(over: Partial<VenueLike> = {}): VenueLike {
     priceBasis: "4시간",
     priceSource: "상업요율",
     baseHours: 4,
+    price4h: 500_000,
+    priceConfidence: "근거일치",
+    priceMin: null,
+    priceMax: null,
+    areaM2: null,
     commercialUse: "가능",
     saturday: "가능",
     sunday: "가능",
@@ -29,23 +34,57 @@ function venue(over: Partial<VenueLike> = {}): VenueLike {
   };
 }
 
-describe("estimateTotal — 기준시간 환산", () => {
-  it("기준시간을 넘기면 블록 수만큼 곱한다", () => {
-    // 4시간 기준 50만원짜리를 7시간 쓰면 2블록 = 100만원
-    expect(estimateTotal(venue(), 7)).toBe(1_000_000);
+describe("요금 환산 — 4시간 환산액이 기준이다", () => {
+  it("7시간이면 시간에 비례해 늘린다", () => {
+    // 블록으로 올림하면 5시간 행사에 8시간치를 물리게 된다(venuePrice.ts).
+    expect(matchVenue(venue(), { hours: 7 }).estimate).toBe(875_000);
   });
 
-  it("기준시간 안이면 한 블록이다", () => {
-    expect(estimateTotal(venue(), 3)).toBe(500_000);
+  it("4시간이면 환산액 그대로다", () => {
+    expect(matchVenue(venue(), { hours: 4 }).estimate).toBe(500_000);
   });
 
-  it("기준시간을 모르면 환산하지 않는다", () => {
-    // 모르는 값을 그럴듯한 숫자로 바꾸면 비교가 조용히 틀어진다.
-    expect(estimateTotal(venue({ baseHours: null }), 7)).toBe(500_000);
+  it("환산액이 없으면 기준시간으로 우리가 환산한다", () => {
+    const r = matchVenue(venue({ price4h: null, price: 100_000, baseHours: 1 }), { hours: 4 });
+    expect(r.estimate).toBe(400_000);
   });
 
   it("요금을 모르면 null", () => {
-    expect(estimateTotal(venue({ price: null }), 7)).toBeNull();
+    expect(matchVenue(venue({ price: null, price4h: null }), { hours: 7 }).estimate).toBeNull();
+  });
+
+  it("㎡당 단가는 총액으로 쓰지 않는다", () => {
+    // 광화문광장 13원이 목록 맨 위에 올라온 원인이다.
+    const r = matchVenue(venue({ price: 13, price4h: null, priceBasis: null }), { hours: 4 });
+    expect(r.estimate).toBeNull();
+    expect(r.warnings.join()).toContain("㎡");
+  });
+});
+
+describe("요금 신뢰도가 순위에 반영된다", () => {
+  it("근거 없는 싼 값이 확인된 비싼 값보다 앞서지 않는다", () => {
+    const 수상한싼곳 = venue({ id: "cheap", price: 13, price4h: null, priceBasis: null, priceConfidence: null });
+    const 확인된곳 = venue({ id: "sure", price4h: 400_000, priceConfidence: "근거일치", priceSource: "전화확인" });
+    const { candidates } = rankVenues([수상한싼곳, 확인된곳], { people: 250, hours: 4 });
+    expect(candidates[0].venue.id).toBe("sure");
+  });
+
+  it("못 믿는 요금으로는 예산 초과 제외를 하지 않는다", () => {
+    // 우리가 곱해 만든 숫자 때문에 멀쩡한 공간이 사라지면 안 된다.
+    const r = matchVenue(
+      venue({ price: 1820, price4h: null, priceBasis: "1일, 1,820원/㎡", areaM2: 4208 }),
+      { budget: 500_000, hours: 4 },
+    );
+    expect(r.blockers).toEqual([]);
+    expect(r.warnings.join()).toContain("근거 불확실");
+  });
+
+  it("확인된 요금이 예산을 크게 넘으면 제외한다", () => {
+    const r = matchVenue(venue({ price4h: 5_000_000, priceConfidence: "근거일치" }), {
+      budget: 500_000,
+      hours: 4,
+    });
+    expect(r.blockers.join()).toContain("예산 초과");
   });
 });
 
@@ -80,7 +119,7 @@ describe("정원 — 완화된 규칙", () => {
 describe("예산 — 완화된 규칙", () => {
   it("15% 이내 초과는 경고로 남긴다", () => {
     // 추정가는 우리가 계산한 값이라 1원 넘었다고 잘라내면 좋은 후보를 잃는다.
-    const r = matchVenue(venue({ price: 550_000, baseHours: null }), {
+    const r = matchVenue(venue({ price4h: 550_000 }), {
       budget: 500_000,
       hours: 4,
     });
@@ -89,7 +128,7 @@ describe("예산 — 완화된 규칙", () => {
   });
 
   it("15% 를 넘으면 후보에서 뺀다", () => {
-    const r = matchVenue(venue({ price: 600_000, baseHours: null }), {
+    const r = matchVenue(venue({ price4h: 600_000 }), {
       budget: 500_000,
       hours: 4,
     });
@@ -99,7 +138,7 @@ describe("예산 — 완화된 규칙", () => {
   it("경계값(정확히 15% 초과)은 통과시킨다", () => {
     const budget = 1_000_000;
     const price = budget * THRESHOLDS.budgetTolerance;
-    const r = matchVenue(venue({ price, baseHours: null }), { budget, hours: 4 });
+    const r = matchVenue(venue({ price4h: price }), { budget, hours: 4 });
     expect(r.blockers).toEqual([]);
   });
 });

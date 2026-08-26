@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Download, Handshake, Pencil, Plus, RefreshCw, Trash2 } from "lucide-react";
+import { Download, Handshake, Pencil, Plus, ReceiptText, RefreshCw, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
@@ -28,6 +28,8 @@ import {
   updatePartner,
   updatePartnerRate,
 } from "@/app/actions/partnerCustomer";
+import { PartnerPaymentsDialog } from "./PartnerPaymentsDialog";
+import type { PartnerPaymentRow, ProjectOption } from "./PartnerPaymentsDialog";
 
 export interface PartnerRow {
   id: string;
@@ -41,6 +43,7 @@ export interface PartnerRow {
   memo: string | null;
   projectNames: string[];
   rates: { id: string; item: string; amount: number; unit: string; memo: string | null }[];
+  payments: PartnerPaymentRow[];
 }
 
 // 계약 만기가 아니라 "요즘도 같이 일하나" 를 나타낸다. 건별로 부르는
@@ -435,10 +438,12 @@ function PartnerRatesDialog({
 export function PartnerTable({
   initialData,
   canEdit,
+  projects,
 }: {
   initialData: PartnerRow[];
   /** 수정 권한. 서버 액션도 막지만, 눌러야만 오류가 나는 버튼은 고장난 화면으로 보인다. */
   canEdit: boolean;
+  projects: ProjectOption[];
 }) {
   const router = useRouter();
 
@@ -450,6 +455,7 @@ export function PartnerTable({
 
   const [dialog, setDialog] = useState<{ initial: FormState; id: string | null; key: number } | null>(null);
   const [rateDialog, setRateDialog] = useState<{ partner: PartnerRow; key: number } | null>(null);
+  const [paymentDialog, setPaymentDialog] = useState<{ partner: PartnerRow; key: number } | null>(null);
   const [saving, setSaving] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
 
@@ -688,16 +694,29 @@ export function PartnerTable({
                   shown.map((p) => (
                     <TableRow key={p.id}>
                       <TableCell className="font-medium whitespace-nowrap">
-                        {canEdit ? (
-                          <button
-                            type="button"
-                            onClick={() => setRateDialog({ partner: p, key: Date.now() })}
-                            className="text-left hover:text-primary hover:underline"
-                            title="단가 관리"
-                          >
-                            {p.name}
-                          </button>
-                        ) : p.name}
+                        <div className="flex items-center gap-2">
+                          {canEdit ? (
+                            <button
+                              type="button"
+                              onClick={() => setRateDialog({ partner: p, key: Date.now() })}
+                              className="text-left hover:text-primary hover:underline"
+                              title="단가 관리"
+                            >
+                              {p.name}
+                            </button>
+                          ) : p.name}
+                          {canEdit && (
+                            <button
+                              type="button"
+                              onClick={() => setPaymentDialog({ partner: p, key: Date.now() })}
+                              className="text-muted-foreground transition-colors hover:text-primary"
+                              title="실제 지급 이력"
+                            >
+                              <ReceiptText className="size-3.5" />
+                              <span className="sr-only">실제 지급 이력</span>
+                            </button>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell className="whitespace-nowrap text-muted-foreground">{p.job ?? "-"}</TableCell>
                       <TableCell>
@@ -801,6 +820,18 @@ export function PartnerTable({
           partnerName={rateDialog.partner.name}
           initial={rateDialog.partner.rates}
           onClose={() => setRateDialog(null)}
+        />
+      )}
+      {paymentDialog && (
+        <PartnerPaymentsDialog
+          key={paymentDialog.key}
+          open
+          partnerId={paymentDialog.partner.id}
+          partnerName={paymentDialog.partner.name}
+          rates={paymentDialog.partner.rates}
+          initialPayments={paymentDialog.partner.payments}
+          projects={projects}
+          onClose={() => setPaymentDialog(null)}
         />
       )}
     </div>

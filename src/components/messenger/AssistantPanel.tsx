@@ -5,6 +5,8 @@ import { Send, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { MessageContent } from "@/components/messenger/MessageContent";
+import { ProposalCard } from "@/components/messenger/ProposalCard";
+import { parseProposals, stripProposals } from "@/lib/assistantProposal";
 import { useVisiblePolling } from "@/lib/useVisiblePolling";
 import { cn } from "@/lib/utils";
 
@@ -202,15 +204,29 @@ export function AssistantPanel() {
                 <p className="px-1 text-[10px] text-muted-foreground">{turn.errorMsg}</p>
               )}
               {turn.status === "completed" && turn.answer !== null && (
-                <div className="flex justify-start">
-                  <div
-                    className={cn(
-                      "max-w-[85%] rounded-2xl rounded-tl-sm bg-muted px-3 py-1.5 text-xs leading-relaxed text-foreground",
-                    )}
-                  >
-                    <MessageContent content={turn.answer} />
-                  </div>
-                </div>
+                <>
+                  {/* 제안은 본문에서 빼고 카드로 그린다. JSON 을 그대로 보여줄 이유가 없다. */}
+                  {stripProposals(turn.answer) && (
+                    <div className="flex justify-start">
+                      <div
+                        className={cn(
+                          "max-w-[85%] rounded-2xl rounded-tl-sm bg-muted px-3 py-1.5 text-xs leading-relaxed text-foreground",
+                        )}
+                      >
+                        <MessageContent content={stripProposals(turn.answer)} />
+                      </div>
+                    </div>
+                  )}
+                  {parseProposals(turn.answer).map((proposal, proposalIndex) => (
+                    <ProposalCard
+                      key={`${turn.id}-${proposalIndex}`}
+                      proposal={proposal}
+                      // 서버가 답변을 다시 읽어 같은 자리의 제안인지 대조한다.
+                      index={proposalIndex}
+                      jobId={turn.id}
+                    />
+                  ))}
+                </>
               )}
               {isWaiting && (
                 <p className="px-1 text-[10px] text-muted-foreground">
