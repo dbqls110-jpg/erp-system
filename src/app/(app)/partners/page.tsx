@@ -13,7 +13,10 @@ export default async function PartnersPage() {
   const [rows, canEdit] = await Promise.all([
     prisma.partner.findMany({
       orderBy: { updatedAt: "desc" },
-      include: { projects: { include: { project: { select: { id: true, name: true } } } } },
+      include: {
+        projects: { include: { project: { select: { id: true, name: true } } } },
+        rates: { orderBy: { order: "asc" } },
+      },
     }),
     canEditMenu(session!.user.id, "partners", session!.user.role),
   ]);
@@ -31,6 +34,13 @@ export default async function PartnersPage() {
     settlementType: p.settlementType,
     memo: p.memo,
     projectNames: p.projects.map((x) => x.project.name),
+    rates: p.rates.map((rate) => ({
+      id: rate.id,
+      item: rate.item,
+      amount: rate.amount,
+      unit: rate.unit,
+      memo: rate.memo,
+    })),
   }));
 
   return <PartnerTable initialData={partners} canEdit={canEdit} />;

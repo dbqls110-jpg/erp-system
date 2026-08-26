@@ -74,7 +74,10 @@ export async function deleteCustomer(id: string) {
 async function syncPartnerSheet() {
   const partners = await prisma.partner.findMany({
     orderBy: { createdAt: "asc" },
-    include: { projects: { include: { project: { select: { name: true } } } } },
+    include: {
+      projects: { include: { project: { select: { name: true } } } },
+      rates: { orderBy: { order: "asc" } },
+    },
   });
   const result = await syncPartnersToSheet(
     partners.map((p) => ({
@@ -87,6 +90,7 @@ async function syncPartnerSheet() {
       phone: p.phone,
       projectNames: p.projects.map((x) => x.project.name),
       memo: p.memo,
+      rates: p.rates.map((rate) => ({ item: rate.item, amount: rate.amount, unit: rate.unit })),
       createdAt: p.createdAt,
     })),
   );
@@ -158,6 +162,70 @@ export async function updatePartner(
 export async function deletePartner(id: string) {
   await requireEditAccess("partners");
   await prisma.partner.delete({ where: { id } });
+  await syncPartnerSheet();
+  revalidatePath("/partners");
+}
+
+function isUniqueConstraintError(error: unknown) {
+  // Prisma의 고유 제약 오류만 사용자가 알아볼 수 있는 작업명 중복 안내로 바꾼다.
+  return typeof error === "object" && error !== null && (error as { code?: unknown }).code === "P2002";
+}
+
+export async function addPartnerRate(
+  partnerId: string,
+  data: { item: string; amount: number; unit?: string; memo?: string },
+) {
+  await requireEditAccess("partners");
+  if (!data.item.trim()) throw new Error("작업 이름을 입력해주세요.");
+  if (data.amount <= 0) throw new Error("단가를 입력해주세요.");
+
+  try {
+    await prisma.partnerRate.create({
+      data: {
+        partnerId,
+        item: data.item.trim(),
+        amount: data.amount,
+        unit: data.unit?.trim() || "건당",
+        memo: data.memo?.trim() || null,
+      },
+    });
+  } catch (error) {
+    if (isUniqueConstraintError(error)) throw new Error("이미 등록된 작업 이름입니다.");
+    throw error;
+  }
+  await syncPartnerSheet();
+  revalidatePath("/partners");
+}
+
+export async function updatePartnerRate(
+  id: string,
+  data: Partial<{ item: string; amount: number; unit: string; memo: string }>,
+) {
+  await requireEditAccess("partners");
+  if (data.item !== undefined && !data.item.trim()) throw new Error("작업 이름을 입력해주세요.");
+  if (data.amount !== undefined && data.amount <= 0) throw new Error("단가를 입력해주세요.");
+
+  try {
+    await prisma.partnerRate.update({
+      where: { id },
+      data: {
+        ...(data.item !== undefined ? { item: data.item.trim() } : {}),
+        ...(data.amount !== undefined ? { amount: data.amount } : {}),
+        ...(data.unit !== undefined ? { unit: data.unit.trim() || "건당" } : {}),
+        ...(data.memo !== undefined ? { memo: data.memo.trim() || null } : {}),
+      },
+    });
+  } catch (error) {
+    if (isUniqueConstraintError(error)) throw new Error("이미 등록된 작업 이름입니다.");
+    throw error;
+  }
+  await syncPartnerSheet();
+  revalidatePath("/partners");
+}
+
+export async function deletePartnerRate(id: string) {
+  await requireEditAccess("partners");
+  await prisma.partnerRate.delete({ where: { id } });
   await syncPartnerSheet();
   revalidatePath("/partners");
 }

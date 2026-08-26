@@ -20,7 +20,14 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { toneBadgeClass } from "@/lib/badge-tone";
-import { createPartner, deletePartner, updatePartner } from "@/app/actions/partnerCustomer";
+import {
+  addPartnerRate,
+  createPartner,
+  deletePartner,
+  deletePartnerRate,
+  updatePartner,
+  updatePartnerRate,
+} from "@/app/actions/partnerCustomer";
 
 export interface PartnerRow {
   id: string;
@@ -33,6 +40,7 @@ export interface PartnerRow {
   settlementType: string | null;
   memo: string | null;
   projectNames: string[];
+  rates: { id: string; item: string; amount: number; unit: string; memo: string | null }[];
 }
 
 // 계약 만기가 아니라 "요즘도 같이 일하나" 를 나타낸다. 건별로 부르는
@@ -65,6 +73,24 @@ function formatRate(rate: number | null, unit: string | null) {
   // 예전에 0 으로 저장된 값이 남아 있다. 0 원은 단가가 아니라 안 적은 것이다.
   if (rate === null || rate === 0) return "-";
   return `${rate.toLocaleString()}원${unit ? ` / ${unit}` : ""}`;
+}
+
+function formatCompactAmount(amount: number) {
+  if (amount >= 10_000) {
+    const man = amount / 10_000;
+    return `${Number.isInteger(man) ? man : man.toFixed(1).replace(/\.0$/, "")}만`;
+  }
+  return amount.toLocaleString();
+}
+
+function formatRatesTitle(rates: PartnerRow["rates"]) {
+  return rates.map((rate) => `${rate.item} ${rate.amount.toLocaleString()}원/${rate.unit}`).join(" · ");
+}
+
+function formatRatesSummary(rates: PartnerRow["rates"]) {
+  const first = rates[0];
+  if (!first) return "-";
+  return `${first.item} ${formatCompactAmount(first.amount)}${rates.length > 1 ? ` 외 ${rates.length - 1}건` : ""}`;
 }
 
 function PartnerDialog({
@@ -201,6 +227,229 @@ function PartnerDialog({
   );
 }
 
+type RateFormState = { item: string; amount: string; unit: string; memo: string };
+
+function PartnerRatesDialog({
+  open,
+  partnerId,
+  partnerName,
+  initial,
+  onClose,
+}: {
+  open: boolean;
+  partnerId: string;
+  partnerName: string;
+  initial: PartnerRow["rates"];
+  onClose: () => void;
+}) {
+  const router = useRouter();
+  const [rates, setRates] = useState(
+    initial.map((rate) => ({ ...rate, amount: String(rate.amount), memo: rate.memo ?? "" })),
+  );
+  const [newRate, setNewRate] = useState<RateFormState>({ item: "", amount: "", unit: "건당", memo: "" });
+  const [savingId, setSavingId] = useState<string | null>(null);
+  const [adding, setAdding] = useState(false);
+
+  const setRate = (id: string, key: keyof RateFormState, value: string) => {
+    setRates((current) => current.map((rate) => (rate.id === id ? { ...rate, [key]: value } : rate)));
+  };
+
+  async function handleRateSave(rate: (typeof rates)[number]) {
+    setSavingId(rate.id);
+    try {
+      await updatePartnerRate(rate.id, {
+        item: rate.item,
+        amount: Number(rate.amount),
+        unit: rate.unit,
+        memo: rate.memo,
+      });
+      toast.success("단가를 수정했습니다.");
+      onClose();
+      router.refresh();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "저장 실패");
+    } finally {
+      setSavingId(null);
+    }
+  }
+
+  async function handleRateAdd() {
+    setAdding(true);
+    try {
+      await addPartnerRate(partnerId, {
+        item: newRate.item,
+        amount: Number(newRate.amount),
+        unit: newRate.unit,
+        memo: newRate.memo,
+      });
+      toast.success("단가를 추가했습니다.");
+      onClose();
+      router.refresh();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "저장 실패");
+    } finally {
+      setAdding(false);
+    }
+  }
+
+  async function handleRateDelete(rate: (typeof rates)[number]) {
+    if (!window.confirm(`'${rate.item}' 단가를 삭제하시겠습니까?`)) return;
+    setSavingId(rate.id);
+    try {
+      await deletePartnerRate(rate.id);
+      toast.success("단가를 삭제했습니다.");
+      onClose();
+      router.refresh();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "삭제 실패");
+    } finally {
+      setSavingId(null);
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent className="max-h-[85vh] max-w-3xl overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="text-base">{partnerName} 단가 관리</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3">
+          <div className="hidden grid-cols-[minmax(0,1fr)_7rem_6rem_minmax(0,1fr)_3rem_2rem] gap-2 px-1 text-xs text-muted-foreground sm:grid">
+            <span>작업 이름</span>
+            <span>금액</span>
+            <span>단위</span>
+            <span>비고</span>
+            <span>저장</span>
+            <span>삭제</span>
+          </div>
+          {rates.length === 0 ? (
+            <p className="rounded-lg border border-dashed p-4 text-center text-sm text-muted-foreground">
+              등록된 항목이 없습니다.
+            </p>
+          ) : (
+            rates.map((rate) => (
+              <div
+                key={rate.id}
+                className="grid grid-cols-1 gap-2 rounded-lg border border-border p-2 sm:grid-cols-[minmax(0,1fr)_7rem_6rem_minmax(0,1fr)_3rem_2rem] sm:border-0 sm:p-0"
+              >
+                <div>
+                  <Label htmlFor={`rate-item-${rate.id}`} className="sr-only">작업 이름</Label>
+                  <Input
+                    id={`rate-item-${rate.id}`}
+                    value={rate.item}
+                    onChange={(e) => setRate(rate.id, "item", e.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor={`rate-amount-${rate.id}`} className="sr-only">금액</Label>
+                  <Input
+                    id={`rate-amount-${rate.id}`}
+                    inputMode="numeric"
+                    value={rate.amount}
+                    onChange={(e) => setRate(rate.id, "amount", e.target.value.replace(/[^0-9]/g, ""))}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor={`rate-unit-${rate.id}`} className="sr-only">단위</Label>
+                  <select
+                    id={`rate-unit-${rate.id}`}
+                    className={`${SELECT_CLASS} w-full`}
+                    value={rate.unit}
+                    onChange={(e) => setRate(rate.id, "unit", e.target.value)}
+                  >
+                    {RATE_UNITS.map((unit) => <option key={unit} value={unit}>{unit}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <Label htmlFor={`rate-memo-${rate.id}`} className="sr-only">비고</Label>
+                  <Input
+                    id={`rate-memo-${rate.id}`}
+                    value={rate.memo}
+                    onChange={(e) => setRate(rate.id, "memo", e.target.value)}
+                  />
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleRateSave(rate)}
+                  disabled={savingId !== null || !rate.item.trim() || Number(rate.amount) <= 0}
+                >
+                  저장
+                </Button>
+                <button
+                  type="button"
+                  onClick={() => handleRateDelete(rate)}
+                  disabled={savingId !== null}
+                  className="flex h-7 items-center justify-center text-muted-foreground transition-colors hover:text-destructive disabled:opacity-50"
+                  title="삭제"
+                >
+                  <Trash2 className="size-3.5" />
+                </button>
+              </div>
+            ))
+          )}
+          <div className="border-t border-border pt-3">
+            <p className="mb-2 text-xs font-medium text-muted-foreground">새 항목 추가</p>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_7rem_6rem_minmax(0,1fr)_3rem]">
+              <div>
+                <Label htmlFor="rate-new-item" className="sr-only">작업 이름</Label>
+                <Input
+                  id="rate-new-item"
+                  placeholder="예: 포스터"
+                  value={newRate.item}
+                  onChange={(e) => setNewRate((current) => ({ ...current, item: e.target.value }))}
+                />
+              </div>
+              <div>
+                <Label htmlFor="rate-new-amount" className="sr-only">금액</Label>
+                <Input
+                  id="rate-new-amount"
+                  inputMode="numeric"
+                  placeholder="500000"
+                  value={newRate.amount}
+                  onChange={(e) => setNewRate((current) => ({ ...current, amount: e.target.value.replace(/[^0-9]/g, "") }))}
+                />
+              </div>
+              <div>
+                <Label htmlFor="rate-new-unit" className="sr-only">단위</Label>
+                <select
+                  id="rate-new-unit"
+                  className={`${SELECT_CLASS} w-full`}
+                  value={newRate.unit}
+                  onChange={(e) => setNewRate((current) => ({ ...current, unit: e.target.value }))}
+                >
+                  {RATE_UNITS.map((unit) => <option key={unit} value={unit}>{unit}</option>)}
+                </select>
+              </div>
+              <div>
+                <Label htmlFor="rate-new-memo" className="sr-only">비고</Label>
+                <Input
+                  id="rate-new-memo"
+                  placeholder="비고"
+                  value={newRate.memo}
+                  onChange={(e) => setNewRate((current) => ({ ...current, memo: e.target.value }))}
+                />
+              </div>
+              <Button
+                size="sm"
+                onClick={handleRateAdd}
+                disabled={adding || !newRate.item.trim() || Number(newRate.amount) <= 0}
+              >
+                <Plus className="size-3.5" /> 추가
+              </Button>
+            </div>
+          </div>
+          <div className="flex justify-end pt-1">
+            <Button variant="outline" size="sm" onClick={onClose} disabled={adding || savingId !== null}>
+              닫기
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export function PartnerTable({
   initialData,
   canEdit,
@@ -218,6 +467,7 @@ export function PartnerTable({
   const [pageSize, setPageSize] = useState(10);
 
   const [dialog, setDialog] = useState<{ initial: FormState; id: string | null; key: number } | null>(null);
+  const [rateDialog, setRateDialog] = useState<{ partner: PartnerRow; key: number } | null>(null);
   const [saving, setSaving] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
 
@@ -455,7 +705,18 @@ export function PartnerTable({
                 ) : (
                   shown.map((p) => (
                     <TableRow key={p.id}>
-                      <TableCell className="font-medium whitespace-nowrap">{p.name}</TableCell>
+                      <TableCell className="font-medium whitespace-nowrap">
+                        {canEdit ? (
+                          <button
+                            type="button"
+                            onClick={() => setRateDialog({ partner: p, key: Date.now() })}
+                            className="text-left hover:text-primary hover:underline"
+                            title="단가 관리"
+                          >
+                            {p.name}
+                          </button>
+                        ) : p.name}
+                      </TableCell>
                       <TableCell className="whitespace-nowrap text-muted-foreground">{p.job ?? "-"}</TableCell>
                       <TableCell>
                         <Badge variant="outline" className={toneBadgeClass(statusTone(p.contractStatus))}>
@@ -463,7 +724,9 @@ export function PartnerTable({
                         </Badge>
                       </TableCell>
                       <TableCell className="text-muted-foreground tabular-nums">
-                        {formatRate(p.rate, p.rateUnit)}
+                        <span title={p.rates.length ? formatRatesTitle(p.rates) : undefined}>
+                          {p.rates.length ? formatRatesSummary(p.rates) : formatRate(p.rate, p.rateUnit)}
+                        </span>
                       </TableCell>
                       <TableCell className="whitespace-nowrap text-muted-foreground">{p.settlementType ?? "-"}</TableCell>
                       <TableCell className="text-muted-foreground tabular-nums">{p.phone ?? "-"}</TableCell>
@@ -532,6 +795,16 @@ export function PartnerTable({
           saving={saving}
           onClose={() => setDialog(null)}
           onSave={handleSave}
+        />
+      )}
+      {rateDialog && (
+        <PartnerRatesDialog
+          key={rateDialog.key}
+          open
+          partnerId={rateDialog.partner.id}
+          partnerName={rateDialog.partner.name}
+          initial={rateDialog.partner.rates}
+          onClose={() => setRateDialog(null)}
         />
       )}
     </div>

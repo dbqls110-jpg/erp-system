@@ -33,6 +33,7 @@ export interface PartnerSheetRow {
   phone: string | null;
   projectNames: string[];
   memo: string | null;
+  rates: { item: string; amount: number; unit: string }[];
   createdAt: Date;
 }
 
@@ -118,12 +119,18 @@ async function resolveSpreadsheetId(): Promise<string> {
 }
 
 function toRow(p: PartnerSheetRow): string[] {
+  const rateCell = p.rates.length
+    ? p.rates.map((rate) => `${rate.item} ${rate.amount.toLocaleString()}원/${rate.unit}`).join(" · ")
+    : p.rate === null
+      ? ""
+      : `${p.rate.toLocaleString()}원${p.rateUnit ? ` / ${p.rateUnit}` : ""}`;
+
   return [
     p.name,
     p.job ?? "",
     p.contractStatus,
-    // 시트는 사람이 훑어보는 곳이라 숫자만 두면 단위를 모른다.
-    p.rate === null ? "" : `${p.rate.toLocaleString()}원${p.rateUnit ? ` / ${p.rateUnit}` : ""}`,
+    // 항목별 단가가 있으면 작업별로 적어야 디자이너처럼 일마다 다른 금액을 구분할 수 있다.
+    rateCell,
     p.settlementType ?? "",
     p.phone ?? "",
     p.projectNames.join(", "),

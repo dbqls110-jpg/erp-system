@@ -32,17 +32,20 @@ interface Turn {
 
 function toTurn(job: {
   id: string;
-  input: string;
+  input?: string;
+  userInput: string | null;
   output: string | null;
   status: string;
   errorMsg: string | null;
   createdAt: Date;
   completedAt: Date | null;
 }): Turn {
+  const fallbackQuestion = job.input?.split("[질문]").pop()?.trim() ?? job.input ?? "";
+
   return {
     id: job.id,
-    // input 에는 지시문과 ERP 자료가 함께 들어 있다. 화면에는 사람이 쓴 질문만 보여준다.
-    question: job.input.split("[질문]").pop()?.trim() ?? job.input,
+    // 새 job은 원문 질문을 쓰고, userInput이 없는 옛 job만 기존 규칙으로 복원한다.
+    question: job.userInput ?? fallbackQuestion,
     answer: job.output,
     status: job.status,
     errorMsg: job.errorMsg,
@@ -56,6 +59,40 @@ export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+  const jobId = req.nextUrl.searchParams.get("job");
+
+  if (jobId) {
+    const [job, heartbeat] = await Promise.all([
+      prisma.agentJob.findFirst({
+        // job id만 알아도 남의 대화를 읽을 수 없도록 소유자 조건을 함께 건다.
+        where: { id: jobId, userId: session.user.id },
+        select: {
+          id: true, input: true, userInput: true, output: true, status: true,
+          errorMsg: true, createdAt: true, completedAt: true,
+        },
+      }),
+      prisma.agentBridgeHeartbeat.findFirst({
+        where: { agentType: { in: [AGENT_TYPE, "hermes"] } },
+        orderBy: { lastSeenAt: "desc" },
+        select: { lastSeenAt: true, status: true },
+      }),
+    ]);
+
+    if (!job) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+    const online = heartbeat
+      ? Date.now() - heartbeat.lastSeenAt.getTime() < BRIDGE_STALE_MS
+      : false;
+
+    return NextResponse.json({
+      turn: toTurn(job),
+      bridge: {
+        online,
+        lastSeenAt: heartbeat?.lastSeenAt.toISOString() ?? null,
+      },
+    });
+  }
+
   const limit = Math.min(Number(req.nextUrl.searchParams.get("limit") ?? 30), 100);
 
   const [jobs, heartbeat] = await Promise.all([
@@ -65,7 +102,7 @@ export async function GET(req: NextRequest) {
       orderBy: { createdAt: "desc" },
       take: limit,
       select: {
-        id: true, input: true, output: true, status: true,
+        id: true, userInput: true, output: true, status: true,
         errorMsg: true, createdAt: true, completedAt: true,
       },
     }),
@@ -76,12 +113,24 @@ export async function GET(req: NextRequest) {
     }),
   ]);
 
+  const legacyJobIds = jobs.filter((job) => job.userInput === null).map((job) => job.id);
+  const legacyJobs = legacyJobIds.length
+    ? await prisma.agentJob.findMany({
+        // 새 job은 큰 input을 목록 응답에서 제외하고, 옛 job에만 폴백용 원문을 읽는다.
+        where: { userId: session.user.id, id: { in: legacyJobIds } },
+        select: { id: true, input: true },
+      })
+    : [];
+  const legacyInputById = new Map(legacyJobs.map((job) => [job.id, job.input]));
+
   const online = heartbeat
     ? Date.now() - heartbeat.lastSeenAt.getTime() < BRIDGE_STALE_MS
     : false;
 
   return NextResponse.json({
-    turns: jobs.reverse().map(toTurn),
+    turns: jobs.reverse().map((job) =>
+      toTurn({ ...job, input: legacyInputById.get(job.id) }),
+    ),
     bridge: {
       online,
       // 꺼져 있으면 화면에서 미리 알려 준다. 물어보고 한참 기다리다 실패하는 것보다 낫다.
@@ -127,7 +176,13 @@ export async function POST(req: NextRequest) {
   const { prompt, topics, contextChars } = await buildAssistantPrompt(question);
 
   const job = await prisma.agentJob.create({
-    data: { agentType: AGENT_TYPE, userId: session.user.id, status: "pending", input: prompt },
+    data: {
+      agentType: AGENT_TYPE,
+      userId: session.user.id,
+      status: "pending",
+      input: prompt,
+      userInput: question,
+    },
     select: { id: true },
   });
 

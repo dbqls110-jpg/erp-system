@@ -42,6 +42,36 @@ const TABLE_FORMAT = [
   "  읽는 사람이 다음에 할 행동이 다릅니다.",
 ].join("\n");
 
+/**
+ * 자료를 고쳐 달라는 말에 대한 지시.
+ *
+ * AI 는 DB 에 쓰지 않는다. 무엇을 어떻게 바꿀지 적어 내면 화면이 확인 카드로 그리고,
+ * 사람이 누를 때 서버가 쓴다. 그래서 "고쳐 뒀습니다" 라고 답하면 안 된다 — 실제로는
+ * 아무 일도 일어나지 않았는데 다 된 줄 알게 된다.
+ */
+const UPDATE_FORMAT = [
+  "자료를 고쳐 달라는 말(전화 결과 기록, 마감일 변경 등)을 들으면,",
+  "직접 고쳤다고 하지 말고 아래 형식의 블록을 답에 넣으세요.",
+  "화면이 확인 카드로 보여주고, 사람이 누를 때 저장됩니다.",
+  "",
+  "```erp-update",
+  '{"target":"venue","id":"<[ERP 자료]에 있는 id 를 그대로>","label":"사람이 알아볼 이름",',
+  '"changes":{"calledAt":"2026-08-26","calledPrice":700000,"calledNote":"11/27 가능"},',
+  '"reason":"통화로 확인"}',
+  "```",
+  "",
+  "규칙:",
+  "- id 는 반드시 [ERP 자료]에 실제로 있는 값을 그대로 쓰세요. 지어내면 적용되지 않습니다.",
+  "- 대상이 여러 개일 수 있으면(같은 건물의 다른 방 등) 블록을 만들지 말고,",
+  "  어느 것인지 먼저 되물으세요. 임의로 하나를 고르면 엉뚱한 곳에 기록됩니다.",
+  "- 바꿀 수 있는 칸은 정해져 있습니다. 그 밖의 칸은 적어도 무시됩니다.",
+  "    venue   : calledAt(통화일) · calledPrice(확인 요금) · calledNote(통화 메모)",
+  "    partner : phone(연락처) · contractStatus(거래 상태) · memo(비고)",
+  "    project : deadline(마감일) · progress(진행률) · memo(비고)",
+  "- 날짜는 2026-08-26 형식으로만 쓰세요. '내일' 같은 말은 받아들여지지 않습니다.",
+  "- 블록 밖에는 무엇을 왜 바꾸려는지 한 줄로 적으세요.",
+].join("\n");
+
 export interface AssistantPrompt {
   prompt: string;
   topics: string[];
@@ -53,7 +83,7 @@ export async function buildAssistantPrompt(question: string): Promise<AssistantP
   const context = await buildAgentContext(question);
   const contextJson = JSON.stringify(context.data, null, 2);
 
-  const parts = [SYSTEM_FRAME, "", TABLE_FORMAT, "", "[ERP 자료]"];
+  const parts = [SYSTEM_FRAME, "", TABLE_FORMAT, "", UPDATE_FORMAT, "", "[ERP 자료]"];
 
   if (context.topics.length === 0) {
     // 주제를 못 알아들었을 때 빈 객체만 던지면 AI 가 "자료가 없다"로 오해한다.

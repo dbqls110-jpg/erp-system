@@ -25,6 +25,11 @@ interface AssistantResponse {
   bridge: { online: boolean; lastSeenAt: string | null };
 }
 
+interface AssistantPollResponse {
+  turn: AssistantTurn;
+  bridge: AssistantResponse["bridge"];
+}
+
 const TERMINAL_STATUSES: AssistantStatus[] = ["completed", "error"];
 const POLLING_TIMEOUT_MS = 3 * 60 * 1000;
 
@@ -77,10 +82,20 @@ export function AssistantPanel() {
       return;
     }
 
-    const data = await fetchAssistant();
-    const target = data?.turns.find((turn) => turn.id === pollingId);
-    if (target && TERMINAL_STATUSES.includes(target.status)) stopPolling();
-  }, [fetchAssistant, pollingId, stopPolling]);
+    try {
+      const res = await fetch(`/api/assistant?job=${encodeURIComponent(pollingId)}`);
+      if (!res.ok) return;
+
+      const data = (await res.json()) as AssistantPollResponse;
+      setTurns((current) =>
+        current.map((turn) => (turn.id === data.turn.id ? data.turn : turn)),
+      );
+      setBridge(data.bridge);
+      if (TERMINAL_STATUSES.includes(data.turn.status)) stopPolling();
+    } catch {
+      // 일시적인 네트워크 오류는 기존처럼 다음 폴링에서 다시 시도한다.
+    }
+  }, [pollingId, stopPolling]);
 
   useEffect(() => {
     void (async () => {
