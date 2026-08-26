@@ -75,24 +75,6 @@ function formatRate(rate: number | null, unit: string | null) {
   return `${rate.toLocaleString()}원${unit ? ` / ${unit}` : ""}`;
 }
 
-function formatCompactAmount(amount: number) {
-  if (amount >= 10_000) {
-    const man = amount / 10_000;
-    return `${Number.isInteger(man) ? man : man.toFixed(1).replace(/\.0$/, "")}만`;
-  }
-  return amount.toLocaleString();
-}
-
-function formatRatesTitle(rates: PartnerRow["rates"]) {
-  return rates.map((rate) => `${rate.item} ${rate.amount.toLocaleString()}원/${rate.unit}`).join(" · ");
-}
-
-function formatRatesSummary(rates: PartnerRow["rates"]) {
-  const first = rates[0];
-  if (!first) return "-";
-  return `${first.item} ${formatCompactAmount(first.amount)}${rates.length > 1 ? ` 외 ${rates.length - 1}건` : ""}`;
-}
-
 function PartnerDialog({
   open,
   initial,
@@ -684,7 +666,7 @@ export function PartnerTable({
                   <TableHead className="whitespace-nowrap">연락처</TableHead>
                   {/* 남는 폭을 이 칸이 가져간다. 안 그러면 여덟 칸이 화면 전체에
                       균등하게 퍼져 값끼리 멀리 떨어진다. */}
-                  <TableHead className="w-full">진행한 프로젝트</TableHead>
+                  <TableHead className="whitespace-nowrap">진행한 프로젝트</TableHead>
                   {canEdit && <TableHead className="w-24 whitespace-nowrap" />}
                 </TableRow>
               </TableHeader>
@@ -724,9 +706,23 @@ export function PartnerTable({
                         </Badge>
                       </TableCell>
                       <TableCell className="text-muted-foreground tabular-nums">
-                        <span title={p.rates.length ? formatRatesTitle(p.rates) : undefined}>
-                          {p.rates.length ? formatRatesSummary(p.rates) : formatRate(p.rate, p.rateUnit)}
-                        </span>
+                        {p.rates.length === 0 ? (
+                          formatRate(p.rate, p.rateUnit)
+                        ) : (
+                          // 항목마다 한 줄씩 편다. "포스터 50만 외 2건" 처럼 접으면 나머지를
+                          // 보려고 또 눌러야 하는데, 단가는 목록에서 바로 비교하려고 보는 값이다.
+                          // 하나뿐인 파트너는 자연히 한 줄로 끝난다.
+                          <div className="space-y-0.5">
+                            {p.rates.map((rate) => (
+                              <div key={rate.id} className="flex gap-2 whitespace-nowrap">
+                                <span className="min-w-16 text-muted-foreground">{rate.item}</span>
+                                <span className="tabular-nums text-foreground">
+                                  {rate.amount.toLocaleString()}원 / {rate.unit}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </TableCell>
                       <TableCell className="whitespace-nowrap text-muted-foreground">{p.settlementType ?? "-"}</TableCell>
                       <TableCell className="text-muted-foreground tabular-nums">{p.phone ?? "-"}</TableCell>
