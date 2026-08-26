@@ -7,13 +7,14 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Send, MessageCircle, ArrowLeft, CalendarPlus } from "lucide-react";
+import { Send, MessageCircle, ArrowLeft, CalendarPlus, Sparkles } from "lucide-react";
 import { sendMessage } from "@/app/actions/message";
 import { createCalendarEvent } from "@/app/actions/calendar";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { toneBadgeClass } from "@/lib/badge-tone";
 import { MessageContent } from "@/components/messenger/MessageContent";
+import { AssistantPanel } from "@/components/messenger/AssistantPanel";
 import { useMessenger } from "@/lib/messenger-store";
 import { useVisiblePolling } from "@/lib/useVisiblePolling";
 
@@ -79,6 +80,8 @@ export function MessengerView({ myId, users }: { myId: string; users: User[] }) 
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const [showList, setShowList] = useState(true);
+  // 사람 대화와 배타적이다. 둘이 동시에 열리면 어느 쪽을 보고 있는지 알 수 없다.
+  const [assistantOpen, setAssistantOpen] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -159,6 +162,7 @@ export function MessengerView({ myId, users }: { myId: string; users: User[] }) 
   }
 
   function selectUser(user: User) {
+    setAssistantOpen(false);
     const existing = conversations.find(c => c.other.id === user.id);
     setSelectedUser(user);
     setSelectedConvId(existing?.conversationId ?? null);
@@ -213,6 +217,23 @@ export function MessengerView({ myId, users }: { myId: string; users: User[] }) 
             <h2 className="text-sm font-semibold text-foreground">메신저</h2>
           </div>
           <div className="flex-1 overflow-y-auto">
+            {/* 비서는 사람이 아니라 목록 맨 위에 고정으로 둔다. 직원 사이에 섞이면 찾기 어렵다. */}
+            <button
+              onClick={() => { setAssistantOpen(true); setSelectedUser(null); setShowList(false); }}
+              className={cn(
+                "w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/50 transition-colors text-left",
+                assistantOpen && "bg-accent",
+              )}
+            >
+              <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/10">
+                <Sparkles className="size-4 text-primary" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-foreground">ERP 비서</p>
+                <p className="text-xs text-muted-foreground">무엇이든 물어보세요</p>
+              </div>
+            </button>
+
             {recentUsers.length === 0 && otherUsers.length === 0 && (
               <div className="flex flex-col items-center gap-3 py-12 text-center">
                 <MessageCircle className="size-6 text-muted-foreground" />
@@ -271,7 +292,20 @@ export function MessengerView({ myId, users }: { myId: string; users: User[] }) 
 
         {/* 오른쪽 채팅 패널 */}
         <div className={cn("flex-1 flex flex-col", showList && "hidden sm:flex")}>
-          {!selectedUser ? (
+          {assistantOpen ? (
+            <>
+              <div className="h-14 px-4 flex items-center gap-3 border-b border-border shrink-0">
+                <button onClick={() => setShowList(true)} className="sm:hidden text-muted-foreground hover:text-foreground mr-1">
+                  <ArrowLeft className="size-3.5" />
+                </button>
+                <div className="flex size-8 items-center justify-center rounded-full bg-primary/10">
+                  <Sparkles className="size-4 text-primary" />
+                </div>
+                <span className="text-sm font-semibold text-foreground">ERP 비서</span>
+              </div>
+              <AssistantPanel />
+            </>
+          ) : !selectedUser ? (
             <div className="flex flex-1 flex-col items-center justify-center gap-3 py-12 text-center">
               <MessageCircle className="size-6 text-muted-foreground" />
               <p className="text-sm text-muted-foreground">왼쪽에서 직원을 선택하세요</p>
