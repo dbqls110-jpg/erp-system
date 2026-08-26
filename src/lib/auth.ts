@@ -25,27 +25,43 @@ export const authOptions: NextAuthOptions = {
       if (account?.provider === "google" && profile?.email) {
         try {
           const users = await prisma.$queryRaw<
-            Array<{ id: string; role: string; name: string | null; image: string | null }>
-          >`SELECT id, role, name, image FROM users WHERE email = ${profile.email}`;
+            Array<{
+              id: string;
+              role: string;
+              name: string | null;
+              image: string | null;
+              partnerId: string | null;
+              customerId: string | null;
+            }>
+          >`SELECT id, role, name, image, "partnerId", "customerId" FROM users WHERE email = ${profile.email}`;
           let dbUser = users[0];
 
           if (!dbUser) {
             const countResult = await prisma.$queryRaw<Array<{ count: bigint }>>`SELECT COUNT(*) as count FROM users`;
             const count = Number(countResult[0].count);
             const newUsers = await prisma.$queryRaw<
-              Array<{ id: string; role: string; name: string | null; image: string | null }>
+              Array<{
+                id: string;
+                role: string;
+                name: string | null;
+                image: string | null;
+                partnerId: string | null;
+                customerId: string | null;
+              }>
             >`
               INSERT INTO users (id, email, name, image, role, active, "createdAt", "updatedAt")
               VALUES (gen_random_uuid()::text, ${profile.email}, ${profile.name ?? null},
                 ${(profile as { picture?: string }).picture ?? null},
                 ${count === 0 ? "admin" : "pending"}, true, NOW(), NOW())
-              RETURNING id, role, name, image
+              RETURNING id, role, name, image, "partnerId", "customerId"
             `;
             dbUser = newUsers[0];
           }
 
           token.id = dbUser.id;
           token.role = dbUser.role;
+          token.partnerId = dbUser.partnerId;
+          token.customerId = dbUser.customerId;
           token.roleCheckedAt = Date.now();
           token.name = dbUser.name;
           token.picture = dbUser.image;
@@ -63,6 +79,8 @@ export const authOptions: NextAuthOptions = {
           console.error("[ERP Auth Error]", err);
           token.id = token.sub ?? "unknown";
           token.role = "pending";
+          token.partnerId = null;
+          token.customerId = null;
         }
       }
       // 로그인 이후에도 role 을 주기적으로 다시 읽는다.
@@ -76,10 +94,18 @@ export const authOptions: NextAuthOptions = {
       // 사용자 한 명당 분당 한 번은 예전에 없앤 폴링보다 훨씬 가볍다.
       if (token.id && Date.now() - ((token.roleCheckedAt as number) ?? 0) > ROLE_REFRESH_MS) {
         try {
-          const rows = await prisma.$queryRaw<Array<{ role: string }>>`
-            SELECT role FROM users WHERE id = ${token.id as string}
+          // 연결(어느 파트너·거래처인지)도 함께 읽는다. 관리자가 승인하며 연결을
+          // 바꿔도 상대가 재로그인해야 반영되면 안 된다.
+          const rows = await prisma.$queryRaw<
+            Array<{ role: string; partnerId: string | null; customerId: string | null }>
+          >`
+            SELECT role, "partnerId", "customerId" FROM users WHERE id = ${token.id as string}
           `;
-          if (rows[0]) token.role = rows[0].role;
+          if (rows[0]) {
+            token.role = rows[0].role;
+            token.partnerId = rows[0].partnerId;
+            token.customerId = rows[0].customerId;
+          }
           token.roleCheckedAt = Date.now();
         } catch (err) {
           // 조회에 실패하면 기존 role 을 유지한다. 여기서 권한을 낮추면 DB 가
@@ -94,6 +120,8 @@ export const authOptions: NextAuthOptions = {
       if (session.user) {
         session.user.id = token.id as string;
         session.user.role = (token.role as string) ?? "pending";
+        session.user.partnerId = (token.partnerId as string | null) ?? null;
+        session.user.customerId = (token.customerId as string | null) ?? null;
       }
       session.accessToken = token.accessToken as string | undefined;
       return session;

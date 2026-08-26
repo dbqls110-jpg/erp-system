@@ -1,10 +1,23 @@
 "use server";
 
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { createNotionEvent, updateNotionEvent, archiveNotionEvent } from "@/lib/notion";
+import { getCalendarViewer } from "@/lib/calendarViewer";
+import { canEditCalendar } from "@/lib/calendarVisibility";
+
+/**
+ * 일정을 고칠 수 있는 사람인지 확인한다.
+ *
+ * 파트너·거래처 계정은 읽기만 한다. 자기 프로젝트라도 일정을 바꾸게 두면 우리 쪽
+ * 기록이 밖에서 바뀐다. 바꿔 달라는 말은 메신저로 받는 편이 맞다.
+ */
+async function requireCalendarEditor() {
+  const viewer = await getCalendarViewer();
+  if (!viewer) throw new Error("Unauthorized");
+  if (!canEditCalendar(viewer)) throw new Error("일정을 바꿀 권한이 없습니다.");
+  return viewer;
+}
 
 export async function createCalendarEvent(data: {
   title: string;
@@ -12,8 +25,7 @@ export async function createCalendarEvent(data: {
   endDate?: string;
   color: string;
 }) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id) throw new Error("Unauthorized");
+  const session = await requireCalendarEditor();
 
   const event = await prisma.calendarEvent.create({
     data: {
@@ -21,7 +33,7 @@ export async function createCalendarEvent(data: {
       date: data.date,
       endDate: data.endDate || null,
       color: data.color,
-      createdBy: session.user.id,
+      createdBy: session.id,
     },
   });
 
@@ -41,13 +53,12 @@ export async function updateCalendarEvent(
   id: string,
   data: { title: string; date: string; endDate?: string; color: string }
 ) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id) throw new Error("Unauthorized");
+  const session = await requireCalendarEditor();
 
   const event = await prisma.calendarEvent.findUnique({ where: { id } });
   if (!event) throw new Error("일정을 찾을 수 없습니다.");
 
-  if (event.createdBy !== session.user.id && session.user.role !== "admin") {
+  if (event.createdBy !== session.id && session.role !== "admin") {
     throw new Error("수정 권한이 없습니다.");
   }
 
@@ -70,13 +81,12 @@ export async function updateCalendarEvent(
 }
 
 export async function deleteCalendarEvent(id: string) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id) throw new Error("Unauthorized");
+  const session = await requireCalendarEditor();
 
   const event = await prisma.calendarEvent.findUnique({ where: { id } });
   if (!event) throw new Error("일정을 찾을 수 없습니다.");
 
-  if (event.createdBy !== session.user.id && session.user.role !== "admin") {
+  if (event.createdBy !== session.id && session.role !== "admin") {
     throw new Error("삭제 권한이 없습니다.");
   }
 

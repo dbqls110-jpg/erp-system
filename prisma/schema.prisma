@@ -13,12 +13,22 @@ model User {
   emailVerified DateTime?
   name          String?
   image         String?
-  role          String    @default("pending") // "admin" | "user" | "pending"
-  isAgent       Boolean   @default(false) // true = Agent bot
-  agentType     String? // "hermes" | "marketer" | null
-  active        Boolean   @default(true)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  role          String    @default("pending") // "admin" | "manager" | "member" | "partner" | "pending"
+
+  /**
+   * 외부 사용자(파트너 개인 · 거래처 담당자)가 어느 자료에 속하는지.
+   * 둘 다 null 이면 내부 직원이다. 하나가 채워져 있으면 그 사람은 자기와 연결된
+   * 프로젝트의 일정만 볼 수 있다. 관리자가 승인할 때 지정한다.
+   * 이 값을 role 로 대신할 수 없다. role=partner 는 "권한이 낮다"는 뜻일 뿐,
+   * 어느 파트너인지는 말해 주지 않는다. 누구인지 모르면 무엇을 가릴지도 정할 수 없다.
+   */
+  partnerId  String?
+  customerId String?
+  isAgent    Boolean  @default(false) // true = Agent bot
+  agentType  String? // "hermes" | "marketer" | null
+  active     Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
   accounts         Account[]
   sessions         Session[]
@@ -32,6 +42,11 @@ model User {
   conversationsAsB Conversation[]  @relation("ConvB")
   sentMessages     Message[]       @relation("MessageSender")
 
+  partner  Partner?  @relation(fields: [partnerId], references: [id], onDelete: SetNull)
+  customer Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+
+  @@index([partnerId])
+  @@index([customerId])
   @@map("users")
 }
 
@@ -155,6 +170,8 @@ model Project {
   files          ProjectFile[]
   customers      ProjectCustomer[]
   partners       ProjectPartner[]
+
+  calendarEvents CalendarEvent[]
 
   @@map("projects")
 }
@@ -291,18 +308,30 @@ model AgentAuditLog {
 
 // ─── 캘린더 ───────────────────────────────────────────────
 model CalendarEvent {
-  id           String   @id @default(cuid())
-  title        String
-  date         String // "YYYY-MM-DD"
-  endDate      String? // "YYYY-MM-DD"
-  color        String   @default("gray") // "gray" | "blue" | "green" | "red" | "yellow" | "purple"
-  createdBy    String
+  id        String  @id @default(cuid())
+  title     String
+  date      String // "YYYY-MM-DD"
+  endDate   String? // "YYYY-MM-DD"
+  color     String  @default("gray") // "gray" | "blue" | "green" | "red" | "yellow" | "purple"
+  createdBy String
+
+  /**
+   * 이 일정이 어느 프로젝트의 것인지.
+   * 외부 사용자에게 무엇을 보일지 가르는 유일한 기준이다. 비어 있으면 내부 일정이라
+   * 직원에게만 보인다. 기본값을 "공개"로 두지 않은 것이 중요하다 — 실수로 비워 둔
+   * 일정이 거래처에 노출되는 것보다, 안 보이는 편이 낫다.
+   */
+  projectId String?
+
   notionPageId String? // Notion page ID (양방향 동기화용)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  user User @relation(fields: [createdBy], references: [id], onDelete: Cascade)
+  user    User     @relation(fields: [createdBy], references: [id], onDelete: Cascade)
+  project Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
 
+  @@index([projectId])
+  @@index([date])
   @@map("calendar_events")
 }
 
@@ -583,6 +612,7 @@ model Customer {
   updatedAt DateTime @updatedAt
 
   projects ProjectCustomer[]
+  users    User[]
 
   @@index([status])
   @@map("customers")
@@ -627,6 +657,7 @@ model Partner {
 
   projects ProjectPartner[]
   rates    PartnerRate[]
+  users    User[]
 
   @@index([contractStatus])
   @@map("partners")
