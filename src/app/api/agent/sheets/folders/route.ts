@@ -3,9 +3,11 @@ import { verifyAgentApiKey } from "@/lib/agentAuth";
 
 const ROOT_FOLDER_NAME = "Hermes 운영 시트";
 
+// subfolder 는 구글 드라이브의 실제 폴더 이름이다. 이름을 바꾸면 기존 폴더를
+// 못 찾으므로 agentType 만 새 이름으로 옮긴다.
 const AGENT_DEFAULTS = [
-  { agentType: "hermes", subfolder: "Hermes" },
-  { agentType: "marketer", subfolder: "마케터" },
+  { agentType: "agent-1", subfolder: "Hermes" },
+  { agentType: "agent-2", subfolder: "마케터" },
   { agentType: "report", subfolder: "보고서" },
 ];
 

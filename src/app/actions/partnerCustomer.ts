@@ -66,7 +66,7 @@ export async function deleteCustomer(id: string) {
 
 export async function createPartner(data: {
   name: string;
-  manager?: string;
+  job?: string;
   phone?: string;
   contractStatus?: string;
   contractStart?: string;
@@ -75,12 +75,12 @@ export async function createPartner(data: {
   memo?: string;
 }) {
   await requireEditAccess("partners");
-  if (!data.name.trim()) throw new Error("파트너사명을 입력해주세요.");
+  if (!data.name.trim()) throw new Error("이름을 입력해주세요.");
 
   await prisma.partner.create({
     data: {
       name: data.name.trim(),
-      manager: data.manager?.trim() || null,
+      job: data.job?.trim() || null,
       phone: data.phone?.trim() || null,
       contractStatus: data.contractStatus?.trim() || "대기",
       contractStart: data.contractStart?.trim() || null,
@@ -96,7 +96,7 @@ export async function updatePartner(
   id: string,
   data: Partial<{
     name: string;
-    manager: string;
+    job: string;
     phone: string;
     contractStatus: string;
     contractStart: string;

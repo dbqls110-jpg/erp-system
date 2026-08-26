@@ -1,5 +1,14 @@
 import { NextRequest } from "next/server";
 import crypto from "crypto";
+import {
+  BRIDGE_AGENT_TYPES,
+  bridgeApiKeyEnvNames,
+  normalizeAgentType,
+  type BridgeAgentType,
+} from "@/lib/agentTypes";
+
+export { BRIDGE_AGENT_TYPES, normalizeAgentType };
+export type { BridgeAgentType };
 
 function extractToken(req: NextRequest): string {
   const auth = req.headers.get("authorization") ?? "";
@@ -22,9 +31,6 @@ export function verifyAgentApiKey(req: NextRequest): boolean {
   return safeEqual(extractToken(req), expected);
 }
 
-export const BRIDGE_AGENT_TYPES = ["hermes", "marketer"] as const;
-export type BridgeAgentType = (typeof BRIDGE_AGENT_TYPES)[number];
-
 /**
  * DB 조회 전에 자격증명 없는 요청을 걸러내기 위한 사전 검사.
  *
@@ -38,14 +44,20 @@ export function hasAnyBridgeCredential(req: NextRequest): boolean {
   return BRIDGE_AGENT_TYPES.some((agentType) => verifyBridgeApiKey(req, agentType));
 }
 
-// 브릿지 전용 키 (agentType 별 분리)
-// HERMES_BRIDGE_API_KEY  → agentType=hermes 만 허용
-// MARKETER_BRIDGE_API_KEY → agentType=marketer 만 허용
+/**
+ * 브릿지 전용 키. 브릿지마다 키가 다르므로 agentType 을 함께 받는다.
+ *
+ * AGENT_1_BRIDGE_API_KEY 를 먼저 보고 없으면 옛 이름 HERMES_BRIDGE_API_KEY 를 본다.
+ * Render 환경변수를 나중에 바꿔도 그 사이에 인증이 끊기지 않게 하기 위함이다.
+ * agentType 은 옛 이름으로 와도 정식 이름으로 바꿔서 처리한다.
+ */
 export function verifyBridgeApiKey(req: NextRequest, agentType: string): boolean {
-  const envKey =
-    agentType === "hermes"   ? process.env.HERMES_BRIDGE_API_KEY :
-    agentType === "marketer" ? process.env.MARKETER_BRIDGE_API_KEY :
-    undefined;
+  const normalized = normalizeAgentType(agentType);
+  if (!normalized) return false;
+
+  const envKey = bridgeApiKeyEnvNames(normalized)
+    .map((name) => process.env[name])
+    .find((value) => value);
 
   if (!envKey) {
     // 전용 키 미설정 시 일반 ERP_AGENT_API_KEY 로 fallback (개발 편의)

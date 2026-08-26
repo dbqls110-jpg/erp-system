@@ -25,7 +25,7 @@ export default async function PartnersPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <p className="mt-1 text-sm text-muted-foreground">파트너사와 계약 현황</p>
+          <p className="mt-1 text-sm text-muted-foreground">파트너 개인별 계약 현황</p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" className="h-9 py-2">
@@ -58,7 +58,7 @@ export default async function PartnersPage() {
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <span className="w-20 shrink-0 text-sm text-muted-foreground">검색키워드</span>
-            <Input className="h-8 w-72" placeholder="파트너사명 또는 담당자 입력" />
+            <Input className="h-8 w-72" placeholder="이름 또는 직업 입력" />
           </div>
           <div className="flex justify-end gap-2 pt-1">
             <Button variant="outline" className="h-8">초기화</Button>
@@ -73,7 +73,7 @@ export default async function PartnersPage() {
           <Button variant="outline" className="h-8"><Download className="size-3.5" /> 엑셀 다운로드</Button>
           <select defaultValue="latest" className="h-8 rounded-2xl border border-transparent bg-input/50 px-3 text-sm text-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/30 w-32">
                   <option value="latest">최종수정일순</option>
-                  <option value="name">파트너사명순</option>
+                  <option value="name">이름순</option>
                 </select>
           <select defaultValue="10" className="h-8 rounded-2xl border border-transparent bg-input/50 px-3 text-sm text-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/30 w-28">
                   <option value="10">10개씩 보기</option>
@@ -89,19 +89,18 @@ export default async function PartnersPage() {
             <Table className="[&_:is(th,td)]:px-4">
               <TableHeader>
                 <TableRow>
-                  <TableHead>파트너사명</TableHead>
-                  <TableHead>담당자</TableHead>
+                  <TableHead>이름</TableHead>
+                  <TableHead>직업</TableHead>
                   <TableHead>계약상태</TableHead>
-                  <TableHead>계약기간</TableHead>
                   <TableHead>정산방식</TableHead>
                   <TableHead>연락처</TableHead>
-                  <TableHead>최종수정일</TableHead>
+                  <TableHead>진행한 프로젝트</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {rows.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="py-12 text-center">
+                    <TableCell colSpan={6} className="py-12 text-center">
                       <div className="flex flex-col items-center gap-3">
                         <Handshake className="size-6 text-muted-foreground" />
                         <p className="text-sm text-muted-foreground">아직 등록된 항목이 없습니다</p>
@@ -112,21 +111,25 @@ export default async function PartnersPage() {
                   rows.map((p) => (
                     <TableRow key={p.id}>
                       <TableCell className="font-medium">{p.name}</TableCell>
-                      <TableCell className="text-muted-foreground">{p.manager ?? "-"}</TableCell>
+                      <TableCell className="text-muted-foreground">{p.job ?? "-"}</TableCell>
                       <TableCell>
                         <Badge variant="outline" className={toneBadgeClass(p.contractStatus === "진행중" ? "green" : p.contractStatus === "만료" ? "gray" : "amber")}>
                           {p.contractStatus}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-muted-foreground tabular-nums">
-                        {p.contractStart || p.contractEnd ? `${p.contractStart ?? ""} ~ ${p.contractEnd ?? ""}` : "-"}
-                      </TableCell>
                       <TableCell className="text-muted-foreground">{p.settlementType ?? "-"}</TableCell>
-                      <TableCell className="text-muted-foreground">{p.phone ?? "-"}</TableCell>
-                      <TableCell className="tabular-nums text-muted-foreground">
-                        {p.projects.length === 0 ? "-" : (
+                      <TableCell className="text-muted-foreground tabular-nums">{p.phone ?? "-"}</TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {/* 건수만 적으면 "어느 프로젝트였지"를 다시 찾아봐야 한다. 이름을 보여준다. */}
+                        {p.projects.length === 0 ? (
+                          "-"
+                        ) : (
                           <span title={p.projects.map((x) => x.project.name).join(", ")}>
-                            프로젝트 {p.projects.length}건
+                            {p.projects
+                              .slice(0, 2)
+                              .map((x) => x.project.name)
+                              .join(", ")}
+                            {p.projects.length > 2 ? ` 외 ${p.projects.length - 2}건` : ""}
                           </span>
                         )}
                       </TableCell>

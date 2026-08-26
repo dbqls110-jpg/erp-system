@@ -11,12 +11,16 @@ import type { drive_v3 } from "googleapis";
 
 const ROOT_FOLDER_NAME = "Hermes 운영 시트";
 
+// 값은 구글 드라이브의 실제 폴더 이름이다. 바꾸면 기존 폴더를 못 찾으므로 그대로 둔다.
+// 키만 새 이름으로 옮기고 옛 이름도 남겨 둔다(이미 옛 이름으로 호출하는 곳이 있다).
 const AGENT_FOLDER_MAP: Record<string, string> = {
+  "agent-1": "Hermes",
+  "agent-2": "마케터",
   hermes: "Hermes",
   marketer: "마케터",
   report: "보고서",
 };
-const ALLOWED_AGENT_TYPES = ["hermes", "marketer"] as const;
+const ALLOWED_AGENT_TYPES = ["agent-1", "agent-2", "hermes", "marketer"] as const;
 
 function sanitizeTitle(raw: string, maxLen: number = LIMITS.MAX_TITLE_LEN): string {
   return raw
@@ -90,7 +94,7 @@ export async function POST(req: NextRequest) {
   }
 
   const {
-    agentType = "hermes",
+    agentType = "agent-1",
     folderName,
     title,
     sourcePrompt,
@@ -101,7 +105,7 @@ export async function POST(req: NextRequest) {
   const resolvedAgentType = String(agentType);
   if (!ALLOWED_AGENT_TYPES.includes(resolvedAgentType as (typeof ALLOWED_AGENT_TYPES)[number])) {
     return NextResponse.json(
-      { error: "agentType은 hermes | marketer 중 하나여야 합니다.", code: "INVALID_AGENT_TYPE" },
+      { error: "agentType은 agent-1 | agent-2 중 하나여야 합니다.", code: "INVALID_AGENT_TYPE" },
       { status: 400 },
     );
   }

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { verifyBridgeApiKey, BRIDGE_AGENT_TYPES, type BridgeAgentType } from "@/lib/agentAuth";
+import { verifyBridgeApiKey } from "@/lib/agentAuth";
+import { normalizeAgentType } from "@/lib/agentTypes";
 import { prisma } from "@/lib/prisma";
 
 interface Body {
@@ -23,9 +24,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  const agentType = (body.agentType ?? "hermes") as BridgeAgentType;
-  if (!BRIDGE_AGENT_TYPES.includes(agentType)) {
-    return NextResponse.json({ error: "agentType은 hermes | marketer" }, { status: 400 });
+  // 옛 이름으로 와도 받아주고, 저장은 정식 이름으로 통일한다. 그러지 않으면
+  // 같은 브릿지가 이름만 다른 두 행으로 갈라져 상태를 못 읽는다.
+  const agentType = normalizeAgentType(body.agentType ?? "agent-1");
+  if (!agentType) {
+    return NextResponse.json({ error: "agentType은 agent-1 | agent-2" }, { status: 400 });
   }
   if (!verifyBridgeApiKey(req, agentType)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

@@ -51,8 +51,9 @@ describe("verifyAgentApiKey", () => {
 
 // ─── verifyBridgeApiKey — 라우팅 분리 ────────────────────────────────────────
 
-describe("verifyBridgeApiKey — Hermes/Marketer 라우팅 분리", () => {
+describe("verifyBridgeApiKey — 브릿지별 라우팅 분리", () => {
   beforeEach(() => {
+    // 옛 이름의 환경변수. 새 이름(AGENT_1_/AGENT_2_)이 없을 때 이쪽으로 넘어와야 한다.
     process.env.HERMES_BRIDGE_API_KEY   = "hermes-secret";
     process.env.MARKETER_BRIDGE_API_KEY = "marketer-secret";
     process.env.ERP_AGENT_API_KEY       = "generic-secret";
@@ -85,9 +86,32 @@ describe("verifyBridgeApiKey — Hermes/Marketer 라우팅 분리", () => {
     expect(verifyBridgeApiKey(mockReq("generic-secret"), "marketer")).toBe(false);
   });
 
-  it("알 수 없는 agentType은 generic 키로 fallback", () => {
-    // agentType=unknown → envKey=undefined → falls back to ERP_AGENT_API_KEY
-    expect(verifyBridgeApiKey(mockReq("generic-secret"), "unknown")).toBe(true);
+  it("알 수 없는 agentType 은 거부한다", () => {
+    // 예전에는 여기서 ERP_AGENT_API_KEY 로 넘어가 true 였다. 그러면 아무 문자열이나
+    // agentType 으로 넣었을 때 일반 키로 브릿지 API 가 열린다. 일반 키는 Discord 봇
+    // 같은 내부 호출용이지 브릿지용이 아니다.
+    //
+    // 특히 jobs/[id] 는 DB 에 적힌 agentType 으로 검증하므로, 예상 못 한 값이 든 행이
+    // 하나라도 있으면 일반 키로 남의 작업을 열 수 있었다.
+    expect(verifyBridgeApiKey(mockReq("generic-secret"), "unknown")).toBe(false);
+  });
+
+  it("새 이름과 옛 이름을 같은 브릿지로 취급한다", () => {
+    // 회사 PC 의 bridge.env 와 Render 환경변수를 한꺼번에 바꿀 수 없으므로
+    // 둘 다 받아들여야 그 사이에 인증이 끊기지 않는다.
+    expect(verifyBridgeApiKey(mockReq("hermes-secret"), "agent-1")).toBe(true);
+    expect(verifyBridgeApiKey(mockReq("marketer-secret"), "agent-2")).toBe(true);
+    expect(verifyBridgeApiKey(mockReq("hermes-secret"), "agent-2")).toBe(false);
+  });
+
+  it("새 이름 환경변수가 옛 이름보다 우선한다", () => {
+    process.env.AGENT_1_BRIDGE_API_KEY = "agent1-secret";
+    try {
+      expect(verifyBridgeApiKey(mockReq("agent1-secret"), "agent-1")).toBe(true);
+      expect(verifyBridgeApiKey(mockReq("hermes-secret"), "agent-1")).toBe(false);
+    } finally {
+      delete process.env.AGENT_1_BRIDGE_API_KEY;
+    }
   });
 
   it("전용 키가 없으면 generic 키로 fallback", () => {

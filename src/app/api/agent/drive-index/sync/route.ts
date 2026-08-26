@@ -7,7 +7,7 @@ import { syncDriveIndex } from "@/lib/driveIndex";
 export const maxDuration = 120;
 
 export async function POST(req: NextRequest) {
-  const bridgeAuthorized = verifyBridgeApiKey(req, "hermes");
+  const bridgeAuthorized = verifyBridgeApiKey(req, "agent-1");
   if (!bridgeAuthorized) {
     const session = await getServerSession(authOptions);
     if (session?.user?.role !== "admin") {

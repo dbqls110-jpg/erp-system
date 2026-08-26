@@ -571,17 +571,24 @@ model Customer {
   @@map("customers")
 }
 
+/// 파트너는 회사가 아니라 개인이다. 프리랜서 · 외주 인력을 이름 단위로 관리한다.
+/// 그래서 담당자(manager)라는 개념이 없다 — 이름 자체가 그 사람이다.
 model Partner {
-  id             String   @id @default(cuid())
-  name           String
-  manager        String?
-  phone          String?
+  id String @id @default(cuid())
+
+  /// 사람 이름
+  name  String
+  /// 직업 · 역할. 예: 사진, 영상, MC, 음향
+  job   String?
+  phone String?
+
   /**
    * "진행중" | "만료" | "대기"
    */
-  contractStatus String   @default("대기")
+  contractStatus String  @default("대기")
   contractStart  String?
   contractEnd    String?
+
   /**
    * "월정산" | "건별"
    */
