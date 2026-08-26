@@ -62,7 +62,8 @@ function statusTone(status: string) {
 
 /** 목록에서는 "50만원 / 건당" 처럼 단위까지 붙여야 뜻이 통한다. */
 function formatRate(rate: number | null, unit: string | null) {
-  if (rate === null) return "-";
+  // 예전에 0 으로 저장된 값이 남아 있다. 0 원은 단가가 아니라 안 적은 것이다.
+  if (rate === null || rate === 0) return "-";
   return `${rate.toLocaleString()}원${unit ? ` / ${unit}` : ""}`;
 }
 
@@ -247,8 +248,9 @@ export function PartnerTable({
         name: form.name,
         job: form.job,
         phone: form.phone,
-        // 빈 칸은 "모름"이지 0 이 아니다. 0 으로 넣으면 무료로 일하는 사람이 된다.
-        rate: form.rate.trim() === "" ? null : Number(form.rate),
+        // 빈 칸도 0 도 "안 적음"으로 본다. 0 원짜리 파트너는 없고, 0 으로 저장하면
+        // 목록에 "0원 / 건당" 이라고 떠서 단가를 아는 것처럼 보인다.
+        rate: form.rate.trim() === "" || Number(form.rate) === 0 ? null : Number(form.rate),
         rateUnit: form.rateUnit,
         contractStatus: form.contractStatus,
         settlementType: form.settlementType,
@@ -424,14 +426,16 @@ export function PartnerTable({
             <Table className="[&_:is(th,td)]:px-4">
               <TableHeader>
                 <TableRow>
-                  <TableHead>이름</TableHead>
-                  <TableHead>직업</TableHead>
-                  <TableHead>거래상태</TableHead>
-                  <TableHead>단가</TableHead>
-                  <TableHead>정산방식</TableHead>
-                  <TableHead>연락처</TableHead>
-                  <TableHead>진행한 프로젝트</TableHead>
-                  {canEdit && <TableHead className="w-24" />}
+                  <TableHead className="whitespace-nowrap">이름</TableHead>
+                  <TableHead className="whitespace-nowrap">직업</TableHead>
+                  <TableHead className="whitespace-nowrap">거래상태</TableHead>
+                  <TableHead className="whitespace-nowrap">단가</TableHead>
+                  <TableHead className="whitespace-nowrap">정산방식</TableHead>
+                  <TableHead className="whitespace-nowrap">연락처</TableHead>
+                  {/* 남는 폭을 이 칸이 가져간다. 안 그러면 여덟 칸이 화면 전체에
+                      균등하게 퍼져 값끼리 멀리 떨어진다. */}
+                  <TableHead className="w-full">진행한 프로젝트</TableHead>
+                  {canEdit && <TableHead className="w-24 whitespace-nowrap" />}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -451,8 +455,8 @@ export function PartnerTable({
                 ) : (
                   shown.map((p) => (
                     <TableRow key={p.id}>
-                      <TableCell className="font-medium">{p.name}</TableCell>
-                      <TableCell className="text-muted-foreground">{p.job ?? "-"}</TableCell>
+                      <TableCell className="font-medium whitespace-nowrap">{p.name}</TableCell>
+                      <TableCell className="whitespace-nowrap text-muted-foreground">{p.job ?? "-"}</TableCell>
                       <TableCell>
                         <Badge variant="outline" className={toneBadgeClass(statusTone(p.contractStatus))}>
                           {p.contractStatus}
@@ -461,7 +465,7 @@ export function PartnerTable({
                       <TableCell className="text-muted-foreground tabular-nums">
                         {formatRate(p.rate, p.rateUnit)}
                       </TableCell>
-                      <TableCell className="text-muted-foreground">{p.settlementType ?? "-"}</TableCell>
+                      <TableCell className="whitespace-nowrap text-muted-foreground">{p.settlementType ?? "-"}</TableCell>
                       <TableCell className="text-muted-foreground tabular-nums">{p.phone ?? "-"}</TableCell>
                       <TableCell className="text-muted-foreground">
                         {/* 건수만 적으면 "어느 프로젝트였지"를 다시 찾아봐야 한다. 이름을 보여준다. */}

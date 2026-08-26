@@ -108,13 +108,13 @@ export default async function CustomersPage() {
             <Table className="[&_:is(th,td)]:px-4">
               <TableHeader>
                 <TableRow>
-                  <TableHead>회사명</TableHead>
-                  <TableHead>담당자</TableHead>
-                  <TableHead>연락처</TableHead>
-                  <TableHead>이메일</TableHead>
-                  <TableHead>분류</TableHead>
-                  <TableHead>상태</TableHead>
-                  <TableHead>최종수정일</TableHead>
+                  <TableHead className="whitespace-nowrap">회사명</TableHead>
+                  <TableHead className="whitespace-nowrap">담당자</TableHead>
+                  <TableHead className="whitespace-nowrap">연락처</TableHead>
+                  <TableHead className="whitespace-nowrap">이메일</TableHead>
+                  <TableHead className="whitespace-nowrap">분류</TableHead>
+                  <TableHead className="whitespace-nowrap">상태</TableHead>
+                  <TableHead className="w-full">최종수정일</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
