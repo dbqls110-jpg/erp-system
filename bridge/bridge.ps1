@@ -111,10 +111,26 @@ function Invoke-Codex {
                 "-s", "read-only", "--skip-git-repo-check"
             ) -RedirectStandardInput $inFile -RedirectStandardOutput $outFile -RedirectStandardError $errFile
 
-        $stdout = if (Test-Path -LiteralPath $outFile) { Get-Content -Raw -LiteralPath $outFile -Encoding utf8 } else { "" }
+        # 주의: Get-Content -Raw 는 빈 파일에서 "" 가 아니라 $null 을 돌려준다.
+        # 그대로 올려 보내면 서버가 null.slice() 로 500 을 냈다. 항상 문자열로 만든다.
+        $stdout = ""
+        if (Test-Path -LiteralPath $outFile) {
+            $raw = Get-Content -Raw -LiteralPath $outFile -Encoding utf8
+            if ($null -ne $raw) { $stdout = $raw }
+        }
+        $stderr = ""
+        if (Test-Path -LiteralPath $errFile) {
+            $rawErr = Get-Content -Raw -LiteralPath $errFile -Encoding utf8
+            if ($null -ne $rawErr) { $stderr = $rawErr }
+        }
+
         if ($p.ExitCode -ne 0) {
-            $stderr = if (Test-Path -LiteralPath $errFile) { Get-Content -Raw -LiteralPath $errFile -Encoding utf8 } else { "" }
             throw "codex exec 종료코드 $($p.ExitCode): $stderr"
+        }
+        # 종료코드가 0인데 출력이 비어 있으면 성공이 아니다. 빈 답을 완료로 보고하면
+        # 사용자에게는 "답이 없는데 성공"으로 보여 원인을 쫓을 실마리가 사라진다.
+        if ([string]::IsNullOrWhiteSpace($stdout)) {
+            throw "codex 가 종료코드 0으로 끝났지만 출력이 비었습니다. stderr: $stderr"
         }
         return $stdout
     } finally {
