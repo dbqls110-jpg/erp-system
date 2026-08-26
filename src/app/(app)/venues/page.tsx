@@ -64,7 +64,7 @@ export default async function VenuesPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="mt-1 text-sm text-muted-foreground">대관 가능한 공간 목록</p>
         </div>
@@ -140,11 +140,11 @@ export default async function VenuesPage() {
         </CardContent>
       </Card>
 
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm">
           총 <span className="font-semibold text-primary">0</span>건
         </p>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button variant="outline" className="h-8">
             <Download className="size-3.5" />
             엑셀 다운로드

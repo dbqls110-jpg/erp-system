@@ -29,7 +29,7 @@ export default async function CustomersPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="mt-1 text-sm text-muted-foreground">고객·협력사 정보</p>
         </div>
@@ -81,11 +81,11 @@ export default async function CustomersPage() {
         </CardContent>
       </Card>
 
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm">
           총 <span className="font-semibold text-primary">{rows.length}</span>건
         </p>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button variant="outline" className="h-8">
             <Download className="size-3.5" />
             엑셀 다운로드

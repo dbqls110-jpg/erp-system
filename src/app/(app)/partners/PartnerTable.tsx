@@ -317,7 +317,7 @@ export function PartnerTable({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="mt-1 text-sm text-muted-foreground">파트너 개인별 계약 현황</p>
         </div>
@@ -382,14 +382,14 @@ export function PartnerTable({
         </CardContent>
       </Card>
 
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm">
           총 <span className="font-semibold text-primary">{filtered.length}</span>건
           {filtered.length !== initialData.length && (
             <span className="ml-1 text-muted-foreground">(전체 {initialData.length}건)</span>
           )}
         </p>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button
             variant="outline"
             className="h-8"
