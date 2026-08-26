@@ -94,11 +94,18 @@ describe("기본 권한 규칙 — 요구사항과 일치하는지", () => {
     }
   });
 
-  it("캘린더 · 프로젝트: 팀장 이상만", () => {
-    for (const menu of ["calendar", "projects"]) {
-      expect(at("manager", menu).view).toBe(true);
-      expect(at("member", menu).view).toBe(false);
-    }
+  it("프로젝트: 팀장 이상만", () => {
+    expect(at("manager", "projects").view).toBe(true);
+    expect(at("member", "projects").view).toBe(false);
+  });
+
+  it("캘린더: 팀장 이상 + 파트너도 볼 수 있다", () => {
+    // 파트너·거래처는 자기가 참여한 프로젝트의 일정만 보인다(calendarVisibility.ts).
+    // 여기서 막으면 가시성 로직이 정확해도 문 앞에서 걸려 빈 화면조차 못 본다.
+    expect(at("manager", "calendar")).toEqual({ view: true, edit: true });
+    expect(at("partner", "calendar")).toEqual({ view: true, edit: false });
+    // 사원은 여전히 못 본다. 사원이 보면 전체가 보이므로 파트너와 다른 이야기다.
+    expect(at("member", "calendar").view).toBe(false);
   });
 
   it("공간 DB · 거래처 · 파트너: 사원 이상 접근, 팀장 이상 수정", () => {
