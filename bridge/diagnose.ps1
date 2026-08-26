@@ -51,19 +51,23 @@ try {
     Write-Output "  stdout 파일 크기: $((Get-Item $outFile -ErrorAction SilentlyContinue).Length) bytes"
     Write-Output "  stderr 파일 크기: $((Get-Item $errFile -ErrorAction SilentlyContinue).Length) bytes"
 
+    # Get-Content 는 PS 속성이 붙은 객체를 준다. 비교를 위해 둘 다 찍는다.
     $raw = Get-Content -Raw -LiteralPath $outFile -Encoding utf8
+    $clean = [IO.File]::ReadAllText($outFile, [Text.Encoding]::UTF8)
     Write-Output ""
     Write-Output "=== 4. 브릿지가 읽어들인 값 ==="
     Write-Output "  `$raw 타입   : $(if ($null -eq $raw) { '$null' } else { $raw.GetType().FullName })"
     Write-Output "  `$raw 길이   : $(if ($null -eq $raw) { '-' } else { $raw.Length })"
     Write-Output "  `$raw 내용   : $(if ($null -eq $raw) { '-' } else { '[' + $raw.Trim() + ']' })"
 
-    $stdout = ""
-    if ($null -ne $raw) { $stdout = $raw }
 
     Write-Output ""
-    Write-Output "=== 5. 서버로 보낼 JSON ==="
-    $payload = @{ status = "completed"; output = $stdout }
+    Write-Output "=== 4-b. .NET 으로 직접 읽은 값 ==="
+    Write-Output "  타입: $($clean.GetType().FullName)  길이: $($clean.Length)"
+
+    Write-Output ""
+    Write-Output "=== 5. 서버로 보낼 JSON (수정 후) ==="
+    $payload = @{ status = "completed"; output = $clean }
     $json = $payload | ConvertTo-Json -Compress
     Write-Output "  길이: $($json.Length)"
     Write-Output "  앞 300자: $($json.Substring(0, [Math]::Min(300, $json.Length)))"

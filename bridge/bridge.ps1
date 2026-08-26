@@ -111,17 +111,22 @@ function Invoke-Codex {
                 "-s", "read-only", "--skip-git-repo-check"
             ) -RedirectStandardInput $inFile -RedirectStandardOutput $outFile -RedirectStandardError $errFile
 
-        # 주의: Get-Content -Raw 는 빈 파일에서 "" 가 아니라 $null 을 돌려준다.
-        # 그대로 올려 보내면 서버가 null.slice() 로 500 을 냈다. 항상 문자열로 만든다.
+        # .NET 으로 직접 읽는다. Get-Content 를 쓰면 안 된다.
+        #
+        # Get-Content 가 돌려주는 값은 순수 문자열이 아니라 PSPath, PSDrive 같은
+        # 속성이 붙은 객체다. .GetType() 은 System.String 이라고 하지만
+        # ConvertTo-Json 은 그 속성까지 통째로 직렬화한다. 그래서 서버에는
+        # output 이 문자열이 아니라 객체로 도착했고, 답이 통째로 버려졌다.
+        # 두 글자짜리 답에 JSON 이 849자였다.
+        #
+        # 덤으로 빈 파일에서 $null 이 나오는 문제도 사라진다.
         $stdout = ""
         if (Test-Path -LiteralPath $outFile) {
-            $raw = Get-Content -Raw -LiteralPath $outFile -Encoding utf8
-            if ($null -ne $raw) { $stdout = $raw }
+            $stdout = [IO.File]::ReadAllText($outFile, [Text.Encoding]::UTF8)
         }
         $stderr = ""
         if (Test-Path -LiteralPath $errFile) {
-            $rawErr = Get-Content -Raw -LiteralPath $errFile -Encoding utf8
-            if ($null -ne $rawErr) { $stderr = $rawErr }
+            $stderr = [IO.File]::ReadAllText($errFile, [Text.Encoding]::UTF8)
         }
 
         if ($p.ExitCode -ne 0) {

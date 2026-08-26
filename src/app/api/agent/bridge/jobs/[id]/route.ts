@@ -40,10 +40,17 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   // 문자열이 아닌 값이 와도 죽지 않게 한다. 브릿지가 보내는 output 은 Codex 의
   // stdout 인데, PowerShell 의 Get-Content -Raw 는 빈 파일에서 "" 가 아니라 $null 을
   // 돌려준다. 그대로 오면 null !== undefined 가 참이라 null.slice() 로 500 이 났다.
-  const text = (value: unknown, max: number) =>
-    typeof value === "string" ? value.slice(0, max) : undefined;
-  const output = text(body.output, 20000);
-  const errorMsg = text(body.errorMsg, 2000);
+  const text = (field: string, value: unknown, max: number) => {
+    if (value === undefined || value === null) return undefined;
+    if (typeof value === "string") return value.slice(0, max);
+    // 값이 왔는데 문자열이 아니면 그냥 버리지 말고 남긴다. 실제로 PowerShell 이
+    // Get-Content 결과를 객체로 직렬화해 답이 통째로 사라진 적이 있는데,
+    // 조용히 버린 탓에 원인을 찾는 데 오래 걸렸다.
+    console.warn(`[bridge] ${field} 가 문자열이 아닙니다:`, typeof value, JSON.stringify(value).slice(0, 200));
+    return undefined;
+  };
+  const output = text("output", body.output, 20000);
+  const errorMsg = text("errorMsg", body.errorMsg, 2000);
 
   // 이미 끝난 작업은 갱신하지 않는다. 브릿지가 재시작하며 같은 보고를 두 번 보내도
   // 결과가 덮이지 않게 한다.
