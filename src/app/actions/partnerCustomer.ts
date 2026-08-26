@@ -50,6 +50,7 @@ export async function updateCustomer(
   await requireEditAccess("customers");
   await prisma.customer.update({
     where: { id },
+    // 문자열만 다듬는다. rate 는 숫자라 trim 대상이 아니고, null 이면 지우는 뜻이다.
     data: Object.fromEntries(
       Object.entries(data).map(([k, v]) => [k, typeof v === "string" ? v.trim() || null : v]),
     ),
@@ -80,6 +81,8 @@ async function syncPartnerSheet() {
       name: p.name,
       job: p.job,
       contractStatus: p.contractStatus,
+      rate: p.rate,
+      rateUnit: p.rateUnit,
       settlementType: p.settlementType,
       phone: p.phone,
       projectNames: p.projects.map((x) => x.project.name),
@@ -96,6 +99,8 @@ export async function createPartner(data: {
   name: string;
   job?: string;
   phone?: string;
+  rate?: number | null;
+  rateUnit?: string;
   contractStatus?: string;
   contractStart?: string;
   contractEnd?: string;
@@ -110,7 +115,9 @@ export async function createPartner(data: {
       name: data.name.trim(),
       job: data.job?.trim() || null,
       phone: data.phone?.trim() || null,
-      contractStatus: data.contractStatus?.trim() || "대기",
+      rate: data.rate ?? null,
+      rateUnit: data.rateUnit?.trim() || null,
+      contractStatus: data.contractStatus?.trim() || "활성",
       contractStart: data.contractStart?.trim() || null,
       contractEnd: data.contractEnd?.trim() || null,
       settlementType: data.settlementType?.trim() || null,
@@ -127,6 +134,8 @@ export async function updatePartner(
     name: string;
     job: string;
     phone: string;
+    rate: number | null;
+    rateUnit: string;
     contractStatus: string;
     contractStart: string;
     contractEnd: string;
@@ -137,6 +146,7 @@ export async function updatePartner(
   await requireEditAccess("partners");
   await prisma.partner.update({
     where: { id },
+    // 문자열만 다듬는다. rate 는 숫자라 trim 대상이 아니고, null 이면 지우는 뜻이다.
     data: Object.fromEntries(
       Object.entries(data).map(([k, v]) => [k, typeof v === "string" ? v.trim() || null : v]),
     ),

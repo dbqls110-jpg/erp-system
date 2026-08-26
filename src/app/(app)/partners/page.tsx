@@ -25,6 +25,8 @@ export default async function PartnersPage() {
     name: p.name,
     job: p.job,
     phone: p.phone,
+    rate: p.rate,
+    rateUnit: p.rateUnit,
     contractStatus: p.contractStatus,
     settlementType: p.settlementType,
     memo: p.memo,

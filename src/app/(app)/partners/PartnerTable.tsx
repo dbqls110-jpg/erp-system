@@ -27,14 +27,19 @@ export interface PartnerRow {
   name: string;
   job: string | null;
   phone: string | null;
+  rate: number | null;
+  rateUnit: string | null;
   contractStatus: string;
   settlementType: string | null;
   memo: string | null;
   projectNames: string[];
 }
 
-const CONTRACT_STATUSES = ["진행중", "만료", "대기"];
+// 계약 만기가 아니라 "요즘도 같이 일하나" 를 나타낸다. 건별로 부르는
+// 프리랜서에게 진행중/만료는 뜻이 맞지 않았다.
+const CONTRACT_STATUSES = ["활성", "보류", "종료"];
 const SETTLEMENT_TYPES = ["월정산", "건별"];
+const RATE_UNITS = ["건당", "일당", "시간당"];
 
 const SELECT_CLASS =
   "h-8 rounded-2xl border border-transparent bg-input/50 px-3 text-sm text-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/30";
@@ -43,14 +48,22 @@ const emptyForm = {
   name: "",
   job: "",
   phone: "",
-  contractStatus: "대기",
+  rate: "",
+  rateUnit: "건당",
+  contractStatus: "활성",
   settlementType: "",
   memo: "",
 };
 type FormState = typeof emptyForm;
 
 function statusTone(status: string) {
-  return status === "진행중" ? "green" : status === "만료" ? "gray" : "amber";
+  return status === "활성" ? "green" : status === "종료" ? "gray" : "amber";
+}
+
+/** 목록에서는 "50만원 / 건당" 처럼 단위까지 붙여야 뜻이 통한다. */
+function formatRate(rate: number | null, unit: string | null) {
+  if (rate === null) return "-";
+  return `${rate.toLocaleString()}원${unit ? ` / ${unit}` : ""}`;
 }
 
 function PartnerDialog({
@@ -126,6 +139,31 @@ function PartnerDialog({
                 <option value="">선택 안 함</option>
                 {SETTLEMENT_TYPES.map((s) => (
                   <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <div className="grid grid-cols-[1fr_7rem] gap-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="p-rate">단가</Label>
+              <Input
+                id="p-rate"
+                inputMode="numeric"
+                value={form.rate}
+                onChange={(e) => set("rate")(e.target.value.replace(/[^0-9]/g, ""))}
+                placeholder="예: 500000"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="p-rate-unit">단위</Label>
+              <select
+                id="p-rate-unit"
+                className={`${SELECT_CLASS} w-full`}
+                value={form.rateUnit}
+                onChange={(e) => set("rateUnit")(e.target.value)}
+              >
+                {RATE_UNITS.map((u) => (
+                  <option key={u} value={u}>{u}</option>
                 ))}
               </select>
             </div>
@@ -209,6 +247,9 @@ export function PartnerTable({
         name: form.name,
         job: form.job,
         phone: form.phone,
+        // 빈 칸은 "모름"이지 0 이 아니다. 0 으로 넣으면 무료로 일하는 사람이 된다.
+        rate: form.rate.trim() === "" ? null : Number(form.rate),
+        rateUnit: form.rateUnit,
         contractStatus: form.contractStatus,
         settlementType: form.settlementType,
         memo: form.memo,
@@ -245,7 +286,7 @@ export function PartnerTable({
 
   /** 브라우저에서 바로 만든다. 목록이 작아 서버를 거칠 이유가 없다. */
   function downloadCsv() {
-    const header = ["이름", "직업", "계약상태", "정산방식", "연락처", "진행한 프로젝트", "비고"];
+    const header = ["이름", "직업", "거래상태", "단가", "정산방식", "연락처", "진행한 프로젝트", "비고"];
     const escape = (v: string) => `"${v.replace(/"/g, '""')}"`;
     const lines = [
       header.map(escape).join(","),
@@ -254,6 +295,7 @@ export function PartnerTable({
           p.name,
           p.job ?? "",
           p.contractStatus,
+          formatRate(p.rate, p.rateUnit),
           p.settlementType ?? "",
           p.phone ?? "",
           p.projectNames.join(", "),
@@ -297,7 +339,7 @@ export function PartnerTable({
       <Card className="shadow-xs">
         <CardContent className="space-y-3 pt-(--card-spacing)">
           <div className="flex flex-wrap items-center gap-3">
-            <span className="w-20 shrink-0 text-sm text-muted-foreground">계약상태</span>
+            <span className="w-20 shrink-0 text-sm text-muted-foreground">거래상태</span>
             <select
               className={`${SELECT_CLASS} w-36`}
               value={status}
@@ -384,7 +426,8 @@ export function PartnerTable({
                 <TableRow>
                   <TableHead>이름</TableHead>
                   <TableHead>직업</TableHead>
-                  <TableHead>계약상태</TableHead>
+                  <TableHead>거래상태</TableHead>
+                  <TableHead>단가</TableHead>
                   <TableHead>정산방식</TableHead>
                   <TableHead>연락처</TableHead>
                   <TableHead>진행한 프로젝트</TableHead>
@@ -394,7 +437,7 @@ export function PartnerTable({
               <TableBody>
                 {shown.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={canEdit ? 7 : 6} className="py-12 text-center">
+                    <TableCell colSpan={canEdit ? 8 : 7} className="py-12 text-center">
                       <div className="flex flex-col items-center gap-3">
                         <Handshake className="size-6 text-muted-foreground" />
                         <p className="text-sm text-muted-foreground">
@@ -414,6 +457,9 @@ export function PartnerTable({
                         <Badge variant="outline" className={toneBadgeClass(statusTone(p.contractStatus))}>
                           {p.contractStatus}
                         </Badge>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground tabular-nums">
+                        {formatRate(p.rate, p.rateUnit)}
                       </TableCell>
                       <TableCell className="text-muted-foreground">{p.settlementType ?? "-"}</TableCell>
                       <TableCell className="text-muted-foreground tabular-nums">{p.phone ?? "-"}</TableCell>
@@ -440,6 +486,8 @@ export function PartnerTable({
                                     name: p.name,
                                     job: p.job ?? "",
                                     phone: p.phone ?? "",
+                                    rate: p.rate === null ? "" : String(p.rate),
+                                    rateUnit: p.rateUnit ?? "건당",
                                     contractStatus: p.contractStatus,
                                     settlementType: p.settlementType ?? "",
                                     memo: p.memo ?? "",

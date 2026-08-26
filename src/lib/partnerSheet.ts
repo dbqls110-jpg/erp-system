@@ -18,7 +18,7 @@ import { prisma } from "@/lib/prisma";
 const SHEET_LINK_NAME = "파트너 명부";
 const SHEET_TITLE = "천우영 파트너 명부";
 const TAB_NAME = "파트너";
-const HEADERS = ["이름", "직업", "계약상태", "정산방식", "연락처", "진행한 프로젝트", "비고", "등록일"];
+const HEADERS = ["이름", "직업", "거래상태", "단가", "정산방식", "연락처", "진행한 프로젝트", "비고", "등록일"];
 
 /** 드라이브에서 명부를 둘 위치. 이미 정리해 둔 자료 폴더 아래에 넣는다. */
 const DRIVE_PATH = ["천우영 시스템", "자료"];
@@ -27,6 +27,8 @@ export interface PartnerSheetRow {
   name: string;
   job: string | null;
   contractStatus: string;
+  rate: number | null;
+  rateUnit: string | null;
   settlementType: string | null;
   phone: string | null;
   projectNames: string[];
@@ -120,6 +122,8 @@ function toRow(p: PartnerSheetRow): string[] {
     p.name,
     p.job ?? "",
     p.contractStatus,
+    // 시트는 사람이 훑어보는 곳이라 숫자만 두면 단위를 모른다.
+    p.rate === null ? "" : `${p.rate.toLocaleString()}원${p.rateUnit ? ` / ${p.rateUnit}` : ""}`,
     p.settlementType ?? "",
     p.phone ?? "",
     p.projectNames.join(", "),
