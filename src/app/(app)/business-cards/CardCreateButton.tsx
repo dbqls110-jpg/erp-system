@@ -29,7 +29,7 @@ export function CardCreateButton() {
 
   return (
     <>
-      <Button onClick={() => setOpen(true)} className="gap-2 bg-dark-onyx text-white hover:bg-midnight-charcoal" style={{ borderRadius: "9px" }}>
+      <Button onClick={() => setOpen(true)} className="gap-2 bg-dark-onyx text-white hover:bg-muted" style={{ borderRadius: "9px" }}>
         <Plus size={16} /> 명함 등록
       </Button>
       <Dialog open={open} onOpenChange={setOpen}>

@@ -10,6 +10,8 @@ interface SheetLink {
   url: string;
   description: string | null;
   category: string | null;
+  /** 우리 소유가 아닌 시트의 소유자. 우리 것이면 null. */
+  externalOwner: string | null;
 }
 
 interface Props {
@@ -194,9 +196,21 @@ export function SheetList({ sheets, isAdmin }: Props) {
                           <Sheet size={20} className="text-green-600" />
                         </div>
                         <div className="min-w-0">
-                          <p className="text-base font-semibold text-gray-900 truncate">{sheet.name}</p>
+                          <div className="flex items-center gap-1.5">
+                            <p className="truncate text-base font-semibold text-gray-900">{sheet.name}</p>
+                            {sheet.externalOwner && (
+                              // 옮길 수 없는 시트라는 뜻이다. 그냥 두면 "왜 이것만
+                              // 정리가 안 됐지"를 계속 다시 묻게 된다.
+                              <span
+                                title={`${sheet.externalOwner} 님 소유입니다. 공유받은 시트라 우리 드라이브로 옮길 수 없습니다.`}
+                                className="shrink-0 rounded-full border border-amber-500/30 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-medium text-amber-600 dark:text-amber-500"
+                              >
+                                외부 소유
+                              </span>
+                            )}
+                          </div>
                           {sheet.description && (
-                            <p className="text-sm text-gray-500 truncate mt-0.5">{sheet.description}</p>
+                            <p className="mt-0.5 truncate text-sm text-gray-500">{sheet.description}</p>
                           )}
                         </div>
                       </div>

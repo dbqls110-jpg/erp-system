@@ -5,9 +5,14 @@ import { updateUserRole } from "@/app/actions/admin";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 
+// 레벨 순서는 access_levels 의 rank 와 같아야 한다(관리자 > 팀장 > 사원 > 파트너).
 const roleConfig: Record<string, { label: string; class: string }> = {
-  admin: { label: "관리자", class: "bg-deep-violet/10 text-deep-violet border-deep-violet/20" },
-  user: { label: "직원", class: "bg-electric-blue/10 text-electric-blue border-electric-blue/20" },
+  admin: { label: "관리자", class: "bg-primary/10 text-primary border-primary/20" },
+  manager: { label: "팀장", class: "bg-primary/10 text-primary border-primary/20" },
+  member: { label: "사원", class: "bg-primary/10 text-primary border-primary/20" },
+  partner: { label: "파트너", class: "bg-primary/10 text-primary border-primary/20" },
+  // 레벨 도입 전의 값. 마이그레이션 전 계정이 "알 수 없음"으로 보이지 않게 남겨둔다.
+  user: { label: "사원", class: "bg-primary/10 text-primary border-primary/20" },
   pending: { label: "승인 대기", class: "bg-yellow-50 text-yellow-700 border-yellow-200" },
 };
 
@@ -32,13 +37,15 @@ export function UserRoleSelect({ userId, currentRole, isCurrentUser }: {
   };
 
   return (
-    <Select defaultValue={currentRole} onValueChange={handleChange}>
+    <Select defaultValue={currentRole === "user" ? "member" : currentRole} onValueChange={handleChange}>
       <SelectTrigger className="w-32 h-8 text-sm">
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
         <SelectItem value="admin">관리자</SelectItem>
-        <SelectItem value="user">직원</SelectItem>
+        <SelectItem value="manager">팀장</SelectItem>
+        <SelectItem value="member">사원</SelectItem>
+        <SelectItem value="partner">파트너</SelectItem>
         <SelectItem value="pending">승인 대기</SelectItem>
       </SelectContent>
     </Select>

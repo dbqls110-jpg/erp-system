@@ -59,13 +59,14 @@
   --font-mono: 'Sometype Mono', ui-monospace, monospace;
 
   /* Radius (DESIGN.md 기준) */
-  --radius-sm: 6px;
-  --radius-md: 9px;
-  --radius-lg: 9px;
-  --radius-xl: 12px;
-  --radius-2xl: 16px;
-  --radius-3xl: 24px;
-  --radius-full: 54px;
+  --radius-sm:  calc(var(--radius) * 0.6);
+  --radius-md:  calc(var(--radius) * 0.8);
+  --radius-lg:  var(--radius);
+  --radius-xl:  calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+  --radius-full: 9999px;
 }
 
 :root {
@@ -88,7 +89,7 @@
   --border: #e8e8e8;
   --input: #e8e8e8;
   --ring: #7b68ee;
-  --radius: 0.5625rem;
+  --radius: 0.625rem;
 
   /* Charts (ClickUp 브랜드 컬러 활용) */
   --chart-1: #7b68ee;

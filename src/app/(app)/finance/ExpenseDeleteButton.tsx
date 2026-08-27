@@ -27,7 +27,7 @@ export function ExpenseDeleteButton({ id, title }: { id: string; title: string }
     <>
       <button
         onClick={() => setOpen(true)}
-        className="text-smoke-gray hover:text-destructive transition-colors"
+        className="text-muted-foreground hover:text-destructive transition-colors"
       >
         <Trash2 size={14} />
       </button>
@@ -35,12 +35,12 @@ export function ExpenseDeleteButton({ id, title }: { id: string; title: string }
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
-            <DialogTitle className="text-deep-space-charcoal" style={{ fontFamily: "var(--font-plus-jakarta-sans)" }}>
+            <DialogTitle className="text-foreground" style={{ fontFamily: "var(--font-plus-jakarta-sans)" }}>
               지출 삭제
             </DialogTitle>
           </DialogHeader>
-          <p className="text-sm text-smoke-gray">
-            <span className="font-semibold text-midnight-charcoal">&ldquo;{title}&rdquo;</span> 항목을 삭제하시겠습니까?
+          <p className="text-sm text-muted-foreground">
+            <span className="font-semibold text-foreground">&ldquo;{title}&rdquo;</span> 항목을 삭제하시겠습니까?
           </p>
           <div className="flex justify-end gap-2 mt-2">
             <Button variant="outline" size="sm" onClick={() => setOpen(false)} disabled={pending}>

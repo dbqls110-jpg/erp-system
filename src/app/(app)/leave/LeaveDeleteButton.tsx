@@ -24,7 +24,7 @@ export function LeaveDeleteButton({ id }: { id: string }) {
     <button
       onClick={handleDelete}
       disabled={isPending}
-      className="text-smoke-gray hover:text-destructive transition-colors disabled:opacity-50 shrink-0"
+      className="text-muted-foreground hover:text-destructive transition-colors disabled:opacity-50 shrink-0"
       title="삭제"
     >
       <Trash2 size={14} />

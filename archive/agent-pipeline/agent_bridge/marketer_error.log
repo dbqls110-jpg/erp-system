@@ -1,0 +1,412 @@
+2026-07-21 21:04:45 [INFO] ERP Agent Bridge v2.0.0 (type=marketer)
+2026-07-21 21:04:45 [INFO] 서버: https://erp-system-lojo.onrender.com
+2026-07-21 21:04:45 [INFO] 운영 시간: 08:00 ~ 01:00 KST
+2026-07-21 21:04:45 [INFO] SSE 연결 시도: https://erp-system-lojo.onrender.com/api/agent/sse/bridge?agentType=marketer
+2026-07-21 21:04:46 [INFO] SSE 연결됨
+2026-07-21 21:11:30 [INFO] SSE 연결 시도: https://erp-system-lojo.onrender.com/api/agent/sse/bridge?agentType=marketer
+2026-07-21 21:11:34 [INFO] SSE 연결됨
+2026-07-21 21:27:07 [INFO] 작업 시작: cmrumot8u00122agxwkul1xbf (type=marketer, user=pipeline-test-20260721)
+2026-07-21 21:27:26 [INFO] 작업 완료: cmrumot8u00122agxwkul1xbf (1 chunks, 119자)
+2026-07-21 22:06:34 [INFO] SSE 연결 시도: https://erp-system-lojo.onrender.com/api/agent/sse/bridge?agentType=marketer
+2026-07-21 22:06:34 [INFO] SSE 연결됨
+2026-07-21 23:01:34 [INFO] SSE 연결 시도: https://erp-system-lojo.onrender.com/api/agent/sse/bridge?agentType=marketer
+2026-07-21 23:01:35 [INFO] SSE 연결됨
+2026-07-21 23:56:35 [INFO] SSE 연결 시도: https://erp-system-lojo.onrender.com/api/agent/sse/bridge?agentType=marketer
+2026-07-21 23:56:35 [INFO] SSE 연결됨
+2026-07-22 00:14:30 [ERROR] SSE 예외 (재시도 5초): Response ended prematurely
+Traceback (most recent call last):
+  File "C:\Users\cybjs\AppData\Local\hermes\hermes-agent\venv\Lib\site-packages\requests\models.py", line 822, in generate
+    yield from self.raw.stream(chunk_size, decode_content=True)
+  File "C:\Users\cybjs\AppData\Local\hermes\hermes-agent\venv\Lib\site-packages\urllib3\response.py", line 1260, in stream
+    yield from self.read_chunked(amt, decode_content=decode_content)
+  File "C:\Users\cybjs\AppData\Local\hermes\hermes-agent\venv\Lib\site-packages\urllib3\response.py", line 1430, in read_chunked
+    self._update_chunk_length()
+  File "C:\Users\cybjs\AppData\Local\hermes\hermes-agent\venv\Lib\site-packages\urllib3\response.py", line 1354, in _update_chunk_length
+    raise ProtocolError("Response ended prematurely") from None
+urllib3.exceptions.ProtocolError: Response ended prematurely
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\cybjs\OneDrive\Desktop\erp 시스템\erp-system\agent_bridge\client.py", line 260, in sse_loop
+    for raw_line in resp.iter_lines(decode_unicode=True):
+  File "C:\Users\cybjs\AppData\Local\hermes\hermes-agent\venv\Lib\site-packages\requests\models.py", line 871, in iter_lines
+    for chunk in self.iter_content(
+  File "C:\Users\cybjs\AppData\Local\hermes\hermes-agent\venv\Lib\site-packages\requests\utils.py", line 562, in stream_decode_response_unicode
+    for chunk in iterator:
+  File "C:\Users\cybjs\AppData\Local\hermes\hermes-agent\venv\Lib\site-packages\requests\models.py", line 824, in generate
+    raise ChunkedEncodingError(e)
+requests.exceptions.ChunkedEncodingError: Response ended prematurely
+2026-07-22 00:14:35 [INFO] SSE 연결 시도: https://erp-system-lojo.onrender.com/api/agent/sse/bridge?agentType=marketer
+2026-07-22 00:14:36 [INFO] SSE 연결됨
+2026-07-22 00:20:51 [ERROR] SSE 예외 (재시도 5초): Response ended prematurely
+Traceback (most recent call last):
+  File "C:\Users\cybjs\AppData\Local\hermes\hermes-agent\venv\Lib\site-packages\requests\models.py", line 822, in generate
+    yield from self.raw.stream(chunk_size, decode_content=True)
+  File "C:\Users\cybjs\AppData\Local\hermes\hermes-agent\venv\Lib\site-packages\urllib3\response.py", line 1260, in stream
+    yield from self.read_chunked(amt, decode_content=decode_content)
+  File "C:\Users\cybjs\AppData\Local\hermes\hermes-agent\venv\Lib\site-packages\urllib3\response.py", line 1430, in read_chunked
+    self._update_chunk_length()
+  File "C:\Users\cybjs\AppData\Local\hermes\hermes-agent\venv\Lib\site-packages\urllib3\response.py", line 1354, in _update_chunk_length
+    raise ProtocolError("Response ended prematurely") from None
+urllib3.exceptions.ProtocolError: Response ended prematurely
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\cybjs\OneDrive\Desktop\erp 시스템\erp-system\agent_bridge\client.py", line 260, in sse_loop
+    for raw_line in resp.iter_lines(decode_unicode=True):
+  File "C:\Users\cybjs\AppData\Local\hermes\hermes-agent\venv\Lib\site-packages\requests\models.py", line 871, in iter_lines
+    for chunk in self.iter_content(
+  File "C:\Users\cybjs\AppData\Local\hermes\hermes-agent\venv\Lib\site-packages\requests\utils.py", line 562, in stream_decode_response_unicode
+    for chunk in iterator:
+  File "C:\Users\cybjs\AppData\Local\hermes\hermes-agent\venv\Lib\site-packages\requests\models.py", line 824, in generate
+    raise ChunkedEncodingError(e)
+requests.exceptions.ChunkedEncodingError: Response ended prematurely
+2026-07-22 00:20:56 [INFO] SSE 연결 시도: https://erp-system-lojo.onrender.com/api/agent/sse/bridge?agentType=marketer
+2026-07-22 00:20:56 [INFO] SSE 연결됨
+2026-07-22 01:04:59 [INFO] 운영 시간 외 (01:00~08:00). 6시간 55분 후 재연결 (슬립 3600초)
+2026-07-22 02:04:59 [INFO] 운영 시간 외 (01:00~08:00). 5시간 55분 후 재연결 (슬립 3600초)
+2026-07-22 03:04:59 [INFO] 운영 시간 외 (01:00~08:00). 4시간 55분 후 재연결 (슬립 3600초)
+2026-07-22 04:04:59 [INFO] 운영 시간 외 (01:00~08:00). 3시간 55분 후 재연결 (슬립 3600초)
+2026-07-22 05:04:59 [INFO] 운영 시간 외 (01:00~08:00). 2시간 55분 후 재연결 (슬립 3600초)
+2026-07-22 06:04:59 [INFO] 운영 시간 외 (01:00~08:00). 1시간 55분 후 재연결 (슬립 3600초)
+2026-07-22 07:04:59 [INFO] 운영 시간 외 (01:00~08:00). 0시간 55분 후 재연결 (슬립 3331초)
+2026-07-22 08:00:30 [INFO] SSE 연결 시도: https://erp-system-lojo.onrender.com/api/agent/sse/bridge?agentType=marketer
+2026-07-22 08:00:31 [INFO] SSE 연결됨
+2026-07-22 08:55:31 [INFO] SSE 연결 시도: https://erp-system-lojo.onrender.com/api/agent/sse/bridge?agentType=marketer
+2026-07-22 08:55:31 [INFO] SSE 연결됨
+2026-07-22 09:50:31 [INFO] SSE 연결 시도: https://erp-system-lojo.onrender.com/api/agent/sse/bridge?agentType=marketer
+2026-07-22 09:50:32 [INFO] SSE 연결됨
+2026-07-22 10:45:32 [INFO] SSE 연결 시도: https://erp-system-lojo.onrender.com/api/agent/sse/bridge?agentType=marketer
+2026-07-22 10:45:32 [INFO] SSE 연결됨
+2026-07-22 11:38:08 [INFO] SSE 연결 시도: https://erp-system-lojo.onrender.com/api/agent/sse/bridge?agentType=marketer
+2026-07-22 11:38:13 [INFO] SSE 연결됨
+2026-07-22 11:48:19 [INFO] SSE 연결 시도: https://erp-system-lojo.onrender.com/api/agent/sse/bridge?agentType=marketer
+2026-07-22 11:48:31 [INFO] SSE 연결됨
+2026-07-22 11:48:34 [WARNING] pending 복구 실패 (무시): HTTPSConnectionPool(host='erp-system-lojo.onrender.com', port=443): Read timed out. (read timeout=15)
+2026-07-22 12:43:31 [INFO] SSE 연결 시도: https://erp-system-lojo.onrender.com/api/agent/sse/bridge?agentType=marketer
+2026-07-22 12:43:31 [INFO] SSE 연결됨
+2026-07-22 13:38:31 [INFO] SSE 연결 시도: https://erp-system-lojo.onrender.com/api/agent/sse/bridge?agentType=marketer
+2026-07-22 13:38:32 [INFO] SSE 연결됨
+2026-07-22 13:46:59 [INFO] SSE 연결 시도: https://erp-system-lojo.onrender.com/api/agent/sse/bridge?agentType=marketer
+2026-07-22 13:47:04 [INFO] SSE 연결됨
+2026-07-22 14:14:08 [INFO] SSE 연결 시도: https://erp-system-lojo.onrender.com/api/agent/sse/bridge?agentType=marketer
+2026-07-22 14:14:18 [INFO] SSE 연결됨
+2026-07-22 14:19:08 [INFO] SSE 연결 시도: https://erp-system-lojo.onrender.com/api/agent/sse/bridge?agentType=marketer
+2026-07-22 14:19:19 [INFO] SSE 연결됨
+2026-07-22 14:19:23 [WARNING] pending 복구 실패 (무시): HTTPSConnectionPool(host='erp-system-lojo.onrender.com', port=443): Read timed out. (read timeout=15)
+2026-07-22 15:14:20 [INFO] SSE 연결 시도: https://erp-system-lojo.onrender.com/api/agent/sse/bridge?agentType=marketer
+2026-07-22 15:14:21 [INFO] SSE 연결됨
+2026-07-22 16:09:21 [INFO] SSE 연결 시도: https://erp-system-lojo.onrender.com/api/agent/sse/bridge?agentType=marketer
+2026-07-22 16:09:21 [INFO] SSE 연결됨
+2026-07-22 17:04:21 [INFO] SSE 연결 시도: https://erp-system-lojo.onrender.com/api/agent/sse/bridge?agentType=marketer
+2026-07-22 17:04:22 [INFO] SSE 연결됨
+2026-07-22 17:59:22 [INFO] SSE 연결 시도: https://erp-system-lojo.onrender.com/api/agent/sse/bridge?agentType=marketer
+2026-07-22 17:59:22 [INFO] SSE 연결됨
+2026-07-22 18:52:53 [ERROR] SSE 예외 (재시도 5초): Response ended prematurely
+Traceback (most recent call last):
+  File "C:\Users\cybjs\AppData\Local\hermes\hermes-agent\venv\Lib\site-packages\requests\models.py", line 822, in generate
+    yield from self.raw.stream(chunk_size, decode_content=True)
+  File "C:\Users\cybjs\AppData\Local\hermes\hermes-agent\venv\Lib\site-packages\urllib3\response.py", line 1260, in stream
+    yield from self.read_chunked(amt, decode_content=decode_content)
+  File "C:\Users\cybjs\AppData\Local\hermes\hermes-agent\venv\Lib\site-packages\urllib3\response.py", line 1430, in read_chunked
+    self._update_chunk_length()
+  File "C:\Users\cybjs\AppData\Local\hermes\hermes-agent\venv\Lib\site-packages\urllib3\response.py", line 1354, in _update_chunk_length
+    raise ProtocolError("Response ended prematurely") from None
+urllib3.exceptions.ProtocolError: Response ended prematurely
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\cybjs\OneDrive\Desktop\erp 시스템\erp-system\agent_bridge\client.py", line 260, in sse_loop
+    for raw_line in resp.iter_lines(decode_unicode=True):
+  File "C:\Users\cybjs\AppData\Local\hermes\hermes-agent\venv\Lib\site-packages\requests\models.py", line 871, in iter_lines
+    for chunk in self.iter_content(
+  File "C:\Users\cybjs\AppData\Local\hermes\hermes-agent\venv\Lib\site-packages\requests\utils.py", line 562, in stream_decode_response_unicode
+    for chunk in iterator:
+  File "C:\Users\cybjs\AppData\Local\hermes\hermes-agent\venv\Lib\site-packages\requests\models.py", line 824, in generate
+    raise ChunkedEncodingError(e)
+requests.exceptions.ChunkedEncodingError: Response ended prematurely
+2026-07-22 18:52:58 [INFO] SSE 연결 시도: https://erp-system-lojo.onrender.com/api/agent/sse/bridge?agentType=marketer
+2026-07-22 18:52:58 [INFO] SSE 연결됨
+2026-07-22 19:14:14 [ERROR] SSE 예외 (재시도 5초): Response ended prematurely
+Traceback (most recent call last):
+  File "C:\Users\cybjs\AppData\Local\hermes\hermes-agent\venv\Lib\site-packages\requests\models.py", line 822, in generate
+    yield from self.raw.stream(chunk_size, decode_content=True)
+  File "C:\Users\cybjs\AppData\Local\hermes\hermes-agent\venv\Lib\site-packages\urllib3\response.py", line 1260, in stream
+    yield from self.read_chunked(amt, decode_content=decode_content)
+  File "C:\Users\cybjs\AppData\Local\hermes\hermes-agent\venv\Lib\site-packages\urllib3\response.py", line 1430, in read_chunked
+    self._update_chunk_length()
+  File "C:\Users\cybjs\AppData\Local\hermes\hermes-agent\venv\Lib\site-packages\urllib3\response.py", line 1354, in _update_chunk_length
+    raise ProtocolError("Response ended prematurely") from None
+urllib3.exceptions.ProtocolError: Response ended prematurely
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\cybjs\OneDrive\Desktop\erp 시스템\erp-system\agent_bridge\client.py", line 260, in sse_loop
+    for raw_line in resp.iter_lines(decode_unicode=True):
+  File "C:\Users\cybjs\AppData\Local\hermes\hermes-agent\venv\Lib\site-packages\requests\models.py", line 871, in iter_lines
+    for chunk in self.iter_content(
+  File "C:\Users\cybjs\AppData\Local\hermes\hermes-agent\venv\Lib\site-packages\requests\utils.py", line 562, in stream_decode_response_unicode
+    for chunk in iterator:
+  File "C:\Users\cybjs\AppData\Local\hermes\hermes-agent\venv\Lib\site-packages\requests\models.py", line 824, in generate
+    raise ChunkedEncodingError(e)
+requests.exceptions.ChunkedEncodingError: Response ended prematurely
+2026-07-22 19:14:19 [INFO] SSE 연결 시도: https://erp-system-lojo.onrender.com/api/agent/sse/bridge?agentType=marketer
+2026-07-22 19:14:20 [INFO] SSE 연결됨
+2026-07-22 20:09:20 [INFO] SSE 연결 시도: https://erp-system-lojo.onrender.com/api/agent/sse/bridge?agentType=marketer
+2026-07-22 20:09:20 [INFO] SSE 연결됨
+2026-07-22 21:04:23 [INFO] SSE 연결 시도: https://erp-system-lojo.onrender.com/api/agent/sse/bridge?agentType=marketer
+2026-07-22 21:04:23 [INFO] SSE 연결됨
+2026-07-22 21:37:04 [WARNING] 하트비트 전송 실패: HTTPSConnectionPool(host='erp-system-lojo.onrender.com', port=443): Max retries exceeded with url: /api/agent/status (Caused by SSLError(SSLEOFError(8, '[SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1016)')))
+2026-07-22 21:59:23 [INFO] SSE 연결 시도: https://erp-system-lojo.onrender.com/api/agent/sse/bridge?agentType=marketer
+2026-07-22 21:59:24 [INFO] SSE 연결됨
+2026-07-22 22:54:24 [INFO] SSE 연결 시도: https://erp-system-lojo.onrender.com/api/agent/sse/bridge?agentType=marketer
+2026-07-22 22:54:24 [INFO] SSE 연결됨
+2026-07-22 23:49:24 [INFO] SSE 연결 시도: https://erp-system-lojo.onrender.com/api/agent/sse/bridge?agentType=marketer
+2026-07-22 23:49:25 [INFO] SSE 연결됨
+2026-07-23 00:18:21 [ERROR] SSE 예외 (재시도 5초): Response ended prematurely
+Traceback (most recent call last):
+  File "C:\Users\cybjs\AppData\Local\hermes\hermes-agent\venv\Lib\site-packages\requests\models.py", line 822, in generate
+    yield from self.raw.stream(chunk_size, decode_content=True)
+  File "C:\Users\cybjs\AppData\Local\hermes\hermes-agent\venv\Lib\site-packages\urllib3\response.py", line 1260, in stream
+    yield from self.read_chunked(amt, decode_content=decode_content)
+  File "C:\Users\cybjs\AppData\Local\hermes\hermes-agent\venv\Lib\site-packages\urllib3\response.py", line 1430, in read_chunked
+    self._update_chunk_length()
+  File "C:\Users\cybjs\AppData\Local\hermes\hermes-agent\venv\Lib\site-packages\urllib3\response.py", line 1354, in _update_chunk_length
+    raise ProtocolError("Response ended prematurely") from None
+urllib3.exceptions.ProtocolError: Response ended prematurely
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\cybjs\OneDrive\Desktop\erp 시스템\erp-system\agent_bridge\client.py", line 260, in sse_loop
+    for raw_line in resp.iter_lines(decode_unicode=True):
+  File "C:\Users\cybjs\AppData\Local\hermes\hermes-agent\venv\Lib\site-packages\requests\models.py", line 871, in iter_lines
+    for chunk in self.iter_content(
+  File "C:\Users\cybjs\AppData\Local\hermes\hermes-agent\venv\Lib\site-packages\requests\utils.py", line 562, in stream_decode_response_unicode
+    for chunk in iterator:
+  File "C:\Users\cybjs\AppData\Local\hermes\hermes-agent\venv\Lib\site-packages\requests\models.py", line 824, in generate
+    raise ChunkedEncodingError(e)
+requests.exceptions.ChunkedEncodingError: Response ended prematurely
+2026-07-23 00:18:26 [INFO] SSE 연결 시도: https://erp-system-lojo.onrender.com/api/agent/sse/bridge?agentType=marketer
+2026-07-23 00:18:27 [INFO] SSE 연결됨
+2026-07-23 01:13:27 [INFO] 운영 시간 외 (01:00~08:00). 6시간 46분 후 재연결 (슬립 3600초)
+2026-07-23 02:13:27 [INFO] 운영 시간 외 (01:00~08:00). 5시간 46분 후 재연결 (슬립 3600초)
+2026-07-23 03:13:27 [INFO] 운영 시간 외 (01:00~08:00). 4시간 46분 후 재연결 (슬립 3600초)
+2026-07-23 04:13:27 [INFO] 운영 시간 외 (01:00~08:00). 3시간 46분 후 재연결 (슬립 3600초)
+2026-07-23 05:13:27 [INFO] 운영 시간 외 (01:00~08:00). 2시간 46분 후 재연결 (슬립 3600초)
+2026-07-23 06:13:27 [INFO] 운영 시간 외 (01:00~08:00). 1시간 46분 후 재연결 (슬립 3600초)
+2026-07-23 07:13:27 [INFO] 운영 시간 외 (01:00~08:00). 0시간 46분 후 재연결 (슬립 2823초)
+2026-07-23 08:00:30 [INFO] SSE 연결 시도: https://erp-system-lojo.onrender.com/api/agent/sse/bridge?agentType=marketer
+2026-07-23 08:00:30 [INFO] SSE 연결됨
+2026-07-23 08:55:30 [INFO] SSE 연결 시도: https://erp-system-lojo.onrender.com/api/agent/sse/bridge?agentType=marketer
+2026-07-23 08:55:31 [INFO] SSE 연결됨
+2026-07-23 09:50:31 [INFO] SSE 연결 시도: https://erp-system-lojo.onrender.com/api/agent/sse/bridge?agentType=marketer
+2026-07-23 09:50:31 [INFO] SSE 연결됨
+2026-07-23 10:45:31 [INFO] SSE 연결 시도: https://erp-system-lojo.onrender.com/api/agent/sse/bridge?agentType=marketer
+2026-07-23 10:45:31 [INFO] SSE 연결됨
+2026-07-23 11:40:31 [INFO] SSE 연결 시도: https://erp-system-lojo.onrender.com/api/agent/sse/bridge?agentType=marketer
+2026-07-23 11:40:32 [INFO] SSE 연결됨
+2026-07-23 12:35:32 [INFO] SSE 연결 시도: https://erp-system-lojo.onrender.com/api/agent/sse/bridge?agentType=marketer
+2026-07-23 12:35:32 [INFO] SSE 연결됨
+2026-07-23 13:30:32 [INFO] SSE 연결 시도: https://erp-system-lojo.onrender.com/api/agent/sse/bridge?agentType=marketer
+2026-07-23 13:30:33 [INFO] SSE 연결됨
+2026-07-23 14:25:33 [INFO] SSE 연결 시도: https://erp-system-lojo.onrender.com/api/agent/sse/bridge?agentType=marketer
+2026-07-23 14:25:33 [INFO] SSE 연결됨
+2026-07-23 15:20:33 [INFO] SSE 연결 시도: https://erp-system-lojo.onrender.com/api/agent/sse/bridge?agentType=marketer
+2026-07-23 15:20:34 [INFO] SSE 연결됨
+2026-07-23 16:15:34 [INFO] SSE 연결 시도: https://erp-system-lojo.onrender.com/api/agent/sse/bridge?agentType=marketer
+2026-07-23 16:15:35 [INFO] SSE 연결됨
+2026-07-23 17:10:35 [INFO] SSE 연결 시도: https://erp-system-lojo.onrender.com/api/agent/sse/bridge?agentType=marketer
+2026-07-23 17:10:36 [INFO] SSE 연결됨
+2026-07-23 18:05:36 [INFO] SSE 연결 시도: https://erp-system-lojo.onrender.com/api/agent/sse/bridge?agentType=marketer
+2026-07-23 18:05:36 [INFO] SSE 연결됨
+2026-07-23 19:00:36 [INFO] SSE 연결 시도: https://erp-system-lojo.onrender.com/api/agent/sse/bridge?agentType=marketer
+2026-07-23 19:00:37 [INFO] SSE 연결됨
+2026-07-23 19:51:50 [ERROR] SSE 예외 (재시도 5초): Response ended prematurely
+Traceback (most recent call last):
+  File "C:\Users\cybjs\AppData\Local\hermes\hermes-agent\venv\Lib\site-packages\requests\models.py", line 822, in generate
+    yield from self.raw.stream(chunk_size, decode_content=True)
+  File "C:\Users\cybjs\AppData\Local\hermes\hermes-agent\venv\Lib\site-packages\urllib3\response.py", line 1260, in stream
+    yield from self.read_chunked(amt, decode_content=decode_content)
+  File "C:\Users\cybjs\AppData\Local\hermes\hermes-agent\venv\Lib\site-packages\urllib3\response.py", line 1430, in read_chunked
+    self._update_chunk_length()
+  File "C:\Users\cybjs\AppData\Local\hermes\hermes-agent\venv\Lib\site-packages\urllib3\response.py", line 1354, in _update_chunk_length
+    raise ProtocolError("Response ended prematurely") from None
+urllib3.exceptions.ProtocolError: Response ended prematurely
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\cybjs\OneDrive\Desktop\erp 시스템\erp-system\agent_bridge\client.py", line 260, in sse_loop
+    for raw_line in resp.iter_lines(decode_unicode=True):
+  File "C:\Users\cybjs\AppData\Local\hermes\hermes-agent\venv\Lib\site-packages\requests\models.py", line 871, in iter_lines
+    for chunk in self.iter_content(
+  File "C:\Users\cybjs\AppData\Local\hermes\hermes-agent\venv\Lib\site-packages\requests\utils.py", line 562, in stream_decode_response_unicode
+    for chunk in iterator:
+  File "C:\Users\cybjs\AppData\Local\hermes\hermes-agent\venv\Lib\site-packages\requests\models.py", line 824, in generate
+    raise ChunkedEncodingError(e)
+requests.exceptions.ChunkedEncodingError: Response ended prematurely
+2026-07-23 19:51:55 [INFO] SSE 연결 시도: https://erp-system-lojo.onrender.com/api/agent/sse/bridge?agentType=marketer
+2026-07-23 19:51:56 [INFO] SSE 연결됨
+2026-07-23 20:46:56 [INFO] SSE 연결 시도: https://erp-system-lojo.onrender.com/api/agent/sse/bridge?agentType=marketer
+2026-07-23 20:46:56 [INFO] SSE 연결됨
+2026-07-23 21:41:56 [INFO] SSE 연결 시도: https://erp-system-lojo.onrender.com/api/agent/sse/bridge?agentType=marketer
+2026-07-23 21:41:57 [INFO] SSE 연결됨
+2026-07-23 22:36:57 [INFO] SSE 연결 시도: https://erp-system-lojo.onrender.com/api/agent/sse/bridge?agentType=marketer
+2026-07-23 22:36:57 [INFO] SSE 연결됨
+2026-07-23 23:27:22 [INFO] SSE 연결 시도: https://erp-system-lojo.onrender.com/api/agent/sse/bridge?agentType=marketer
+2026-07-23 23:27:28 [INFO] SSE 연결됨
+2026-07-24 00:22:28 [INFO] SSE 연결 시도: https://erp-system-lojo.onrender.com/api/agent/sse/bridge?agentType=marketer
+2026-07-24 00:22:28 [INFO] SSE 연결됨
+2026-07-24 01:17:28 [INFO] 운영 시간 외 (01:00~08:00). 6시간 42분 후 재연결 (슬립 3600초)
+2026-07-24 02:17:28 [INFO] 운영 시간 외 (01:00~08:00). 5시간 42분 후 재연결 (슬립 3600초)
+2026-07-24 03:17:28 [INFO] 운영 시간 외 (01:00~08:00). 4시간 42분 후 재연결 (슬립 3600초)
+2026-07-24 04:17:28 [INFO] 운영 시간 외 (01:00~08:00). 3시간 42분 후 재연결 (슬립 3600초)
+2026-07-24 05:17:28 [INFO] 운영 시간 외 (01:00~08:00). 2시간 42분 후 재연결 (슬립 3600초)
+2026-07-24 06:17:30 [INFO] 운영 시간 외 (01:00~08:00). 1시간 42분 후 재연결 (슬립 3600초)
+2026-07-24 07:17:30 [INFO] 운영 시간 외 (01:00~08:00). 0시간 42분 후 재연결 (슬립 2580초)
+2026-07-24 08:00:30 [INFO] SSE 연결 시도: https://erp-system-lojo.onrender.com/api/agent/sse/bridge?agentType=marketer
+2026-07-24 08:00:31 [INFO] SSE 연결됨
+2026-07-24 08:55:30 [WARNING] 하트비트 전송 실패: HTTPSConnectionPool(host='erp-system-lojo.onrender.com', port=443): Max retries exceeded with url: /api/agent/status (Caused by SSLError(SSLEOFError(8, '[SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1016)')))
+2026-07-24 08:55:31 [INFO] SSE 연결 시도: https://erp-system-lojo.onrender.com/api/agent/sse/bridge?agentType=marketer
+2026-07-24 08:55:31 [WARNING] SSE 연결 오류 (재시도 5초): HTTPSConnectionPool(host='erp-system-lojo.onrender.com', port=443): Max retries exceeded with url: /api/agent/sse/bridge?agentType=marketer (Caused by SSLError(SSLEOFError(8, '[SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1016)')))
+2026-07-24 08:55:36 [INFO] SSE 연결 시도: https://erp-system-lojo.onrender.com/api/agent/sse/bridge?agentType=marketer
+2026-07-24 08:55:36 [WARNING] pending 복구 실패 (무시): HTTPSConnectionPool(host='erp-system-lojo.onrender.com', port=443): Max retries exceeded with url: /api/agent/jobs/pending?agentType=marketer&limit=10 (Caused by SSLError(SSLEOFError(8, '[SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1016)')))
+2026-07-24 08:55:37 [INFO] SSE 연결됨
+2026-07-24 08:56:00 [WARNING] 하트비트 전송 실패: HTTPSConnectionPool(host='erp-system-lojo.onrender.com', port=443): Max retries exceeded with url: /api/agent/status (Caused by SSLError(SSLEOFError(8, '[SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1016)')))
+2026-07-24 09:50:37 [INFO] SSE 연결 시도: https://erp-system-lojo.onrender.com/api/agent/sse/bridge?agentType=marketer
+2026-07-24 09:50:37 [INFO] SSE 연결됨
+2026-07-24 10:44:44 [WARNING] 하트비트 전송 실패: 520 Server Error: <none> for url: https://erp-system-lojo.onrender.com/api/agent/status
+2026-07-24 10:45:37 [INFO] SSE 연결 시도: https://erp-system-lojo.onrender.com/api/agent/sse/bridge?agentType=marketer
+2026-07-24 10:45:38 [INFO] SSE 연결됨
+2026-07-24 11:40:38 [INFO] SSE 연결 시도: https://erp-system-lojo.onrender.com/api/agent/sse/bridge?agentType=marketer
+2026-07-24 11:40:38 [INFO] SSE 연결됨
+2026-07-24 12:35:38 [INFO] SSE 연결 시도: https://erp-system-lojo.onrender.com/api/agent/sse/bridge?agentType=marketer
+2026-07-24 12:35:39 [INFO] SSE 연결됨
+2026-07-24 13:30:39 [INFO] SSE 연결 시도: https://erp-system-lojo.onrender.com/api/agent/sse/bridge?agentType=marketer
+2026-07-24 13:30:39 [INFO] SSE 연결됨
+2026-07-24 14:25:39 [INFO] SSE 연결 시도: https://erp-system-lojo.onrender.com/api/agent/sse/bridge?agentType=marketer
+2026-07-24 14:25:40 [INFO] SSE 연결됨
+2026-07-24 14:43:16 [ERROR] SSE 예외 (재시도 5초): Response ended prematurely
+Traceback (most recent call last):
+  File "C:\Users\cybjs\AppData\Local\hermes\hermes-agent\venv\Lib\site-packages\requests\models.py", line 822, in generate
+    yield from self.raw.stream(chunk_size, decode_content=True)
+  File "C:\Users\cybjs\AppData\Local\hermes\hermes-agent\venv\Lib\site-packages\urllib3\response.py", line 1260, in stream
+    yield from self.read_chunked(amt, decode_content=decode_content)
+  File "C:\Users\cybjs\AppData\Local\hermes\hermes-agent\venv\Lib\site-packages\urllib3\response.py", line 1430, in read_chunked
+    self._update_chunk_length()
+  File "C:\Users\cybjs\AppData\Local\hermes\hermes-agent\venv\Lib\site-packages\urllib3\response.py", line 1354, in _update_chunk_length
+    raise ProtocolError("Response ended prematurely") from None
+urllib3.exceptions.ProtocolError: Response ended prematurely
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\cybjs\OneDrive\Desktop\erp 시스템\erp-system\agent_bridge\client.py", line 260, in sse_loop
+    for raw_line in resp.iter_lines(decode_unicode=True):
+  File "C:\Users\cybjs\AppData\Local\hermes\hermes-agent\venv\Lib\site-packages\requests\models.py", line 871, in iter_lines
+    for chunk in self.iter_content(
+  File "C:\Users\cybjs\AppData\Local\hermes\hermes-agent\venv\Lib\site-packages\requests\utils.py", line 562, in stream_decode_response_unicode
+    for chunk in iterator:
+  File "C:\Users\cybjs\AppData\Local\hermes\hermes-agent\venv\Lib\site-packages\requests\models.py", line 824, in generate
+    raise ChunkedEncodingError(e)
+requests.exceptions.ChunkedEncodingError: Response ended prematurely
+2026-07-24 14:43:21 [INFO] SSE 연결 시도: https://erp-system-lojo.onrender.com/api/agent/sse/bridge?agentType=marketer
+2026-07-24 14:43:21 [INFO] SSE 연결됨
+2026-07-24 15:38:21 [INFO] SSE 연결 시도: https://erp-system-lojo.onrender.com/api/agent/sse/bridge?agentType=marketer
+2026-07-24 15:38:21 [INFO] SSE 연결됨
+2026-07-24 16:23:54 [ERROR] SSE 예외 (재시도 5초): Response ended prematurely
+Traceback (most recent call last):
+  File "C:\Users\cybjs\AppData\Local\hermes\hermes-agent\venv\Lib\site-packages\requests\models.py", line 822, in generate
+    yield from self.raw.stream(chunk_size, decode_content=True)
+  File "C:\Users\cybjs\AppData\Local\hermes\hermes-agent\venv\Lib\site-packages\urllib3\response.py", line 1260, in stream
+    yield from self.read_chunked(amt, decode_content=decode_content)
+  File "C:\Users\cybjs\AppData\Local\hermes\hermes-agent\venv\Lib\site-packages\urllib3\response.py", line 1430, in read_chunked
+    self._update_chunk_length()
+  File "C:\Users\cybjs\AppData\Local\hermes\hermes-agent\venv\Lib\site-packages\urllib3\response.py", line 1354, in _update_chunk_length
+    raise ProtocolError("Response ended prematurely") from None
+urllib3.exceptions.ProtocolError: Response ended prematurely
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\cybjs\OneDrive\Desktop\erp 시스템\erp-system\agent_bridge\client.py", line 260, in sse_loop
+    for raw_line in resp.iter_lines(decode_unicode=True):
+  File "C:\Users\cybjs\AppData\Local\hermes\hermes-agent\venv\Lib\site-packages\requests\models.py", line 871, in iter_lines
+    for chunk in self.iter_content(
+  File "C:\Users\cybjs\AppData\Local\hermes\hermes-agent\venv\Lib\site-packages\requests\utils.py", line 562, in stream_decode_response_unicode
+    for chunk in iterator:
+  File "C:\Users\cybjs\AppData\Local\hermes\hermes-agent\venv\Lib\site-packages\requests\models.py", line 824, in generate
+    raise ChunkedEncodingError(e)
+requests.exceptions.ChunkedEncodingError: Response ended prematurely
+2026-07-24 16:23:59 [INFO] SSE 연결 시도: https://erp-system-lojo.onrender.com/api/agent/sse/bridge?agentType=marketer
+2026-07-24 16:24:00 [INFO] SSE 연결됨
+2026-07-24 17:19:00 [INFO] SSE 연결 시도: https://erp-system-lojo.onrender.com/api/agent/sse/bridge?agentType=marketer
+2026-07-24 17:19:00 [INFO] SSE 연결됨
+2026-07-24 18:14:00 [INFO] SSE 연결 시도: https://erp-system-lojo.onrender.com/api/agent/sse/bridge?agentType=marketer
+2026-07-24 18:14:01 [INFO] SSE 연결됨
+2026-07-24 19:09:01 [INFO] SSE 연결 시도: https://erp-system-lojo.onrender.com/api/agent/sse/bridge?agentType=marketer
+2026-07-24 19:09:01 [INFO] SSE 연결됨
+2026-07-24 20:04:01 [INFO] SSE 연결 시도: https://erp-system-lojo.onrender.com/api/agent/sse/bridge?agentType=marketer
+2026-07-24 20:04:02 [INFO] SSE 연결됨
+2026-07-24 20:59:02 [INFO] SSE 연결 시도: https://erp-system-lojo.onrender.com/api/agent/sse/bridge?agentType=marketer
+2026-07-24 20:59:02 [INFO] SSE 연결됨
+2026-07-24 21:54:02 [INFO] SSE 연결 시도: https://erp-system-lojo.onrender.com/api/agent/sse/bridge?agentType=marketer
+2026-07-24 21:54:03 [INFO] SSE 연결됨
+2026-07-24 22:49:03 [INFO] SSE 연결 시도: https://erp-system-lojo.onrender.com/api/agent/sse/bridge?agentType=marketer
+2026-07-24 22:49:03 [INFO] SSE 연결됨
+2026-07-24 23:44:03 [INFO] SSE 연결 시도: https://erp-system-lojo.onrender.com/api/agent/sse/bridge?agentType=marketer
+2026-07-24 23:44:03 [INFO] SSE 연결됨
+2026-07-25 00:39:03 [INFO] SSE 연결 시도: https://erp-system-lojo.onrender.com/api/agent/sse/bridge?agentType=marketer
+2026-07-25 00:39:04 [INFO] SSE 연결됨
+2026-07-25 01:34:04 [INFO] 운영 시간 외 (01:00~08:00). 6시간 25분 후 재연결 (슬립 3600초)
+2026-07-25 02:34:04 [INFO] 운영 시간 외 (01:00~08:00). 5시간 25분 후 재연결 (슬립 3600초)
+2026-07-25 03:34:04 [INFO] 운영 시간 외 (01:00~08:00). 4시간 25분 후 재연결 (슬립 3600초)
+2026-07-25 04:34:04 [INFO] 운영 시간 외 (01:00~08:00). 3시간 25분 후 재연결 (슬립 3600초)
+2026-07-25 05:34:06 [INFO] 운영 시간 외 (01:00~08:00). 2시간 25분 후 재연결 (슬립 3600초)
+2026-07-25 06:34:06 [INFO] 운영 시간 외 (01:00~08:00). 1시간 25분 후 재연결 (슬립 3600초)
+2026-07-25 07:34:06 [INFO] 운영 시간 외 (01:00~08:00). 0시간 25분 후 재연결 (슬립 1584초)
+2026-07-25 08:00:30 [INFO] SSE 연결 시도: https://erp-system-lojo.onrender.com/api/agent/sse/bridge?agentType=marketer
+2026-07-25 08:00:30 [INFO] SSE 연결됨
+2026-07-25 08:55:30 [INFO] SSE 연결 시도: https://erp-system-lojo.onrender.com/api/agent/sse/bridge?agentType=marketer
+2026-07-25 08:55:31 [INFO] SSE 연결됨
+2026-07-25 09:50:31 [INFO] SSE 연결 시도: https://erp-system-lojo.onrender.com/api/agent/sse/bridge?agentType=marketer
+2026-07-25 09:50:31 [INFO] SSE 연결됨
+2026-07-25 10:45:31 [INFO] SSE 연결 시도: https://erp-system-lojo.onrender.com/api/agent/sse/bridge?agentType=marketer
+2026-07-25 10:45:31 [INFO] SSE 연결됨
+2026-07-25 11:17:43 [WARNING] 하트비트 전송 실패: HTTPSConnectionPool(host='erp-system-lojo.onrender.com', port=443): Max retries exceeded with url: /api/agent/status (Caused by SSLError(SSLEOFError(8, '[SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1016)')))
+2026-07-25 11:40:31 [INFO] SSE 연결 시도: https://erp-system-lojo.onrender.com/api/agent/sse/bridge?agentType=marketer
+2026-07-25 11:40:32 [INFO] SSE 연결됨
+2026-07-25 12:35:32 [INFO] SSE 연결 시도: https://erp-system-lojo.onrender.com/api/agent/sse/bridge?agentType=marketer
+2026-07-25 12:35:32 [INFO] SSE 연결됨
+2026-07-25 13:30:32 [INFO] SSE 연결 시도: https://erp-system-lojo.onrender.com/api/agent/sse/bridge?agentType=marketer
+2026-07-25 13:30:32 [INFO] SSE 연결됨
+2026-07-25 13:32:56 [WARNING] 하트비트 전송 실패: HTTPSConnectionPool(host='erp-system-lojo.onrender.com', port=443): Read timed out. (read timeout=15)
+2026-07-25 14:25:32 [INFO] SSE 연결 시도: https://erp-system-lojo.onrender.com/api/agent/sse/bridge?agentType=marketer
+2026-07-25 14:25:33 [INFO] SSE 연결됨
+2026-07-25 15:20:33 [INFO] SSE 연결 시도: https://erp-system-lojo.onrender.com/api/agent/sse/bridge?agentType=marketer
+2026-07-25 15:20:33 [INFO] SSE 연결됨
+2026-07-25 16:15:33 [INFO] SSE 연결 시도: https://erp-system-lojo.onrender.com/api/agent/sse/bridge?agentType=marketer
+2026-07-25 16:15:34 [INFO] SSE 연결됨
+2026-07-25 17:10:34 [INFO] SSE 연결 시도: https://erp-system-lojo.onrender.com/api/agent/sse/bridge?agentType=marketer
+2026-07-25 17:10:35 [INFO] SSE 연결됨
+2026-07-25 18:05:35 [INFO] SSE 연결 시도: https://erp-system-lojo.onrender.com/api/agent/sse/bridge?agentType=marketer
+2026-07-25 18:05:35 [INFO] SSE 연결됨
+2026-07-25 19:00:35 [INFO] SSE 연결 시도: https://erp-system-lojo.onrender.com/api/agent/sse/bridge?agentType=marketer
+2026-07-25 19:00:35 [INFO] SSE 연결됨
+2026-07-25 19:55:35 [INFO] SSE 연결 시도: https://erp-system-lojo.onrender.com/api/agent/sse/bridge?agentType=marketer
+2026-07-25 19:55:36 [INFO] SSE 연결됨
+2026-07-25 20:50:36 [INFO] SSE 연결 시도: https://erp-system-lojo.onrender.com/api/agent/sse/bridge?agentType=marketer
+2026-07-25 20:50:37 [INFO] SSE 연결됨
+2026-07-25 21:45:37 [INFO] SSE 연결 시도: https://erp-system-lojo.onrender.com/api/agent/sse/bridge?agentType=marketer
+2026-07-25 21:45:37 [INFO] SSE 연결됨
+2026-07-25 22:40:37 [INFO] SSE 연결 시도: https://erp-system-lojo.onrender.com/api/agent/sse/bridge?agentType=marketer
+2026-07-25 22:40:38 [INFO] SSE 연결됨
+2026-07-25 23:35:38 [INFO] SSE 연결 시도: https://erp-system-lojo.onrender.com/api/agent/sse/bridge?agentType=marketer
+2026-07-25 23:35:38 [INFO] SSE 연결됨
+2026-07-26 00:30:39 [INFO] SSE 연결 시도: https://erp-system-lojo.onrender.com/api/agent/sse/bridge?agentType=marketer
+2026-07-26 00:30:39 [INFO] SSE 연결됨

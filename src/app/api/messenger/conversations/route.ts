@@ -10,10 +10,16 @@ export async function GET() {
   const uid = session.user.id;
 
   const convs = await prisma.conversation.findMany({
-    where: { OR: [{ participantA: uid }, { participantB: uid }] },
+    // 상대가 에이전트인 대화는 숨긴다. 파이프라인을 제거해 더는 답하지 않으므로
+    // 목록에 남겨두면 "답 없는 유령 대화"가 된다. 데이터는 지우지 않는다.
+    where: {
+      OR: [{ participantA: uid }, { participantB: uid }],
+      userA: { isAgent: false },
+      userB: { isAgent: false },
+    },
     include: {
-      userA: { select: { id: true, name: true, image: true } },
-      userB: { select: { id: true, name: true, image: true } },
+      userA: { select: { id: true, name: true, image: true, isAgent: true } },
+      userB: { select: { id: true, name: true, image: true, isAgent: true } },
       messages: { orderBy: { createdAt: "desc" }, take: 1 },
     },
     orderBy: { lastMessageAt: "desc" },

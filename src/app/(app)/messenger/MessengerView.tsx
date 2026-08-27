@@ -3,30 +3,32 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Send, MessageCircle, ArrowLeft, CalendarPlus } from "lucide-react";
-import { AgentStatusBadge } from "@/components/AgentStatusBadge";
+import { Send, MessageCircle, ArrowLeft, CalendarPlus, Sparkles } from "lucide-react";
 import { sendMessage } from "@/app/actions/message";
 import { createCalendarEvent } from "@/app/actions/calendar";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { toneBadgeClass } from "@/lib/badge-tone";
+import { MessageContent } from "@/components/messenger/MessageContent";
+import { AssistantPanel } from "@/components/messenger/AssistantPanel";
+import { useMessenger } from "@/lib/messenger-store";
+import { useVisiblePolling } from "@/lib/useVisiblePolling";
 
 interface User {
   id: string;
   name: string | null;
   image: string | null;
-  role: string;
+  /**
+   * 대화 목록 API 는 role 을 내려주지 않는다(상대를 표시하는 데 필요 없어서).
+   * 필수로 두면 conversations 에서 온 상대를 이 타입으로 못 받는다.
+   */
+  role?: string;
   isAgent?: boolean;
   agentType?: string | null;
-}
-
-interface ConvItem {
-  conversationId: string;
-  other: User;
-  lastMsg: { content: string; senderId: string; createdAt: string } | null;
-  unread: number;
 }
 
 interface Message {
@@ -41,30 +43,6 @@ interface ContextMenu {
   x: number;
   y: number;
   message: Message;
-}
-
-function MessageContent({ content }: { content: string }) {
-  const parts = content.split(/(https?:\/\/[^\s]+)/g);
-  return (
-    <span className="whitespace-pre-wrap break-words">
-      {parts.map((part, index) =>
-        /^https?:\/\//.test(part) ? (
-          <a
-            key={`${part}-${index}`}
-            href={part}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="underline underline-offset-2 break-all"
-            onClick={(event) => event.stopPropagation()}
-          >
-            {part}
-          </a>
-        ) : (
-          part
-        ),
-      )}
-    </span>
-  );
 }
 
 const COLOR_OPTIONS = [
@@ -93,21 +71,19 @@ function todayStr() {
 }
 
 export function MessengerView({ myId, users }: { myId: string; users: User[] }) {
-  const [conversations, setConversations] = useState<ConvItem[]>([]);
+  // 대화 목록은 AppShell 의 MessengerProvider 가 한 번만 폴링해 나눠준다.
+  // 여기서 또 폴링하면 플로팅 위젯 · 헤더와 합쳐 요청이 세 배가 된다.
+  const { conversations, refresh: refreshConversations } = useMessenger();
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [selectedConvId, setSelectedConvId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const [showList, setShowList] = useState(true);
+  // 사람 대화와 배타적이다. 둘이 동시에 열리면 어느 쪽을 보고 있는지 알 수 없다.
+  const [assistantOpen, setAssistantOpen] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-
-  // 신규 실시간 에이전트 파이프라인: "작성 중" 표시 + SSE 구독 상태
-  const [agentPending, setAgentPending] = useState<{ jobId: string; status: "pending" | "waiting" | "error" } | null>(null);
-  const [lastFailedSend, setLastFailedSend] = useState<{ receiverId: string; text: string } | null>(null);
-  const sseRef = useRef<EventSource | null>(null);
-  const sseReconnectRef = useRef(0);
 
   // 우클릭 컨텍스트 메뉴
   const [contextMenu, setContextMenu] = useState<ContextMenu | null>(null);
@@ -120,13 +96,6 @@ export function MessengerView({ myId, users }: { myId: string; users: User[] }) 
   const [calColor, setCalColor] = useState("blue");
   const [calSaving, setCalSaving] = useState(false);
 
-  const fetchConversations = useCallback(async () => {
-    try {
-      const res = await fetch("/api/messenger/conversations");
-      if (res.ok) setConversations(await res.json());
-    } catch {}
-  }, []);
-
   const fetchMessages = useCallback(async (convId: string) => {
     try {
       const res = await fetch(`/api/messenger/messages?conversationId=${convId}`);
@@ -134,100 +103,16 @@ export function MessengerView({ myId, users }: { myId: string; users: User[] }) 
     } catch {}
   }, []);
 
-  const closeAgentSSE = useCallback(() => {
-    sseRef.current?.close();
-    sseRef.current = null;
-  }, []);
-
-  // 재연결 시 자기 자신을 다시 호출해야 하는데, useCallback 상수를 정의 도중 참조하면
-  // "선언 전 접근" 오류가 나므로 항상 최신 함수를 가리키는 ref를 통해 간접 호출한다.
-  const connectAgentSSERef = useRef<
-    (jobId: string, convIdForRefresh: string, receiverId: string, text: string) => void
-  >(() => {});
-
-  // 신규 파이프라인 job을 SSE로 추적: status/completed/error/timeout 이벤트 기반(폴링 아님)
-  // receiverId/text는 재시도 버튼용으로 그대로 들고 다닌다(state 참조 대신 파라미터로 고정해 stale closure 방지)
-  const connectAgentSSE = useCallback((jobId: string, convIdForRefresh: string, receiverId: string, text: string) => {
-    sseRef.current?.close();
-    const es = new EventSource(`/api/agent/sse?jobId=${jobId}`);
-
-    es.addEventListener("status", () => {
-      setAgentPending((prev) => (prev && prev.jobId === jobId ? { ...prev, status: "pending" } : prev));
-    });
-
-    es.addEventListener("completed", () => {
-      es.close();
-      sseRef.current = null;
-      setAgentPending((prev) => (prev && prev.jobId === jobId ? null : prev));
-      fetchMessages(convIdForRefresh);
-      fetchConversations();
-    });
-
-    es.addEventListener("error", () => {
-      es.close();
-      sseRef.current = null;
-      setAgentPending((prev) => (prev && prev.jobId === jobId ? { jobId, status: "error" } : prev));
-      setLastFailedSend({ receiverId, text });
-    });
-
-    es.addEventListener("timeout", () => {
-      es.close();
-      sseRef.current = null;
-      if (sseReconnectRef.current < 3) {
-        sseReconnectRef.current += 1;
-        connectAgentSSERef.current(jobId, convIdForRefresh, receiverId, text);
-      } else {
-        // 브릿지가 오프라인이거나 응답이 오래 걸리는 경우 — 더 이상 자동 재연결하지 않고 대기 상태로 고정
-        setAgentPending((prev) => (prev && prev.jobId === jobId ? { jobId, status: "waiting" } : prev));
-      }
-    });
-
-    sseRef.current = es;
-  }, [fetchMessages, fetchConversations]);
-
-  useEffect(() => {
-    connectAgentSSERef.current = connectAgentSSE;
-  }, [connectAgentSSE]);
-
-  useEffect(() => {
-    // 대화 전환/언마운트 시 이전 job 추적 정리
-    return () => { closeAgentSSE(); };
-  }, [selectedConvId, closeAgentSSE]);
-
-  // 탭 가시성 추적 (백그라운드 탭에서 폴링 중단)
-  const visibleRef = useRef(true);
-  useEffect(() => {
-    const onChange = () => { visibleRef.current = document.visibilityState === "visible"; };
-    document.addEventListener("visibilitychange", onChange);
-    return () => document.removeEventListener("visibilitychange", onChange);
-  }, []);
-
-  // 새벽 2시~오전 8시: 폴링 완전 중단 (Render 무료 시간 절약)
-  function isQuietHours() {
-    const h = new Date().getHours();
-    return h >= 2 && h < 8;
-  }
-
-  useEffect(() => {
-    if (!isQuietHours()) fetchConversations();
-    const id = setInterval(() => {
-      if (visibleRef.current && !isQuietHours()) fetchConversations();
-    }, 30000);
-    return () => clearInterval(id);
-  }, [fetchConversations]);
-
-  useEffect(() => {
-    if (!selectedConvId) return;
-    if (!isQuietHours()) fetchMessages(selectedConvId);
-    const id = setInterval(() => {
-      if (visibleRef.current && !isQuietHours()) fetchMessages(selectedConvId);
-    }, 8000);
-    return () => clearInterval(id);
-  }, [selectedConvId, fetchMessages]);
+  // 열려 있는 대화의 메시지만 자체 폴링한다. 대화 목록은 Provider 담당이다.
+  useVisiblePolling(
+    () => { if (selectedConvId) fetchMessages(selectedConvId); },
+    8000,
+    { refreshKey: selectedConvId },
+  );
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, agentPending]);
+  }, [messages]);
 
   // 컨텍스트 메뉴 외부 클릭 시 닫기
   useEffect(() => {
@@ -277,14 +162,12 @@ export function MessengerView({ myId, users }: { myId: string; users: User[] }) 
   }
 
   function selectUser(user: User) {
+    setAssistantOpen(false);
     const existing = conversations.find(c => c.other.id === user.id);
     setSelectedUser(user);
     setSelectedConvId(existing?.conversationId ?? null);
     setMessages([]);
     setShowList(false);
-    closeAgentSSE();
-    setAgentPending(null);
-    setLastFailedSend(null);
     inputRef.current?.focus();
     if (existing) fetchMessages(existing.conversationId);
   }
@@ -296,43 +179,25 @@ export function MessengerView({ myId, users }: { myId: string; users: User[] }) 
     const receiverId = selectedUser.id;
     setInput("");
     try {
-      const result = await sendMessage(receiverId, text);
-      if (result?.jobId) {
-        // Show the typing state before conversation/message refresh requests.
-        setLastFailedSend(null);
-        sseReconnectRef.current = 0;
-        setAgentPending({ jobId: result.jobId, status: "pending" });
-      }
+      await sendMessage(receiverId, text);
 
+      // 첫 메시지면 대화가 방금 생겼으므로 id 를 찾아야 한다.
       const res = await fetch("/api/messenger/conversations");
       if (res.ok) {
-        const convs: ConvItem[] = await res.json();
-        setConversations(convs);
+        const convs: { conversationId: string; other: { id: string } }[] = await res.json();
         const found = convs.find(c => c.other.id === receiverId);
         if (found) {
           setSelectedConvId(found.conversationId);
           await fetchMessages(found.conversationId);
-
-          if (result?.jobId) {
-            connectAgentSSE(result.jobId, found.conversationId, receiverId, text);
-          }
         }
       }
+      // 헤더 배지와 플로팅 위젯도 같이 최신화된다.
+      await refreshConversations();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "전송 실패");
-      setLastFailedSend({ receiverId, text });
     } finally {
       setSending(false);
     }
-  }
-
-  function handleRetryAgentSend() {
-    if (!lastFailedSend) return;
-    setAgentPending(null);
-    setInput(lastFailedSend.text);
-    setLastFailedSend(null);
-    // 사용자가 다시 전송 버튼을 눌러 명시적으로 재시도 (자동 재시도 아님)
-    inputRef.current?.focus();
   }
 
   const convUserIds = new Set(conversations.map(c => c.other.id));
@@ -341,44 +206,64 @@ export function MessengerView({ myId, users }: { myId: string; users: User[] }) 
 
   return (
     <>
-      <div className="flex h-full bg-canvas-white">
+      <div className="flex h-full bg-background">
         {/* 왼쪽 패널 */}
         <div className={cn(
-          "w-full sm:w-72 shrink-0 border-r border-ash-gray flex flex-col",
+          "w-full sm:w-72 shrink-0 border-r border-border flex flex-col",
           !showList && "hidden sm:flex"
         )}>
-          <div className="h-14 px-4 flex items-center border-b border-ash-gray shrink-0">
-            <MessageCircle size={16} className="text-deep-violet mr-2" />
-            <h2 className="text-sm font-semibold text-deep-space-charcoal">메신저</h2>
+          <div className="h-14 px-4 flex items-center border-b border-border shrink-0">
+            <MessageCircle size={16} className="text-primary mr-2" />
+            <h2 className="text-sm font-semibold text-foreground">메신저</h2>
           </div>
           <div className="flex-1 overflow-y-auto">
+            {/* 비서는 사람이 아니라 목록 맨 위에 고정으로 둔다. 직원 사이에 섞이면 찾기 어렵다. */}
+            <button
+              onClick={() => { setAssistantOpen(true); setSelectedUser(null); setShowList(false); }}
+              className={cn(
+                "w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/50 transition-colors text-left",
+                assistantOpen && "bg-accent",
+              )}
+            >
+              <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/10">
+                <Sparkles className="size-4 text-primary" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-foreground">ERP 비서</p>
+                <p className="text-xs text-muted-foreground">무엇이든 물어보세요</p>
+              </div>
+            </button>
+
             {recentUsers.length === 0 && otherUsers.length === 0 && (
-              <p className="text-sm text-smoke-gray px-4 py-6">다른 직원이 없습니다.</p>
+              <div className="flex flex-col items-center gap-3 py-12 text-center">
+                <MessageCircle className="size-6 text-muted-foreground" />
+                <p className="text-sm text-muted-foreground">다른 직원이 없습니다.</p>
+              </div>
             )}
             {recentUsers.length > 0 && (
               <div>
-                <p className="text-[10px] font-semibold text-smoke-gray uppercase tracking-wider px-4 pt-3 pb-1">최근 대화</p>
+                <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider px-4 pt-3 pb-1">최근 대화</p>
                 {conversations.map((conv) => (
                   <button key={conv.conversationId} onClick={() => selectUser(conv.other)}
-                    className={cn("w-full flex items-center gap-3 px-4 py-3 hover:bg-hint-of-sky/50 transition-colors text-left", selectedUser?.id === conv.other.id && "bg-accent")}>
+                    className={cn("w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/50 transition-colors text-left", selectedUser?.id === conv.other.id && "bg-accent")}>
                     <div className="relative shrink-0">
                       <Avatar className="h-9 w-9">
                         <AvatarImage src={conv.other.image ?? undefined} />
-                        <AvatarFallback className="text-xs bg-hint-of-sky">{initials(conv.other.name)}</AvatarFallback>
+                        <AvatarFallback className="text-xs bg-muted">{initials(conv.other.name)}</AvatarFallback>
                       </Avatar>
                       {conv.unread > 0 && (
-                        <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-0.5 rounded-full bg-warm-fade text-white text-[9px] flex items-center justify-center font-bold">
+                        <Badge variant="outline" className={cn("absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-0.5 rounded-full text-[9px] font-bold", toneBadgeClass("red"))}>
                           {conv.unread > 9 ? "9+" : conv.unread}
-                        </span>
+                        </Badge>
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium text-midnight-charcoal truncate">{conv.other.name ?? "직원"}</span>
-                        {conv.lastMsg && <span className="text-[10px] text-smoke-gray shrink-0 ml-1">{timeStr(conv.lastMsg.createdAt)}</span>}
+                        <span className="text-sm font-medium text-foreground truncate">{conv.other.name ?? "직원"}</span>
+                        {conv.lastMsg && <span className="text-[10px] text-muted-foreground shrink-0 ml-1">{timeStr(conv.lastMsg.createdAt)}</span>}
                       </div>
                       {conv.lastMsg && (
-                        <p className={cn("text-xs truncate", conv.unread > 0 ? "text-midnight-charcoal font-medium" : "text-smoke-gray")}>
+                        <p className={cn("text-xs truncate", conv.unread > 0 ? "text-foreground font-medium" : "text-muted-foreground")}>
                           {conv.lastMsg.senderId === myId ? "나: " : ""}{conv.lastMsg.content}
                         </p>
                       )}
@@ -389,15 +274,15 @@ export function MessengerView({ myId, users }: { myId: string; users: User[] }) 
             )}
             {otherUsers.length > 0 && (
               <div>
-                <p className="text-[10px] font-semibold text-smoke-gray uppercase tracking-wider px-4 pt-3 pb-1">전체 직원</p>
+                <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider px-4 pt-3 pb-1">전체 직원</p>
                 {otherUsers.map((user) => (
                   <button key={user.id} onClick={() => selectUser(user)}
-                    className={cn("w-full flex items-center gap-3 px-4 py-3 hover:bg-hint-of-sky/50 transition-colors text-left", selectedUser?.id === user.id && "bg-accent")}>
+                    className={cn("w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/50 transition-colors text-left", selectedUser?.id === user.id && "bg-accent")}>
                     <Avatar className="h-9 w-9 shrink-0">
                       <AvatarImage src={user.image ?? undefined} />
-                      <AvatarFallback className="text-xs bg-hint-of-sky">{initials(user.name)}</AvatarFallback>
+                      <AvatarFallback className="text-xs bg-muted">{initials(user.name)}</AvatarFallback>
                     </Avatar>
-                    <span className="text-sm font-medium text-midnight-charcoal truncate">{user.name ?? "직원"}</span>
+                    <span className="text-sm font-medium text-foreground truncate">{user.name ?? "직원"}</span>
                   </button>
                 ))}
               </div>
@@ -407,34 +292,47 @@ export function MessengerView({ myId, users }: { myId: string; users: User[] }) 
 
         {/* 오른쪽 채팅 패널 */}
         <div className={cn("flex-1 flex flex-col", showList && "hidden sm:flex")}>
-          {!selectedUser ? (
-            <div className="flex-1 flex flex-col items-center justify-center text-smoke-gray gap-2">
-              <MessageCircle size={40} className="opacity-30" />
-              <p className="text-sm">왼쪽에서 직원을 선택하세요</p>
-              <p className="text-xs opacity-60">메시지 우클릭 → 캘린더 등록 가능</p>
+          {assistantOpen ? (
+            <>
+              <div className="h-14 px-4 flex items-center gap-3 border-b border-border shrink-0">
+                <button onClick={() => setShowList(true)} className="sm:hidden text-muted-foreground hover:text-foreground mr-1">
+                  <ArrowLeft className="size-3.5" />
+                </button>
+                <div className="flex size-8 items-center justify-center rounded-full bg-primary/10">
+                  <Sparkles className="size-4 text-primary" />
+                </div>
+                <span className="text-sm font-semibold text-foreground">ERP 비서</span>
+              </div>
+              <AssistantPanel />
+            </>
+          ) : !selectedUser ? (
+            <div className="flex flex-1 flex-col items-center justify-center gap-3 py-12 text-center">
+              <MessageCircle className="size-6 text-muted-foreground" />
+              <p className="text-sm text-muted-foreground">왼쪽에서 직원을 선택하세요</p>
+              <p className="text-xs text-muted-foreground/60">메시지 우클릭 → 캘린더 등록 가능</p>
             </div>
           ) : (
             <>
-              <div className="h-14 px-4 flex items-center gap-3 border-b border-ash-gray shrink-0">
-                <button onClick={() => setShowList(true)} className="sm:hidden text-smoke-gray hover:text-midnight-charcoal mr-1">
-                  <ArrowLeft size={18} />
+              <div className="h-14 px-4 flex items-center gap-3 border-b border-border shrink-0">
+                <button onClick={() => setShowList(true)} className="sm:hidden text-muted-foreground hover:text-foreground mr-1">
+                  <ArrowLeft className="size-3.5" />
                 </button>
                 <Avatar className="h-8 w-8">
                   <AvatarImage src={selectedUser.image ?? undefined} />
-                  <AvatarFallback className="text-xs bg-hint-of-sky">{initials(selectedUser.name)}</AvatarFallback>
+                  <AvatarFallback className="text-xs bg-muted">{initials(selectedUser.name)}</AvatarFallback>
                 </Avatar>
                 <div className="flex flex-col min-w-0">
-                  <span className="text-sm font-semibold text-deep-space-charcoal">{selectedUser.name}</span>
-                  {selectedUser.isAgent && selectedUser.agentType && (
-                    <AgentStatusBadge agentType={selectedUser.agentType} />
-                  )}
+                  <span className="text-sm font-semibold text-foreground">{selectedUser.name}</span>
                 </div>
-                <span className="text-xs text-smoke-gray ml-auto">메시지 우클릭 → 캘린더 등록</span>
+                <span className="text-xs text-muted-foreground ml-auto">메시지 우클릭 → 캘린더 등록</span>
               </div>
 
               <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
                 {messages.length === 0 && (
-                  <p className="text-xs text-smoke-gray text-center py-8">아직 메시지가 없습니다. 첫 메시지를 보내보세요!</p>
+                  <div className="flex flex-col items-center gap-3 py-12 text-center">
+                    <MessageCircle className="size-6 text-muted-foreground" />
+                    <p className="text-sm text-muted-foreground">아직 메시지가 없습니다. 첫 메시지를 보내보세요!</p>
+                  </div>
                 )}
                 {messages.map((msg) => {
                   const isMine = msg.senderId === myId;
@@ -444,67 +342,25 @@ export function MessengerView({ myId, users }: { myId: string; users: User[] }) 
                       {!isMine && (
                         <Avatar className="h-6 w-6 mr-2 shrink-0 mt-0.5">
                           <AvatarImage src={selectedUser.image ?? undefined} />
-                          <AvatarFallback className="text-[9px] bg-hint-of-sky">{initials(selectedUser.name)}</AvatarFallback>
+                          <AvatarFallback className="text-[9px] bg-muted">{initials(selectedUser.name)}</AvatarFallback>
                         </Avatar>
                       )}
                       <div className={cn("max-w-[70%] space-y-0.5", isMine && "items-end flex flex-col")}>
                         <div className={cn(
                           "px-3 py-2 rounded-2xl text-sm leading-relaxed select-text cursor-context-menu",
-                          isMine ? "bg-deep-violet text-white rounded-tr-sm" : "bg-hint-of-sky text-midnight-charcoal rounded-tl-sm"
+                          isMine ? "bg-primary text-primary-foreground rounded-tr-sm" : "bg-muted text-foreground rounded-tl-sm"
                         )}>
                           <MessageContent content={msg.content} />
                         </div>
-                        <span className="text-[10px] text-smoke-gray px-1">{timeStr(msg.createdAt)}</span>
+                        <span className="text-[10px] text-muted-foreground px-1">{timeStr(msg.createdAt)}</span>
                       </div>
                     </div>
                   );
                 })}
-                {agentPending && (
-                  <div className="flex justify-start">
-                    <Avatar className="h-6 w-6 mr-2 shrink-0 mt-0.5">
-                      <AvatarImage src={selectedUser.image ?? undefined} />
-                      <AvatarFallback className="text-[9px] bg-hint-of-sky">{initials(selectedUser.name)}</AvatarFallback>
-                    </Avatar>
-                    <div className="max-w-[70%] space-y-0.5">
-                      <div
-                        className="px-3 py-2 rounded-2xl rounded-tl-sm text-sm leading-relaxed bg-hint-of-sky text-midnight-charcoal opacity-80"
-                        role="status"
-                        aria-live="polite"
-                      >
-                        {agentPending.status === "error"
-                          ? "답변 생성 중 오류가 발생했습니다."
-                          : agentPending.status === "waiting"
-                          ? "브릿지 연결 대기 중입니다. 잠시 후 새로고침해서 확인해주세요."
-                          : (
-                            <span className="inline-flex items-center gap-1.5">
-                              <span>{selectedUser.name ?? "에이전트"}가 답변 작성 중</span>
-                              <span className="inline-flex items-end gap-0.5" aria-hidden="true">
-                                {[0, 1, 2].map((dot) => (
-                                  <span
-                                    key={dot}
-                                    className="h-1 w-1 rounded-full bg-current motion-safe:animate-bounce"
-                                    style={{ animationDelay: `${dot * 140}ms`, animationDuration: "700ms" }}
-                                  />
-                                ))}
-                              </span>
-                            </span>
-                          )}
-                      </div>
-                      {agentPending.status === "error" && lastFailedSend && (
-                        <button
-                          onClick={handleRetryAgentSend}
-                          className="text-[11px] text-deep-violet underline px-1"
-                        >
-                          다시 시도
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                )}
                 <div ref={bottomRef} />
               </div>
 
-              <div className="px-4 py-3 border-t border-ash-gray shrink-0">
+              <div className="px-4 py-3 border-t border-border shrink-0">
                 <div className="flex gap-2">
                   <Input
                     ref={inputRef}
@@ -516,8 +372,8 @@ export function MessengerView({ myId, users }: { myId: string; users: User[] }) 
                     disabled={sending}
                   />
                   <Button size="icon" onClick={handleSend} disabled={!input.trim() || sending}
-                    className="bg-deep-violet hover:bg-deep-violet/90 text-white shrink-0" style={{ borderRadius: "9px" }}>
-                    <Send size={15} />
+                    className="h-9 py-2 bg-primary hover:bg-primary/90 text-primary-foreground shrink-0">
+                    <Send className="size-3.5" />
                   </Button>
                 </div>
               </div>
@@ -530,14 +386,14 @@ export function MessengerView({ myId, users }: { myId: string; users: User[] }) 
       {contextMenu && (
         <div
           ref={contextMenuRef}
-          className="fixed z-50 bg-popover border border-ash-gray rounded-lg shadow-lg py-1 min-w-[160px]"
+          className="fixed z-50 bg-popover border border-border rounded-lg shadow-lg py-1 min-w-[160px]"
           style={{ top: contextMenu.y, left: contextMenu.x }}
         >
           <button
             onClick={() => openCalModal(contextMenu.message)}
-            className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-midnight-charcoal hover:bg-hint-of-sky transition-colors"
+            className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors"
           >
-            <CalendarPlus size={14} className="text-deep-violet" />
+            <CalendarPlus className="size-3.5 text-primary" />
             캘린더에 등록
           </button>
         </div>
@@ -548,7 +404,7 @@ export function MessengerView({ myId, users }: { myId: string; users: User[] }) 
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <CalendarPlus size={16} className="text-deep-violet" />
+              <CalendarPlus size={16} className="text-primary" />
               캘린더에 일정 등록
             </DialogTitle>
           </DialogHeader>
@@ -581,7 +437,7 @@ export function MessengerView({ myId, users }: { myId: string; users: User[] }) 
                     className={cn(
                       "w-6 h-6 rounded-full transition-all",
                       c.class,
-                      calColor === c.value ? "ring-2 ring-offset-2 ring-midnight-charcoal scale-110" : "opacity-60 hover:opacity-100"
+                      calColor === c.value ? "ring-2 ring-offset-2 ring-foreground scale-110" : "opacity-60 hover:opacity-100"
                     )}
                   />
                 ))}

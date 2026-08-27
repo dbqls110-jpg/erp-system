@@ -20,8 +20,8 @@ export function ProjectFilter({ current }: { current: string }) {
           className={cn(
             "px-3 py-1.5 rounded-lg text-sm font-medium transition-colors",
             current === f.value
-              ? "bg-deep-violet text-white"
-              : "bg-canvas-white border border-ash-gray text-midnight-charcoal hover:border-deep-violet/40 hover:text-deep-violet"
+              ? "bg-primary text-white"
+              : "bg-background border border-border text-foreground hover:border-primary/40 hover:text-primary"
           )}
         >
           {f.label}

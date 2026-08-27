@@ -79,19 +79,21 @@ export async function GET(req: NextRequest) {
 
     const scored = allFiles
       .map((f) => ({
-        name: f.name ?? "",
-        spreadsheetId: f.id ?? "",
-        url: `https://docs.google.com/spreadsheets/d/${f.id}/edit`,
-        modifiedTime: f.modifiedTime ?? null,
-        _score: scoreMatch(f.name ?? "", q),
+        score: scoreMatch(f.name ?? "", q),
+        file: {
+          name: f.name ?? "",
+          spreadsheetId: f.id ?? "",
+          url: `https://docs.google.com/spreadsheets/d/${f.id}/edit`,
+          modifiedTime: f.modifiedTime ?? null,
+        },
       }))
-      .filter((f) => f._score > 0)
+      .filter((entry) => entry.score > 0)
       .sort((a, b) => {
-        if (b._score !== a._score) return b._score - a._score;
-        return (b.modifiedTime ?? "").localeCompare(a.modifiedTime ?? "");
+        if (b.score !== a.score) return b.score - a.score;
+        return (b.file.modifiedTime ?? "").localeCompare(a.file.modifiedTime ?? "");
       });
 
-    const matches = scored.slice(0, limit).map(({ _score: _, ...rest }) => rest);
+    const matches = scored.slice(0, limit).map((entry) => entry.file);
 
     return NextResponse.json({
       q,

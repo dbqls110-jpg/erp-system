@@ -85,35 +85,46 @@ export function clearDriveTokenCache() {
 }
 
 export async function getDriveRefreshToken(): Promise<string> {
-  if (process.env.GOOGLE_DRIVE_OWNER_REFRESH_TOKEN) {
-    return process.env.GOOGLE_DRIVE_OWNER_REFRESH_TOKEN;
-  }
   if (_cachedRefreshToken) return _cachedRefreshToken;
 
-  // 동적 import로 순환 의존성 회피
-  const { prisma } = await import("@/lib/prisma");
-  const record = await prisma.agentAuditLog.findFirst({
-    where: { action: "drive_oauth_active" },
-    orderBy: { createdAt: "desc" },
-    select: { result: true },
-  });
+  const envToken = process.env.GOOGLE_DRIVE_OWNER_REFRESH_TOKEN;
 
-  if (!record?.result) {
-    throw new Error(
-      "Google Drive refresh_token이 없습니다. /api/admin/drive-setup 방문 후 재인증하세요."
-    );
-  }
-  const r = record.result as Record<string, string>;
-  if (!r.enc) throw new Error("저장된 Drive 토큰 데이터가 손상됐습니다.");
-
+  // DB 를 먼저 본다. 예전에는 env 를 먼저 봤는데, 그러면 어딘가에 남아 있는 낡은
+  // env 값이 재인증으로 갱신된 DB 토큰을 가려 버린다. 실제로 로컬에서 그 상태가
+  // 만들어져 invalid_grant 가 났고, env 를 지우기 전까지 원인이 드러나지 않았다.
+  // env 는 주석대로 폴백으로만 쓴다.
   try {
-    _cachedRefreshToken = decryptFromStorage(r.enc);
-    return _cachedRefreshToken;
-  } catch {
-    throw new Error(
-      "Drive 토큰 복호화 실패. DRIVE_TOKEN_ENC_KEY(또는 NEXTAUTH_SECRET)가 인증 당시와 동일한지 확인하세요."
-    );
+    // 동적 import로 순환 의존성 회피
+    const { prisma } = await import("@/lib/prisma");
+    const record = await prisma.agentAuditLog.findFirst({
+      where: { action: "drive_oauth_active" },
+      orderBy: { createdAt: "desc" },
+      select: { result: true },
+    });
+
+    const r = record?.result as Record<string, string> | undefined;
+    if (r?.enc) {
+      _cachedRefreshToken = decryptFromStorage(r.enc);
+      return _cachedRefreshToken;
+    }
+  } catch (err) {
+    // DB 가 없거나 키가 달라 복호화에 실패해도 여기서 죽지 않는다.
+    // env 폴백이 있으면 그걸로 계속 간다.
+    if (!envToken) {
+      throw new Error(
+        "Drive 토큰을 읽지 못했습니다. DRIVE_TOKEN_ENC_KEY(또는 NEXTAUTH_SECRET)가 인증 당시와 " +
+        `동일한지 확인하고, 필요하면 /api/admin/drive-setup 에서 재인증하세요. (${
+          err instanceof Error ? err.message : String(err)
+        })`
+      );
+    }
   }
+
+  if (envToken) return envToken;
+
+  throw new Error(
+    "Google Drive refresh_token이 없습니다. /api/admin/drive-setup 방문 후 재인증하세요."
+  );
 }
 
 export async function makeDriveClientAsOwner() {

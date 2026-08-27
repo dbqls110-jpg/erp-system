@@ -84,3 +84,12 @@ next-env.d.ts
 # SQLite
 *.db
 *.db-journal
+
+# 보관본에 실제 시크릿이 딸려 들어가지 않도록
+archive/**/*.env
+
+# 브릿지 시크릿
+bridge/bridge.env
+
+# 파이썬 스크립트 캐시
+__pycache__/

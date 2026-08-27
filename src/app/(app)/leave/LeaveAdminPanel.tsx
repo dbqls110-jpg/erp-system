@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useState, useCallback } from "react";
+import { useVisiblePolling } from "@/lib/useVisiblePolling";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -34,11 +35,8 @@ export function LeaveAdminPanel({ requests: initial }: { requests: LeaveRequest[
     } catch {}
   }, []);
 
-  // 20초마다 새 신청 확인
-  useEffect(() => {
-    const id = setInterval(fetchPending, 20000);
-    return () => clearInterval(id);
-  }, [fetchPending]);
+  // 탭이 보이는 동안에만 20초마다 새 신청 확인
+  useVisiblePolling(fetchPending, 20000, { immediate: false });
 
   const handleApprove = async (id: string) => {
     setLoading(id + "-approve");
@@ -69,33 +67,33 @@ export function LeaveAdminPanel({ requests: initial }: { requests: LeaveRequest[
   if (requests.length === 0) return null;
 
   return (
-    <Card className="border-deep-violet/20 shadow-[var(--shadow-sm)]">
+    <Card className="shadow-xs">
       <CardHeader>
-        <CardTitle className="text-base font-semibold text-deep-space-charcoal flex items-center gap-2" style={{ fontFamily: "var(--font-plus-jakarta-sans)" }}>
-          승인 대기 <Badge className="bg-deep-violet/10 text-deep-violet border-0">{requests.length}</Badge>
+        <CardTitle className="text-base font-semibold text-foreground flex items-center gap-2" style={{ fontFamily: "var(--font-plus-jakarta-sans)" }}>
+          승인 대기 <Badge className="bg-primary/10 text-primary border-0">{requests.length}</Badge>
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
         {requests.map((r) => (
-          <div key={r.id} className="flex items-center justify-between p-3 rounded-lg bg-hint-of-sky">
+          <div key={r.id} className="flex items-center justify-between rounded-lg bg-muted p-3">
             <div>
-              <p className="text-sm font-medium text-midnight-charcoal">
+              <p className="text-sm font-medium text-foreground">
                 {r.user.name ?? r.user.email} · {typeLabel[r.type]} · {r.days}일
               </p>
-              <p className="text-xs text-smoke-gray">
+              <p className="text-xs text-muted-foreground">
                 {r.startDate === r.endDate ? r.startDate : `${r.startDate} ~ ${r.endDate}`}
                 {r.type === "hourly" && r.startTime && r.endTime && ` (${r.startTime}~${r.endTime})`}
                 {r.reason && ` · ${r.reason}`}
               </p>
             </div>
             <div className="flex gap-2">
-              <Button size="sm" variant="outline" className="text-destructive border-destructive/30 hover:bg-destructive/5"
+              <Button size="sm" variant="outline" className="h-9 py-2 text-destructive border-destructive/30 hover:bg-destructive/5"
                 disabled={!!loading} onClick={() => handleReject(r.id)}>
-                {loading === r.id + "-reject" ? "처리 중..." : "반려"}
+                {loading === r.id + "-reject" ? "처리 중…" : "반려"}
               </Button>
-              <Button size="sm" className="bg-deep-violet text-white hover:bg-rich-plum border-0"
+              <Button size="sm" className="bg-primary text-white hover:bg-primary/90 border-0"
                 disabled={!!loading} onClick={() => handleApprove(r.id)}>
-                {loading === r.id + "-approve" ? "처리 중..." : "승인"}
+                {loading === r.id + "-approve" ? "처리 중…" : "승인"}
               </Button>
             </div>
           </div>

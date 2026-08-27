@@ -27,7 +27,7 @@ export function LeaveCancelButton({ id }: { id: string }) {
     <>
       <button
         onClick={() => setOpen(true)}
-        className="text-smoke-gray hover:text-destructive transition-colors"
+        className="text-muted-foreground hover:text-destructive transition-colors"
         title="취소"
       >
         <X size={14} />
@@ -36,11 +36,11 @@ export function LeaveCancelButton({ id }: { id: string }) {
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
-            <DialogTitle className="text-deep-space-charcoal" style={{ fontFamily: "var(--font-plus-jakarta-sans)" }}>
+            <DialogTitle className="text-foreground" style={{ fontFamily: "var(--font-plus-jakarta-sans)" }}>
               휴가 신청 취소
             </DialogTitle>
           </DialogHeader>
-          <p className="text-sm text-smoke-gray">
+          <p className="text-sm text-muted-foreground">
             신청한 휴가를 취소하시겠습니까?<br />
             취소 후에는 다시 신청해야 합니다.
           </p>

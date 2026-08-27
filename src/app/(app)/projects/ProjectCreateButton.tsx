@@ -30,7 +30,7 @@ export function ProjectCreateButton() {
 
   return (
     <>
-      <Button onClick={() => setOpen(true)} className="gap-2 bg-dark-onyx text-white hover:bg-midnight-charcoal" style={{ borderRadius: "9px" }}>
+      <Button onClick={() => setOpen(true)} className="gap-2 bg-dark-onyx text-white hover:bg-muted" style={{ borderRadius: "9px" }}>
         <Plus size={16} /> 새 프로젝트
       </Button>
       <Dialog open={open} onOpenChange={setOpen}>
@@ -47,8 +47,6 @@ export function ProjectCreateButton() {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
-                <Label>발표일</Label>
-                <Input type="date" name="announceDate" />
               </div>
               <div className="space-y-1">
                 <Label>마감일</Label>

@@ -5,9 +5,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Plus, Pencil, Trash2, Eye, EyeOff, ExternalLink, Search, Copy } from "lucide-react";
 import { createCredential, updateCredential, deleteCredential } from "@/app/actions/credential";
+import { toneBadgeClass } from "@/lib/badge-tone";
 import { toast } from "sonner";
 
 interface Credential {
@@ -20,14 +23,13 @@ interface Credential {
   memo: string | null;
   url: string | null;
 }
-
-const CATEGORY_COLORS: Record<string, string> = {
-  "나라장터": "bg-blue-50 text-blue-700 border-blue-200",
-  "Google": "bg-red-50 text-red-700 border-red-200",
-  "Naver": "bg-green-50 text-green-700 border-green-200",
-  "Gmail": "bg-orange-50 text-orange-700 border-orange-200",
-  "Client": "bg-pink-50 text-pink-700 border-pink-200",
-  "정부24": "bg-teal-50 text-teal-700 border-teal-200",
+const CATEGORY_TONES: Record<string, Parameters<typeof toneBadgeClass>[0]> = {
+  "나라장터": "blue",
+  "Google": "red",
+  "Naver": "green",
+  "Gmail": "amber",
+  "Client": "purple",
+  "정부24": "blue",
 };
 
 const emptyForm = { name: "", company: "", category: "", username: "", password: "", memo: "", url: "" };
@@ -80,9 +82,9 @@ function CredentialForm({
             <button
               type="button"
               onClick={() => setShowPw((v) => !v)}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-smoke-gray hover:text-midnight-charcoal"
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
             >
-              {showPw ? <EyeOff size={14} /> : <Eye size={14} />}
+              {showPw ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
             </button>
           </div>
         </div>
@@ -97,7 +99,7 @@ function CredentialForm({
       </div>
       <div className="flex justify-end gap-2 pt-1">
         <Button variant="outline" size="sm" onClick={onCancel}>취소</Button>
-        <Button size="sm" onClick={() => onSave(form)} disabled={!form.name.trim() || saving}>
+        <Button size="sm" className="h-9 py-2" onClick={() => onSave(form)} disabled={!form.name.trim() || saving}>
           {saving ? "저장 중..." : "저장"}
         </Button>
       </div>
@@ -105,7 +107,17 @@ function CredentialForm({
   );
 }
 
-export function CredentialTable({ initialData }: { initialData: Credential[] }) {
+export function CredentialTable({
+  initialData,
+  canEdit,
+}: {
+  initialData: Credential[];
+  /**
+   * 수정 권한. 서버 액션이 어차피 막지만, 눌러야만 오류가 나는 버튼을
+   * 남겨두면 권한이 없는 사람에게는 고장난 화면으로 보인다.
+   */
+  canEdit: boolean;
+}) {
   const [items, setItems] = useState<Credential[]>(initialData);
   const [search, setSearch] = useState("");
   const [visiblePw, setVisiblePw] = useState<Set<string>>(new Set());
@@ -127,7 +139,8 @@ export function CredentialTable({ initialData }: { initialData: Credential[] }) 
   function togglePw(id: string) {
     setVisiblePw((prev) => {
       const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
       return next;
     });
   }
@@ -188,10 +201,10 @@ export function CredentialTable({ initialData }: { initialData: Credential[] }) 
       : emptyForm;
 
   return (
-    <>
-      <div className="flex items-center gap-3 mb-4">
+    <div className="space-y-4">
+      <div className="flex items-center gap-3">
         <div className="relative flex-1 max-w-xs">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-smoke-gray" />
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
           <Input
             className="pl-8 h-9 text-sm"
             placeholder="서비스명, 회사, 구분 검색..."
@@ -199,104 +212,109 @@ export function CredentialTable({ initialData }: { initialData: Credential[] }) 
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
-        <Button size="sm" className="gap-1.5" onClick={() => setDialog({ mode: "add" })}>
-          <Plus size={14} /> 새로 만들기
-        </Button>
+        {canEdit && (
+          <Button size="sm" className="h-9 gap-1.5 py-2" onClick={() => setDialog({ mode: "add" })}>
+            <Plus className="size-3.5" /> 새로 만들기
+          </Button>
+        )}
       </div>
 
-      <div className="rounded-lg border border-ash-gray overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 border-b border-ash-gray">
-              <tr>
-                {["서비스명", "회사", "구분", "아이디", "비밀번호", "비고", "링크", ""].map((h) => (
-                  <th key={h} className="text-left px-3 py-2.5 text-xs font-medium text-smoke-gray whitespace-nowrap">
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.length === 0 ? (
-                <tr>
-                  <td colSpan={8} className="text-center py-10 text-smoke-gray text-sm">
-                    {search ? "검색 결과가 없습니다." : "등록된 계정이 없습니다."}
-                  </td>
-                </tr>
-              ) : (
-                filtered.map((c) => {
-                  const pwVisible = visiblePw.has(c.id);
-                  const catCls = c.category ? (CATEGORY_COLORS[c.category] ?? "bg-gray-50 text-gray-600 border-gray-200") : "";
-                  return (
-                    <tr key={c.id} className="border-b border-ash-gray last:border-0 hover:bg-gray-50/50 transition-colors">
-                      <td className="px-3 py-2.5 font-medium text-midnight-charcoal whitespace-nowrap">{c.name}</td>
-                      <td className="px-3 py-2.5 text-smoke-gray whitespace-nowrap">{c.company ?? "—"}</td>
-                      <td className="px-3 py-2.5">
-                        {c.category ? (
-                          <Badge variant="outline" className={`text-xs ${catCls}`}>{c.category}</Badge>
-                        ) : <span className="text-smoke-gray">—</span>}
-                      </td>
-                      <td className="px-3 py-2.5">
-                        {c.username ? (
-                          <div className="flex items-center gap-1.5">
-                            <span className="font-mono text-xs">{c.username}</span>
-                            <button onClick={() => copyToClipboard(c.username!, "아이디")} className="text-smoke-gray hover:text-deep-violet transition-colors">
-                              <Copy size={11} />
-                            </button>
-                          </div>
-                        ) : <span className="text-smoke-gray">—</span>}
-                      </td>
-                      <td className="px-3 py-2.5">
-                        {c.password ? (
-                          <div className="flex items-center gap-1.5">
-                            <span className="font-mono text-xs">
-                              {pwVisible ? c.password : "••••••••"}
-                            </span>
-                            <button onClick={() => togglePw(c.id)} className="text-smoke-gray hover:text-deep-violet transition-colors">
-                              {pwVisible ? <EyeOff size={11} /> : <Eye size={11} />}
-                            </button>
-                            <button onClick={() => copyToClipboard(c.password!, "비밀번호")} className="text-smoke-gray hover:text-deep-violet transition-colors">
-                              <Copy size={11} />
-                            </button>
-                          </div>
-                        ) : <span className="text-smoke-gray">—</span>}
-                      </td>
-                      <td className="px-3 py-2.5 text-smoke-gray max-w-[120px] truncate">{c.memo ?? "—"}</td>
-                      <td className="px-3 py-2.5">
-                        {c.url ? (
-                          <a href={c.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-deep-violet hover:underline text-xs truncate max-w-[140px]">
-                            {c.url.replace(/^https?:\/\//, "").split("/")[0]}
-                            <ExternalLink size={10} className="shrink-0" />
-                          </a>
-                        ) : <span className="text-smoke-gray">—</span>}
-                      </td>
-                      <td className="px-3 py-2.5">
-                        <div className="flex items-center gap-1.5">
-                          <button
-                            onClick={() => setDialog({ mode: "edit", item: c })}
-                            className="text-smoke-gray hover:text-deep-violet transition-colors"
-                            title="수정"
-                          >
-                            <Pencil size={13} />
-                          </button>
-                          <button
-                            onClick={() => handleDelete(c.id)}
-                            disabled={deletingId === c.id}
-                            className="text-smoke-gray hover:text-destructive transition-colors"
-                            title="삭제"
-                          >
-                            <Trash2 size={13} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      <Card className="shadow-xs py-0">
+        <CardContent className="p-0">
+          {filtered.length === 0 ? (
+            <div className="flex flex-col items-center gap-3 py-12 text-center">
+              <Search className="size-6 text-muted-foreground" />
+              <p className="text-sm text-muted-foreground">{search ? "검색 결과가 없습니다." : "등록된 계정이 없습니다."}</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table className="[&_:is(th,td)]:px-4">
+                <TableHeader className="bg-muted border-b border-border">
+                  <TableRow>
+                    {["서비스명", "회사", "구분", "아이디", "비밀번호", "비고", "링크", ""].map((h) => (
+                      <TableHead key={h} className="text-left py-2.5 text-xs font-medium text-muted-foreground whitespace-nowrap">
+                        {h}
+                      </TableHead>
+                    ))}
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filtered.map((c) => {
+                    const pwVisible = visiblePw.has(c.id);
+                    const catTone = c.category ? (CATEGORY_TONES[c.category] ?? "gray") : "gray";
+                    return (
+                      <TableRow key={c.id} className="border-b border-border last:border-0 hover:bg-muted/50 transition-colors">
+                        <TableCell className="py-2.5 font-medium text-foreground whitespace-nowrap">{c.name}</TableCell>
+                        <TableCell className="py-2.5 text-muted-foreground whitespace-nowrap">{c.company ?? "—"}</TableCell>
+                        <TableCell className="py-2.5">
+                          {c.category ? (
+                            <Badge variant="outline" className={`text-xs ${toneBadgeClass(catTone)}`}>{c.category}</Badge>
+                          ) : <span className="text-muted-foreground">—</span>}
+                        </TableCell>
+                        <TableCell className="py-2.5">
+                          {c.username ? (
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-mono text-xs">{c.username}</span>
+                              <button onClick={() => copyToClipboard(c.username!, "아이디")} className="text-muted-foreground hover:text-primary transition-colors">
+                                <Copy className="size-3.5" />
+                              </button>
+                            </div>
+                          ) : <span className="text-muted-foreground">—</span>}
+                        </TableCell>
+                        <TableCell className="py-2.5">
+                          {c.password ? (
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-mono text-xs">
+                                {pwVisible ? c.password : "••••••••"}
+                              </span>
+                              <button onClick={() => togglePw(c.id)} className="text-muted-foreground hover:text-primary transition-colors">
+                                {pwVisible ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
+                              </button>
+                              <button onClick={() => copyToClipboard(c.password!, "비밀번호")} className="text-muted-foreground hover:text-primary transition-colors">
+                                <Copy className="size-3.5" />
+                              </button>
+                            </div>
+                          ) : <span className="text-muted-foreground">—</span>}
+                        </TableCell>
+                        <TableCell className="py-2.5 text-muted-foreground max-w-[120px] truncate">{c.memo ?? "—"}</TableCell>
+                        <TableCell className="py-2.5">
+                          {c.url ? (
+                            <a href={c.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-primary hover:underline text-xs truncate max-w-[140px]">
+                              {c.url.replace(/^https?:\/\//, "").split("/")[0]}
+                              <ExternalLink className="size-3.5 shrink-0" />
+                            </a>
+                          ) : <span className="text-muted-foreground">—</span>}
+                        </TableCell>
+                        <TableCell className="py-2.5">
+                          {canEdit && (
+                            <div className="flex items-center gap-1.5">
+                              <button
+                                onClick={() => setDialog({ mode: "edit", item: c })}
+                                className="text-muted-foreground hover:text-primary transition-colors"
+                                title="수정"
+                              >
+                                <Pencil className="size-3.5" />
+                              </button>
+                              <button
+                                onClick={() => handleDelete(c.id)}
+                                disabled={deletingId === c.id}
+                                className="text-muted-foreground hover:text-destructive transition-colors"
+                                title="삭제"
+                              >
+                                <Trash2 className="size-3.5" />
+                              </button>
+                            </div>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <Dialog open={!!dialog} onOpenChange={(o) => { if (!o) setDialog(null); }}>
         <DialogContent className="max-w-md">
@@ -315,6 +333,6 @@ export function CredentialTable({ initialData }: { initialData: Credential[] }) 
           )}
         </DialogContent>
       </Dialog>
-    </>
+    </div>
   );
 }

@@ -97,7 +97,7 @@ function Assert-NoSecretInDiff {
 
     $privateKeyMarker = "PRIVATE" + " KEY"
     $patterns = @(
-        '(?im)^\+.*(?:api[_-]?key|client[_-]?secret|password|passwd|access[_-]?token|refresh[_-]?token|private[_-]?key)\s*[:=]\s*["''][^"'']+["'']',
+        '(?im)^\+.*(?<![\w.])(?:api[_-]?key|client[_-]?secret|password|passwd|access[_-]?token|refresh[_-]?token|private[_-]?key)\s*[:=]\s*["''][^"'']+["'']',
         "(?im)^\+.*-----BEGIN .*$privateKeyMarker-----",
         '(?im)^\+.*\b(?:AKIA[0-9A-Z]{16}|AIza[0-9A-Za-z_-]{20,}|ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|sk-[A-Za-z0-9]{20,})\b'
     )

@@ -2,11 +2,21 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getNotionEvents } from "@/lib/notion";
+import { getCalendarViewer } from "@/lib/calendarViewer";
+import {
+  calendarWhereFor,
+  projectWhereFor,
+  showLeaves,
+  showNotionEvents,
+} from "@/lib/calendarVisibility";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  // 화면과 같은 규칙을 쓴다. 여기만 빠뜨리면 주소를 직접 불러 전부 볼 수 있다.
+  const viewer = (await getCalendarViewer())!;
 
   const { searchParams } = req.nextUrl;
   const year = parseInt(searchParams.get("year") ?? String(new Date().getFullYear()));
@@ -26,22 +36,29 @@ export async function GET(req: NextRequest) {
   const [projects, leaves, customEvents, notionEvents] = await Promise.all([
     prisma.project.findMany({
       where: {
-        OR: [
-          { announceDate: { gte: start, lte: end } },
-          { deadline: { gte: start, lte: end } },
+        AND: [
+          {
+            OR: [
+              { announceDate: { gte: start, lte: end } },
+              { deadline: { gte: start, lte: end } },
+            ],
+          },
+          projectWhereFor(viewer),
         ],
       },
       select: { id: true, name: true, announceDate: true, deadline: true },
     }),
-    prisma.leaveRequest.findMany({
-      where: { status: "approved", startDate: { gte: start, lte: end } },
-      include: { user: { select: { name: true } } },
-    }),
+    showLeaves(viewer)
+      ? prisma.leaveRequest.findMany({
+          where: { status: "approved", startDate: { gte: start, lte: end } },
+          include: { user: { select: { name: true } } },
+        })
+      : [],
     prisma.calendarEvent.findMany({
-      where: { date: { gte: start, lte: end } },
+      where: { AND: [{ date: { gte: start, lte: end } }, calendarWhereFor(viewer)] },
       select: { id: true, title: true, date: true, endDate: true, color: true, notionPageId: true },
     }),
-    getNotionEvents(year, month).catch(() => []),
+    showNotionEvents(viewer) ? getNotionEvents(year, month).catch(() => []) : [],
   ]);
 
   // ERP에서 이미 Notion과 연결된 페이지 ID 목록 (중복 방지)
@@ -53,7 +70,6 @@ export async function GET(req: NextRequest) {
   const events = [
     ...projects.flatMap((p) => {
       const evts = [];
-      if (p.announceDate) evts.push({ date: p.announceDate, title: `📢 ${p.name} 발표`, type: "announce", id: p.id });
       if (p.deadline) evts.push({ date: p.deadline, title: `🎯 ${p.name} 마감`, type: "deadline", id: p.id });
       return evts;
     }),

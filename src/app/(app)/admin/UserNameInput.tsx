@@ -33,7 +33,7 @@ export function UserNameInput({ userId, name: initialName }: Props) {
     return (
       <button
         onClick={() => setEditing(true)}
-        className="flex items-center gap-1.5 group text-sm font-medium text-midnight-charcoal hover:text-deep-violet transition-colors"
+        className="flex items-center gap-1.5 group text-sm font-medium text-foreground hover:text-primary transition-colors"
       >
         {value || "이름 없음"}
         <Pencil size={12} className="opacity-0 group-hover:opacity-60 transition-opacity" />
@@ -54,7 +54,7 @@ export function UserNameInput({ userId, name: initialName }: Props) {
       <button onClick={handleSave} disabled={isPending} className="text-green-600 hover:text-green-700 transition-colors">
         <Check size={15} />
       </button>
-      <button onClick={() => { setValue(initialName); setEditing(false); }} className="text-smoke-gray hover:text-destructive transition-colors">
+      <button onClick={() => { setValue(initialName); setEditing(false); }} className="text-muted-foreground hover:text-destructive transition-colors">
         <X size={15} />
       </button>
     </div>

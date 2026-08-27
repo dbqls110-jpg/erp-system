@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Trash2, CheckSquare, Square, Pencil } from "lucide-react";
+import { Plus, Trash2, CheckSquare, Square, Pencil, Receipt } from "lucide-react";
 import { toast } from "sonner";
 import {
   createFixedExpense,
@@ -125,9 +125,12 @@ export function FixedExpensePanel({ items, checkedIds, year, month, isAdmin }: P
 
   return (
     <>
-      <div className="space-y-1">
+      <div className="space-y-4">
         {items.length === 0 ? (
-          <p className="text-sm text-smoke-gray py-2">등록된 고정비 항목이 없습니다.</p>
+          <div className="flex flex-col items-center gap-3 py-12 text-center">
+            <Receipt className="size-6 text-muted-foreground" />
+            <p className="text-sm text-muted-foreground">등록된 고정비 항목이 없습니다.</p>
+          </div>
         ) : (
           <>
             {items.map((item) => {
@@ -136,36 +139,36 @@ export function FixedExpensePanel({ items, checkedIds, year, month, isAdmin }: P
               return (
                 <div
                   key={item.id}
-                  className="flex items-center justify-between py-2 border-b border-ash-gray last:border-0 text-sm"
+                  className="flex items-center justify-between py-2 border-b border-border last:border-0 text-sm"
                 >
                   <div className="flex items-center gap-3">
                     <button
                       onClick={() => handleCheck(item, !checked)}
                       disabled={pending}
-                      className="text-smoke-gray hover:text-deep-violet transition-colors disabled:opacity-50 shrink-0"
+                      className="text-muted-foreground hover:text-primary transition-colors disabled:opacity-50 shrink-0"
                     >
                       {checked
-                        ? <CheckSquare size={18} className="text-deep-violet" />
-                        : <Square size={18} />
+                        ? <CheckSquare className="size-3.5 text-primary" />
+                        : <Square className="size-3.5" />
                       }
                     </button>
-                    <span className={`font-medium ${checked ? "line-through text-smoke-gray" : "text-midnight-charcoal"}`}>
+                    <span className={`font-medium ${checked ? "line-through text-muted-foreground" : "text-foreground"}`}>
                       {item.name}
                     </span>
                     <Badge variant="outline" className="text-xs">{CATEGORY_LABELS[item.category]}</Badge>
-                    <span className="text-smoke-gray text-xs">매달 {item.dayOfMonth}일</span>
+                    <span className="text-muted-foreground text-xs">매달 {item.dayOfMonth}일</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className={`font-medium ${checked ? "text-smoke-gray line-through" : ""}`}>
+                    <span className={`font-medium ${checked ? "text-muted-foreground line-through" : ""}`}>
                       {item.amount.toLocaleString()}원
                     </span>
                     {isAdmin && (
                       <>
-                        <button onClick={() => openEdit(item)} disabled={pending} className="text-smoke-gray hover:text-deep-violet transition-colors disabled:opacity-50">
-                          <Pencil size={13} />
+                        <button onClick={() => openEdit(item)} disabled={pending} className="text-muted-foreground hover:text-primary transition-colors disabled:opacity-50">
+                          <Pencil className="size-3.5" />
                         </button>
-                        <button onClick={() => handleDelete(item)} disabled={pending} className="text-smoke-gray hover:text-destructive transition-colors disabled:opacity-50">
-                          <Trash2 size={14} />
+                        <button onClick={() => handleDelete(item)} disabled={pending} className="text-muted-foreground hover:text-destructive transition-colors disabled:opacity-50">
+                          <Trash2 className="size-3.5" />
                         </button>
                       </>
                     )}
@@ -174,12 +177,12 @@ export function FixedExpensePanel({ items, checkedIds, year, month, isAdmin }: P
               );
             })}
             <div className="flex justify-between items-center pt-2 text-sm font-medium">
-              <span className="text-smoke-gray">
+              <span className="text-muted-foreground">
                 납부 완료 {items.filter(i => checkedIds.has(i.id)).length}/{items.length}건
               </span>
               <span>
-                <span className="text-deep-violet">{checkedTotal.toLocaleString()}원</span>
-                <span className="text-smoke-gray"> / {totalFixed.toLocaleString()}원</span>
+                <span className="text-primary">{checkedTotal.toLocaleString()}원</span>
+                <span className="text-muted-foreground"> / {totalFixed.toLocaleString()}원</span>
               </span>
             </div>
           </>
@@ -190,9 +193,9 @@ export function FixedExpensePanel({ items, checkedIds, year, month, isAdmin }: P
             variant="outline"
             size="sm"
             onClick={openCreate}
-            className="gap-1.5 mt-2"
+            className="gap-1.5 mt-2 h-9 py-2"
           >
-            <Plus size={13} /> 고정비 항목 추가
+            <Plus className="size-3.5" /> 고정비 항목 추가
           </Button>
         )}
       </div>
@@ -237,8 +240,8 @@ export function FixedExpensePanel({ items, checkedIds, year, month, isAdmin }: P
             </div>
             <div className="flex gap-2 justify-end pt-1">
               <Button variant="outline" size="sm" onClick={() => setOpen(false)}>취소</Button>
-              <Button size="sm" onClick={handleSave} disabled={!name.trim() || !amount || saving}>
-                {saving ? "저장 중..." : "저장"}
+              <Button size="sm" onClick={handleSave} disabled={!name.trim() || !amount || saving} className="h-9 py-2">
+                {saving ? "저장 중…" : "저장"}
               </Button>
             </div>
           </div>

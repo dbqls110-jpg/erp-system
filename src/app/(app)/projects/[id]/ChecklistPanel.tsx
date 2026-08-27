@@ -12,6 +12,7 @@ interface ChecklistItem {
   id: string;
   content: string;
   isDone: boolean;
+  completedAt: Date | string | null;
 }
 
 export function ChecklistPanel({ projectId, items }: { projectId: string; items: ChecklistItem[] }) {
@@ -49,22 +50,27 @@ export function ChecklistPanel({ projectId, items }: { projectId: string; items:
 
   return (
     <div className="space-y-2">
-      {items.length === 0 && <p className="text-sm text-smoke-gray">체크리스트 항목이 없습니다.</p>}
+      {items.length === 0 && <p className="text-sm text-muted-foreground">체크리스트 항목이 없습니다.</p>}
       {items.map((item) => (
         <div key={item.id} className="flex items-center gap-3 group">
           <button
             onClick={() => handleToggle(item.id)}
             className={cn(
               "w-5 h-5 rounded border-2 flex-shrink-0 flex items-center justify-center transition-colors",
-              item.isDone ? "bg-deep-violet border-deep-violet" : "border-ash-gray hover:border-deep-violet"
+              item.isDone ? "bg-primary border-primary" : "border-border hover:border-primary"
             )}
           >
             {item.isDone && <svg width="10" height="8" viewBox="0 0 10 8" fill="none"><path d="M1 4L3.5 6.5L9 1" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>}
           </button>
-          <span className={cn("flex-1 text-sm", item.isDone ? "line-through text-smoke-gray" : "text-midnight-charcoal")}>
+          <span className={cn("flex-1 text-sm", item.isDone ? "line-through text-muted-foreground" : "text-foreground")}>
             {item.content}
           </span>
-          <button onClick={() => handleDelete(item.id)} className="opacity-0 group-hover:opacity-100 text-smoke-gray hover:text-destructive transition-opacity">
+          {item.isDone && item.completedAt && (
+            <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+              {new Date(item.completedAt).toLocaleDateString("ko-KR", { month: "numeric", day: "numeric" })}
+            </span>
+          )}
+          <button onClick={() => handleDelete(item.id)} className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-opacity">
             <Trash2 size={14} />
           </button>
         </div>

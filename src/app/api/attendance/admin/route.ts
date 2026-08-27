@@ -19,7 +19,8 @@ export async function GET(req: NextRequest) {
   const end = `${year}-${monthStr}-${String(daysInMonth).padStart(2, "0")}`;
 
   const records = await prisma.attendance.findMany({
-    where: { date: { gte: start, lte: end } },
+    // AI 대화 파이프라인을 들어내면서 에이전트 계정의 근태는 의미가 없어졌다.
+    where: { date: { gte: start, lte: end }, user: { isAgent: false } },
     include: { user: { select: { id: true, name: true, email: true, isAgent: true } } },
     orderBy: [{ date: "asc" }, { clockIn: "asc" }],
   });

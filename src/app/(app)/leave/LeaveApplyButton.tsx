@@ -52,7 +52,7 @@ export function LeaveApplyButton() {
 
   return (
     <>
-      <Button onClick={() => setOpen(true)} className="gap-2 bg-dark-onyx text-white hover:bg-midnight-charcoal" style={{ borderRadius: "9px" }}>
+      <Button onClick={() => setOpen(true)} className="gap-2 bg-dark-onyx text-white hover:bg-muted" style={{ borderRadius: "9px" }}>
         <Plus size={16} /> 휴가 신청
       </Button>
       <Dialog open={open} onOpenChange={handleClose}>
@@ -130,7 +130,7 @@ export function LeaveApplyButton() {
             </div>
             <div className="flex gap-2 justify-end">
               <Button type="button" variant="outline" onClick={() => handleClose(false)}>취소</Button>
-              <Button type="submit" disabled={loading} className="bg-dark-onyx text-white hover:bg-midnight-charcoal" style={{ borderRadius: "9px" }}>
+              <Button type="submit" disabled={loading} className="bg-dark-onyx text-white hover:bg-muted" style={{ borderRadius: "9px" }}>
                 {loading ? "신청 중..." : "신청"}
               </Button>
             </div>

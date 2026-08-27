@@ -12,7 +12,7 @@ import path from "path";
 const ROOT = path.resolve(__dirname, "../..");
 
 describe("package.json render-build 스크립트", () => {
-  let pkg: Record<string, any>;
+  let pkg: { scripts: Record<string, string> } & Record<string, unknown>;
 
   it("package.json 파싱 성공", () => {
     pkg = JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf8"));

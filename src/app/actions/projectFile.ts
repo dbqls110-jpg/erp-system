@@ -22,7 +22,7 @@ export async function uploadProjectFile(projectId: string, formData: FormData) {
 
   const buffer = Buffer.from(await file.arrayBuffer());
 
-  const { driveFileId, driveUrl } = await uploadFileToDrive(
+  const { driveFileId, driveUrl, category } = await uploadFileToDrive(
     session.accessToken,
     { buffer, name: file.name, mimeType: file.type || "application/octet-stream", size: file.size },
     { id: project.id, name: project.name, createdAt: project.createdAt }
@@ -32,6 +32,7 @@ export async function uploadProjectFile(projectId: string, formData: FormData) {
     data: {
       projectId,
       driveFileId,
+      category,
       name: file.name,
       mimeType: file.type || "application/octet-stream",
       driveUrl,

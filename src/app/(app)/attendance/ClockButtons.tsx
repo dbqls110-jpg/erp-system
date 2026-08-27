@@ -43,7 +43,7 @@ export function ClockButtons({ hasClockIn, hasClockOut }: Props) {
       <Button
         onClick={handleClockIn}
         disabled={hasClockIn || loading === "in"}
-        className="gap-2 bg-deep-violet text-white hover:bg-rich-plum border-0 disabled:opacity-40"
+        className="gap-2 bg-primary text-white hover:bg-primary/90 border-0 disabled:opacity-40"
         style={{ borderRadius: "9px" }}
       >
         <LogIn size={16} />
