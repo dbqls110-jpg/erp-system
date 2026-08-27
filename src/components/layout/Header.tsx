@@ -13,7 +13,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { LogOut, Menu, Mail, ExternalLink, LayoutDashboard, MessageCircle } from "lucide-react";
 import { clockOut } from "@/app/actions/attendance";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 const pageTitle: Record<string, string> = {
   "/dashboard": "대시보드",
@@ -47,6 +47,7 @@ export function Header({ user, onMobileMenuOpen }: HeaderProps) {
   const pathname = usePathname();
   const router = useRouter();
   const [unread, setUnread] = useState(0);
+  const visibleRef = useRef(true);
 
   const refreshUnread = useCallback(() => {
     fetch("/api/messenger/unread")
@@ -55,10 +56,23 @@ export function Header({ user, onMobileMenuOpen }: HeaderProps) {
       .catch(() => {});
   }, []);
 
-  // 페이지 이동 시 즉시 갱신 + 10초 폴링
+  // 백그라운드 탭에서는 폴링을 멈추고, 다시 보일 때 즉시 갱신한다.
+  useEffect(() => {
+    const onVisibilityChange = () => {
+      visibleRef.current = document.visibilityState === "visible";
+      if (visibleRef.current) refreshUnread();
+    };
+
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", onVisibilityChange);
+  }, [refreshUnread]);
+
+  // 페이지 이동 시 즉시 갱신 + 보이는 탭에서만 30초 폴링
   useEffect(() => {
     refreshUnread();
-    const id = setInterval(refreshUnread, 30000);
+    const id = setInterval(() => {
+      if (visibleRef.current) refreshUnread();
+    }, 30000);
     return () => clearInterval(id);
   }, [pathname, refreshUnread]);
   const title = Object.entries(pageTitle).find(([key]) => pathname === key || pathname.startsWith(key + "/"))?.[1] ?? "";

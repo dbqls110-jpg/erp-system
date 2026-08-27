@@ -2,6 +2,7 @@
 
 # dependencies
 /node_modules
+**/node_modules/
 /.pnp
 .pnp.*
 .yarn/*
@@ -12,26 +13,53 @@
 
 # testing
 /coverage
+**/coverage/
 
 # next.js
 /.next/
+**/.next/
 /out/
+**/out/
 
 # production
 /build
+**/build/
+**/dist/
 
 # misc
 .DS_Store
+
+# secret material (never commit)
+.env
+.env.*
+**/.env
+**/.env.*
 *.pem
+*.key
+*.crt
+*.cer
+*.der
+*.p12
+*.pfx
+*.jks
+*.keystore
+*.secret
+*.secrets
+*.credential
+*.credentials
+*password.json
+*passwords.json
+*secret*.json
+*credential*.json
+*credentials*.json
+*service-account*.json
+*service_account*.json
 
 # debug
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
-
-# env files (can opt-in for committing if needed)
-.env*
 
 # agent_bridge local runtime files (contain secrets / local state)
 agent_bridge/hermes.env
