@@ -11,7 +11,7 @@
     "sheet:create": "node scripts/create-erp-sheet.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
-    "render-build": "prisma generate && prisma migrate deploy && next build"
+    "render-build": "prisma generate && prisma migrate deploy && npx tsc --noEmit && next build"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.2",

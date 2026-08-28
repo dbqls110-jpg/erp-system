@@ -35,6 +35,11 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  // Render runs the type check explicitly in render-build. Skipping Next's
+  // duplicate checker keeps the production build within its memory limit.
+  typescript: {
+    ignoreBuildErrors: true,
+  },
   // Google Drive와 PDF 파서는 서버에서만 실행한다. 브라우저 번들에 포함되면
   // PDF worker와 Node 전용 의존성이 함께 내려가므로 외부 패키지로 둔다.
   serverExternalPackages: ["googleapis", "pdf-parse"],
