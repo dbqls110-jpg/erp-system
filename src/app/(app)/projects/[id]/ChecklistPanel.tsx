@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { addChecklistItem, toggleChecklistItem, deleteChecklistItem } from "@/app/actions/project";
@@ -15,62 +16,128 @@ interface ChecklistItem {
   completedAt: Date | string | null;
 }
 
+function formatCompletedDate(value: Date | string) {
+  const iso = typeof value === "string" ? value : value.toISOString();
+  const [month, day] = iso.slice(5, 10).split("-");
+  return `${Number(month)}/${Number(day)}`;
+}
+
 export function ChecklistPanel({ projectId, items }: { projectId: string; items: ChecklistItem[] }) {
+  const router = useRouter();
+  const [checklistItems, setChecklistItems] = useState(items);
   const [newItem, setNewItem] = useState("");
   const [loading, setLoading] = useState(false);
+  const [pendingId, setPendingId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const handleAdd = async () => {
-    if (!newItem.trim()) return;
+    const content = newItem.trim();
+    if (!content || loading) return;
     setLoading(true);
+    setError(null);
     try {
-      await addChecklistItem(projectId, newItem.trim());
+      const item = await addChecklistItem(projectId, content);
+      setChecklistItems((current) => [...current, item]);
       setNewItem("");
-    } catch {
-      toast.error("추가 실패");
+      router.refresh();
+      toast.success("체크리스트 항목을 추가했습니다.");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "항목 추가에 실패했습니다.";
+      setError(message);
+      toast.error(message);
     } finally {
       setLoading(false);
     }
   };
 
   const handleToggle = async (itemId: string) => {
+    if (pendingId) return;
+    const currentItem = checklistItems.find((item) => item.id === itemId);
+    if (!currentItem) return;
+
+    const previous = checklistItems;
+    const nextDone = !currentItem.isDone;
+    setPendingId(itemId);
+    setError(null);
+    setChecklistItems((current) => current.map((item) => (
+      item.id === itemId
+        ? { ...item, isDone: nextDone, completedAt: nextDone ? new Date().toISOString() : null }
+        : item
+    )));
+
     try {
-      await toggleChecklistItem(itemId, projectId);
-    } catch {
-      toast.error("업데이트 실패");
+      const updated = await toggleChecklistItem(itemId, projectId);
+      if (!updated) {
+        setChecklistItems((current) => current.filter((item) => item.id !== itemId));
+      } else {
+        setChecklistItems((current) => current.map((item) => item.id === itemId ? updated : item));
+      }
+      router.refresh();
+    } catch (err) {
+      setChecklistItems(previous);
+      const message = err instanceof Error ? err.message : "항목 상태 변경에 실패했습니다.";
+      setError(message);
+      toast.error(message);
+    } finally {
+      setPendingId(null);
     }
   };
 
   const handleDelete = async (itemId: string) => {
+    if (pendingId) return;
+    const previous = checklistItems;
+    setPendingId(itemId);
+    setError(null);
+    setChecklistItems((current) => current.filter((item) => item.id !== itemId));
+
     try {
       await deleteChecklistItem(itemId, projectId);
-    } catch {
-      toast.error("삭제 실패");
+      router.refresh();
+      toast.success("체크리스트 항목을 삭제했습니다.");
+    } catch (err) {
+      setChecklistItems(previous);
+      const message = err instanceof Error ? err.message : "항목 삭제에 실패했습니다.";
+      setError(message);
+      toast.error(message);
+    } finally {
+      setPendingId(null);
     }
   };
 
   return (
     <div className="space-y-2">
-      {items.length === 0 && <p className="text-sm text-muted-foreground">체크리스트 항목이 없습니다.</p>}
-      {items.map((item) => (
+      {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+      {checklistItems.length === 0 && <p className="text-sm text-muted-foreground">체크리스트 항목이 없습니다.</p>}
+      {checklistItems.map((item) => (
         <div key={item.id} className="flex items-center gap-3 group">
           <button
-            onClick={() => handleToggle(item.id)}
+            type="button"
+            onClick={() => void handleToggle(item.id)}
+            disabled={pendingId !== null}
+            aria-label={`${item.content} ${item.isDone ? "완료 해제" : "완료 처리"}`}
+            aria-pressed={item.isDone}
             className={cn(
-              "w-5 h-5 rounded border-2 flex-shrink-0 flex items-center justify-center transition-colors",
+              "w-5 h-5 rounded border-2 flex-shrink-0 flex items-center justify-center transition-colors disabled:opacity-60",
               item.isDone ? "bg-primary border-primary" : "border-border hover:border-primary"
             )}
           >
-            {item.isDone && <svg width="10" height="8" viewBox="0 0 10 8" fill="none"><path d="M1 4L3.5 6.5L9 1" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>}
+            {item.isDone && <svg width="10" height="8" viewBox="0 0 10 8" fill="none" aria-hidden="true"><path d="M1 4L3.5 6.5L9 1" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>}
           </button>
           <span className={cn("flex-1 text-sm", item.isDone ? "line-through text-muted-foreground" : "text-foreground")}>
             {item.content}
           </span>
           {item.isDone && item.completedAt && (
             <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
-              {new Date(item.completedAt).toLocaleDateString("ko-KR", { month: "numeric", day: "numeric" })}
+              {formatCompletedDate(item.completedAt)}
             </span>
           )}
-          <button onClick={() => handleDelete(item.id)} className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-opacity">
+          <button
+            type="button"
+            onClick={() => void handleDelete(item.id)}
+            disabled={pendingId !== null}
+            aria-label={`${item.content} 삭제`}
+            className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100 text-muted-foreground hover:text-destructive transition-opacity disabled:opacity-40"
+          >
             <Trash2 size={14} />
           </button>
         </div>
@@ -82,9 +149,10 @@ export function ChecklistPanel({ projectId, items }: { projectId: string; items:
           onChange={(e) => setNewItem(e.target.value)}
           placeholder="새 항목 추가"
           className="text-sm"
-          onKeyDown={(e) => e.key === "Enter" && handleAdd()}
+          onKeyDown={(e) => { if (e.key === "Enter") void handleAdd(); }}
+          disabled={loading}
         />
-        <Button onClick={handleAdd} disabled={loading} size="sm" variant="outline" className="gap-1 shrink-0">
+        <Button type="button" onClick={() => void handleAdd()} disabled={loading || !newItem.trim()} size="sm" variant="outline" className="gap-1 shrink-0">
           <Plus size={14} /> 추가
         </Button>
       </div>

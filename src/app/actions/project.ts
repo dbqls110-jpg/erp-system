@@ -124,11 +124,13 @@ export async function addChecklistItem(projectId: string, content: string) {
   if (!session?.user?.id) throw new Error("Unauthorized");
 
   const count = await prisma.checklistItem.count({ where: { projectId } });
-  await prisma.checklistItem.create({
+  const item = await prisma.checklistItem.create({
     data: { projectId, content, order: count },
+    select: { id: true, content: true, isDone: true, completedAt: true },
   });
   await updateProgress(projectId);
   revalidatePath(`/projects/${projectId}`);
+  return item;
 }
 
 export async function toggleChecklistItem(itemId: string, projectId: string) {
@@ -138,16 +140,18 @@ export async function toggleChecklistItem(itemId: string, projectId: string) {
   const item = await prisma.checklistItem.findUnique({ where: { id: itemId } });
   if (!item) return;
 
-  await prisma.checklistItem.update({
+  const updated = await prisma.checklistItem.update({
     where: { id: itemId },
     data: {
       isDone: !item.isDone,
       // 체크한 시점을 남긴다. 해제하면 지워서 "언제 완료했는지"가 항상 현재 상태와 맞게 유지된다.
       completedAt: !item.isDone ? new Date() : null,
     },
+    select: { id: true, content: true, isDone: true, completedAt: true },
   });
   await updateProgress(projectId);
   revalidatePath(`/projects/${projectId}`);
+  return updated;
 }
 
 export async function deleteChecklistItem(itemId: string, projectId: string) {
@@ -157,6 +161,7 @@ export async function deleteChecklistItem(itemId: string, projectId: string) {
   await prisma.checklistItem.delete({ where: { id: itemId } });
   await updateProgress(projectId);
   revalidatePath(`/projects/${projectId}`);
+  return { id: itemId };
 }
 
 export async function updateProjectMemo(id: string, memo: string) {
