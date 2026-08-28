@@ -7,6 +7,8 @@ interface AuditOptions {
   dryRun: boolean;
   payload?: unknown;
   result?: unknown;
+  /** Sensitive operations must fail closed if the audit record cannot be written. */
+  required?: boolean;
 }
 
 export async function auditLog(opts: AuditOptions) {
@@ -21,8 +23,9 @@ export async function auditLog(opts: AuditOptions) {
         result: opts.result ? (opts.result as object) : undefined,
       },
     });
-  } catch {
-    // 감사 로그 실패가 실제 작업을 막지 않도록 조용히 처리
+  } catch (error) {
+    if (opts.required) throw error;
+    // 일반적인 비핵심 감사 로그 실패는 기존 동작을 막지 않는다.
   }
 }
 

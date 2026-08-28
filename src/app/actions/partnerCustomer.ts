@@ -21,14 +21,21 @@ export async function createCustomer(data: {
   await requireEditAccess("customers");
   if (!data.name.trim()) throw new Error("회사명을 입력해주세요.");
 
+  const allowedCategories = new Set(["고객사", "협력사", "공급사"]);
+  const allowedStatuses = new Set(["거래중", "보류", "종료"]);
+  const category = data.category?.trim() || "고객사";
+  const status = data.status?.trim() || "거래중";
+  if (!allowedCategories.has(category)) throw new Error("올바른 거래처 분류를 선택해주세요.");
+  if (!allowedStatuses.has(status)) throw new Error("올바른 거래처 상태를 선택해주세요.");
+
   await prisma.customer.create({
     data: {
       name: data.name.trim(),
       manager: data.manager?.trim() || null,
       phone: data.phone?.trim() || null,
       email: data.email?.trim() || null,
-      category: data.category?.trim() || null,
-      status: data.status?.trim() || "거래중",
+      category,
+      status,
       memo: data.memo?.trim() || null,
     },
   });

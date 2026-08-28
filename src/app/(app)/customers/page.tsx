@@ -1,7 +1,7 @@
 import { getServerSession } from "next-auth";
 import type { Prisma } from "@prisma/client";
 import { authOptions } from "@/lib/auth";
-import { requireMenuAccess } from "@/lib/permissions";
+import { canEditMenu, requireMenuAccess } from "@/lib/permissions";
 import { Building2, Download, RefreshCw } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -21,6 +21,7 @@ const STATUS_BY_QUERY = { active: "거래중", pending: "보류", closed: "종�
 export default async function CustomersPage({ searchParams }: { searchParams?: CustomerSearchParams }) {
   const session = await getServerSession(authOptions);
   await requireMenuAccess(session!.user.id, "customers", session!.user.role);
+  const canEdit = await canEditMenu(session!.user.id, "customers", session!.user.role);
 
   const params = await searchParams;
   const categoryParam = typeof params?.category === "string" ? params.category : "all";
@@ -54,7 +55,7 @@ export default async function CustomersPage({ searchParams }: { searchParams?: C
           <a href="/customers" className="inline-flex h-9 items-center gap-2 rounded-md border border-input bg-background px-3 text-sm font-medium hover:bg-accent hover:text-accent-foreground">
             <RefreshCw className="size-3.5" /> 새로고침
           </a>
-          <CustomerCreateButton />
+          {canEdit && <CustomerCreateButton />}
         </div>
       </div>
 

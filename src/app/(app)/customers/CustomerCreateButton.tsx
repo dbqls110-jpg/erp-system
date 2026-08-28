@@ -64,40 +64,40 @@ export function CustomerCreateButton() {
           </DialogHeader>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="space-y-1.5 sm:col-span-2">
-              <Label htmlFor="customer-name">거래처명 *</Label>
-              <Input id="customer-name" value={form.name} onChange={(event) => set("name")(event.target.value)} autoFocus />
+              <Label htmlFor="customer-create-name">거래처명 *</Label>
+              <Input id="customer-create-name" value={form.name} onChange={(event) => set("name")(event.target.value)} autoFocus />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="customer-manager">담당자</Label>
-              <Input id="customer-manager" value={form.manager} onChange={(event) => set("manager")(event.target.value)} />
+              <Label htmlFor="customer-create-manager">담당자</Label>
+              <Input id="customer-create-manager" value={form.manager} onChange={(event) => set("manager")(event.target.value)} />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="customer-phone">연락처</Label>
-              <Input id="customer-phone" value={form.phone} onChange={(event) => set("phone")(event.target.value)} />
+              <Label htmlFor="customer-create-phone">연락처</Label>
+              <Input id="customer-create-phone" value={form.phone} onChange={(event) => set("phone")(event.target.value)} />
             </div>
             <div className="space-y-1.5 sm:col-span-2">
-              <Label htmlFor="customer-email">이메일</Label>
-              <Input id="customer-email" type="email" value={form.email} onChange={(event) => set("email")(event.target.value)} />
+              <Label htmlFor="customer-create-email">이메일</Label>
+              <Input id="customer-create-email" type="email" value={form.email} onChange={(event) => set("email")(event.target.value)} />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="customer-category">분류</Label>
-              <select id="customer-category" value={form.category} onChange={(event) => set("category")(event.target.value)} className="h-9 w-full rounded-2xl border border-transparent bg-input/50 px-3 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/30">
+              <Label htmlFor="customer-create-category">분류</Label>
+              <select id="customer-create-category" value={form.category} onChange={(event) => set("category")(event.target.value)} className="h-9 w-full rounded-2xl border border-transparent bg-input/50 px-3 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/30">
                 <option value="고객사">고객사</option>
                 <option value="협력사">협력사</option>
                 <option value="공급사">공급사</option>
               </select>
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="customer-status">상태</Label>
-              <select id="customer-status" value={form.status} onChange={(event) => set("status")(event.target.value)} className="h-9 w-full rounded-2xl border border-transparent bg-input/50 px-3 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/30">
+              <Label htmlFor="customer-create-status">상태</Label>
+              <select id="customer-create-status" value={form.status} onChange={(event) => set("status")(event.target.value)} className="h-9 w-full rounded-2xl border border-transparent bg-input/50 px-3 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/30">
                 <option value="거래중">거래중</option>
                 <option value="보류">보류</option>
                 <option value="종료">종료</option>
               </select>
             </div>
             <div className="space-y-1.5 sm:col-span-2">
-              <Label htmlFor="customer-memo">메모</Label>
-              <textarea id="customer-memo" value={form.memo} onChange={(event) => set("memo")(event.target.value)} className="min-h-20 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/30" />
+              <Label htmlFor="customer-create-memo">메모</Label>
+              <textarea id="customer-create-memo" value={form.memo} onChange={(event) => set("memo")(event.target.value)} className="min-h-20 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/30" />
             </div>
           </div>
           <div className="flex justify-end gap-2">

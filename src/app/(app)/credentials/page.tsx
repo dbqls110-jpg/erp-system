@@ -13,9 +13,19 @@ export default async function CredentialsPage() {
   const canEdit = session?.user?.id
     ? await canEditMenu(session.user.id, "credentials", session.user.role)
     : false;
-  const credentials = await prisma.credential.findMany({
+  // 목록 응답에는 민감한 값 자체를 포함하지 않는다. 아이디·비밀번호는
+  // 사용자가 명시적으로 요청한 순간 서버에서 권한 확인과 감사 기록 후 반환한다.
+  const credentialsWithSecrets = await prisma.credential.findMany({
     orderBy: [{ order: "asc" }, { createdAt: "asc" }],
+    select: { id: true, name: true, company: true, category: true, memo: true, url: true, username: true, password: true },
   });
+  const credentials = credentialsWithSecrets.map(({ username, password, ...credential }) => ({
+    ...credential,
+    username: null,
+    password: null,
+    hasUsername: Boolean(username),
+    hasPassword: Boolean(password),
+  }));
 
   return (
     <div className="space-y-4">

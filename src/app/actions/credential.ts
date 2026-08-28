@@ -22,8 +22,8 @@ export async function createCredential(data: {
       name: data.name.trim(),
       company: data.company?.trim() || null,
       category: data.category?.trim() || null,
-      username: data.username?.trim() || null,
-      password: data.password || null,
+      ...(data.username?.trim() ? { username: data.username.trim() } : {}),
+      ...(data.password ? { password: data.password } : {}),
       memo: data.memo?.trim() || null,
       url: data.url?.trim() || null,
     },
@@ -52,8 +52,8 @@ export async function updateCredential(
       name: data.name.trim(),
       company: data.company?.trim() || null,
       category: data.category?.trim() || null,
-      username: data.username?.trim() || null,
-      password: data.password || null,
+      ...(data.username?.trim() ? { username: data.username.trim() } : {}),
+      ...(data.password ? { password: data.password } : {}),
       memo: data.memo?.trim() || null,
       url: data.url?.trim() || null,
     },
@@ -74,6 +74,9 @@ export async function deleteCredential(id: string) {
  * 접근 사실을 감사 로그에 남긴다. 값 자체는 로그에 절대 기록하지 않는다.
  */
 export async function auditCredentialAccess(id: string, action: "reveal_username" | "copy_username" | "reveal_password" | "copy_password") {
+  if (!["reveal_username", "copy_username", "reveal_password", "copy_password"].includes(action)) {
+    throw new Error("올바르지 않은 민감정보 접근 작업입니다.");
+  }
   const session = await requireSessionUser();
   await requireMenuAccess(session.user.id, "credentials", session.user.role);
   const credential = await prisma.credential.findUnique({ where: { id }, select: { id: true, name: true } });
@@ -86,5 +89,40 @@ export async function auditCredentialAccess(id: string, action: "reveal_username
     dryRun: false,
     payload: { credentialId: credential.id, credentialName: credential.name, userId: session.user.id },
     result: { recorded: true },
+    required: true,
   });
+}
+
+/**
+ * 목록에는 포함하지 않은 민감한 값을 단건으로 가져온다. 권한 재확인과
+ * 감사 기록이 모두 성공한 경우에만 값을 반환해 RSC 초기 응답 노출을 막는다.
+ */
+export async function readCredentialSecret(
+  id: string,
+  action: "reveal_username" | "copy_username" | "reveal_password" | "copy_password",
+) {
+  if (!["reveal_username", "copy_username", "reveal_password", "copy_password"].includes(action)) {
+    throw new Error("올바르지 않은 민감정보 접근 작업입니다.");
+  }
+  const session = await requireSessionUser();
+  await requireMenuAccess(session.user.id, "credentials", session.user.role);
+  const credential = await prisma.credential.findUnique({
+    where: { id },
+    select: { id: true, name: true, username: true, password: true },
+  });
+  if (!credential) throw new Error("인증 정보를 찾을 수 없습니다.");
+  const field = action.endsWith("username") ? "username" : "password";
+  const value = field === "username" ? credential.username : credential.password;
+  if (!value) throw new Error("등록된 민감정보가 없습니다.");
+
+  await auditLog({
+    method: "POST",
+    endpoint: "/credentials",
+    action: `credential_${action}`,
+    dryRun: false,
+    payload: { credentialId: credential.id, credentialName: credential.name, userId: session.user.id },
+    result: { recorded: true },
+    required: true,
+  });
+  return value;
 }

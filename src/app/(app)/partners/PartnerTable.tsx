@@ -669,7 +669,11 @@ export function PartnerTable({
             ) : shown.map((p) => (
               <article key={p.id} className="rounded-xl border border-border p-3">
                 <div className="flex items-start justify-between gap-3">
-                  <button type="button" onClick={() => canEdit && setRateDialog({ partner: p, key: Date.now() })} className="truncate text-left font-medium hover:text-primary hover:underline" aria-label={`${p.name} 단가 관리`}>{p.name}</button>
+                  {canEdit ? (
+                    <button type="button" onClick={() => setRateDialog({ partner: p, key: Date.now() })} className="truncate text-left font-medium hover:text-primary hover:underline" aria-label={`${p.name} 단가 관리`}>{p.name}</button>
+                  ) : (
+                    <h3 className="truncate font-medium">{p.name}</h3>
+                  )}
                   <Badge variant="outline" className="shrink-0">{p.contractStatus}</Badge>
                 </div>
                 <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1 text-xs text-muted-foreground">
@@ -681,6 +685,7 @@ export function PartnerTable({
                 </dl>
                 {canEdit && (
                   <div className="mt-3 flex justify-end gap-2 border-t border-border pt-2">
+                    <button type="button" onClick={() => setPaymentDialog({ partner: p, key: Date.now() })} className="rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-muted hover:text-primary" aria-label={`${p.name} 실제 지급 이력`}><ReceiptText className="mr-1 inline size-3.5" />지급 이력</button>
                     <button type="button" onClick={() => setDialog({ id: p.id, key: Date.now(), initial: { name: p.name, job: p.job ?? "", phone: p.phone ?? "", rate: p.rate === null ? "" : String(p.rate), rateUnit: p.rateUnit ?? "건당", contractStatus: p.contractStatus, settlementType: p.settlementType ?? "", memo: p.memo ?? "" } })} className="rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-muted hover:text-primary" aria-label={`${p.name} 수정`}><Pencil className="mr-1 inline size-3.5" />수정</button>
                     <button type="button" onClick={() => handleDelete(p)} disabled={busyId === p.id} className="rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-muted hover:text-destructive" aria-label={`${p.name} 삭제`}><Trash2 className="mr-1 inline size-3.5" />삭제</button>
                   </div>

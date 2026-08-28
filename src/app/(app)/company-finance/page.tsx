@@ -29,7 +29,7 @@ export default async function CompanyFinancePage({
   await requireMenuAccess(session!.user.id, "companyFinance", session!.user.role);
   const canEdit = await canEditMenu(session!.user.id, "companyFinance", session!.user.role);
 
-  const currentYear = new Date().getFullYear();
+  const currentYear = Number(currentKoreanDateKey().slice(0, 4));
   const parsedYear = Number.parseInt(params.year ?? "", 10);
   const year = Number.isInteger(parsedYear) && parsedYear >= 2000 && parsedYear <= 2100 ? parsedYear : currentYear;
   const entries = await prisma.companyFinanceEntry.findMany({
