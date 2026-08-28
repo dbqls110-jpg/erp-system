@@ -103,13 +103,13 @@ export function ChecklistPanel({ projectId, items }: { projectId: string; items:
     }
   };
 
-  const handleToggle = async (itemId: string) => {
+  const handleToggle = async (itemId: string, checked?: boolean) => {
     if (pendingId) return;
     const currentItem = checklistItems.find((item) => item.id === itemId);
     if (!currentItem) return;
 
     const previous = checklistItems;
-    const nextDone = !currentItem.isDone;
+    const nextDone = checked ?? !currentItem.isDone;
     setPendingId(itemId);
     setError(null);
     setChecklistItems((current) => current.map((item) => (
@@ -162,20 +162,16 @@ export function ChecklistPanel({ projectId, items }: { projectId: string; items:
       {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
       {checklistItems.length === 0 && <p className="text-sm text-muted-foreground">체크리스트 항목이 없습니다.</p>}
       {checklistItems.map((item) => (
-        <div key={item.id} className="flex items-center gap-3 group">
-          <button
-            type="button"
-            onClick={() => void handleToggle(item.id)}
+        <div key={item.id} className="group flex items-center gap-2 rounded-md px-1 py-1 -mx-1 hover:bg-muted/40">
+          <input
+            id={`checklist-${item.id}`}
+            type="checkbox"
+            checked={item.isDone}
+            onChange={(event) => void handleToggle(item.id, event.target.checked)}
             disabled={pendingId !== null}
             aria-label={`${item.content} ${item.isDone ? "완료 해제" : "완료 처리"}`}
-            aria-pressed={item.isDone}
-            className={cn(
-              "w-5 h-5 rounded border-2 flex-shrink-0 flex items-center justify-center transition-colors disabled:opacity-60",
-              item.isDone ? "bg-primary border-primary" : "border-border hover:border-primary"
-            )}
-          >
-            {item.isDone && <svg width="10" height="8" viewBox="0 0 10 8" fill="none" aria-hidden="true"><path d="M1 4L3.5 6.5L9 1" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>}
-          </button>
+            className="h-4 w-4 shrink-0 cursor-pointer accent-primary disabled:cursor-not-allowed disabled:opacity-60"
+          />
           {editingId === item.id ? (
             <div className="flex min-w-0 flex-1 items-center gap-1.5">
               <Input
@@ -210,9 +206,12 @@ export function ChecklistPanel({ projectId, items }: { projectId: string; items:
               </button>
             </div>
           ) : (
-            <span className={cn("min-w-0 flex-1 text-sm", item.isDone ? "line-through text-muted-foreground" : "text-foreground")}>
+            <label
+              htmlFor={`checklist-${item.id}`}
+              className={cn("min-w-0 flex-1 cursor-pointer text-sm", item.isDone ? "line-through text-muted-foreground" : "text-foreground")}
+            >
               {item.content}
-            </span>
+            </label>
           )}
           {item.isDone && item.completedAt && (
             <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
@@ -220,13 +219,13 @@ export function ChecklistPanel({ projectId, items }: { projectId: string; items:
             </span>
           )}
           {editingId !== item.id && (
-          <button
-            type="button"
-            onClick={() => handleStartEdit(item)}
-            disabled={pendingId !== null}
-            aria-label={`${item.content} 수정`}
+            <button
+              type="button"
+              onClick={() => handleStartEdit(item)}
+              disabled={pendingId !== null}
+              aria-label={`${item.content} 수정`}
               title="내용 수정"
-              className="opacity-60 group-hover:opacity-100 focus-visible:opacity-100 text-muted-foreground hover:text-foreground transition-opacity disabled:opacity-40"
+              className="inline-flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
             >
               <Pencil size={14} aria-hidden="true" />
             </button>
@@ -236,9 +235,10 @@ export function ChecklistPanel({ projectId, items }: { projectId: string; items:
             onClick={() => void handleDelete(item.id)}
             disabled={pendingId !== null || editingId === item.id}
             aria-label={`${item.content} 삭제`}
-            className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100 text-muted-foreground hover:text-destructive transition-opacity disabled:opacity-40"
+            title="항목 삭제"
+            className="inline-flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-destructive disabled:cursor-not-allowed disabled:opacity-40"
           >
-            <Trash2 size={14} />
+            <Trash2 size={14} aria-hidden="true" />
           </button>
         </div>
       ))}
