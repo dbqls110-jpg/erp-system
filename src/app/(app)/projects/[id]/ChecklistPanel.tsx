@@ -4,9 +4,9 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { addChecklistItem, toggleChecklistItem, deleteChecklistItem } from "@/app/actions/project";
+import { addChecklistItem, updateChecklistItem, toggleChecklistItem, deleteChecklistItem } from "@/app/actions/project";
 import { toast } from "sonner";
-import { Plus, Trash2 } from "lucide-react";
+import { Check, Pencil, Plus, Trash2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface ChecklistItem {
@@ -26,6 +26,8 @@ export function ChecklistPanel({ projectId, items }: { projectId: string; items:
   const router = useRouter();
   const [checklistItems, setChecklistItems] = useState(items);
   const [newItem, setNewItem] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingContent, setEditingContent] = useState("");
   const [loading, setLoading] = useState(false);
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -47,6 +49,57 @@ export function ChecklistPanel({ projectId, items }: { projectId: string; items:
       toast.error(message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleStartEdit = (item: ChecklistItem) => {
+    if (pendingId) return;
+    setError(null);
+    setEditingId(item.id);
+    setEditingContent(item.content);
+  };
+
+  const handleCancelEdit = () => {
+    if (pendingId) return;
+    setEditingId(null);
+    setEditingContent("");
+    setError(null);
+  };
+
+  const handleSaveEdit = async (itemId: string) => {
+    if (pendingId) return;
+    const content = editingContent.trim();
+    if (!content) {
+      const message = "체크리스트 항목 내용을 입력해 주세요.";
+      setError(message);
+      toast.error(message);
+      return;
+    }
+
+    const previous = checklistItems;
+    const currentItem = checklistItems.find((item) => item.id === itemId);
+    if (!currentItem) return;
+
+    setPendingId(itemId);
+    setError(null);
+    setChecklistItems((current) => current.map((item) => (
+      item.id === itemId ? { ...item, content } : item
+    )));
+
+    try {
+      const updated = await updateChecklistItem(itemId, projectId, content);
+      setChecklistItems((current) => current.map((item) => item.id === itemId ? updated : item));
+      setEditingId(null);
+      setEditingContent("");
+      router.refresh();
+      toast.success("체크리스트 항목을 수정했습니다.");
+    } catch (err) {
+      setChecklistItems(previous);
+      const message = err instanceof Error ? err.message : "항목 수정에 실패했습니다.";
+      setError(message);
+      toast.error(message);
+    } finally {
+      setPendingId(null);
     }
   };
 
@@ -123,18 +176,65 @@ export function ChecklistPanel({ projectId, items }: { projectId: string; items:
           >
             {item.isDone && <svg width="10" height="8" viewBox="0 0 10 8" fill="none" aria-hidden="true"><path d="M1 4L3.5 6.5L9 1" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>}
           </button>
-          <span className={cn("flex-1 text-sm", item.isDone ? "line-through text-muted-foreground" : "text-foreground")}>
-            {item.content}
-          </span>
+          {editingId === item.id ? (
+            <div className="flex min-w-0 flex-1 items-center gap-1.5">
+              <Input
+                value={editingContent}
+                onChange={(e) => setEditingContent(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") void handleSaveEdit(item.id);
+                  if (e.key === "Escape") handleCancelEdit();
+                }}
+                aria-label={`${item.content} 수정`}
+                autoFocus
+                disabled={pendingId !== null}
+                className="h-8 text-sm"
+              />
+              <button
+                type="button"
+                onClick={() => void handleSaveEdit(item.id)}
+                disabled={pendingId !== null || !editingContent.trim()}
+                aria-label="체크리스트 항목 수정 저장"
+                className="inline-flex size-8 shrink-0 items-center justify-center rounded-md text-primary hover:bg-primary/10 disabled:opacity-40"
+              >
+                <Check size={15} aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                onClick={handleCancelEdit}
+                disabled={pendingId !== null}
+                aria-label="체크리스트 항목 수정 취소"
+                className="inline-flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted disabled:opacity-40"
+              >
+                <X size={15} aria-hidden="true" />
+              </button>
+            </div>
+          ) : (
+            <span className={cn("min-w-0 flex-1 text-sm", item.isDone ? "line-through text-muted-foreground" : "text-foreground")}>
+              {item.content}
+            </span>
+          )}
           {item.isDone && item.completedAt && (
             <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
               {formatCompletedDate(item.completedAt)}
             </span>
           )}
+          {editingId !== item.id && (
+          <button
+            type="button"
+            onClick={() => handleStartEdit(item)}
+            disabled={pendingId !== null}
+            aria-label={`${item.content} 수정`}
+              title="내용 수정"
+              className="opacity-60 group-hover:opacity-100 focus-visible:opacity-100 text-muted-foreground hover:text-foreground transition-opacity disabled:opacity-40"
+            >
+              <Pencil size={14} aria-hidden="true" />
+            </button>
+          )}
           <button
             type="button"
             onClick={() => void handleDelete(item.id)}
-            disabled={pendingId !== null}
+            disabled={pendingId !== null || editingId === item.id}
             aria-label={`${item.content} 삭제`}
             className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100 text-muted-foreground hover:text-destructive transition-opacity disabled:opacity-40"
           >

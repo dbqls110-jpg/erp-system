@@ -123,14 +123,36 @@ export async function addChecklistItem(projectId: string, content: string) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) throw new Error("Unauthorized");
 
+  const normalizedContent = content.trim();
+  if (!normalizedContent) throw new Error("체크리스트 항목 내용을 입력해 주세요.");
+
   const count = await prisma.checklistItem.count({ where: { projectId } });
   const item = await prisma.checklistItem.create({
-    data: { projectId, content, order: count },
+    data: { projectId, content: normalizedContent, order: count },
     select: { id: true, content: true, isDone: true, completedAt: true },
   });
   await updateProgress(projectId);
   revalidatePath(`/projects/${projectId}`);
   return item;
+}
+
+export async function updateChecklistItem(itemId: string, projectId: string, content: string) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) throw new Error("Unauthorized");
+
+  const normalizedContent = content.trim();
+  if (!normalizedContent) throw new Error("체크리스트 항목 내용을 입력해 주세요.");
+
+  const item = await prisma.checklistItem.findUnique({ where: { id: itemId } });
+  if (!item || item.projectId !== projectId) throw new Error("체크리스트 항목을 찾을 수 없습니다.");
+
+  const updated = await prisma.checklistItem.update({
+    where: { id: itemId },
+    data: { content: normalizedContent },
+    select: { id: true, content: true, isDone: true, completedAt: true },
+  });
+  revalidatePath(`/projects/${projectId}`);
+  return updated;
 }
 
 export async function toggleChecklistItem(itemId: string, projectId: string) {
