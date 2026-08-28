@@ -24,6 +24,8 @@ const INTERNAL_ASSISTANT_MARKERS = [
   "[배포 검증]",
   "연결 시험이다.",
   "연결 확인 테스트입니다.",
+  "연결 테스트",
+  "두 번째 연결 테스트",
 ];
 
 function isInternalAssistantQuestion(question: string) {
