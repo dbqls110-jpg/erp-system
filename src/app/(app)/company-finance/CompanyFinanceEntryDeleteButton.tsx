@@ -1,11 +1,13 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { deleteCompanyFinanceEntry } from "@/app/actions/companyFinance";
 
 export function CompanyFinanceEntryDeleteButton({ id, title }: { id: string; title: string }) {
+  const router = useRouter();
   const [loading, setLoading] = useState(false);
 
   const handleDelete = async () => {
@@ -14,6 +16,7 @@ export function CompanyFinanceEntryDeleteButton({ id, title }: { id: string; tit
     try {
       await deleteCompanyFinanceEntry(id);
       toast.success("회사 매출·매입 내역을 삭제했습니다.");
+      router.refresh();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "삭제에 실패했습니다.");
     } finally {
