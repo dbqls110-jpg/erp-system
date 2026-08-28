@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
 
   // 본인 대화의 답변만 적용할 수 있다. 남의 job id 를 넣어도 찾지 못한다.
   const job = await prisma.agentJob.findFirst({
-    where: { id: jobId, userId: session.user.id },
+    where: { id: jobId, userId: session.user.id, visibility: "user" },
     select: { output: true, status: true },
   });
   if (!job) return NextResponse.json({ error: "대화를 찾을 수 없습니다." }, { status: 404 });

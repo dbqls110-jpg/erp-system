@@ -34,6 +34,15 @@ const CATEGORY_TONES: Record<string, Parameters<typeof toneBadgeClass>[0]> = {
 
 const emptyForm = { name: "", company: "", category: "", username: "", password: "", memo: "", url: "" };
 
+function maskUsername(value: string) {
+  if (value.includes("@")) {
+    const [local, domain] = value.split("@", 2);
+    return `${local.slice(0, 1)}•••@${domain}`;
+  }
+  if (value.length <= 2) return "•".repeat(value.length);
+  return `${value.slice(0, 1)}${"•".repeat(Math.max(2, value.length - 2))}${value.slice(-1)}`;
+}
+
 function CredentialForm({
   initial,
   onSave,
@@ -121,6 +130,7 @@ export function CredentialTable({
   const [items, setItems] = useState<Credential[]>(initialData);
   const [search, setSearch] = useState("");
   const [visiblePw, setVisiblePw] = useState<Set<string>>(new Set());
+  const [visibleUsername, setVisibleUsername] = useState<Set<string>>(new Set());
   const [dialog, setDialog] = useState<{ mode: "add" } | { mode: "edit"; item: Credential } | null>(null);
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -138,6 +148,15 @@ export function CredentialTable({
 
   function togglePw(id: string) {
     setVisiblePw((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleUsername(id: string) {
+    setVisibleUsername((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
@@ -241,6 +260,7 @@ export function CredentialTable({
                 <TableBody>
                   {filtered.map((c) => {
                     const pwVisible = visiblePw.has(c.id);
+                    const usernameVisible = visibleUsername.has(c.id);
                     const catTone = c.category ? (CATEGORY_TONES[c.category] ?? "gray") : "gray";
                     return (
                       <TableRow key={c.id} className="border-b border-border last:border-0 hover:bg-muted/50 transition-colors">
@@ -254,8 +274,21 @@ export function CredentialTable({
                         <TableCell className="py-2.5">
                           {c.username ? (
                             <div className="flex items-center gap-1.5">
-                              <span className="font-mono text-xs">{c.username}</span>
-                              <button onClick={() => copyToClipboard(c.username!, "아이디")} className="text-muted-foreground hover:text-primary transition-colors">
+                              <span className="font-mono text-xs">{usernameVisible ? c.username : maskUsername(c.username)}</span>
+                              <button
+                                type="button"
+                                onClick={() => toggleUsername(c.id)}
+                                aria-label={`${c.name} 아이디 ${usernameVisible ? "숨기기" : "표시"}`}
+                                className="text-muted-foreground hover:text-primary transition-colors"
+                              >
+                                {usernameVisible ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => copyToClipboard(c.username!, "아이디")}
+                                aria-label={`${c.name} 아이디 복사`}
+                                className="text-muted-foreground hover:text-primary transition-colors"
+                              >
                                 <Copy className="size-3.5" />
                               </button>
                             </div>
@@ -267,7 +300,12 @@ export function CredentialTable({
                               <span className="font-mono text-xs">
                                 {pwVisible ? c.password : "••••••••"}
                               </span>
-                              <button onClick={() => togglePw(c.id)} className="text-muted-foreground hover:text-primary transition-colors">
+                              <button
+                                type="button"
+                                onClick={() => togglePw(c.id)}
+                                aria-label={`${c.name} 비밀번호 ${pwVisible ? "숨기기" : "표시"}`}
+                                className="text-muted-foreground hover:text-primary transition-colors"
+                              >
                                 {pwVisible ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
                               </button>
                               <button onClick={() => copyToClipboard(c.password!, "비밀번호")} className="text-muted-foreground hover:text-primary transition-colors">

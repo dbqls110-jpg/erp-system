@@ -54,16 +54,24 @@ function eventTitle(e: CalEvent) {
   return `${linkMark}${highlightMark}${e.title}`;
 }
 
+function eventSourceLabel(type: CalEvent["type"]) {
+  if (type === "notion") return "Notion · 읽기 전용";
+  if (type === "leave") return "휴가";
+  if (type === "announce" || type === "deadline") return "프로젝트";
+  return "ERP 직접 등록";
+}
+
 type ModalState =
   | { mode: "closed" }
   | { mode: "create"; date: string }
   | { mode: "detail"; date: string; events: CalEvent[] }
   | { mode: "edit"; event: CalEvent };
 
-export function CalendarView({ initialEvents, currentYear, currentMonth, projectOptions }: {
+export function CalendarView({ initialEvents, currentYear, currentMonth, todayDate, projectOptions }: {
   initialEvents: CalEvent[];
   currentYear: number;
   currentMonth: number;
+  todayDate: string;
   projectOptions: { id: string; name: string }[];
 }) {
   const [year, setYear] = useState(currentYear);
@@ -109,7 +117,7 @@ export function CalendarView({ initialEvents, currentYear, currentMonth, project
 
   const firstDay = new Date(year, month - 1, 1).getDay();
   const daysInMonth = new Date(year, month, 0).getDate();
-  const today = new Date().toISOString().split("T")[0];
+  const today = todayDate;
 
   const getEventsForDay = (day: number) => {
     const dateStr = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
@@ -202,11 +210,11 @@ export function CalendarView({ initialEvents, currentYear, currentMonth, project
       <Card className="shadow-xs">
         <CardContent className="p-4">
           <div className="flex items-center justify-between mb-4">
-            <Button variant="ghost" size="sm" onClick={prevMonth} disabled={loading}><ChevronLeft size={16} /></Button>
+            <Button variant="ghost" size="sm" onClick={prevMonth} disabled={loading} aria-label="이전 달"><ChevronLeft size={16} /></Button>
             <h2 className="text-lg font-bold text-foreground" style={{ fontFamily: "var(--font-plus-jakarta-sans)" }}>
               {year}년 {month}월 {loading && <span className="text-xs text-muted-foreground font-normal">로딩 중…</span>}
             </h2>
-            <Button variant="ghost" size="sm" onClick={nextMonth} disabled={loading}><ChevronRight size={16} /></Button>
+            <Button variant="ghost" size="sm" onClick={nextMonth} disabled={loading} aria-label="다음 달"><ChevronRight size={16} /></Button>
           </div>
 
           <div className="grid grid-cols-7 mb-2">
@@ -282,8 +290,8 @@ export function CalendarView({ initialEvents, currentYear, currentMonth, project
             <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-destructive inline-block" />마감일</span>
             <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-primary inline-block" />휴가</span>
             <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-primary inline-block" />직접 등록</span>
-            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-primary inline-block" />Notion</span>
-            <span className="text-muted-foreground/70">날짜 클릭 시 일정 추가</span>
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-primary inline-block" />Notion · 읽기 전용</span>
+            <span className="text-muted-foreground/70">날짜 클릭 시 ERP 직접 등록 일정 추가</span>
           </div>
         </CardContent>
       </Card>
@@ -311,17 +319,22 @@ export function CalendarView({ initialEvents, currentYear, currentMonth, project
                       {e.type === "notion" && <span className="opacity-50 mr-1 font-bold text-xs">N</span>}
                       {eventTitle(e)}
                     </span>
+                    <span className="ml-2 shrink-0 text-[10px] opacity-70">{eventSourceLabel(e.type)}</span>
                     {e.type === "custom" && (
                       <div className="flex items-center gap-1.5 ml-2 shrink-0">
                         <button
+                          type="button"
                           onClick={() => openEdit(e)}
+                          aria-label={`${e.title} 수정`}
                           className="opacity-60 hover:opacity-100 transition-opacity"
                           title="수정"
                         >
                           <Pencil size={13} />
                         </button>
                         <button
+                          type="button"
                           onClick={() => handleDelete(e.id, e.title)}
+                          aria-label={`${e.title} 삭제`}
                           disabled={deletingId === e.id}
                           className="opacity-60 hover:opacity-100 transition-opacity"
                           title="삭제"
@@ -394,9 +407,11 @@ export function CalendarView({ initialEvents, currentYear, currentMonth, project
                 <div className="flex gap-2">
                   {COLOR_OPTIONS.map((c) => (
                     <button
+                      type="button"
                       key={c.value}
                       onClick={() => setColor(c.value)}
                       title={c.label}
+                      aria-label={`${c.label} 색상 선택`}
                       className={cn(
                         "w-6 h-6 rounded-full transition-all",
                         c.class,
@@ -465,9 +480,11 @@ export function CalendarView({ initialEvents, currentYear, currentMonth, project
                 <div className="flex gap-2">
                   {COLOR_OPTIONS.map((c) => (
                     <button
+                      type="button"
                       key={c.value}
                       onClick={() => setColor(c.value)}
                       title={c.label}
+                      aria-label={`${c.label} 색상 선택`}
                       className={cn(
                         "w-6 h-6 rounded-full transition-all",
                         c.class,

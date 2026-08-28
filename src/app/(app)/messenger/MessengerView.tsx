@@ -66,11 +66,7 @@ function timeStr(iso: string) {
   return d.toLocaleDateString("ko-KR", { month: "short", day: "numeric" });
 }
 
-function todayStr() {
-  return new Date().toISOString().split("T")[0];
-}
-
-export function MessengerView({ myId, users }: { myId: string; users: User[] }) {
+export function MessengerView({ myId, users, todayDate }: { myId: string; users: User[]; todayDate: string }) {
   // 대화 목록은 AppShell 의 MessengerProvider 가 한 번만 폴링해 나눠준다.
   // 여기서 또 폴링하면 플로팅 위젯 · 헤더와 합쳐 요청이 세 배가 된다.
   const { conversations, refresh: refreshConversations } = useMessenger();
@@ -92,7 +88,7 @@ export function MessengerView({ myId, users }: { myId: string; users: User[] }) 
   // 캘린더 등록 모달
   const [calModal, setCalModal] = useState(false);
   const [calTitle, setCalTitle] = useState("");
-  const [calDate, setCalDate] = useState(todayStr());
+  const [calDate, setCalDate] = useState(todayDate);
   const [calColor, setCalColor] = useState("blue");
   const [calSaving, setCalSaving] = useState(false);
 
@@ -141,7 +137,7 @@ export function MessengerView({ myId, users }: { myId: string; users: User[] }) 
 
   function openCalModal(msg: Message) {
     setCalTitle(msg.content.slice(0, 60));
-    setCalDate(todayStr());
+    setCalDate(todayDate);
     setCalColor("blue");
     setContextMenu(null);
     setCalModal(true);

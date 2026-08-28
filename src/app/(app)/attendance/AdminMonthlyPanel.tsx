@@ -9,6 +9,7 @@ import { ChevronLeft, ChevronRight, Users, Pencil, Check, X } from "lucide-react
 import Link from "next/link";
 import { adminUpdateAttendance } from "@/app/actions/attendance";
 import { toneBadgeClass } from "@/lib/badge-tone";
+import { summarizeAttendance } from "@/lib/attendanceSummary";
 import { toast } from "sonner";
 
 interface AttendanceRecord {
@@ -25,6 +26,8 @@ interface UserSummary {
   records: AttendanceRecord[];
   totalHours: number;
   workDays: number;
+  missingClockOut: number;
+  uncalculatedHours: number;
 }
 
 function fmt(isoStr: string | null) {
@@ -72,10 +75,10 @@ function AttendanceRow({ r, onSaved }: { r: AttendanceRecord; onSaved: () => voi
           <Input type="time" value={ci} onChange={(e) => setCi(e.target.value)} className="h-6 text-xs w-28 px-1" />
           <span className="text-muted-foreground">퇴근</span>
           <Input type="time" value={co} onChange={(e) => setCo(e.target.value)} className="h-6 text-xs w-28 px-1" />
-          <button onClick={handleSave} disabled={saving} className="text-primary hover:opacity-70">
+          <button type="button" onClick={handleSave} disabled={saving} className="text-primary hover:opacity-70" aria-label="근태 수정 저장">
             <Check className="size-3.5" />
           </button>
-          <button onClick={handleCancel} className="text-muted-foreground hover:text-destructive">
+          <button type="button" onClick={handleCancel} className="text-muted-foreground hover:text-destructive" aria-label="근태 수정 취소">
             <X className="size-3.5" />
           </button>
         </div>
@@ -86,7 +89,12 @@ function AttendanceRow({ r, onSaved }: { r: AttendanceRecord; onSaved: () => voi
           {r.workHours != null && (
             <Badge variant="outline" className="text-[10px] py-0">{r.workHours.toFixed(1)}h</Badge>
           )}
-          <button onClick={() => setEditing(true)} className="text-muted-foreground hover:text-primary transition-colors" title="수정">
+          {r.clockIn && r.workHours == null && (
+            <Badge variant="outline" className={`${toneBadgeClass("amber")} text-[10px] py-0`}>
+              {r.clockOut ? "시간 계산 불가" : "퇴근 미기록 · 시간 미계산"}
+            </Badge>
+          )}
+          <button type="button" onClick={() => setEditing(true)} className="text-muted-foreground hover:text-primary transition-colors" title="수정" aria-label="근태 수정">
             <Pencil className="size-3.5" />
           </button>
         </div>
@@ -95,10 +103,9 @@ function AttendanceRow({ r, onSaved }: { r: AttendanceRecord; onSaved: () => voi
   );
 }
 
-export function AdminMonthlyPanel() {
-  const now = new Date();
-  const [year, setYear] = useState(now.getFullYear());
-  const [month, setMonth] = useState(now.getMonth() + 1);
+export function AdminMonthlyPanel({ initialYear, initialMonth }: { initialYear: number; initialMonth: number }) {
+  const [year, setYear] = useState(initialYear);
+  const [month, setMonth] = useState(initialMonth);
   const [summaries, setSummaries] = useState<UserSummary[]>([]);
   const [loading, setLoading] = useState(false);
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -117,14 +124,16 @@ export function AdminMonthlyPanel() {
         for (const r of records) {
           const uid = r.user.id;
           if (!map.has(uid)) {
-            map.set(uid, { user: r.user, records: [], totalHours: 0, workDays: 0 });
+            map.set(uid, { user: r.user, records: [], totalHours: 0, workDays: 0, missingClockOut: 0, uncalculatedHours: 0 });
           }
           const s = map.get(uid)!;
           s.records.push(r);
-          s.totalHours += r.workHours ?? 0;
-          if (r.workHours) s.workDays++;
         }
-        setSummaries(Array.from(map.values()).sort((a, b) => (a.user.name ?? "").localeCompare(b.user.name ?? "")));
+        const computed = Array.from(map.values()).map((summary) => ({
+          ...summary,
+          ...summarizeAttendance(summary.records),
+        }));
+        setSummaries(computed.sort((a, b) => (a.user.name ?? "").localeCompare(b.user.name ?? "")));
       } catch {
         // keep existing
       } finally {
@@ -174,8 +183,11 @@ export function AdminMonthlyPanel() {
             {summaries.map((s) => (
               <div key={s.user.id} className="border border-border rounded-lg overflow-hidden">
                 <button
+                  type="button"
                   className="w-full flex items-center justify-between px-4 py-3 hover:bg-muted transition-colors text-left"
                   onClick={() => setExpanded(expanded === s.user.id ? null : s.user.id)}
+                  aria-expanded={expanded === s.user.id}
+                  aria-label={`${s.user.name ?? s.user.email} 근태 상세 ${expanded === s.user.id ? "닫기" : "열기"}`}
                 >
                   <div className="flex items-center gap-1.5">
                     <Link
@@ -191,6 +203,9 @@ export function AdminMonthlyPanel() {
                   </div>
                   <div className="flex items-center gap-3 text-xs text-muted-foreground">
                     <Badge variant="outline" className="text-xs">{s.workDays}일 출근</Badge>
+                    {s.missingClockOut > 0 && (
+                      <Badge variant="outline" className={`${toneBadgeClass("amber")} text-xs`}>미퇴근 {s.missingClockOut}건</Badge>
+                    )}
                     <span className="font-medium text-foreground">{s.totalHours.toFixed(1)}h</span>
                     <span>{expanded === s.user.id ? "▲" : "▼"}</span>
                   </div>

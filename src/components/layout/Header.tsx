@@ -24,6 +24,12 @@ const pageTitle: Record<string, string> = {
   "/calendar": "캘린더",
   "/business-cards": "명함 관리",
   "/finance": "재무 관리",
+  "/customers": "거래처 관리",
+  "/partners": "파트너 관리",
+  "/venues": "공간 DB",
+  "/credentials": "ID 관리",
+  "/sheets": "구글 시트",
+  "/projects/stats": "프로젝트 통계",
   "/admin": "관리자",
   "/messenger": "메신저",
 };
@@ -71,7 +77,12 @@ export function Header({ user, onMobileMenuOpen }: HeaderProps) {
   useEffect(() => {
     if (visibleRef.current) void refresh();
   }, [pathname, refresh]);
-  const title = Object.entries(pageTitle).find(([key]) => pathname === key || pathname.startsWith(key + "/"))?.[1] ?? "";
+  const title = Object.entries(pageTitle)
+    .sort(([left], [right]) => right.length - left.length)
+    .find(([key]) => pathname === key || pathname.startsWith(key + "/"))?.[1] ?? "";
+  useEffect(() => {
+    document.title = title ? `${title} | 사내 ERP 시스템` : "사내 ERP 시스템";
+  }, [title]);
   const initials = user.name
     ? user.name.slice(0, 2).toUpperCase()
     : user.email?.slice(0, 2).toUpperCase() ?? "?";
@@ -89,15 +100,16 @@ export function Header({ user, onMobileMenuOpen }: HeaderProps) {
         {onMobileMenuOpen && (
           <button
             onClick={onMobileMenuOpen}
+            aria-label="메뉴 열기"
             className="lg:hidden text-muted-foreground hover:text-foreground p-1"
           >
             <Menu size={20} />
           </button>
         )}
-        <p className="text-sm font-semibold text-foreground">{title}</p>
+        <h1 className="text-sm font-semibold text-foreground">{title || "사내 ERP 시스템"}</h1>
       </div>
       <div className="flex items-center gap-3">
-        <Link href="/messenger" className="relative text-muted-foreground hover:text-primary transition-colors">
+        <Link href="/messenger" aria-label="메신저" className="relative text-muted-foreground hover:text-primary transition-colors">
           <MessageCircle size={20} />
           {unread > 0 && (
             <span className="absolute -top-1 -right-1 h-4 min-w-4 px-0.5 rounded-full bg-destructive text-white text-[10px] flex items-center justify-center font-bold">

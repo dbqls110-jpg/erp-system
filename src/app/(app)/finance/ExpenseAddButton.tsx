@@ -10,9 +10,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { addExpense } from "@/app/actions/finance";
 import { toast } from "sonner";
 import { Plus } from "lucide-react";
-import { format } from "date-fns";
 
-export function ExpenseAddButton() {
+export function ExpenseAddButton({ initialDate }: { initialDate: string }) {
   const [open, setOpen] = useState(false);
   const [category, setCategory] = useState("other");
   const [loading, setLoading] = useState(false);
@@ -45,7 +44,7 @@ export function ExpenseAddButton() {
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
                 <Label>날짜 *</Label>
-                <Input type="date" name="date" required defaultValue={format(new Date(), "yyyy-MM-dd")} />
+                <Input type="date" name="date" required defaultValue={initialDate} />
               </div>
               <div className="space-y-1">
                 <Label>금액 *</Label>

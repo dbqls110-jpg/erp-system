@@ -11,6 +11,7 @@ import { ClockButtons } from "./ClockButtons";
 import { AdminMonthlyPanel } from "./AdminMonthlyPanel";
 import { WorkingTimer } from "./WorkingTimer";
 import { AttendanceAdminRow } from "./AttendanceAdminRow";
+import { summarizeAttendance } from "@/lib/attendanceSummary";
 
 function isLate(d: Date | null) {
   if (!d) return false;
@@ -50,7 +51,7 @@ export default async function AttendancePage() {
       : Promise.resolve([]),
   ]);
 
-  const totalWorkHours = monthlyRecords.reduce((sum, r) => sum + (r.workHours ?? 0), 0);
+  const attendanceSummary = summarizeAttendance(monthlyRecords);
   const late = isLate(todayRecord?.clockIn ?? null);
   const working = !!todayRecord?.clockIn && !todayRecord?.clockOut;
 
@@ -111,9 +112,15 @@ export default async function AttendancePage() {
           <CardHeader>
             <CardDescription>이번 달 총 근무</CardDescription>
             <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
-              {totalWorkHours.toFixed(1)}시간
+              {attendanceSummary.totalHours.toFixed(1)}시간
             </CardTitle>
           </CardHeader>
+          <CardContent>
+            <p className="text-xs text-muted-foreground">
+              출근 {attendanceSummary.workDays}일
+              {attendanceSummary.uncalculatedHours > 0 && ` · 시간 계산 불가 ${attendanceSummary.uncalculatedHours}건`}
+            </p>
+          </CardContent>
         </Card>
       </div>
 
@@ -171,7 +178,7 @@ export default async function AttendancePage() {
       )}
 
       {/* 관리자: 월별 전체 직원 조회 */}
-      {isAdmin && <AdminMonthlyPanel />}
+      {isAdmin && <AdminMonthlyPanel initialYear={now.getFullYear()} initialMonth={now.getMonth() + 1} />}
 
       {/* 이번 달 기록 */}
       <Card className="shadow-xs">
@@ -219,7 +226,13 @@ export default async function AttendancePage() {
                           <Badge variant="outline" className={`${toneBadgeClass("purple")} text-[10px] py-0`}>야근</Badge>
                         )}
                       </div>
-                      <span className="w-14 text-right">{r.workHours ? `${r.workHours.toFixed(1)}h` : "—"}</span>
+                      <span className="w-14 text-right">
+                        {r.workHours != null ? `${r.workHours.toFixed(1)}h` : (
+                          <Badge variant="outline" className={`${toneBadgeClass("amber")} text-[10px] py-0`}>
+                            {missingClockOut ? "시간 미계산" : "계산 불가"}
+                          </Badge>
+                        )}
+                      </span>
                       {isAdmin && (
                         <AttendanceAdminRow
                           id={r.id}

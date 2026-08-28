@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { toneBadgeClass } from "@/lib/badge-tone";
 import { CalendarX2, ChevronLeft } from "lucide-react";
 import Link from "next/link";
+import { summarizeAttendance } from "@/lib/attendanceSummary";
 
 export default async function EmployeeAttendancePage({
   params,
@@ -37,8 +38,7 @@ export default async function EmployeeAttendancePage({
 
   if (!user) notFound();
 
-  const totalHours = records.reduce((s, r) => s + (r.workHours ?? 0), 0);
-  const workDays = records.filter(r => r.clockIn).length;
+  const attendanceSummary = summarizeAttendance(records);
 
   function fmt(d: Date | null) {
     if (!d) return "—";
@@ -70,20 +70,33 @@ export default async function EmployeeAttendancePage({
         <Card className="@container/card h-full shadow-xs">
           <CardHeader>
             <CardDescription>출근일수</CardDescription>
-            <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">{workDays}일</CardTitle>
+            <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">{attendanceSummary.workDays}일</CardTitle>
           </CardHeader>
+          <CardContent>
+            {attendanceSummary.missingClockOut > 0 && (
+              <p className="text-xs text-muted-foreground">미퇴근 {attendanceSummary.missingClockOut}건</p>
+            )}
+          </CardContent>
         </Card>
         <Card className="@container/card h-full shadow-xs">
           <CardHeader>
             <CardDescription>총 근무시간</CardDescription>
-            <CardTitle className="text-2xl font-semibold tabular-nums text-primary @[250px]/card:text-3xl">{totalHours.toFixed(1)}h</CardTitle>
+            <CardTitle className="text-2xl font-semibold tabular-nums text-primary @[250px]/card:text-3xl">{attendanceSummary.totalHours.toFixed(1)}h</CardTitle>
           </CardHeader>
+          <CardContent>
+            {attendanceSummary.uncalculatedHours > 0 && (
+              <p className="text-xs text-muted-foreground">시간 계산 불가 {attendanceSummary.uncalculatedHours}건</p>
+            )}
+          </CardContent>
         </Card>
         <Card className="@container/card h-full shadow-xs">
           <CardHeader>
             <CardDescription>일 평균</CardDescription>
-            <CardTitle className="text-2xl font-semibold tabular-nums text-primary @[250px]/card:text-3xl">{workDays > 0 ? (totalHours / workDays).toFixed(1) : "0"}h</CardTitle>
+            <CardTitle className="text-2xl font-semibold tabular-nums text-primary @[250px]/card:text-3xl">{attendanceSummary.completedDays > 0 ? (attendanceSummary.totalHours / attendanceSummary.completedDays).toFixed(1) : "0"}h</CardTitle>
           </CardHeader>
+          <CardContent>
+            <p className="text-xs text-muted-foreground">계산된 출근일 기준</p>
+          </CardContent>
         </Card>
       </div>
 
@@ -117,6 +130,11 @@ export default async function EmployeeAttendancePage({
                     <span>퇴근 <span className="text-foreground font-medium">{fmt(r.clockOut)}</span></span>
                     {r.workHours != null && (
                       <Badge variant="outline" className={toneBadgeClass("gray")}>{r.workHours.toFixed(1)}h</Badge>
+                    )}
+                    {r.clockIn && r.workHours == null && (
+                      <Badge variant="outline" className={`${toneBadgeClass("amber")} text-[10px] py-0`}>
+                        {r.clockOut ? "시간 계산 불가" : "퇴근 미기록 · 시간 미계산"}
+                      </Badge>
                     )}
                   </div>
                 </div>

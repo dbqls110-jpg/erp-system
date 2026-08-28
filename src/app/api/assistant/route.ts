@@ -65,7 +65,7 @@ export async function GET(req: NextRequest) {
     const [job, heartbeat] = await Promise.all([
       prisma.agentJob.findFirst({
         // job id만 알아도 남의 대화를 읽을 수 없도록 소유자 조건을 함께 건다.
-        where: { id: jobId, userId: session.user.id },
+        where: { id: jobId, userId: session.user.id, visibility: "user" },
         select: {
           id: true, input: true, userInput: true, output: true, status: true,
           errorMsg: true, createdAt: true, completedAt: true,
@@ -98,7 +98,7 @@ export async function GET(req: NextRequest) {
   const [jobs, heartbeat] = await Promise.all([
     prisma.agentJob.findMany({
       // 남의 질문이 보이면 안 된다. 본인 것만 준다.
-      where: { userId: session.user.id },
+      where: { userId: session.user.id, visibility: "user" },
       orderBy: { createdAt: "desc" },
       take: limit,
       select: {
@@ -117,7 +117,7 @@ export async function GET(req: NextRequest) {
   const legacyJobs = legacyJobIds.length
     ? await prisma.agentJob.findMany({
         // 새 job은 큰 input을 목록 응답에서 제외하고, 옛 job에만 폴백용 원문을 읽는다.
-        where: { userId: session.user.id, id: { in: legacyJobIds } },
+        where: { userId: session.user.id, visibility: "user", id: { in: legacyJobIds } },
         select: { id: true, input: true },
       })
     : [];
@@ -163,7 +163,11 @@ export async function POST(req: NextRequest) {
   // 같은 사람이 앞선 질문의 답을 기다리는 중이면 새로 받지 않는다. 브릿지가 한 번에
   // 하나씩 처리하므로, 쌓아 두면 마지막 답까지 하염없이 기다리게 된다.
   const pending = await prisma.agentJob.findFirst({
-    where: { userId: session.user.id, status: { in: ["pending", "accepted", "processing"] } },
+    where: {
+      userId: session.user.id,
+      visibility: "user",
+      status: { in: ["pending", "accepted", "processing"] },
+    },
     select: { id: true },
   });
   if (pending) {
@@ -179,6 +183,7 @@ export async function POST(req: NextRequest) {
     data: {
       agentType: AGENT_TYPE,
       userId: session.user.id,
+      visibility: "user",
       status: "pending",
       input: prompt,
       userInput: question,

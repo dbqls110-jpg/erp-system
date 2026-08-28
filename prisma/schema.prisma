@@ -414,6 +414,8 @@ model AgentJob {
   agentType String // "hermes" | "marketer"
   userId    String // 요청자 userId
   status    String @default("pending") // "pending" | "accepted" | "processing" | "completed" | "error"
+  /// 운영 비서 대화와 내부 평가/fixture 작업을 분리한다. 브릿지는 모두 처리할 수 있지만 사용자 화면에는 user만 노출한다.
+  visibility String @default("user") // "user" | "internal"
   input     String // 브릿지에 보낼 프롬프트 전체(지시문 + 주입 자료 + 질문)
 
   /// 사람이 실제로 친 말.
@@ -435,7 +437,7 @@ model AgentJob {
   deltas AgentJobDelta[]
 
   @@index([agentType, status, createdAt])
-  @@index([userId, createdAt])
+  @@index([userId, visibility, createdAt])
   @@map("agent_jobs")
 }
 

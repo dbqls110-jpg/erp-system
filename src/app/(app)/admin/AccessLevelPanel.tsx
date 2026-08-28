@@ -48,6 +48,13 @@ function sortLevels(levels: AccessLevel[]) {
   return [...levels].sort((left, right) => right.rank - left.rank)
 }
 
+function accessSignature(rows: MenuAccess[]) {
+  return [...rows]
+    .sort((left, right) => `${left.menuKey}:${left.levelKey}`.localeCompare(`${right.menuKey}:${right.levelKey}`))
+    .map((row) => `${row.menuKey}:${row.levelKey}:${row.canView ? 1 : 0}:${row.canEdit ? 1 : 0}`)
+    .join("|")
+}
+
 async function getApiError(response: Response) {
   try {
     const payload = (await response.json()) as { error?: unknown }
@@ -67,6 +74,7 @@ function getErrorMessage(error: unknown) {
 export default function AccessLevelPanel() {
   const [levels, setLevels] = React.useState<AccessLevel[]>([])
   const [menuAccess, setMenuAccess] = React.useState<MenuAccess[]>([])
+  const [savedMenuAccess, setSavedMenuAccess] = React.useState<MenuAccess[]>([])
   const [newName, setNewName] = React.useState("")
   const [newKey, setNewKey] = React.useState("")
   const [editingLevelId, setEditingLevelId] = React.useState<string | null>(null)
@@ -97,6 +105,7 @@ export default function AccessLevelPanel() {
       const payload = (await response.json()) as AccessLevelsResponse
       setLevels(sortLevels(payload.levels ?? []))
       setMenuAccess(payload.menuAccess ?? [])
+      setSavedMenuAccess(payload.menuAccess ?? [])
       setError(null)
     } catch (loadError) {
       setError(getErrorMessage(loadError))
@@ -104,6 +113,11 @@ export default function AccessLevelPanel() {
       setLoading(false)
     }
   }, [])
+
+  const hasPendingAccessChanges = React.useMemo(
+    () => accessSignature(menuAccess) !== accessSignature(savedMenuAccess),
+    [menuAccess, savedMenuAccess],
+  )
 
   React.useEffect(() => {
     async function loadOnMount() {
@@ -210,6 +224,7 @@ export default function AccessLevelPanel() {
       if (!response.ok) throw new Error(await getApiError(response))
       setLevels((current) => current.filter((l) => l.id !== level.id))
       setMenuAccess((current) => current.filter((row) => row.levelKey !== level.key))
+      setSavedMenuAccess((current) => current.filter((row) => row.levelKey !== level.key))
       setNotice("레벨을 삭제했습니다.")
     } catch (deleteError) {
       setError(getErrorMessage(deleteError))
@@ -219,12 +234,12 @@ export default function AccessLevelPanel() {
   }
 
   /**
-   * 체크박스 하나를 바꾸면 그 메뉴 한 줄을 통째로 저장한다.
+   * 체크박스 하나를 바꾸면 화면에 임시 반영한다. 저장은 사용자가 확인한 뒤 일괄 처리한다.
    *
    * 접근을 끄면 수정도 같이 꺼지고, 수정을 켜면 접근이 같이 켜진다 —
    * 못 들어가는데 고칠 수 있는 상태는 존재할 수 없다.
    */
-  const handleToggle = async (
+  const handleToggle = (
     menuKey: string,
     levelKey: string,
     field: "canView" | "canEdit",
@@ -234,8 +249,6 @@ export default function AccessLevelPanel() {
 
     setError(null)
     setNotice(null)
-    const previous = menuAccess
-
     const forMenu = accessByMenu.get(menuKey) ?? new Map<string, MenuAccess>()
     const next = new Map(forMenu)
     const existing = next.get(levelKey) ?? { menuKey, levelKey, canView: false, canEdit: false }
@@ -254,28 +267,55 @@ export default function AccessLevelPanel() {
       ...current.filter((row) => row.menuKey !== menuKey),
       ...entries.filter((row) => row.canView || row.canEdit).map((row) => ({ menuKey, ...row })),
     ])
-    setBusy(menuKey)
+    setNotice("변경사항이 저장 대기 중입니다. 아래 저장 버튼을 눌러 반영하세요.")
+  }
+
+  const handleSaveAccess = async () => {
+    if (!hasPendingAccessChanges || busy !== null) return
+
+    setError(null)
+    setNotice(null)
+    setBusy("access-save")
+    const menuKeys = [...new Set([...savedMenuAccess, ...menuAccess].map((row) => row.menuKey))]
+    const changedMenuKeys = menuKeys.filter((menuKey) => {
+      const before = savedMenuAccess.filter((row) => row.menuKey === menuKey)
+      const after = menuAccess.filter((row) => row.menuKey === menuKey)
+      return accessSignature(before) !== accessSignature(after)
+    })
 
     try {
-      const response = await fetch("/api/admin/access-levels", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ menuKey, entries }),
-      })
-      if (!response.ok) throw new Error(await getApiError(response))
-      setNotice("메뉴 권한을 저장했습니다.")
-    } catch (toggleError) {
-      setMenuAccess(previous)
-      setError(getErrorMessage(toggleError))
+      await Promise.all(changedMenuKeys.map(async (menuKey) => {
+        const entries = menuAccess
+          .filter((row) => row.menuKey === menuKey)
+          .map(({ levelKey, canView, canEdit }) => ({ levelKey, canView, canEdit }))
+        const response = await fetch("/api/admin/access-levels", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ menuKey, entries }),
+        })
+        if (!response.ok) throw new Error(await getApiError(response))
+      }))
+      setSavedMenuAccess(menuAccess.map((row) => ({ ...row })))
+      setNotice("메뉴 권한 변경사항을 저장했습니다.")
+    } catch (saveError) {
+      await load()
+      setError(getErrorMessage(saveError))
     } finally {
       setBusy(null)
     }
   }
 
+  const handleResetAccess = () => {
+    if (!hasPendingAccessChanges || busy !== null) return
+    setMenuAccess(savedMenuAccess.map((row) => ({ ...row })))
+    setNotice("저장 대기 중인 변경사항을 되돌렸습니다.")
+    setError(null)
+  }
+
   return (
     <div className="space-y-6">
-      {error ? <p className="text-sm text-destructive">{error}</p> : null}
-      {notice ? <p className="text-sm text-muted-foreground">{notice}</p> : null}
+      {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
+      {notice ? <p role="status" aria-live="polite" className="text-sm text-muted-foreground">{notice}</p> : null}
 
       <Card className="shadow-xs">
         <CardHeader>
@@ -457,8 +497,32 @@ export default function AccessLevelPanel() {
           <CardTitle>메뉴별 권한</CardTitle>
           <CardDescription>
             접근은 메뉴에 들어갈 수 있는지, 수정은 그 안에서 자료를 고칠 수 있는지입니다.
-            체크하면 즉시 저장됩니다. 관리자는 설정과 무관하게 항상 전부 허용됩니다
+            체크 후 저장하면 반영됩니다. 관리자는 설정과 무관하게 항상 전부 허용됩니다.
           </CardDescription>
+          <div className="flex flex-wrap items-center justify-between gap-2 pt-2">
+            <p className="text-xs text-muted-foreground" aria-live="polite">
+              {hasPendingAccessChanges ? "저장 대기 중인 변경사항이 있습니다." : "모든 변경사항이 저장되었습니다."}
+            </p>
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleResetAccess}
+                disabled={!hasPendingAccessChanges || busy !== null}
+              >
+                되돌리기
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => void handleSaveAccess()}
+                disabled={!hasPendingAccessChanges || busy !== null}
+              >
+                {busy === "access-save" ? "저장 중…" : "변경사항 저장"}
+              </Button>
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           {levels.length === 0 ? (
@@ -491,7 +555,7 @@ export default function AccessLevelPanel() {
                 <TableBody>
                   {MENU_KEYS.map((menu) => {
                     const forMenu = accessByMenu.get(menu.key)
-                    const isBusy = busy === menu.key
+                    const isBusy = busy !== null
 
                     return (
                       <TableRow key={menu.key}>
