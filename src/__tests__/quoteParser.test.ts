@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { parseQuoteText } from "@/lib/quoteParser";
+import * as XLSX from "xlsx";
+import { analyzeQuoteFile, parseQuoteText } from "@/lib/quoteParser";
 
 describe("견적서 금액 추출", () => {
   it("매출·매입 라벨과 원 단위 금액을 읽는다", () => {
@@ -39,5 +40,22 @@ describe("견적서 금액 추출", () => {
     expect(result.revenue).toBeNull();
     expect(result.cost).toBeNull();
     expect(result.confidence).toBe("none");
+  });
+
+  it("엑셀 견적서에서도 매출·매입 금액을 읽는다", async () => {
+    const workbook = XLSX.utils.book_new();
+    const sheet = XLSX.utils.aoa_to_sheet([
+      ["매출 금액", "매입 금액"],
+      ["1,200,000원", "700,000원"],
+    ]);
+    XLSX.utils.book_append_sheet(workbook, sheet, "견적서");
+    const bytes = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
+    const result = await analyzeQuoteFile(new File([bytes], "견적서.xlsx", {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    }));
+
+    expect(result.source).toBe("spreadsheet");
+    expect(result.revenue).toBe(1_200_000);
+    expect(result.cost).toBe(700_000);
   });
 });

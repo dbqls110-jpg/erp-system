@@ -142,7 +142,7 @@ export function ProjectCreateButton() {
                 disabled={loading || analyzing}
                 className="cursor-pointer"
               />
-              <p className="text-xs text-muted-foreground">PDF(텍스트형), CSV, TXT는 금액을 자동 추출합니다. Excel·스캔 이미지·워드 파일은 원본을 보관하고 금액은 직접 입력해 주세요.</p>
+              <p className="text-xs text-muted-foreground">PDF(텍스트형), CSV, TXT, Excel은 금액을 자동 추출합니다. 스캔 이미지·워드 파일은 원본을 보관하고 금액은 직접 입력해 주세요.</p>
               {analyzing && (
                 <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                   <Loader2 size={13} className="animate-spin" /> {quoteFileName || "견적서"} 분석 중...

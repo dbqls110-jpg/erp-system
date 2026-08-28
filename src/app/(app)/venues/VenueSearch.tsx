@@ -352,6 +352,7 @@ export function VenueSearch({ districts, venueTypes }: VenueSearchProps) {
       <Card ref={tableRef} className="py-0 shadow-xs">
         <CardContent className="p-0">
           <div className="overflow-x-auto">
+            <p className="mb-2 text-xs text-muted-foreground md:hidden">표를 좌우로 밀어 더 많은 열을 볼 수 있습니다.</p>
             <Table className="mx-auto w-auto table-auto [&_:is(th,td)]:px-4 [&_:is(th,td)]:py-3">
               <TableHeader>
                 <TableRow>

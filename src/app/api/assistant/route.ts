@@ -19,6 +19,17 @@ import { buildAssistantPrompt } from "@/lib/assistantPrompt";
 const BRIDGE_STALE_MS = 3 * 60 * 1000;
 const AGENT_TYPE = "agent-1";
 const MAX_QUESTION_LEN = 2000;
+const INTERNAL_ASSISTANT_MARKERS = [
+  "[ERP AI 평가",
+  "[배포 검증]",
+  "연결 시험이다.",
+  "연결 확인 테스트입니다.",
+];
+
+function isInternalAssistantQuestion(question: string) {
+  const normalized = question.trim();
+  return INTERNAL_ASSISTANT_MARKERS.some((marker) => normalized.startsWith(marker));
+}
 
 interface Turn {
   id: string;
@@ -80,12 +91,17 @@ export async function GET(req: NextRequest) {
 
     if (!job) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
+    const turn = toTurn(job);
+    if (isInternalAssistantQuestion(turn.question)) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+
     const online = heartbeat
       ? Date.now() - heartbeat.lastSeenAt.getTime() < BRIDGE_STALE_MS
       : false;
 
     return NextResponse.json({
-      turn: toTurn(job),
+      turn,
       bridge: {
         online,
         lastSeenAt: heartbeat?.lastSeenAt.toISOString() ?? null,
@@ -127,10 +143,13 @@ export async function GET(req: NextRequest) {
     ? Date.now() - heartbeat.lastSeenAt.getTime() < BRIDGE_STALE_MS
     : false;
 
+  const turns = jobs
+    .reverse()
+    .map((job) => toTurn({ ...job, input: legacyInputById.get(job.id) }))
+    .filter((turn) => !isInternalAssistantQuestion(turn.question));
+
   return NextResponse.json({
-    turns: jobs.reverse().map((job) =>
-      toTurn({ ...job, input: legacyInputById.get(job.id) }),
-    ),
+    turns,
     bridge: {
       online,
       // 꺼져 있으면 화면에서 미리 알려 준다. 물어보고 한참 기다리다 실패하는 것보다 낫다.
@@ -165,7 +184,7 @@ export async function POST(req: NextRequest) {
   const pending = await prisma.agentJob.findFirst({
     where: {
       userId: session.user.id,
-      visibility: "user",
+      visibility: isInternalAssistantQuestion(question) ? "internal" : "user",
       status: { in: ["pending", "accepted", "processing"] },
     },
     select: { id: true },

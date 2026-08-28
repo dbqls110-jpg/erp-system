@@ -247,6 +247,7 @@ export function CredentialTable({
             </div>
           ) : (
             <div className="overflow-x-auto">
+              <p className="mb-2 text-xs text-muted-foreground md:hidden">표를 좌우로 밀어 더 많은 열을 볼 수 있습니다.</p>
               <Table className="[&_:is(th,td)]:px-4">
                 <TableHeader className="bg-muted border-b border-border">
                   <TableRow>

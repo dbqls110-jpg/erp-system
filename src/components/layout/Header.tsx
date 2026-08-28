@@ -82,7 +82,19 @@ export function Header({ user, onMobileMenuOpen }: HeaderProps) {
     .sort(([left], [right]) => right.length - left.length)
     .find(([key]) => pathname === key || pathname.startsWith(key + "/"))?.[1] ?? "";
   useEffect(() => {
-    document.title = title ? `${title} | 사내 ERP 시스템` : "사내 ERP 시스템";
+    const nextTitle = title ? `${title} | 사내 ERP 시스템` : "사내 ERP 시스템";
+    const applyTitle = () => {
+      if (document.title !== nextTitle) document.title = nextTitle;
+    };
+
+    // Next's metadata manager can restore the root title after hydration. Keep
+    // the visible browser title aligned with the route without changing the DOM
+    // markup used for the server render.
+    applyTitle();
+    const titleElement = document.querySelector("title");
+    const observer = titleElement ? new MutationObserver(applyTitle) : null;
+    observer?.observe(titleElement!, { childList: true, characterData: true, subtree: true });
+    return () => observer?.disconnect();
   }, [title]);
   const initials = user.name
     ? user.name.slice(0, 2).toUpperCase()

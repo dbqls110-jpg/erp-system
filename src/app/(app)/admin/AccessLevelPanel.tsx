@@ -327,6 +327,7 @@ export default function AccessLevelPanel() {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="overflow-x-auto rounded-lg border">
+            <p className="px-3 pt-2 text-xs text-muted-foreground md:hidden">표를 좌우로 밀어 더 많은 열을 볼 수 있습니다.</p>
             <Table className="[&_:is(th,td)]:px-4">
               <TableHeader>
                 <TableRow>
@@ -529,6 +530,7 @@ export default function AccessLevelPanel() {
             <p className="py-6 text-sm text-muted-foreground">접근 레벨을 먼저 추가해 주세요.</p>
           ) : (
             <div className="overflow-x-auto rounded-lg border">
+              <p className="px-3 pt-2 text-xs text-muted-foreground md:hidden">권한표를 좌우로 밀어 더 많은 열을 볼 수 있습니다.</p>
               <Table className="[&_:is(th,td)]:px-4">
                 <TableHeader>
                   <TableRow>

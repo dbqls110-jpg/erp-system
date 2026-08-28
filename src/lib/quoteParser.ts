@@ -1,4 +1,5 @@
 import { PDFParse } from "pdf-parse";
+import * as XLSX from "xlsx";
 
 /** 금액 추출 결과의 신뢰도. 자동 입력 후에도 사용자가 확인할 수 있게 화면에 표시한다. */
 export type QuoteConfidence = "high" | "medium" | "low" | "none";
@@ -7,7 +8,7 @@ export interface QuoteAnalysis {
   revenue: number | null;
   cost: number | null;
   confidence: QuoteConfidence;
-  source: "pdf-text" | "text" | "unsupported" | "empty";
+  source: "pdf-text" | "text" | "spreadsheet" | "unsupported" | "empty";
   note: string;
   matchedLabels: string[];
 }
@@ -105,7 +106,7 @@ function formatMoney(value: number | null): string {
 }
 
 /** 텍스트가 이미 추출된 견적서에서 매출·매입 금액을 찾는다. */
-export function parseQuoteText(text: string, source: "pdf-text" | "text" = "text"): QuoteAnalysis {
+export function parseQuoteText(text: string, source: "pdf-text" | "text" | "spreadsheet" = "text"): QuoteAnalysis {
   const normalized = text.normalize("NFKC").replace(/\u00a0/g, " ").trim();
   if (!normalized) {
     return {
@@ -167,13 +168,38 @@ function isPdfFile(file: File): boolean {
   return file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
 }
 
+function isSpreadsheetFile(file: File): boolean {
+  const name = file.name.toLowerCase();
+  return [".xls", ".xlsx"].some((extension) => name.endsWith(extension))
+    || file.type === "application/vnd.ms-excel"
+    || file.type === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+}
+
+async function spreadsheetText(file: File): Promise<string> {
+  const workbook = XLSX.read(new Uint8Array(await file.arrayBuffer()), { type: "array" });
+  return workbook.SheetNames
+    .map((sheetName) => {
+      const sheet = workbook.Sheets[sheetName];
+      const rows = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, raw: false });
+      const columnCount = rows.reduce((max, row) => Math.max(max, row.length), 0);
+      const columns = Array.from({ length: columnCount }, (_, columnIndex) =>
+        rows
+          .map((row) => String(row[columnIndex] ?? "").trim())
+          .filter(Boolean)
+          .join("\n"),
+      );
+      return `${sheetName}\n${columns.filter(Boolean).join("\n")}`;
+    })
+    .join("\n");
+}
+
 /** 업로드된 견적서에서 텍스트를 읽어 금액을 분석한다. 원본 파일은 이 함수에서 저장하지 않는다. */
 export async function analyzeQuoteFile(file: File): Promise<QuoteAnalysis> {
   if (!file || file.size === 0) {
     throw new Error("견적서 파일을 선택해 주세요.");
   }
 
-  if (!isPdfFile(file) && !isTextFile(file)) {
+  if (!isPdfFile(file) && !isTextFile(file) && !isSpreadsheetFile(file)) {
     return {
       revenue: null,
       cost: null,
@@ -197,6 +223,21 @@ export async function analyzeQuoteFile(file: File): Promise<QuoteAnalysis> {
 
   if (isTextFile(file)) {
     return parseQuoteText(await file.text(), "text");
+  }
+
+  if (isSpreadsheetFile(file)) {
+    try {
+      return parseQuoteText(await spreadsheetText(file), "spreadsheet");
+    } catch {
+      return {
+        revenue: null,
+        cost: null,
+        confidence: "none",
+        source: "empty",
+        note: "엑셀 견적서 내용을 읽지 못했습니다. 원본은 첨부되지만 금액은 직접 입력해 주세요.",
+        matchedLabels: [],
+      };
+    }
   }
 
   const parser = new PDFParse({ data: new Uint8Array(await file.arrayBuffer()) });
