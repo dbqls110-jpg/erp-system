@@ -138,10 +138,12 @@ $status | ForEach-Object { Write-Host $_ }
 
 $trackedChanges = @(Invoke-Git @("diff", "--name-only", "HEAD", "--"))
 $untrackedChanges = @(Invoke-Git @("ls-files", "--others", "--exclude-standard"))
-$candidatePaths = @($trackedChanges + $untrackedChanges) |
-    Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
-    ForEach-Object { Normalize-GitPath $_ } |
-    Sort-Object -Unique
+$candidatePaths = @(
+    @($trackedChanges + $untrackedChanges) |
+        Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
+        ForEach-Object { Normalize-GitPath $_ } |
+        Sort-Object -Unique
+)
 
 if ($candidatePaths.Count -eq 0) {
     Write-Host "There are no changes to synchronize."
