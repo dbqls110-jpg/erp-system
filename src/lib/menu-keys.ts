@@ -88,7 +88,7 @@ export const DEFAULT_MENU_RULES: Record<string, { view: string[]; edit: string[]
   venues: { view: MEMBER_UP, edit: MANAGER_UP },
 
   finance: { view: MANAGER_UP, edit: ADMIN_ONLY },
-  companyFinance: { view: MANAGER_UP, edit: [] },
+  companyFinance: { view: MANAGER_UP, edit: MANAGER_UP },
   sheets: { view: MANAGER_UP, edit: MANAGER_UP },
   credentials: { view: MANAGER_UP, edit: MANAGER_UP },
 

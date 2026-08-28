@@ -37,6 +37,7 @@ model User {
   leaveRequests    LeaveRequest[]
   expenses         Expense[]
   businessCards    BusinessCard[]
+  companyFinanceEntries CompanyFinanceEntry[]
   calendarEvents   CalendarEvent[]
   conversationsAsA Conversation[]  @relation("ConvA")
   conversationsAsB Conversation[]  @relation("ConvB")
@@ -259,6 +260,27 @@ model Expense {
   @@index([userId, date])
   @@index([date])
   @@map("expenses")
+}
+
+// ─── 회사 매출·매입 ───────────────────────────────────────
+// 프로젝트 손익과 분리된 회사 장부. 회사별 분기 집계는 이 모델만 사용한다.
+model CompanyFinanceEntry {
+  id          String   @id @default(cuid())
+  company     String   // "인포피아" | "노바웨이" | "클로원"
+  type        String   // "revenue" | "cost"
+  date        String   // "YYYY-MM-DD"
+  title       String
+  amount      Float
+  memo        String?
+  createdById String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  createdBy User @relation(fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@index([company, date])
+  @@index([date])
+  @@map("company_finance_entries")
 }
 
 // ─── 메신저 ───────────────────────────────────────────────

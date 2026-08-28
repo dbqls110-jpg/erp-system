@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { normalizeCompany, summarizeCompanyFinance } from "@/lib/companyFinance";
+import { normalizeCompany, summarizeCompanyFinance, summarizeCompanyFinanceEntries } from "@/lib/companyFinance";
 
 describe("회사별 분기 매출·매입 집계", () => {
   it("회사와 생성일 기준으로 분기별 금액을 합산한다", () => {
@@ -39,5 +39,18 @@ describe("회사별 분기 매출·매입 집계", () => {
     expect(normalizeCompany(" 인포피아 ")).toBe("인포피아");
     expect(normalizeCompany("기타 회사")).toBeNull();
     expect(normalizeCompany(null)).toBeNull();
+  });
+
+  it("프로젝트와 분리된 직접 등록 장부만 매출·매입으로 집계한다", () => {
+    const result = summarizeCompanyFinanceEntries([
+      { company: "인포피아", type: "revenue", amount: 1_000_000, date: "2026-02-10" },
+      { company: "인포피아", type: "cost", amount: 250_000, date: "2026-05-10" },
+      { company: "노바웨이", type: "revenue", amount: 700_000, date: "2025-12-31" },
+    ], 2026);
+
+    expect(result.summaries[0].quarters[1]).toMatchObject({ revenue: 1_000_000, cost: 0, projectCount: 1 });
+    expect(result.summaries[0].quarters[2]).toMatchObject({ revenue: 0, cost: 250_000, profit: -250_000, projectCount: 1 });
+    expect(result.summaries[1].revenue).toBe(0);
+    expect(result.unassigned.projectCount).toBe(0);
   });
 });
