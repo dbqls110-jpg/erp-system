@@ -13,6 +13,7 @@ import { useMessenger, type ConvItem, type MessengerUser } from "@/lib/messenger
 import { useVisiblePolling } from "@/lib/useVisiblePolling";
 import { AssistantPanel } from "./AssistantPanel";
 import { MessageContent } from "./MessageContent";
+import { formatKoreanShortDate, formatKoreanTime, koreanDateKey } from "@/lib/dateFormat";
 
 interface Message {
   id: string;
@@ -27,11 +28,9 @@ function initials(name: string | null) {
 }
 
 function timeStr(iso: string) {
-  const d = new Date(iso);
-  const isToday = d.toDateString() === new Date().toDateString();
-  return isToday
-    ? d.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })
-    : d.toLocaleDateString("ko-KR", { month: "short", day: "numeric" });
+  return koreanDateKey(iso) === koreanDateKey(new Date())
+    ? formatKoreanTime(iso)
+    : formatKoreanShortDate(iso);
 }
 
 /**

@@ -529,7 +529,36 @@ export default function AccessLevelPanel() {
           {levels.length === 0 ? (
             <p className="py-6 text-sm text-muted-foreground">접근 레벨을 먼저 추가해 주세요.</p>
           ) : (
-            <div className="overflow-x-auto rounded-lg border">
+            <>
+            <div className="space-y-2 md:hidden">
+              {MENU_KEYS.map((menu) => {
+                const forMenu = accessByMenu.get(menu.key)
+                return (
+                  <section key={menu.key} className="rounded-xl border border-border p-3">
+                    <h3 className="text-sm font-medium">{menu.label}</h3>
+                    <div className="mt-2 space-y-2">
+                      {levels.map((level) => {
+                        const row = forMenu?.get(level.key)
+                        const isAdminLevel = level.key === "admin"
+                        const canView = isAdminLevel || (row?.canView ?? false)
+                        const canEdit = isAdminLevel || (row?.canEdit ?? false)
+                        const isBusy = busy !== null
+                        return (
+                          <div key={level.id} className="flex items-center justify-between rounded-lg bg-muted/40 px-2.5 py-2 text-xs">
+                            <span>{level.name}</span>
+                            <span className="flex items-center gap-3">
+                              <label className="flex items-center gap-1.5"><input type="checkbox" className="size-4 accent-primary disabled:opacity-40" checked={canView} disabled={isBusy || isAdminLevel} aria-label={`${menu.label} ${level.name} 접근`} onChange={(event) => void handleToggle(menu.key, level.key, "canView", event.target.checked)} />접근</label>
+                              <label className="flex items-center gap-1.5"><input type="checkbox" className="size-4 accent-primary disabled:opacity-40" checked={canEdit} disabled={isBusy || isAdminLevel} aria-label={`${menu.label} ${level.name} 수정`} onChange={(event) => void handleToggle(menu.key, level.key, "canEdit", event.target.checked)} />수정</label>
+                            </span>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </section>
+                )
+              })}
+            </div>
+            <div className="hidden overflow-x-auto rounded-lg border md:block">
               <p className="px-3 pt-2 text-xs text-muted-foreground md:hidden">권한표를 좌우로 밀어 더 많은 열을 볼 수 있습니다.</p>
               <Table className="[&_:is(th,td)]:px-4">
                 <TableHeader>
@@ -619,6 +648,7 @@ export default function AccessLevelPanel() {
                 </TableBody>
               </Table>
             </div>
+            </>
           )}
         </CardContent>
       </Card>

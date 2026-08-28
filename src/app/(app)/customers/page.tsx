@@ -2,7 +2,7 @@ import { getServerSession } from "next-auth";
 import type { Prisma } from "@prisma/client";
 import { authOptions } from "@/lib/auth";
 import { requireMenuAccess } from "@/lib/permissions";
-import { Building2, Download, Plus, RefreshCw } from "lucide-react";
+import { Building2, Download, RefreshCw } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toneBadgeClass } from "@/lib/badge-tone";
 import { prisma } from "@/lib/prisma";
+import { CustomerCreateButton } from "./CustomerCreateButton";
 
 type CustomerSearchParams = Promise<Record<string, string | string[] | undefined>>;
 
@@ -53,7 +54,7 @@ export default async function CustomersPage({ searchParams }: { searchParams?: C
           <a href="/customers" className="inline-flex h-9 items-center gap-2 rounded-md border border-input bg-background px-3 text-sm font-medium hover:bg-accent hover:text-accent-foreground">
             <RefreshCw className="size-3.5" /> 새로고침
           </a>
-          <Button className="h-9 py-2"><Plus className="size-3.5" /> 등록</Button>
+          <CustomerCreateButton />
         </div>
       </div>
 
@@ -95,7 +96,31 @@ export default async function CustomersPage({ searchParams }: { searchParams?: C
 
       <Card className="py-0 shadow-xs">
         <CardContent className="p-0">
-          <div className="overflow-x-auto">
+          <div className="space-y-2 p-3 md:hidden">
+            {rows.length === 0 ? (
+              <div className="flex flex-col items-center gap-3 py-10 text-center">
+                <Building2 className="size-6 text-muted-foreground" />
+                <p className="text-sm text-muted-foreground">{hasFilters ? "검색 결과가 없습니다." : "아직 등록된 거래처가 없습니다."}</p>
+                {hasFilters && <a href="/customers" className="text-xs text-primary underline underline-offset-2">검색 조건 초기화</a>}
+              </div>
+            ) : rows.map((customer) => (
+              <article key={customer.id} className="rounded-xl border border-border p-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <h3 className="truncate font-medium">{customer.name}</h3>
+                    <p className="mt-1 text-xs text-muted-foreground">담당자 {customer.manager ?? "-"} · {customer.phone ?? "-"}</p>
+                  </div>
+                  <Badge variant="outline" className="shrink-0" >{customer.status}</Badge>
+                </div>
+                <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                  <div><dt className="inline">분류 </dt><dd className="inline text-foreground">{customer.category ?? "-"}</dd></div>
+                  <div><dt className="inline">프로젝트 </dt><dd className="inline text-foreground">{customer.projects.length === 0 ? "-" : `${customer.projects.length}건`}</dd></div>
+                  <div className="col-span-2 truncate"><dt className="inline">이메일 </dt><dd className="inline text-foreground">{customer.email ?? "-"}</dd></div>
+                </dl>
+              </article>
+            ))}
+          </div>
+          <div className="hidden overflow-x-auto md:block">
             <p className="mb-2 text-xs text-muted-foreground md:hidden">표를 좌우로 밀어 더 많은 열을 볼 수 있습니다.</p>
             <Table className="mx-auto w-auto table-auto [&_:is(th,td)]:px-4 [&_:is(th,td)]:py-3">
               <TableHeader><TableRow><TableHead className="whitespace-nowrap">회사명</TableHead><TableHead className="whitespace-nowrap">담당자</TableHead><TableHead className="whitespace-nowrap">연락처</TableHead><TableHead className="whitespace-nowrap">이메일</TableHead><TableHead className="whitespace-nowrap">분류</TableHead><TableHead className="whitespace-nowrap">상태</TableHead><TableHead className="whitespace-nowrap text-right">프로젝트</TableHead></TableRow></TableHeader>

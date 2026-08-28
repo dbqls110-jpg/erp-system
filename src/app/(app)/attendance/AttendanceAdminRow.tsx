@@ -75,10 +75,10 @@ export function AttendanceAdminRow({ id, date, clockInIso, clockOutIso }: Props)
 
   return (
     <div className="flex items-center gap-2">
-      <button type="button" onClick={() => setEditing(true)} className="text-muted-foreground hover:text-primary transition-colors" title="수정" aria-label="근태 수정">
+      <button type="button" onClick={() => setEditing(true)} className="text-muted-foreground hover:text-primary transition-colors" title="수정" aria-label={`${date} 근태 수정`}>
         <Pencil size={13} />
       </button>
-      <button type="button" onClick={handleDelete} disabled={delPending} className="text-muted-foreground hover:text-destructive transition-colors" title="삭제" aria-label="근태 삭제">
+      <button type="button" onClick={handleDelete} disabled={delPending} className="text-muted-foreground hover:text-destructive transition-colors" title="삭제" aria-label={`${date} 근태 삭제`}>
         <Trash2 size={13} />
       </button>
     </div>

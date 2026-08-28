@@ -9,6 +9,7 @@ import { QUARTERS, summarizeCompanyFinanceEntries, type CompanyFinanceEntryRecor
 import { CompanyFinanceYearNav } from "./CompanyFinanceYearNav";
 import { CompanyFinanceEntryForm } from "./CompanyFinanceEntryForm";
 import { CompanyFinanceEntryDeleteButton } from "./CompanyFinanceEntryDeleteButton";
+import { currentKoreanDateKey } from "@/lib/dateFormat";
 
 function formatWon(value: number) {
   return `${value.toLocaleString()}원`;
@@ -45,7 +46,7 @@ export default async function CompanyFinancePage({
   const totalCost = summaries.reduce((sum, summary) => sum + summary.cost, 0);
   const totalProfit = totalRevenue - totalCost;
   const defaultDate = year === currentYear
-    ? new Date().toISOString().slice(0, 10)
+    ? currentKoreanDateKey()
     : `${year}-01-01`;
 
   return (

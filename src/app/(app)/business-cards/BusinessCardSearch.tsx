@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { CardDeleteButton } from "./CardDeleteButton";
+import { formatKoreanShortDate } from "@/lib/dateFormat";
 import { Phone, Mail, MapPin, Building, Briefcase, Search, CreditCard } from "lucide-react";
 
 interface BusinessCard {
@@ -100,7 +101,7 @@ export function BusinessCardSearch({ cards, isAdmin }: { cards: BusinessCard[]; 
                     {isAdmin && <CardDeleteButton id={c.id} name={c.name} />}
                   </div>
                   <p className="text-xs text-muted-foreground mt-2 border-t border-border pt-2">
-                    등록자: {c.user.name} · {new Date(c.createdAt).toLocaleDateString("ko-KR")}
+                    등록자: {c.user.name} · {formatKoreanShortDate(c.createdAt)}
                   </p>
                 </CardContent>
               </Card>

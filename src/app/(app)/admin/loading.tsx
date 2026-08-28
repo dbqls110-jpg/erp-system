@@ -7,7 +7,8 @@
  */
 export default function Loading() {
   return (
-    <div className="space-y-6 animate-pulse">
+    <div className="space-y-6 animate-pulse" role="status" aria-label="관리자 화면을 불러오는 중">
+      <p className="text-sm text-muted-foreground">관리자 화면을 불러오는 중…</p>
       <div className="h-8 w-24 bg-muted rounded-lg" />
       <div className="h-96 bg-muted rounded-xl" />
     </div>

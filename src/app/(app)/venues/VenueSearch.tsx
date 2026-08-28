@@ -351,7 +351,22 @@ export function VenueSearch({ districts, venueTypes }: VenueSearchProps) {
 
       <Card ref={tableRef} className="py-0 shadow-xs">
         <CardContent className="p-0">
-          <div className="overflow-x-auto">
+          <div className="space-y-2 p-3 md:hidden">
+            {!result ? (
+              <p className="py-10 text-center text-sm text-muted-foreground">검색 조건을 입력하고 검색하세요.</p>
+            ) : result.candidates.length === 0 ? (
+              <p className="py-10 text-center text-sm text-muted-foreground">조건에 맞는 후보가 없습니다.</p>
+            ) : result.candidates.map(({ venue, warnings, price }) => (
+              <article key={venue.id} className="rounded-xl border border-border p-3">
+                <button type="button" onClick={() => setOpenVenueId(venue.id)} className="font-medium text-left hover:text-primary hover:underline">{displayValue(venue.name)}</button>
+                <p className="mt-1 text-xs text-muted-foreground">{displayValue(venue.district)} · {displayValue(venue.type)} · {displayCapacity(venue.capacityMin, venue.capacityMax)}</p>
+                <p className="mt-2 text-sm"><span className={trustClass(price.trust)}>{price.label}</span>{!price.free && <span className="ml-1 text-xs text-muted-foreground">({TRUST_LABEL[price.trust]})</span>}</p>
+                <div className="mt-2 text-xs text-muted-foreground">{venue.phone ? <a href={`tel:${venue.phone.replace(/[^\d+]/g, "")}`} className="hover:text-primary">{venue.phone}</a> : "연락처 미상"} · <ReserveCell venue={venue} /></div>
+                {warnings.length > 0 && <p className="mt-2 text-xs text-muted-foreground">{warnings.join(" · ")}</p>}
+              </article>
+            ))}
+          </div>
+          <div className="hidden overflow-x-auto md:block">
             <p className="mb-2 text-xs text-muted-foreground md:hidden">표를 좌우로 밀어 더 많은 열을 볼 수 있습니다.</p>
             <Table className="mx-auto w-auto table-auto [&_:is(th,td)]:px-4 [&_:is(th,td)]:py-3">
               <TableHeader>

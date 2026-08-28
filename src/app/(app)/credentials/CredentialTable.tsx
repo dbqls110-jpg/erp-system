@@ -9,7 +9,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Plus, Pencil, Trash2, Eye, EyeOff, ExternalLink, Search, Copy } from "lucide-react";
-import { createCredential, updateCredential, deleteCredential } from "@/app/actions/credential";
+import { createCredential, updateCredential, deleteCredential, auditCredentialAccess } from "@/app/actions/credential";
 import { toneBadgeClass } from "@/lib/badge-tone";
 import { toast } from "sonner";
 
@@ -146,20 +146,36 @@ export function CredentialTable({
     );
   });
 
-  function togglePw(id: string) {
+  async function togglePw(id: string) {
+    if (visiblePw.has(id)) {
+      setVisiblePw((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+      return;
+    }
+    if (!(await confirmSensitiveAccess(id, "reveal_password", "비밀번호를 표시"))) return;
     setVisiblePw((prev) => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+      next.add(id);
       return next;
     });
   }
 
-  function toggleUsername(id: string) {
+  async function toggleUsername(id: string) {
+    if (visibleUsername.has(id)) {
+      setVisibleUsername((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+      return;
+    }
+    if (!(await confirmSensitiveAccess(id, "reveal_username", "아이디를 표시"))) return;
     setVisibleUsername((prev) => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+      next.add(id);
       return next;
     });
   }
@@ -202,8 +218,25 @@ export function CredentialTable({
     }
   }
 
-  function copyToClipboard(text: string, label: string) {
-    navigator.clipboard.writeText(text).then(() => toast.success(`${label} 복사됨`));
+  async function confirmSensitiveAccess(id: string, action: "reveal_username" | "copy_username" | "reveal_password" | "copy_password", label: string) {
+    if (!window.confirm(`${label} 처리 시 접근 기록이 남습니다. 계속하시겠습니까?`)) return false;
+    try {
+      await auditCredentialAccess(id, action);
+      return true;
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "접근 권한을 확인할 수 없습니다.");
+      return false;
+    }
+  }
+
+  async function copyToClipboard(id: string, text: string, label: string, action: "copy_username" | "copy_password") {
+    if (!(await confirmSensitiveAccess(id, action, `${label}를 복사`))) return;
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success(`${label}가 클립보드에 복사되었습니다.`);
+    } catch {
+      toast.error("클립보드 복사에 실패했습니다.");
+    }
   }
 
   const dialogInitial =
@@ -246,7 +279,29 @@ export function CredentialTable({
               <p className="text-sm text-muted-foreground">{search ? "검색 결과가 없습니다." : "등록된 계정이 없습니다."}</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <>
+            <div className="space-y-2 p-3 md:hidden">
+              {filtered.map((c) => {
+                const pwVisible = visiblePw.has(c.id);
+                const usernameVisible = visibleUsername.has(c.id);
+                return (
+                  <article key={c.id} className="rounded-xl border border-border p-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <h3 className="truncate font-medium">{c.name}</h3>
+                        <p className="mt-1 text-xs text-muted-foreground">{c.company ?? "회사 미상"} · {c.category ?? "구분 미상"}</p>
+                      </div>
+                      {canEdit && <div className="flex shrink-0 gap-1"><button type="button" onClick={() => setDialog({ mode: "edit", item: c })} className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-primary" aria-label={`${c.name} 수정`}><Pencil className="size-3.5" /></button><button type="button" onClick={() => handleDelete(c.id)} disabled={deletingId === c.id} className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-destructive" aria-label={`${c.name} 삭제`}><Trash2 className="size-3.5" /></button></div>}
+                    </div>
+                    <div className="mt-3 space-y-2 text-xs">
+                      {c.username && <div className="flex items-center justify-between gap-2"><span className="text-muted-foreground">아이디</span><span className="flex items-center gap-1 font-mono"><span>{usernameVisible ? c.username : maskUsername(c.username)}</span><button type="button" onClick={() => void toggleUsername(c.id)} aria-label={`${c.name} 아이디 ${usernameVisible ? "숨기기" : "표시"}`} className="p-1 text-muted-foreground hover:text-primary">{usernameVisible ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}</button><button type="button" onClick={() => void copyToClipboard(c.id, c.username!, "아이디", "copy_username")} aria-label={`${c.name} 아이디 복사`} className="p-1 text-muted-foreground hover:text-primary"><Copy className="size-3.5" /></button></span></div>}
+                      {c.password && <div className="flex items-center justify-between gap-2"><span className="text-muted-foreground">비밀번호</span><span className="flex items-center gap-1 font-mono"><span>{pwVisible ? c.password : "••••••••"}</span><button type="button" onClick={() => void togglePw(c.id)} aria-label={`${c.name} 비밀번호 ${pwVisible ? "숨기기" : "표시"}`} className="p-1 text-muted-foreground hover:text-primary">{pwVisible ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}</button><button type="button" onClick={() => void copyToClipboard(c.id, c.password!, "비밀번호", "copy_password")} aria-label={`${c.name} 비밀번호 복사`} className="p-1 text-muted-foreground hover:text-primary"><Copy className="size-3.5" /></button></span></div>}
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+            <div className="hidden overflow-x-auto md:block">
               <p className="mb-2 text-xs text-muted-foreground md:hidden">표를 좌우로 밀어 더 많은 열을 볼 수 있습니다.</p>
               <Table className="[&_:is(th,td)]:px-4">
                 <TableHeader className="bg-muted border-b border-border">
@@ -278,7 +333,7 @@ export function CredentialTable({
                               <span className="font-mono text-xs">{usernameVisible ? c.username : maskUsername(c.username)}</span>
                               <button
                                 type="button"
-                                onClick={() => toggleUsername(c.id)}
+                                onClick={() => void toggleUsername(c.id)}
                                 aria-label={`${c.name} 아이디 ${usernameVisible ? "숨기기" : "표시"}`}
                                 className="text-muted-foreground hover:text-primary transition-colors"
                               >
@@ -286,7 +341,7 @@ export function CredentialTable({
                               </button>
                               <button
                                 type="button"
-                                onClick={() => copyToClipboard(c.username!, "아이디")}
+                                onClick={() => void copyToClipboard(c.id, c.username!, "아이디", "copy_username")}
                                 aria-label={`${c.name} 아이디 복사`}
                                 className="text-muted-foreground hover:text-primary transition-colors"
                               >
@@ -303,13 +358,13 @@ export function CredentialTable({
                               </span>
                               <button
                                 type="button"
-                                onClick={() => togglePw(c.id)}
+                                onClick={() => void togglePw(c.id)}
                                 aria-label={`${c.name} 비밀번호 ${pwVisible ? "숨기기" : "표시"}`}
                                 className="text-muted-foreground hover:text-primary transition-colors"
                               >
                                 {pwVisible ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
                               </button>
-                              <button onClick={() => copyToClipboard(c.password!, "비밀번호")} className="text-muted-foreground hover:text-primary transition-colors">
+                              <button type="button" onClick={() => void copyToClipboard(c.id, c.password!, "비밀번호", "copy_password")} aria-label={`${c.name} 비밀번호 복사`} className="text-muted-foreground hover:text-primary transition-colors">
                                 <Copy className="size-3.5" />
                               </button>
                             </div>
@@ -351,6 +406,7 @@ export function CredentialTable({
                 </TableBody>
               </Table>
             </div>
+            </>
           )}
         </CardContent>
       </Card>

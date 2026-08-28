@@ -660,7 +660,35 @@ export function PartnerTable({
 
       <Card className="shadow-xs py-0">
         <CardContent className="p-0">
-          <div className="overflow-x-auto">
+          <div className="space-y-2 p-3 md:hidden">
+            {shown.length === 0 ? (
+              <div className="flex flex-col items-center gap-3 py-10 text-center">
+                <Handshake className="size-6 text-muted-foreground" />
+                <p className="text-sm text-muted-foreground">{initialData.length === 0 ? "아직 등록된 항목이 없습니다" : "조건에 맞는 파트너가 없습니다"}</p>
+              </div>
+            ) : shown.map((p) => (
+              <article key={p.id} className="rounded-xl border border-border p-3">
+                <div className="flex items-start justify-between gap-3">
+                  <button type="button" onClick={() => canEdit && setRateDialog({ partner: p, key: Date.now() })} className="truncate text-left font-medium hover:text-primary hover:underline" aria-label={`${p.name} 단가 관리`}>{p.name}</button>
+                  <Badge variant="outline" className="shrink-0">{p.contractStatus}</Badge>
+                </div>
+                <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                  <div><dt className="inline">직업 </dt><dd className="inline text-foreground">{p.job ?? "-"}</dd></div>
+                  <div><dt className="inline">연락처 </dt><dd className="inline text-foreground">{p.phone ?? "-"}</dd></div>
+                  <div><dt className="inline">단가 </dt><dd className="inline text-foreground">{p.rates.length === 0 ? formatRate(p.rate, p.rateUnit) : `${p.rates.length}개 항목`}</dd></div>
+                  <div><dt className="inline">정산 </dt><dd className="inline text-foreground">{p.settlementType ?? "-"}</dd></div>
+                  <div className="col-span-2 truncate"><dt className="inline">프로젝트 </dt><dd className="inline text-foreground">{p.projectNames.length === 0 ? "-" : p.projectNames.join(", ")}</dd></div>
+                </dl>
+                {canEdit && (
+                  <div className="mt-3 flex justify-end gap-2 border-t border-border pt-2">
+                    <button type="button" onClick={() => setDialog({ id: p.id, key: Date.now(), initial: { name: p.name, job: p.job ?? "", phone: p.phone ?? "", rate: p.rate === null ? "" : String(p.rate), rateUnit: p.rateUnit ?? "건당", contractStatus: p.contractStatus, settlementType: p.settlementType ?? "", memo: p.memo ?? "" } })} className="rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-muted hover:text-primary" aria-label={`${p.name} 수정`}><Pencil className="mr-1 inline size-3.5" />수정</button>
+                    <button type="button" onClick={() => handleDelete(p)} disabled={busyId === p.id} className="rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-muted hover:text-destructive" aria-label={`${p.name} 삭제`}><Trash2 className="mr-1 inline size-3.5" />삭제</button>
+                  </div>
+                )}
+              </article>
+            ))}
+          </div>
+          <div className="hidden overflow-x-auto md:block">
             <p className="mb-2 text-xs text-muted-foreground md:hidden">표를 좌우로 밀어 더 많은 열을 볼 수 있습니다.</p>
             <Table className="mx-auto w-auto table-auto [&_:is(th,td)]:px-4 [&_:is(th,td)]:py-3">
               <TableHeader>
@@ -761,6 +789,7 @@ export function PartnerTable({
                         <TableCell>
                           <div className="flex items-center gap-1.5">
                             <button
+                              type="button"
                               onClick={() =>
                                 setDialog({
                                   id: p.id,
@@ -779,14 +808,17 @@ export function PartnerTable({
                               }
                               className="text-muted-foreground transition-colors hover:text-primary"
                               title="수정"
+                              aria-label={`${p.name} 수정`}
                             >
                               <Pencil className="size-3.5" />
                             </button>
                             <button
+                              type="button"
                               onClick={() => handleDelete(p)}
                               disabled={busyId === p.id}
                               className="text-muted-foreground transition-colors hover:text-destructive"
                               title="삭제"
+                              aria-label={`${p.name} 삭제`}
                             >
                               <Trash2 className="size-3.5" />
                             </button>

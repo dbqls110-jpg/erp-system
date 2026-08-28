@@ -17,6 +17,7 @@ import { MessageContent } from "@/components/messenger/MessageContent";
 import { AssistantPanel } from "@/components/messenger/AssistantPanel";
 import { useMessenger } from "@/lib/messenger-store";
 import { useVisiblePolling } from "@/lib/useVisiblePolling";
+import { formatKoreanShortDate, formatKoreanTime, koreanDateKey } from "@/lib/dateFormat";
 
 interface User {
   id: string;
@@ -59,11 +60,8 @@ function initials(name: string | null) {
 }
 
 function timeStr(iso: string) {
-  const d = new Date(iso);
-  const now = new Date();
-  const isToday = d.toDateString() === now.toDateString();
-  if (isToday) return d.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" });
-  return d.toLocaleDateString("ko-KR", { month: "short", day: "numeric" });
+  if (koreanDateKey(iso) === koreanDateKey(new Date())) return formatKoreanTime(iso);
+  return formatKoreanShortDate(iso);
 }
 
 export function MessengerView({ myId, users, todayDate }: { myId: string; users: User[]; todayDate: string }) {

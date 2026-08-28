@@ -264,6 +264,8 @@ export function AssistantPanel() {
             onClick={() => void handleSend()}
             disabled={!input.trim() || !bridge?.online || sending}
             className="size-8 shrink-0"
+            aria-label="질문 전송"
+            title="질문 전송"
           >
             <Send className="size-3.5" />
           </Button>

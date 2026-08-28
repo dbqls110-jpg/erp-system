@@ -11,6 +11,7 @@ import { adminUpdateAttendance } from "@/app/actions/attendance";
 import { toneBadgeClass } from "@/lib/badge-tone";
 import { summarizeAttendance } from "@/lib/attendanceSummary";
 import { toast } from "sonner";
+import { formatKoreanTime } from "@/lib/dateFormat";
 
 interface AttendanceRecord {
   id: string;
@@ -32,7 +33,7 @@ interface UserSummary {
 
 function fmt(isoStr: string | null) {
   if (!isoStr) return "—";
-  return new Date(isoStr).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit", hour12: false });
+  return formatKoreanTime(isoStr);
 }
 function toTime(isoStr: string | null) {
   if (!isoStr) return "";
@@ -94,7 +95,7 @@ function AttendanceRow({ r, onSaved }: { r: AttendanceRecord; onSaved: () => voi
               {r.clockOut ? "시간 계산 불가" : "퇴근 미기록 · 시간 미계산"}
             </Badge>
           )}
-          <button type="button" onClick={() => setEditing(true)} className="text-muted-foreground hover:text-primary transition-colors" title="수정" aria-label="근태 수정">
+          <button type="button" onClick={() => setEditing(true)} className="text-muted-foreground hover:text-primary transition-colors" title="수정" aria-label={`${r.user.name ?? r.user.email} ${r.date} 근태 수정`}>
             <Pencil className="size-3.5" />
           </button>
         </div>
