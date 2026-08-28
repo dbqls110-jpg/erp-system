@@ -15,10 +15,12 @@ export interface QuoteAnalysis {
 const MAX_PARSE_BYTES = 10 * 1024 * 1024;
 
 const REVENUE_LABELS = [
-  String.raw`총\s*견적(?:금액|가)?`,
+  String.raw`총\s*견적\s*(?:금액|가)?`,
   "계약금액",
   "견적(?:금액|가)?",
   "청구(?:금액|액)?",
+  String.raw`총\s*합계(?:금액|액)`,
+  "합계금액",
   "공급가액",
   "판매(?:금액|가)?",
   "매출(?:금액|액)?",

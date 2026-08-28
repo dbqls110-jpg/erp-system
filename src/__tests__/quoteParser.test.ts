@@ -18,6 +18,12 @@ describe("견적서 금액 추출", () => {
     expect(result.cost).toBe(300_000);
   });
 
+  it("총 견적 금액처럼 라벨 중간에 공백이 있어도 읽는다", () => {
+    const result = parseQuoteText("총 견적 금액: 2,500,000원");
+
+    expect(result.revenue).toBe(2_500_000);
+  });
+
   it("합계만 있으면 매출로 임시 입력하고 매입을 추측하지 않는다", () => {
     const result = parseQuoteText("총 합계: 3,000,000원");
 
