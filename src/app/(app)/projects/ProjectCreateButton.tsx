@@ -11,6 +11,7 @@ import { analyzeQuote } from "@/app/actions/quote";
 import type { QuoteAnalysis } from "@/lib/quoteParser";
 import { toast } from "sonner";
 import { AlertCircle, CheckCircle2, Loader2, Plus } from "lucide-react";
+import { COMPANY_NAMES } from "@/lib/companyFinance";
 
 export function ProjectCreateButton() {
   const [open, setOpen] = useState(false);
@@ -94,6 +95,18 @@ export function ProjectCreateButton() {
             <div className="space-y-1">
               <Label>클라이언트</Label>
               <Input name="client" placeholder="클라이언트명" />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="project-company">회사</Label>
+              <select
+                id="project-company"
+                name="company"
+                defaultValue=""
+                className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+              >
+                <option value="">회사 미지정</option>
+                {COMPANY_NAMES.map((company) => <option key={company} value={company}>{company}</option>)}
+              </select>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">

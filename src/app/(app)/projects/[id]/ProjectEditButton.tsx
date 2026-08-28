@@ -10,11 +10,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { updateProject } from "@/app/actions/project";
 import { toast } from "sonner";
 import { Pencil } from "lucide-react";
+import { COMPANY_NAMES } from "@/lib/companyFinance";
 
 interface Project {
   id: string;
   name: string;
   client: string | null;
+  company: string | null;
   announceDate: string | null;
   deadline: string | null;
   assignee: string | null;
@@ -61,6 +63,18 @@ export function ProjectEditButton({ project }: { project: Project }) {
             <div className="space-y-1">
               <Label>클라이언트</Label>
               <Input name="client" defaultValue={project.client ?? ""} />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="edit-project-company">회사</Label>
+              <select
+                id="edit-project-company"
+                name="company"
+                defaultValue={project.company ?? ""}
+                className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+              >
+                <option value="">회사 미지정</option>
+                {COMPANY_NAMES.map((company) => <option key={company} value={company}>{company}</option>)}
+              </select>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">

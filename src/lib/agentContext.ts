@@ -64,7 +64,7 @@ export async function buildAgentContext(question: string): Promise<AgentContext>
           const rows = await prisma.project.findMany({
             where: { status: "active" },
             select: {
-              id: true, name: true, client: true, deadline: true,
+              id: true, name: true, client: true, company: true, deadline: true,
               progress: true, assignee: true, revenue: true, cost: true,
             },
             orderBy: { updatedAt: "desc" },

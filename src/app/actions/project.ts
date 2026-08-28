@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { uploadProjectFile } from "@/app/actions/projectFile";
 import { analyzeQuoteFile, type QuoteAnalysis } from "@/lib/quoteParser";
+import { normalizeCompany } from "@/lib/companyFinance";
 
 export interface CreateProjectResult {
   projectId: string;
@@ -21,6 +22,12 @@ function parseOptionalAmount(rawValue: FormDataEntryValue | null, fieldName: str
     throw new Error(`${fieldName}은(는) 0 이상의 숫자로 입력해 주세요.`);
   }
   return value;
+}
+
+function parseOptionalCompany(rawValue: FormDataEntryValue | null): string | null {
+  if (typeof rawValue !== "string" || !rawValue.trim()) return null;
+  if (!normalizeCompany(rawValue)) throw new Error("회사를 목록에서 선택해 주세요.");
+  return normalizeCompany(rawValue);
 }
 
 export async function createProject(formData: FormData): Promise<CreateProjectResult> {
@@ -49,11 +56,13 @@ export async function createProject(formData: FormData): Promise<CreateProjectRe
 
   const revenue = parseOptionalAmount(formData.get("revenue"), "매출") ?? quoteAnalysis?.revenue ?? null;
   const cost = parseOptionalAmount(formData.get("cost"), "매입") ?? quoteAnalysis?.cost ?? null;
+  const company = parseOptionalCompany(formData.get("company"));
 
   const project = await prisma.project.create({
     data: {
       name: formData.get("name") as string,
       client: (formData.get("client") as string) || null,
+      company,
       announceDate: (formData.get("announceDate") as string) || null,
       deadline: (formData.get("deadline") as string) || null,
       assignee: (formData.get("assignee") as string) || null,
@@ -93,12 +102,14 @@ export async function updateProject(id: string, formData: FormData) {
 
   const revenue = parseOptionalAmount(formData.get("revenue"), "매출");
   const cost = parseOptionalAmount(formData.get("cost"), "매입");
+  const company = parseOptionalCompany(formData.get("company"));
 
   await prisma.project.update({
     where: { id },
     data: {
       name: formData.get("name") as string,
       client: (formData.get("client") as string) || null,
+      company,
       announceDate: (formData.get("announceDate") as string) || null,
       deadline: (formData.get("deadline") as string) || null,
       assignee: (formData.get("assignee") as string) || null,

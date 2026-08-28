@@ -24,6 +24,7 @@ const pageTitle: Record<string, string> = {
   "/calendar": "캘린더",
   "/business-cards": "명함 관리",
   "/finance": "재무 관리",
+  "/company-finance": "회사 매출·매입",
   "/customers": "거래처 관리",
   "/partners": "파트너 관리",
   "/venues": "공간 DB",

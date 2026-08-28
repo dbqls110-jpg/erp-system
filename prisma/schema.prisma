@@ -155,6 +155,7 @@ model Project {
   id           String   @id @default(cuid())
   name         String
   client       String?
+  company      String? // 인포피아 | 노바웨이 | 클로원
   announceDate String?
   deadline     String?
   status       String   @default("active") // "active" | "completed" | "on_hold"
