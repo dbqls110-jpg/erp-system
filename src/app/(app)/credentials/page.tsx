@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { canEditMenu } from "@/lib/permissions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CredentialTable } from "./CredentialTable";
+import { ShieldCheck } from "lucide-react";
 
 // 인증/권한은 (app)/layout.tsx 가 담당한다(세션 없으면 /login, pending 이면 /pending).
 export default async function CredentialsPage() {
@@ -41,6 +42,10 @@ export default async function CredentialsPage() {
           </CardTitle>
         </CardHeader>
         <CardContent>
+          <div className="mb-4 flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-700 dark:text-amber-400" role="note">
+            <ShieldCheck className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+            <p>아이디·비밀번호를 표시하거나 복사하면 서버에서 권한을 다시 확인하고 접근 기록을 남깁니다.</p>
+          </div>
           <CredentialTable initialData={credentials} canEdit={canEdit} />
         </CardContent>
       </Card>

@@ -153,6 +153,7 @@ export function CredentialTable({
     try {
       const value = await readCredentialSecret(id, "reveal_password");
       setRevealedPw((prev) => ({ ...prev, [id]: value }));
+      toast.success("비밀번호가 표시되었습니다. 접근 기록이 저장되었습니다.");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "접근 권한을 확인할 수 없습니다.");
     }
@@ -171,6 +172,7 @@ export function CredentialTable({
     try {
       const value = await readCredentialSecret(id, "reveal_username");
       setRevealedUsername((prev) => ({ ...prev, [id]: value }));
+      toast.success("아이디가 표시되었습니다. 접근 기록이 저장되었습니다.");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "접근 권한을 확인할 수 없습니다.");
     }
@@ -234,7 +236,7 @@ export function CredentialTable({
     try {
       const text = await readCredentialSecret(id, action);
       await navigator.clipboard.writeText(text);
-      toast.success(`${label}가 클립보드에 복사되었습니다.`);
+      toast.success(`${label}가 클립보드에 복사되었습니다. 접근 기록이 저장되었습니다.`);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "클립보드 복사에 실패했습니다.");
     }

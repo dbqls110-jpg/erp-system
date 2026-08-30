@@ -128,7 +128,12 @@ export default async function LeavePage() {
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                       <span className="text-muted-foreground">{Math.round(r.days * 100) / 100}일</span>
-                      {isAdmin && <LeaveDeleteButton id={r.id} />}
+                      {isAdmin && (
+                        <LeaveDeleteButton
+                          id={r.id}
+                          label={`${r.startDate} ${typeLabel[r.type] ?? "휴가"}`}
+                        />
+                      )}
                     </div>
                   </div>
                 );
@@ -171,7 +176,12 @@ export default async function LeavePage() {
                       <span className="text-muted-foreground">{Math.round(r.days * 100) / 100}일</span>
                       <Badge variant="outline" className={toneBadgeClass(s.tone)}>{s.label}</Badge>
                       {r.status === "pending" && <LeaveCancelButton id={r.id} />}
-                      {isAdmin && <LeaveDeleteButton id={r.id} />}
+                      {isAdmin && (
+                        <LeaveDeleteButton
+                          id={r.id}
+                          label={`${r.startDate} ${typeLabel[r.type] ?? "휴가"}`}
+                        />
+                      )}
                     </div>
                   </div>
                 );
