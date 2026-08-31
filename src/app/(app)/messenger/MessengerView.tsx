@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Send, MessageCircle, ArrowLeft, CalendarPlus, Sparkles, Paperclip, FileText, X, Bot } from "lucide-react";
+import { Send, MessageCircle, ArrowLeft, CalendarPlus, Sparkles, Paperclip, FileText, X, Bot, Bookmark } from "lucide-react";
 import { sendMessage, sendMessageWithAttachment } from "@/app/actions/message";
 import { createCalendarEvent } from "@/app/actions/calendar";
 import { toast } from "sonner";
@@ -18,6 +18,7 @@ import { AssistantPanel } from "@/components/messenger/AssistantPanel";
 import { useMessenger } from "@/lib/messenger-store";
 import { useVisiblePolling } from "@/lib/useVisiblePolling";
 import { formatKoreanShortDate, formatKoreanTime, koreanDateKey } from "@/lib/dateFormat";
+import { getSelfConversationUser } from "@/lib/messenger-conversation";
 
 interface User {
   id: string;
@@ -77,7 +78,7 @@ function formatFileSize(size: number | null) {
   return `${(size / (1024 * 1024)).toFixed(size >= 10 * 1024 * 1024 ? 0 : 1)}MB`;
 }
 
-export function MessengerView({ myId, users, todayDate }: { myId: string; users: User[]; todayDate: string }) {
+export function MessengerView({ myId, myUser, users, todayDate }: { myId: string; myUser: User; users: User[]; todayDate: string }) {
   // 대화 목록은 AppShell 의 MessengerProvider 가 한 번만 폴링해 나눠준다.
   // 여기서 또 폴링하면 플로팅 위젯 · 헤더와 합쳐 요청이 세 배가 된다.
   const { conversations, refresh: refreshConversations } = useMessenger();
@@ -246,8 +247,11 @@ export function MessengerView({ myId, users, todayDate }: { myId: string; users:
     }
   }
 
-  const convUserIds = new Set(conversations.map(c => c.other.id));
-  const recentUsers = conversations.map(c => c.other);
+  const selfConversationUser = getSelfConversationUser(myUser);
+  const selfConversation = conversations.find(c => c.other.id === myId);
+  const recentConversations = conversations.filter(c => c.other.id !== myId);
+  const convUserIds = new Set(recentConversations.map(c => c.other.id));
+  const recentUsers = recentConversations.map(c => c.other);
   const otherUsers = users.filter(u => !convUserIds.has(u.id));
 
   return (
@@ -263,7 +267,38 @@ export function MessengerView({ myId, users, todayDate }: { myId: string; users:
             <h2 className="text-sm font-semibold text-foreground">메신저</h2>
           </div>
           <div className="flex-1 overflow-y-auto">
-            {/* 비서는 사람이 아니라 목록 맨 위에 고정으로 둔다. 직원 사이에 섞이면 찾기 어렵다. */}
+            {/* 자기 대화는 사람 목록과 구분하고, 대화가 없어도 바로 메모를 시작할 수 있게 고정한다. */}
+            <button
+              onClick={() => selectUser(selfConversationUser)}
+              aria-label="나에게 메모 보내기"
+              className={cn(
+                "w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/50 transition-colors text-left",
+                selectedUser?.id === myId && !assistantOpen && "bg-accent",
+              )}
+            >
+              <div className="relative shrink-0">
+                <Avatar className="h-9 w-9">
+                  <AvatarImage src={selfConversationUser.image ?? undefined} />
+                  <AvatarFallback className="text-xs bg-muted">{initials(myUser.name)}</AvatarFallback>
+                </Avatar>
+                <span className="absolute -right-1 -bottom-1 flex size-4 items-center justify-center rounded-full border border-background bg-primary text-primary-foreground">
+                  <Bookmark className="size-2.5" aria-hidden="true" />
+                </span>
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center justify-between gap-1">
+                  <span className="text-sm font-medium text-foreground">나에게</span>
+                  {selfConversation?.lastMsg && <span className="text-[10px] text-muted-foreground shrink-0">{timeStr(selfConversation.lastMsg.createdAt)}</span>}
+                </div>
+                <p className="text-xs truncate text-muted-foreground">
+                  {selfConversation?.lastMsg?.attachmentName
+                    ? `📎 ${selfConversation.lastMsg.attachmentName}`
+                    : selfConversation?.lastMsg?.content || "메모·링크·파일을 여기에 저장해 두세요."}
+                </p>
+              </div>
+            </button>
+
+            {/* 비서는 자기 대화 다음에 고정해 직원 대화와 섞이지 않게 한다. */}
             <button
               onClick={() => { setAssistantDraft(""); setAssistantOpen(true); setSelectedUser(null); setShowList(false); }}
               className={cn(
@@ -289,7 +324,7 @@ export function MessengerView({ myId, users, todayDate }: { myId: string; users:
             {recentUsers.length > 0 && (
               <div>
                 <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider px-4 pt-3 pb-1">최근 대화</p>
-                {conversations.map((conv) => (
+                {recentConversations.map((conv) => (
                   <button key={conv.conversationId} onClick={() => selectUser(conv.other)}
                     className={cn("w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/50 transition-colors text-left", selectedUser?.id === conv.other.id && "bg-accent")}>
                     <div className="relative shrink-0">
@@ -378,7 +413,11 @@ export function MessengerView({ myId, users, todayDate }: { myId: string; users:
                 {messages.length === 0 && (
                   <div className="flex flex-col items-center gap-3 py-12 text-center">
                     <MessageCircle className="size-6 text-muted-foreground" />
-                    <p className="text-sm text-muted-foreground">아직 메시지가 없습니다. 첫 메시지를 보내보세요!</p>
+                    <p className="text-sm text-muted-foreground">
+                      {selectedUser.id === myId
+                        ? "메모·링크·파일을 이곳에 저장해 두세요."
+                        : "아직 메시지가 없습니다. 첫 메시지를 보내보세요!"}
+                    </p>
                   </div>
                 )}
                 {messages.map((msg) => {
@@ -477,7 +516,7 @@ export function MessengerView({ myId, users, todayDate }: { myId: string; users:
                     value={input}
                     onChange={e => setInput(e.target.value)}
                     onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
-                    placeholder={`${selectedUser.name ?? "직원"}에게 메시지 보내기`}
+                    placeholder={selectedUser.id === myId ? "메모·링크·파일을 나에게 보내기" : `${selectedUser.name ?? "직원"}에게 메시지 보내기`}
                     className="flex-1"
                     disabled={sending}
                   />

@@ -23,30 +23,30 @@ interface CalEvent {
 }
 
 const COLOR_OPTIONS = [
-  { value: "gray",   label: "회색",   class: "bg-muted-foreground" },
-  { value: "blue",   label: "파랑",   class: "bg-primary" },
-  { value: "green",  label: "초록",   class: "bg-primary" },
-  { value: "red",    label: "빨강",   class: "bg-destructive" },
-  { value: "yellow", label: "노랑",   class: "bg-muted-foreground" },
-  { value: "purple", label: "보라",   class: "bg-primary" },
+  { value: "gray",   label: "회색",   class: "bg-gray-500 dark:bg-gray-400" },
+  { value: "blue",   label: "파랑",   class: "bg-blue-500 dark:bg-blue-400" },
+  { value: "green",  label: "초록",   class: "bg-green-500 dark:bg-green-400" },
+  { value: "red",    label: "빨강",   class: "bg-red-500 dark:bg-red-400" },
+  { value: "yellow", label: "노랑",   class: "bg-amber-400 dark:bg-amber-300" },
+  { value: "purple", label: "보라",   class: "bg-purple-500 dark:bg-purple-400" },
 ];
 
 const TYPE_COLORS: Record<string, string> = {
-  announce: "bg-primary/10 text-primary",
-  deadline: "bg-destructive/10 text-destructive",
-  leave: "bg-primary/10 text-primary",
+  announce: "border border-blue-500/40 bg-blue-500/10 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300",
+  deadline: "border border-destructive/40 bg-destructive/15 text-destructive dark:bg-destructive/25",
+  leave: "border border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:bg-emerald-500/25 dark:text-emerald-300",
 };
 
 const CUSTOM_COLORS: Record<string, string> = {
-  gray:   "bg-muted text-muted-foreground",
-  blue:   "bg-primary/10 text-primary",
-  green:  "bg-primary/10 text-primary",
-  red:    "bg-destructive/10 text-destructive",
-  yellow: "bg-muted text-foreground",
-  purple: "bg-primary/10 text-primary",
+  gray:   "border border-border bg-muted text-muted-foreground dark:bg-muted/50",
+  blue:   "border border-blue-500/40 bg-blue-500/20 text-blue-700 dark:bg-blue-500/30 dark:text-blue-300",
+  green:  "border border-green-500/40 bg-green-500/20 text-green-700 dark:bg-green-500/30 dark:text-green-300",
+  red:    "border border-red-500/40 bg-red-500/20 text-red-700 dark:bg-red-500/30 dark:text-red-300",
+  yellow: "border border-amber-500/40 bg-amber-400/25 text-amber-800 dark:bg-amber-400/30 dark:text-amber-200",
+  purple: "border border-purple-500/40 bg-purple-500/20 text-purple-700 dark:bg-purple-500/30 dark:text-purple-300",
 };
 
-const NOTION_STYLE = "bg-primary/10 text-primary border border-primary/20";
+const NOTION_STYLE = "border border-violet-500/40 bg-violet-500/10 text-violet-700 dark:bg-violet-500/25 dark:text-violet-300";
 
 function eventTitle(e: CalEvent) {
   const linkMark = e.projectId ? "🔗 " : "";
@@ -55,7 +55,7 @@ function eventTitle(e: CalEvent) {
 }
 
 function eventSourceLabel(type: CalEvent["type"]) {
-  if (type === "notion") return "Notion · 읽기 전용";
+  if (type === "notion") return "Notion";
   if (type === "leave") return "휴가";
   if (type === "announce" || type === "deadline") return "프로젝트";
   return "ERP 직접 등록";
@@ -67,12 +67,33 @@ type ModalState =
   | { mode: "detail"; date: string; events: CalEvent[] }
   | { mode: "edit"; event: CalEvent };
 
-export function CalendarView({ initialEvents, currentYear, currentMonth, todayDate, projectOptions }: {
+export function CalendarView({
+  initialEvents,
+  currentYear,
+  currentMonth,
+  todayDate,
+  projectOptions,
+  showLeaves,
+  showNotionEvents,
+  canEditCalendar,
+  isExternalViewer,
+}: {
   initialEvents: CalEvent[];
   currentYear: number;
   currentMonth: number;
   todayDate: string;
   projectOptions: { id: string; name: string }[];
+  showLeaves: boolean;
+  showNotionEvents: boolean;
+  canEditCalendar: boolean;
+  /**
+   * 파트너·거래처 계정인지.
+   *
+   * "무엇이 보이는가" 를 canEditCalendar 로 판단하면 안 된다. 지금은 두 값이 같지만
+   * 뜻이 다르다 — 나중에 파트너가 자기 프로젝트에 메모라도 달 수 있게 하는 순간,
+   * 편집 권한이 열리면서 프로젝트 공지까지 조용히 같이 열린다.
+   */
+  isExternalViewer: boolean;
 }) {
   const [year, setYear] = useState(currentYear);
   const [month, setMonth] = useState(currentMonth);
@@ -87,6 +108,15 @@ export function CalendarView({ initialEvents, currentYear, currentMonth, todayDa
   const [projectId, setProjectId] = useState("");
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  // 서버에서 받은 일정에도 화면별 공개 범위를 적용해 외부 사용자는 마감일만 본다.
+  const visibleEvents = events.filter((event) => {
+    if (!showLeaves && event.type === "leave") return false;
+    if (!showNotionEvents && event.type === "notion") return false;
+    // 외부 사용자는 마감일만 본다. 서버에서 이미 걸러 오지만 화면에서도 한 번 더 막는다.
+    if (isExternalViewer && event.type !== "deadline") return false;
+    return true;
+  });
 
   const fetchEvents = useCallback(async (y: number, m: number) => {
     setLoading(true);
@@ -121,7 +151,7 @@ export function CalendarView({ initialEvents, currentYear, currentMonth, todayDa
 
   const getEventsForDay = (day: number) => {
     const dateStr = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-    return events.filter((e) => {
+    return visibleEvents.filter((e) => {
       if (e.endDate && e.endDate > e.date) return dateStr >= e.date && dateStr <= e.endDate;
       return e.date === dateStr;
     });
@@ -132,7 +162,7 @@ export function CalendarView({ initialEvents, currentYear, currentMonth, todayDa
     const dayEvents = getEventsForDay(day);
     if (dayEvents.length > 0) {
       setModal({ mode: "detail", date: dateStr, events: dayEvents });
-    } else {
+    } else if (canEditCalendar) {
       openCreate(dateStr);
     }
   }
@@ -236,8 +266,11 @@ export function CalendarView({ initialEvents, currentYear, currentMonth, todayDa
               return (
                 <div
                   key={day}
-                  className="bg-background min-h-[80px] p-1 cursor-pointer hover:bg-muted/40 transition-colors group"
-                  onClick={() => openDay(day)}
+                  className={cn(
+                    "bg-background min-h-[80px] p-1 group",
+                    canEditCalendar && "cursor-pointer hover:bg-muted/40 transition-colors"
+                  )}
+                  onClick={canEditCalendar ? () => openDay(day) : undefined}
                 >
                   <div className="flex items-center justify-between mb-1">
                     <span className={cn(
@@ -246,7 +279,7 @@ export function CalendarView({ initialEvents, currentYear, currentMonth, todayDa
                     )}>
                       {day}
                     </span>
-                    <Plus className="size-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+                    {canEditCalendar && <Plus className="size-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />}
                   </div>
                   <div className="space-y-0.5">
                     {dayEvents.slice(0, 2).map((e, i) => {
@@ -288,10 +321,10 @@ export function CalendarView({ initialEvents, currentYear, currentMonth, todayDa
 
           <div className="flex flex-wrap gap-4 mt-4 text-xs text-muted-foreground">
             <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-destructive inline-block" />마감일</span>
-            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-primary inline-block" />휴가</span>
-            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-primary inline-block" />직접 등록</span>
-            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-primary inline-block" />Notion · 읽기 전용</span>
-            <span className="text-muted-foreground/70">날짜 클릭 시 ERP 직접 등록 일정 추가</span>
+            {showLeaves && <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500 dark:bg-emerald-400 inline-block" />휴가</span>}
+            {!isExternalViewer && <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-500 dark:bg-blue-400 inline-block" />직접 등록</span>}
+            {showNotionEvents && <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-violet-500 dark:bg-violet-400 inline-block" />Notion</span>}
+            {canEditCalendar && <span className="text-muted-foreground/70">날짜 클릭 시 ERP 직접 등록 일정 추가</span>}
           </div>
         </CardContent>
       </Card>
@@ -346,14 +379,16 @@ export function CalendarView({ initialEvents, currentYear, currentMonth, todayDa
                   </div>
                 );
               })}
-              <Button
-                variant="outline"
-                size="sm"
-                className="w-full gap-1 mt-2"
-                onClick={() => openCreate(modal.date)}
-              >
-                <Plus className="size-3.5" /> 일정 추가
-              </Button>
+              {canEditCalendar && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full gap-1 mt-2"
+                  onClick={() => openCreate(modal.date)}
+                >
+                  <Plus className="size-3.5" /> 일정 추가
+                </Button>
+              )}
             </div>
           )}
         </DialogContent>

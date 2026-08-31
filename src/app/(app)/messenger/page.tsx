@@ -23,7 +23,16 @@ export default async function MessengerPage() {
 
   return (
     <div className="h-full -m-4 sm:-m-6">
-      <MessengerView myId={session!.user.id} users={users} todayDate={todayDate} />
+      <MessengerView
+        myId={session!.user.id}
+        myUser={{
+          id: session!.user.id,
+          name: session!.user.name ?? null,
+          image: session!.user.image ?? null,
+        }}
+        users={users}
+        todayDate={todayDate}
+      />
     </div>
   );
 }

@@ -58,7 +58,16 @@ export function AppShell({ user, userId, children, allowedMenus }: AppShellProps
         </div>
       </div>
 
-      {!onMessengerPage && <MessengerDock myId={userId} />}
+      {!onMessengerPage && (
+        <MessengerDock
+          myId={userId}
+          myUser={{
+            id: userId,
+            name: user.name ?? null,
+            image: user.image ?? null,
+          }}
+        />
+      )}
     </MessengerProvider>
   );
 }

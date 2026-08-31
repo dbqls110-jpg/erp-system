@@ -1,6 +1,7 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { getConversationOther } from "@/lib/messenger-conversation";
 import { NextResponse } from "next/server";
 
 export async function GET() {
@@ -38,7 +39,7 @@ export async function GET() {
 
   const result = convs.map((c) => ({
     conversationId: c.id,
-    other: c.participantA === uid ? c.userB : c.userA,
+    other: getConversationOther(c, uid),
     lastMsg: c.messages[0] ?? null,
     unread: unreadMap[c.id] ?? 0,
   }));

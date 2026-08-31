@@ -8,6 +8,8 @@ import { CalendarView } from "./CalendarView";
 import { getCalendarViewer } from "@/lib/calendarViewer";
 import {
   calendarWhereFor,
+  canEditCalendar,
+  isExternal,
   projectWhereFor,
   showLeaves,
   showNotionEvents,
@@ -22,6 +24,10 @@ export default async function CalendarPage() {
   // 자료를 모으므로 네 곳 모두 걸러야 한다 — 일정만 가리면 프로젝트 마감일과
   // 직원 휴가가 그대로 새어 나간다.
   const viewer = (await getCalendarViewer())!;
+  const viewerCanEditCalendar = canEditCalendar(viewer);
+  const viewerIsExternal = isExternal(viewer);
+  const viewerShowsLeaves = showLeaves(viewer);
+  const viewerShowsNotionEvents = showNotionEvents(viewer);
   const now = new Date();
   const year = now.getFullYear();
   const month = now.getMonth() + 1;
@@ -48,7 +54,7 @@ export default async function CalendarPage() {
       orderBy: { name: "asc" },
       select: { id: true, name: true },
     }),
-    showLeaves(viewer)
+    viewerShowsLeaves
       ? prisma.leaveRequest.findMany({
           where: {
             status: "approved",
@@ -61,7 +67,7 @@ export default async function CalendarPage() {
       where: { AND: [{ date: { gte: `${year}-${monthStr}-01` } }, calendarWhereFor(viewer)] },
       select: { id: true, title: true, date: true, endDate: true, color: true, notionPageId: true, projectId: true },
     }),
-    showNotionEvents(viewer) ? getNotionEvents(year, month).catch(() => []) : [],
+    viewerShowsNotionEvents ? getNotionEvents(year, month).catch(() => []) : [],
   ]);
 
   const linkedNotionIds = new Set([
@@ -109,13 +115,17 @@ export default async function CalendarPage() {
 
   return (
     <div className="space-y-4">
-      <div><p className="mt-1 text-sm text-muted-foreground">프로젝트와 휴가 일정을 한눈에 확인하세요.</p></div>
+      <div><p className="mt-1 text-sm text-muted-foreground">{viewerCanEditCalendar ? "프로젝트와 휴가 일정을 한눈에 확인하세요." : "프로젝트 마감일을 한눈에 확인하세요."}</p></div>
       <CalendarView
         initialEvents={events}
         currentYear={year}
         currentMonth={month}
         todayDate={`${year}-${monthStr}-${String(now.getDate()).padStart(2, "0")}`}
         projectOptions={projectOptions}
+        showLeaves={viewerShowsLeaves}
+        showNotionEvents={viewerShowsNotionEvents}
+        canEditCalendar={viewerCanEditCalendar}
+        isExternalViewer={viewerIsExternal}
       />
     </div>
   );

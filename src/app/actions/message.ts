@@ -9,6 +9,7 @@ import {
   MAX_MESSENGER_FILE_SIZE,
   uploadMessengerFile,
 } from "@/lib/googleDrive";
+import { getConversationOther } from "@/lib/messenger-conversation";
 
 // 대화 가져오기 (없으면 생성)
 async function getOrCreateConversation(userAId: string, userBId: string) {
@@ -155,7 +156,7 @@ export async function getMyConversations() {
   });
 
   return convs.map((c) => {
-    const other = c.participantA === session.user!.id ? c.userB : c.userA;
+    const other = getConversationOther(c, session.user!.id);
     const lastMsg = c.messages[0] ?? null;
     return { conversationId: c.id, other, lastMsg };
   });
