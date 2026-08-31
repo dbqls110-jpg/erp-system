@@ -556,8 +556,8 @@ export function PartnerTable({
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-4">
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <div className="flex items-center gap-2.5">
             <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
@@ -628,24 +628,24 @@ export function PartnerTable({
         </CardContent>
       </Card>
 
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm">
           총 <span className="font-semibold text-primary">{filtered.length}</span>건
           {filtered.length !== initialData.length && (
             <span className="ml-1 text-muted-foreground">(전체 {initialData.length}건)</span>
           )}
         </p>
-        <div className="flex w-full min-w-0 flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+        <div className="flex w-full min-w-0 flex-col gap-1.5 sm:w-auto sm:flex-row sm:items-center">
           <Button
             variant="outline"
-            className="h-9 shrink-0 rounded-lg px-3"
+            className="h-8 shrink-0 rounded-lg px-3"
             onClick={downloadCsv}
             disabled={filtered.length === 0}
           >
             <Download className="size-3.5" /> 엑셀 다운로드
           </Button>
           <select
-            className={`${SELECT_CLASS} h-9 w-full min-w-[10rem] shrink-0 whitespace-nowrap sm:w-40`}
+            className={`${SELECT_CLASS} w-full min-w-[10rem] shrink-0 whitespace-nowrap sm:w-40`}
             value={sort}
             onChange={(e) => setSort(e.target.value)}
           >
@@ -653,7 +653,7 @@ export function PartnerTable({
             <option value="name">이름순</option>
           </select>
           <select
-            className={`${SELECT_CLASS} h-9 w-full min-w-[9.5rem] shrink-0 whitespace-nowrap sm:w-36`}
+            className={`${SELECT_CLASS} w-full min-w-[9.5rem] shrink-0 whitespace-nowrap sm:w-36`}
             value={String(pageSize)}
             onChange={(e) => setPageSize(Number(e.target.value))}
           >
