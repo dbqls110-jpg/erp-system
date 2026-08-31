@@ -93,3 +93,7 @@ bridge/bridge.env
 
 # 파이썬 스크립트 캐시
 __pycache__/
+
+# 저장소 루트에 남은 ERP와 무관한 작업용 파이썬 산출물
+/venue_*.py
+/scripts/tmp/

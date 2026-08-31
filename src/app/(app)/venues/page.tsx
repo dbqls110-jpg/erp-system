@@ -9,9 +9,10 @@ import { prisma } from "@/lib/prisma";
 export default async function VenuesPage() {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) redirect("/login");
-  await requireMenuAccess(session.user.id, "venues", session.user.role);
 
-  const [districtRows, typeRows] = await Promise.all([
+  // 권한 검사가 실패하면 JSX를 반환하지 않으므로 공간 분류를 함께 조회해도 응답에 포함되지 않는다.
+  const [, districtRows, typeRows] = await Promise.all([
+    requireMenuAccess(session.user.id, "venues", session.user.role),
     prisma.venue.findMany({
       where: { district: { not: null } },
       select: { district: true },

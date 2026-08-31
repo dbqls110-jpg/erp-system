@@ -1,4 +1,5 @@
 import { FILE_CATEGORIES } from "@/lib/fileCategory";
+import { LIMITS, sanitizeSheetTitle } from "@/lib/sheetLimits";
 
 /**
  * AI 가 내놓은 변경 제안을 검사하고 실제로 적용한다.
@@ -43,17 +44,30 @@ export const EDITABLE_FIELDS = {
     projectId: "프로젝트",
     category: "분류 폴더",
   },
+  sheet_create: {
+    title: "시트 이름",
+    folderName: "저장 폴더",
+    tabs: "탭 이름",
+    data: "시트 데이터",
+  },
 } as const;
 
 export type ProposalTarget = keyof typeof EDITABLE_FIELDS;
 
+export interface SheetCreateContent {
+  title: string;
+  folderName?: string;
+  tabs: string[];
+  data: Record<string, string[][]>;
+}
+
 export interface Proposal {
   target: ProposalTarget;
-  /** 바꿀 대상의 id. AI 가 프롬프트에 실린 자료에서 그대로 가져와야 한다. */
+  /** 기존 자료 제안의 id. 새 시트를 만드는 제안은 빈 문자열이다. */
   id: string;
   /** 사람이 확인할 수 있게 AI 가 적어 둔 대상 이름. 검증에 쓰지 않는다. */
   label?: string;
-  changes: Record<string, string | number | null>;
+  changes: Record<string, unknown>;
   /** 왜 이렇게 바꾸는지. 화면에 그대로 보여준다. */
   reason?: string;
 }
@@ -66,13 +80,18 @@ export interface ProposalIssue {
 export interface ValidatedProposal {
   proposal: Proposal;
   /** 실제로 적용할 값. 검사를 통과한 칸만 남는다. */
-  accepted: Record<string, string | number | Date | null>;
+  accepted: Record<string, unknown>;
   /** 버린 칸과 그 이유. 화면에 보여줘야 사람이 왜 빠졌는지 안다. */
   rejected: ProposalIssue[];
 }
 
 function isTarget(value: unknown): value is ProposalTarget {
   return typeof value === "string" && value in EDITABLE_FIELDS;
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return null;
+  return value as Record<string, unknown>;
 }
 
 /** 답변에서 제안 블록을 뽑는다. 형태가 안 맞으면 조용히 버린다. */
@@ -87,15 +106,25 @@ export function parseProposals(answer: string): Proposal[] {
       if (typeof parsed !== "object" || parsed === null) continue;
       const p = parsed as Record<string, unknown>;
       if (!isTarget(p.target)) continue;
-      if (typeof p.id !== "string" || !p.id) continue;
-      if (typeof p.changes !== "object" || p.changes === null) continue;
+      const isSheetCreate = p.target === "sheet_create";
+      if (!isSheetCreate && (typeof p.id !== "string" || !p.id)) continue;
+
+      const topLevelSheetFields = isSheetCreate
+        ? Object.fromEntries(
+            ["title", "folderName", "tabs", "data"]
+              .filter((field) => field in p)
+              .map((field) => [field, p[field]]),
+          )
+        : null;
+      const changes = asRecord(p.changes) ?? topLevelSheetFields;
+      if (!changes) continue;
 
       out.push({
         target: p.target,
-        id: p.id,
+        id: typeof p.id === "string" ? p.id : "",
         label: typeof p.label === "string" ? p.label : undefined,
         reason: typeof p.reason === "string" ? p.reason : undefined,
-        changes: p.changes as Record<string, string | number | null>,
+        changes,
       });
     } catch {
       // 깨진 JSON 은 제안으로 다루지 않는다. 답변 본문에는 그대로 남는다.
@@ -112,8 +141,10 @@ const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
  * 여기서 통과했다고 바로 쓰지 않는다. 사람이 화면에서 보고 누를 때 쓴다.
  */
 export function validateProposal(proposal: Proposal): ValidatedProposal {
+  if (proposal.target === "sheet_create") return validateSheetCreateProposal(proposal);
+
   const allowed = EDITABLE_FIELDS[proposal.target] as Record<string, string>;
-  const accepted: Record<string, string | number | Date | null> = {};
+  const accepted: Record<string, unknown> = {};
   const rejected: ProposalIssue[] = [];
 
   for (const [field, value] of Object.entries(proposal.changes)) {
@@ -203,6 +234,127 @@ export function validateProposal(proposal: Proposal): ValidatedProposal {
       delete accepted.destination;
     }
   }
+
+  return { proposal, accepted, rejected };
+}
+
+function validateSheetCreateProposal(proposal: Proposal): ValidatedProposal {
+  const accepted: Record<string, unknown> = {};
+  const rejected: ProposalIssue[] = [];
+  const changes = proposal.changes;
+  const allowedFields = new Set(["title", "folderName", "tabs", "data"]);
+
+  for (const field of Object.keys(changes)) {
+    if (!allowedFields.has(field)) {
+      rejected.push({ field, reason: "시트 제안에서 사용할 수 없는 항목입니다." });
+    }
+  }
+
+  const rawTitle = changes.title;
+  if (typeof rawTitle !== "string" || !rawTitle.trim()) {
+    rejected.push({ field: "title", reason: "시트 이름이 필요합니다." });
+  } else if (rawTitle.trim().length > LIMITS.MAX_TITLE_LEN) {
+    rejected.push({ field: "title", reason: `시트 이름은 ${LIMITS.MAX_TITLE_LEN}자 이내여야 합니다.` });
+  } else {
+    const title = sanitizeSheetTitle(rawTitle);
+    if (!title) rejected.push({ field: "title", reason: "시트 이름이 유효하지 않습니다." });
+    else accepted.title = title;
+  }
+
+  const rawFolderName = changes.folderName;
+  if (rawFolderName !== undefined) {
+    if (typeof rawFolderName !== "string" || !rawFolderName.trim()) {
+      rejected.push({ field: "folderName", reason: "저장 폴더 이름이 유효하지 않습니다." });
+    } else {
+      const folderName = sanitizeSheetTitle(rawFolderName, 50);
+      if (!folderName) rejected.push({ field: "folderName", reason: "저장 폴더 이름이 유효하지 않습니다." });
+      else accepted.folderName = folderName;
+    }
+  }
+
+  const rawTabs = changes.tabs;
+  let safeTabs = ["Sheet1"];
+  if (rawTabs !== undefined) {
+    if (!Array.isArray(rawTabs)) {
+      rejected.push({ field: "tabs", reason: "탭 이름은 배열이어야 합니다." });
+    } else if (rawTabs.length > LIMITS.MAX_TABS) {
+      rejected.push({ field: "tabs", reason: `탭은 최대 ${LIMITS.MAX_TABS}개까지 만들 수 있습니다.` });
+    } else {
+      const invalidTab = rawTabs.find((tab) => typeof tab !== "string");
+      if (invalidTab !== undefined) {
+        rejected.push({ field: "tabs", reason: "탭 이름은 글자여야 합니다." });
+      } else {
+        safeTabs = [...new Set(rawTabs.map((tab) => tab.trim()).filter(Boolean))];
+        if (safeTabs.length === 0) safeTabs = ["Sheet1"];
+      }
+    }
+  }
+  accepted.tabs = safeTabs;
+
+  const rawData = changes.data;
+  const data = rawData === undefined ? {} : asRecord(rawData);
+  if (rawData !== undefined && !data) {
+    rejected.push({ field: "data", reason: "데이터는 탭 이름별 행 배열이어야 합니다." });
+  }
+
+  const normalizedData: Record<string, string[][]> = {};
+  let totalCells = 0;
+  if (data) {
+    for (const [tabName, rawRows] of Object.entries(data)) {
+      if (!Array.isArray(rawRows)) {
+        rejected.push({ field: `data.${tabName}`, reason: "행 배열이어야 합니다." });
+        continue;
+      }
+      totalCells += rawRows.reduce(
+        (count, row) => count + (Array.isArray(row) ? row.length : 0),
+        0,
+      );
+      if (totalCells > LIMITS.MAX_INITIAL_CELLS) {
+        rejected.push({
+          field: "data",
+          reason: `초기 데이터는 최대 ${LIMITS.MAX_INITIAL_CELLS}개 셀까지입니다.`,
+        });
+        break;
+      }
+      if (rawRows.length > LIMITS.MAX_WRITE_ROWS) {
+        rejected.push({
+          field: `data.${tabName}`,
+          reason: `한 탭은 최대 ${LIMITS.MAX_WRITE_ROWS}행까지입니다.`,
+        });
+        continue;
+      }
+
+      const normalizedRows: string[][] = [];
+      for (const [rowIndex, rawRow] of rawRows.entries()) {
+        if (!Array.isArray(rawRow)) {
+          rejected.push({ field: `data.${tabName}[${rowIndex}]`, reason: "행 배열이어야 합니다." });
+          continue;
+        }
+        if (rawRow.length > LIMITS.MAX_COLS) {
+          rejected.push({
+            field: `data.${tabName}[${rowIndex}]`,
+            reason: `한 행은 최대 ${LIMITS.MAX_COLS}칸까지입니다.`,
+          });
+          continue;
+        }
+        normalizedRows.push(
+          rawRow.map((value, columnIndex) => {
+            const raw = String(value ?? "");
+            const safe = /^[=+\-@]/.test(raw) ? `'${raw}` : raw;
+            if (safe.length > LIMITS.MAX_CELL_LEN) {
+              rejected.push({
+                field: `data.${tabName}[${rowIndex}][${columnIndex}]`,
+                reason: `셀 값은 ${LIMITS.MAX_CELL_LEN}자 이내여야 합니다.`,
+              });
+            }
+            return safe.slice(0, LIMITS.MAX_CELL_LEN);
+          }),
+        );
+      }
+      if (safeTabs.includes(tabName)) normalizedData[tabName] = normalizedRows;
+    }
+  }
+  accepted.data = normalizedData;
 
   return { proposal, accepted, rejected };
 }

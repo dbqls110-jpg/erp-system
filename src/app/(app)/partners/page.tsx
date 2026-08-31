@@ -8,9 +8,10 @@ import { PartnerTable } from "./PartnerTable";
 export default async function PartnersPage() {
   // 사이드바에서 메뉴를 숨기는 것만으로는 못 막는다. 주소를 직접 치면 그냥 열린다.
   const session = await getServerSession(authOptions);
-  await requireMenuAccess(session!.user.id, "partners", session!.user.role);
 
-  const [rows, projects, canEdit] = await Promise.all([
+  // 권한 검사가 실패하면 JSX를 반환하지 않으므로 목록 조회를 함께 시작해도 권한 없는 자료가 노출되지 않는다.
+  const [, rows, projects, canEdit] = await Promise.all([
+    requireMenuAccess(session!.user.id, "partners", session!.user.role),
     prisma.partner.findMany({
       orderBy: { updatedAt: "desc" },
       include: {

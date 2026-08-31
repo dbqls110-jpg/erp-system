@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
+import { revalidatePath } from "next/cache";
 
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -7,12 +8,14 @@ import { canEditMenu } from "@/lib/permissions";
 import {
   parseProposals,
   validateProposal,
+  type SheetCreateContent,
   type ProposalTarget,
 } from "@/lib/assistantProposal";
 import {
   moveMessengerFileToCategory,
   moveMessengerFileToProject,
 } from "@/lib/googleDrive";
+import { createSpreadsheet, SheetCreationError } from "@/lib/sheetCreation";
 
 /**
  * 비서가 내놓은 변경 제안을 실제로 적용한다.
@@ -29,7 +32,39 @@ const MENU_FOR: Record<ProposalTarget, string> = {
   partner: "partners",
   project: "projects",
   drive_file: "messenger",
+  sheet_create: "sheets",
 };
+
+interface ExistingSheetApply {
+  title: string;
+  url: string;
+  folderPath?: string;
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return null;
+  return value as Record<string, unknown>;
+}
+
+async function findExistingSheetApply(jobId: string, index: number): Promise<ExistingSheetApply | null> {
+  // 감사 로그에 같은 job과 제안 위치가 있으면 Google API를 다시 부르지 않는다.
+  const logs = await prisma.agentAuditLog.findMany({
+    where: { action: "assistant_apply_sheet_create" },
+    orderBy: { createdAt: "desc" },
+    select: { payload: true, result: true },
+  });
+  const match = logs.find((log) => {
+    const payload = asRecord(log.payload);
+    return payload?.jobId === jobId && payload?.index === index;
+  });
+  const result = asRecord(match?.result);
+  if (typeof result?.title !== "string" || typeof result.url !== "string") return null;
+  return {
+    title: result.title,
+    url: result.url,
+    folderPath: typeof result.folderPath === "string" ? result.folderPath : undefined,
+  };
+}
 
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
@@ -72,6 +107,12 @@ export async function POST(req: NextRequest) {
   }
 
   const { accepted, rejected } = validateProposal(proposal);
+  if (proposal.target === "sheet_create" && rejected.length > 0) {
+    return NextResponse.json(
+      { error: "시트 제안에 고칠 항목이 있습니다.", rejected },
+      { status: 400 },
+    );
+  }
   if (Object.keys(accepted).length === 0) {
     return NextResponse.json(
       { error: "적용할 수 있는 항목이 없습니다.", rejected },
@@ -80,6 +121,69 @@ export async function POST(req: NextRequest) {
   }
 
   try {
+    if (proposal.target === "sheet_create") {
+      const content = accepted as unknown as SheetCreateContent;
+      const existing = await findExistingSheetApply(jobId, index);
+      if (existing) {
+        return NextResponse.json({
+          ok: true,
+          name: existing.title,
+          url: existing.url,
+          folderPath: existing.folderPath,
+          reused: true,
+        });
+      }
+
+      const created = await createSpreadsheet({
+        agentType: "agent-1",
+        title: content.title,
+        folderName: content.folderName,
+        tabs: content.tabs,
+        data: content.data,
+        strictData: true,
+      });
+      if (!created.spreadsheetId || !created.url) {
+        throw new Error("시트 생성 결과가 올바르지 않습니다.");
+      }
+
+      await prisma.sheetLink.create({
+        data: {
+          name: created.finalTitle,
+          url: created.url,
+          description: `메신저에서 생성 · 저장 폴더: ${created.folderPath}`,
+          category: "기타",
+          order: 0,
+        },
+      });
+
+      const rowCount = Object.values(content.data).reduce((count, rows) => count + rows.length, 0);
+      await prisma.agentAuditLog.create({
+        data: {
+          method: "POST",
+          endpoint: "/api/assistant/apply",
+          action: "assistant_apply_sheet_create",
+          payload: { jobId, index, title: created.finalTitle, folderPath: created.folderPath, rowCount },
+          result: {
+            title: created.finalTitle,
+            folderPath: created.folderPath,
+            rowCount,
+            spreadsheetId: created.spreadsheetId,
+            url: created.url,
+            by: session.user.id,
+          },
+        },
+      });
+      revalidatePath("/sheets");
+
+      return NextResponse.json({
+        ok: true,
+        name: created.finalTitle,
+        url: created.url,
+        folderPath: created.folderPath,
+      }, { status: 201 });
+    }
+
+    const legacyAccepted = accepted as Record<string, string | number | Date | null>;
     let name: string;
     let moveResult: { name: string; folderPath: string; driveUrl: string } | null = null;
     if (proposal.target === "drive_file") {
@@ -119,21 +223,21 @@ export async function POST(req: NextRequest) {
     } else if (proposal.target === "venue") {
       const row = await prisma.venue.update({
         where: { id: proposal.id },
-        data: accepted,
+        data: legacyAccepted,
         select: { name: true },
       });
       name = row.name;
     } else if (proposal.target === "partner") {
       const row = await prisma.partner.update({
         where: { id: proposal.id },
-        data: accepted,
+        data: legacyAccepted,
         select: { name: true },
       });
       name = row.name;
     } else {
       const row = await prisma.project.update({
         where: { id: proposal.id },
-        data: accepted,
+        data: legacyAccepted,
         select: { name: true },
       });
       name = row.name;
@@ -145,7 +249,12 @@ export async function POST(req: NextRequest) {
         method: "POST",
         endpoint: "/api/assistant/apply",
         action: `assistant_apply_${proposal.target}`,
-        payload: { jobId, index, id: proposal.id, changes: proposal.changes },
+        payload: {
+          jobId,
+          index,
+          id: proposal.id,
+          changes: JSON.parse(JSON.stringify(proposal.changes)),
+        },
         // Prisma 의 Json 타입은 배열을 그대로 못 받는다. 평범한 값으로 풀어 담는다.
         result: {
           applied: JSON.parse(JSON.stringify(accepted)),
@@ -158,6 +267,9 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ ok: true, name, applied: accepted, rejected });
   } catch (err) {
+    if (err instanceof SheetCreationError) {
+      return NextResponse.json({ error: err.message, code: err.code, ...err.details }, { status: err.status });
+    }
     // 대상이 이미 지워졌거나 id 가 틀린 경우가 대부분이다.
     console.error("[assistant apply]", err);
     return NextResponse.json(

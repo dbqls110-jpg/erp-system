@@ -26,17 +26,21 @@ export default async function CompanyFinancePage({
 }) {
   const params = await searchParams;
   const session = await getServerSession(authOptions);
-  await requireMenuAccess(session!.user.id, "companyFinance", session!.user.role);
-  const canEdit = await canEditMenu(session!.user.id, "companyFinance", session!.user.role);
 
   const currentYear = Number(currentKoreanDateKey().slice(0, 4));
   const parsedYear = Number.parseInt(params.year ?? "", 10);
   const year = Number.isInteger(parsedYear) && parsedYear >= 2000 && parsedYear <= 2100 ? parsedYear : currentYear;
-  const entries = await prisma.companyFinanceEntry.findMany({
-    where: { date: { gte: `${year}-01-01`, lte: `${year}-12-31` } },
-    orderBy: [{ date: "desc" }, { createdAt: "desc" }],
-    select: { id: true, company: true, type: true, date: true, title: true, amount: true, memo: true },
-  });
+  // 권한 검사가 실패하면 JSX를 반환하지 않으므로 장부 조회를 함께 시작해도 자료가 노출되지 않는다.
+  // requireMenuAccess 와 canEditMenu 는 같은 React.cache 결과를 공유한다.
+  const [, canEdit, entries] = await Promise.all([
+    requireMenuAccess(session!.user.id, "companyFinance", session!.user.role),
+    canEditMenu(session!.user.id, "companyFinance", session!.user.role),
+    prisma.companyFinanceEntry.findMany({
+      where: { date: { gte: `${year}-01-01`, lte: `${year}-12-31` } },
+      orderBy: [{ date: "desc" }, { createdAt: "desc" }],
+      select: { id: true, company: true, type: true, date: true, title: true, amount: true, memo: true },
+    }),
+  ]);
   const summaryEntries: CompanyFinanceEntryRecord[] = entries.flatMap((entry) => {
     if (entry.type !== "revenue" && entry.type !== "cost") return [];
     return [{ company: entry.company, type: entry.type, amount: entry.amount, date: entry.date }];

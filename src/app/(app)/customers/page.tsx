@@ -20,8 +20,6 @@ const STATUS_BY_QUERY = { active: "거래중", pending: "보류", closed: "종�
 
 export default async function CustomersPage({ searchParams }: { searchParams?: CustomerSearchParams }) {
   const session = await getServerSession(authOptions);
-  await requireMenuAccess(session!.user.id, "customers", session!.user.role);
-  const canEdit = await canEditMenu(session!.user.id, "customers", session!.user.role);
 
   const params = await searchParams;
   const categoryParam = typeof params?.category === "string" ? params.category : "all";
@@ -40,11 +38,17 @@ export default async function CustomersPage({ searchParams }: { searchParams?: C
     ];
   }
 
-  const rows = await prisma.customer.findMany({
-    where,
-    orderBy: { updatedAt: "desc" },
-    include: { projects: { include: { project: { select: { id: true, name: true } } } } },
-  });
+  // 권한 검사가 실패하면 예외가 전파되어 JSX를 반환하지 않으므로 목록 조회를 함께 시작해도
+  // 권한 없는 자료가 응답에 포함되지 않는다. 권한 자료는 React.cache 로 한 번만 읽는다.
+  const [, canEdit, rows] = await Promise.all([
+    requireMenuAccess(session!.user.id, "customers", session!.user.role),
+    canEditMenu(session!.user.id, "customers", session!.user.role),
+    prisma.customer.findMany({
+      where,
+      orderBy: { updatedAt: "desc" },
+      include: { projects: { include: { project: { select: { id: true, name: true } } } } },
+    }),
+  ]);
   const hasFilters = Boolean(keyword || category || status);
 
   return (

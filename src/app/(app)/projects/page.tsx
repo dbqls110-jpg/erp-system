@@ -27,15 +27,18 @@ export default async function ProjectsPage({
   const currentFilter = ["active", "completed", "on_hold"].includes(status ?? "") ? status! : "all";
 
   const session = await getServerSession(authOptions);
-  await requireMenuAccess(session!.user.id, "projects", session!.user.role);
   const isAdmin = session?.user?.role === "admin";
 
   const whereStatus = currentFilter === "all" ? {} : { status: currentFilter };
-  const projects = await prisma.project.findMany({
-    where: whereStatus,
-    include: { _count: { select: { checklistItems: true } } },
-    orderBy: { createdAt: "desc" },
-  });
+  // 권한 검사가 실패하면 JSX를 반환하지 않으므로 프로젝트 목록을 함께 조회해도 응답에 포함되지 않는다.
+  const [, projects] = await Promise.all([
+    requireMenuAccess(session!.user.id, "projects", session!.user.role),
+    prisma.project.findMany({
+      where: whereStatus,
+      include: { _count: { select: { checklistItems: true } } },
+      orderBy: { createdAt: "desc" },
+    }),
+  ]);
 
   return (
     <div className="space-y-4">

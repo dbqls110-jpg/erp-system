@@ -7,13 +7,16 @@ import { SheetList } from "./SheetList";
 
 export default async function SheetsPage() {
   const session = await getServerSession(authOptions);
-  await requireMenuAccess(session!.user.id, "sheets", session!.user.role);
   // 관리자 여부가 아니라 실제 수정 권한을 본다. 관리자 화면에서 팀장에게
   // 수정 권한을 준 경우 버튼이 보여야 하고, 뺐다면 사라져야 한다.
-  const canEdit = session?.user?.id
-    ? await canEditMenu(session.user.id, "sheets", session.user.role)
-    : false;
-  const sheets = await prisma.sheetLink.findMany({ orderBy: [{ category: "asc" }, { order: "asc" }, { createdAt: "asc" }] });
+  // 권한 검사가 실패하면 JSX를 반환하지 않으므로 시트 목록을 함께 조회해도 응답에 포함되지 않는다.
+  const [, canEdit, sheets] = await Promise.all([
+    requireMenuAccess(session!.user.id, "sheets", session!.user.role),
+    session?.user?.id
+      ? canEditMenu(session.user.id, "sheets", session.user.role)
+      : Promise.resolve(false),
+    prisma.sheetLink.findMany({ orderBy: [{ category: "asc" }, { order: "asc" }, { createdAt: "asc" }] }),
+  ]);
 
   return (
     <div className="space-y-4">

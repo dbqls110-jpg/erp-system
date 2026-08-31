@@ -1,6 +1,8 @@
 import { google } from "googleapis";
 import crypto from "crypto";
 
+export { LIMITS } from "@/lib/sheetLimits";
+
 // ─── OAuth 오류 감지 ──────────────────────────────────────────────────────────
 
 export function isInvalidGrantError(err: unknown): boolean {
@@ -252,12 +254,3 @@ export function resolveSpreadsheetId(
   if (fallback && isValidSpreadsheetId(fallback)) return { id: fallback };
   return null;
 }
-
-export const LIMITS = {
-  MAX_READ_ROWS:     1000,
-  MAX_WRITE_ROWS:    500,
-  MAX_COLS:          26,
-  MAX_TABS:          10,
-  MAX_TITLE_LEN:     100,
-  MAX_INITIAL_CELLS: 13000,
-} as const;

@@ -72,6 +72,24 @@ const UPDATE_FORMAT = [
   "- 블록 밖에는 무엇을 왜 바꾸려는지 한 줄로 적으세요.",
 ].join("\n");
 
+const SHEET_CREATE_FORMAT = [
+  "여러 후보나 목록을 새 구글 시트로 정리해 달라는 말(예: '지금 나온 후보들로 시트 만들어줘')을 들으면,",
+  "직접 시트를 만들었다고 하지 마세요. 아래 제안만 답에 넣으면 사람이 확인하고 '시트 만들기'를 눌러 실제로 만듭니다.",
+  "사람이 누르기 전에는 아무 시트도 만들어지지 않으므로 '만들었습니다' 또는 '저장했습니다'라고 말하지 마세요.",
+  "표를 만들 때는 반드시 머리글을 첫 줄에 넣으세요.",
+  "",
+  "```erp-update",
+  '{"target":"sheet_create","label":"공간 후보","changes":{"title":"공간 후보","tabs":["후보"],"data":{"후보":[["이름","지역","수용 인원"],["구민회관","구로구","300"]]}},',
+  '"reason":"대화에서 나온 후보 정리"}',
+  "```",
+  "",
+  "규칙:",
+  "- title은 사장님이 알아볼 이름으로 꼭 넣고, folderName은 특별히 요청받았을 때만 넣으세요. 생략하면 기존 기본 폴더에 저장됩니다.",
+  "- tabs는 탭 이름 배열이고, data는 탭 이름별 행 배열입니다. data의 각 배열 첫 줄은 머리글입니다.",
+  "- 셀 값은 글자로 넣으세요. 표에 넣을 정보가 없으면 빈 글자나 '미상'처럼 사람이 이해할 수 있는 글자를 쓰세요.",
+  "- 내용이 많아 제한을 넘을 것 같으면 억지로 한 칸에 몰아넣지 말고, 먼저 범위를 줄일지 물어보세요.",
+].join("\n");
+
 const DRIVE_MOVE_FORMAT = [
   "[첨부파일 이동 요청]이 질문에 포함되어 있으면 파일을 직접 옮기지 말고 확인용 제안만 만든다.",
   "프로젝트 폴더로 보낼 때는 [ERP 자료]의 프로젝트 id를 그대로 사용하고 destination은 project로 한다.",
@@ -97,7 +115,7 @@ export async function buildAssistantPrompt(question: string): Promise<AssistantP
   const context = await buildAgentContext(question);
   const contextJson = JSON.stringify(context.data, null, 2);
 
-  const parts = [SYSTEM_FRAME, "", TABLE_FORMAT, "", UPDATE_FORMAT, "", DRIVE_MOVE_FORMAT, "", "[ERP 자료]"];
+  const parts = [SYSTEM_FRAME, "", TABLE_FORMAT, "", UPDATE_FORMAT, "", SHEET_CREATE_FORMAT, "", DRIVE_MOVE_FORMAT, "", "[ERP 자료]"];
 
   if (context.topics.length === 0) {
     // 주제를 못 알아들었을 때 빈 객체만 던지면 AI 가 "자료가 없다"로 오해한다.

@@ -6,6 +6,7 @@ import {
   fieldLabel,
   type Proposal,
 } from "@/lib/assistantProposal";
+import { LIMITS } from "@/lib/sheetLimits";
 
 function fence(json: string) {
   return "```erp-update\n" + json + "\n```";
@@ -17,6 +18,16 @@ const VALID = JSON.stringify({
   label: "구로구민회관 대공연장",
   changes: { calledAt: "2026-08-26", calledPrice: 700000, calledNote: "11/27 가능" },
   reason: "통화로 확인",
+});
+
+const SHEET_VALID = JSON.stringify({
+  target: "sheet_create",
+  changes: {
+    title: "공간 후보",
+    tabs: ["후보"],
+    data: { 후보: [["이름", "지역"], ["구민회관", "구로구"]] },
+  },
+  reason: "대화에서 나온 후보 정리",
 });
 
 describe("parseProposals — 답변에서 제안 뽑기", () => {
@@ -49,6 +60,21 @@ describe("parseProposals — 답변에서 제안 뽑기", () => {
     const two = fence(VALID) + "\n" + fence(VALID);
     expect(parseProposals(two)).toHaveLength(2);
     expect(parseProposals(two)).toHaveLength(2);
+  });
+
+  it("sheet_create 제안은 시트 내용을 읽는다", () => {
+    const [p] = parseProposals(fence(SHEET_VALID));
+    expect(p.target).toBe("sheet_create");
+    expect(p.changes.title).toBe("공간 후보");
+    expect(p.changes.data).toEqual({ 후보: [["이름", "지역"], ["구민회관", "구로구"]] });
+  });
+
+  it("sheet_create은 id 없이도 읽어 검증에서 이유를 보여준다", () => {
+    const [p] = parseProposals(fence(JSON.stringify({ target: "sheet_create", changes: {} })));
+    expect(p.target).toBe("sheet_create");
+    expect(validateProposal(p).rejected).toEqual([
+      { field: "title", reason: "시트 이름이 필요합니다." },
+    ]);
   });
 });
 
@@ -103,6 +129,40 @@ describe("validateProposal — 무엇을 받아들이고 무엇을 버리는가"
     // 공간의 통화 기록 칸을 파트너에 쓰려 하면 통하지 않아야 한다.
     expect(validateProposal(make({ calledPrice: 1 }, "partner")).rejected).toHaveLength(1);
     expect(validateProposal(make({ phone: "010-0000-0000" }, "partner")).rejected).toEqual([]);
+  });
+
+  it("기존 project 제안도 그대로 검증한다", () => {
+    const { accepted, rejected } = validateProposal(
+      make({ deadline: "2026-09-01", progress: 50, memo: "중간 점검" }, "project"),
+    );
+    expect(accepted.deadline).toBe("2026-09-01");
+    expect(accepted.progress).toBe(50);
+    expect(rejected).toEqual([]);
+  });
+
+  it("sheet_create의 셀 상한을 넘으면 이유를 남긴다", () => {
+    const rows = Array.from({ length: LIMITS.MAX_INITIAL_CELLS + 1 }, () => ["후보"]);
+    const { rejected } = validateProposal({
+      target: "sheet_create",
+      id: "",
+      changes: { title: "공간 후보", tabs: ["후보"], data: { 후보: rows } },
+    });
+    expect(rejected.some((issue) => issue.field === "data" && issue.reason.includes("최대"))).toBe(true);
+  });
+
+  it("sheet_create의 수식처럼 보이는 셀은 글자로 바꾼다", () => {
+    const { accepted, rejected } = validateProposal({
+      target: "sheet_create",
+      id: "",
+      changes: {
+        title: "합계 확인",
+        tabs: ["Sheet1"],
+        data: { Sheet1: [["금액"], ["=SUM(A1)"]] },
+      },
+    });
+    const data = accepted.data as Record<string, string[][]>;
+    expect(data.Sheet1[1][0]).toBe("'=SUM(A1)");
+    expect(rejected).toEqual([]);
   });
 });
 

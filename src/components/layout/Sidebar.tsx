@@ -9,16 +9,16 @@ import {
   LayoutDashboard,
   MapPin,
   Clock,
-  Calendar,
+  PlaneTakeoff,
   FolderKanban,
   CalendarDays,
-  Banknote,
+  WalletCards,
   Settings,
   MessageCircle,
   KeyRound,
-  Sheet,
+  FileSpreadsheet,
   X,
-  BarChart2,
+  ChartNoAxesCombined,
 } from "lucide-react";
 
 interface NavItem {
@@ -31,20 +31,21 @@ interface NavItem {
 }
 
 interface NavGroup {
-  /** 라벨이 없으면 그룹 헤더를 렌더하지 않는다 (정본: 첫 그룹은 라벨 없음) */
+  /** 모든 메뉴 묶음의 성격을 바로 구분할 수 있도록 그룹 헤더를 표시한다. */
   label?: string;
   items: NavItem[];
 }
 
 const navGroups: NavGroup[] = [
   {
+    label: "개요",
     items: [{ label: "대시보드", href: "/dashboard", icon: LayoutDashboard, menuKey: "dashboard" }],
   },
   {
     label: "인사",
     items: [
       { label: "근태 관리", href: "/attendance", icon: Clock, menuKey: "attendance" },
-      { label: "휴가 관리", href: "/leave", icon: Calendar, menuKey: "leave" },
+      { label: "휴가 관리", href: "/leave", icon: PlaneTakeoff, menuKey: "leave" },
     ],
   },
   {
@@ -61,9 +62,9 @@ const navGroups: NavGroup[] = [
       { label: "거래처", href: "/customers", icon: Building2, menuKey: "customers" },
       { label: "파트너", href: "/partners", icon: Handshake, menuKey: "partners" },
       { label: "공간 DB", href: "/venues", icon: MapPin, menuKey: "venues" },
-      { label: "재무 관리", href: "/finance", icon: Banknote, menuKey: "finance" },
-      { label: "회사 매출·매입", href: "/company-finance", icon: BarChart2, menuKey: "companyFinance" },
-      { label: "구글 시트", href: "/sheets", icon: Sheet, menuKey: "sheets" },
+      { label: "재무 관리", href: "/finance", icon: WalletCards, menuKey: "finance" },
+      { label: "회사 매출·매입", href: "/company-finance", icon: ChartNoAxesCombined, menuKey: "companyFinance" },
+      { label: "구글 시트", href: "/sheets", icon: FileSpreadsheet, menuKey: "sheets" },
       { label: "ID 관리", href: "/credentials", icon: KeyRound, menuKey: "credentials" },
     ],
   },
@@ -106,14 +107,14 @@ export function Sidebar({ role, onClose, allowedMenus }: SidebarProps) {
         onClick={onClose}
         aria-current={active ? "page" : undefined}
         className={cn(
-          "flex h-8 w-full items-center gap-2 overflow-hidden rounded-xl px-3 text-left text-sm whitespace-nowrap transition-colors",
+          "flex h-9 w-full items-center gap-2.5 overflow-hidden rounded-xl px-3 text-left text-sm whitespace-nowrap transition-colors",
           "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
           active
             ? "bg-sidebar-accent font-medium text-sidebar-accent-foreground"
             : "text-sidebar-foreground/80"
         )}
       >
-        <Icon className="size-4 shrink-0" />
+        <Icon className="size-[18px] shrink-0" />
         <span className="truncate">{item.label}</span>
       </Link>
     );
@@ -147,20 +148,23 @@ export function Sidebar({ role, onClose, allowedMenus }: SidebarProps) {
 
       {/* 내비게이션 */}
       <nav className="flex flex-1 flex-col overflow-y-auto px-2 py-2">
-        {navGroups.map((group, gi) => {
-          const items = group.items.filter(visible);
-          if (items.length === 0) return null;
-          return (
-            <div key={group.label ?? `g${gi}`} className={cn(group.label && "py-1")}>
-              {group.label && (
-                <div className="flex h-8 shrink-0 items-center rounded-xl px-3 text-xs font-medium text-sidebar-foreground/70">
-                  {group.label}
-                </div>
-              )}
-              <div className="flex flex-col gap-1">{items.map(renderItem)}</div>
-            </div>
-          );
-        })}
+        {/* 메뉴 행을 넉넉히 두면서도 관리자 화면에서 전체 항목이 한 화면에 들어오도록 간격을 제한한다. */}
+        <div className="flex flex-col gap-1.5">
+          {navGroups.map((group, gi) => {
+            const items = group.items.filter(visible);
+            if (items.length === 0) return null;
+            return (
+              <div key={group.label ?? `g${gi}`} className="py-1">
+                {group.label && (
+                  <div className="flex h-7 shrink-0 items-center rounded-xl px-3 text-xs font-medium text-sidebar-foreground/70">
+                    {group.label}
+                  </div>
+                )}
+                <div className="flex flex-col gap-1.5">{items.map(renderItem)}</div>
+              </div>
+            );
+          })}
+        </div>
 
         {secondary.length > 0 && (
           <div className="mt-auto flex flex-col gap-1 pt-2">

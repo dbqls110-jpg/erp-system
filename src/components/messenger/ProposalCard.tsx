@@ -8,8 +8,10 @@ import { Button } from "@/components/ui/button";
 import {
   fieldLabel,
   validateProposal,
+  type SheetCreateContent,
   type Proposal,
 } from "@/lib/assistantProposal";
+import { sheetFolderPath } from "@/lib/sheetLimits";
 
 /**
  * 비서가 내놓은 변경 제안을 확인 카드로 보여준다.
@@ -29,6 +31,50 @@ function displayValue(value: unknown): string {
   return String(value);
 }
 
+function SheetPreview({ data }: { data: Record<string, string[][]> }) {
+  const entries = Object.entries(data).filter(([, rows]) => rows.length > 0);
+  if (entries.length === 0) {
+    return <p className="mt-2 text-[11px] text-muted-foreground">미리 볼 표 내용이 없습니다.</p>;
+  }
+
+  return (
+    <div className="mt-2 space-y-2">
+      {entries.map(([tabName, rows]) => {
+        const previewRows = rows.slice(0, 5);
+        const columnCount = Math.max(1, ...previewRows.map((row) => row.length));
+        return (
+          <div key={tabName} className="overflow-hidden rounded-lg border border-border">
+            <p className="border-b border-border bg-muted/50 px-2 py-1 text-[11px] font-medium text-foreground">
+              {tabName}
+            </p>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-[11px]">
+                <tbody>
+                  {previewRows.map((row, rowIndex) => (
+                    <tr key={rowIndex} className={rowIndex === 0 ? "bg-muted/30" : undefined}>
+                      {Array.from({ length: columnCount }, (_, columnIndex) => {
+                        const Cell = rowIndex === 0 ? "th" : "td";
+                        return (
+                          <Cell
+                            key={columnIndex}
+                            className="max-w-48 border-r border-border px-2 py-1 align-top last:border-r-0"
+                          >
+                            {row[columnIndex] ?? ""}
+                          </Cell>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export function ProposalCard({
   proposal,
   index,
@@ -45,25 +91,46 @@ export function ProposalCard({
   const [error, setError] = useState<string | null>(null);
 
   const { accepted, rejected } = validateProposal(proposal);
-  const nothingToApply = Object.keys(accepted).length === 0;
+  const isSheetCreate = proposal.target === "sheet_create";
+  const sheet = isSheetCreate ? (accepted as unknown as Partial<SheetCreateContent>) : null;
+  const sheetTabs = sheet && Array.isArray(sheet.tabs) ? sheet.tabs : [];
+  const sheetData = sheet && sheet.data && typeof sheet.data === "object" ? sheet.data : {};
+  const sheetRowCount = Object.values(sheetData).reduce(
+    (count, rows) => count + (Array.isArray(rows) ? rows.length : 0),
+    0,
+  );
+  const sheetCellCount = Object.values(sheetData).reduce(
+    (count, rows) => count + (Array.isArray(rows) ? rows.reduce((sum, row) => sum + row.length, 0) : 0),
+    0,
+  );
+  const sheetColumnCount = Object.values(sheetData).reduce(
+    (count, rows) => Math.max(count, ...(Array.isArray(rows) ? rows.map((row) => row.length) : [])),
+    0,
+  );
+  const nothingToApply = isSheetCreate
+    ? rejected.length > 0 || typeof sheet?.title !== "string"
+    : Object.keys(accepted).length === 0;
+  const [sheetUrl, setSheetUrl] = useState<string | null>(null);
 
   async function apply() {
     setState("saving");
     setError(null);
+    setSheetUrl(null);
     try {
       const res = await fetch("/api/assistant/apply", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ jobId, index }),
       });
-      const data = (await res.json()) as { error?: string; name?: string };
+      const data = (await res.json()) as { error?: string; name?: string; url?: string };
       if (!res.ok) {
         setError(data.error ?? "저장하지 못했습니다.");
         setState("idle");
         return;
       }
       setState("done");
-      toast.success(`${data.name ?? "자료"}에 반영했습니다.`);
+      setSheetUrl(data.url ?? null);
+      toast.success(isSheetCreate ? "구글 시트를 만들었습니다." : `${data.name ?? "자료"}에 반영했습니다.`);
       onApplied?.();
     } catch {
       setError("저장하지 못했습니다.");
@@ -74,7 +141,7 @@ export function ProposalCard({
   return (
     <div className="rounded-xl border border-border bg-background p-3">
       <p className="text-xs font-medium text-foreground">
-        {proposal.label ?? proposal.id}
+        {isSheetCreate ? (typeof sheet?.title === "string" ? sheet.title : "새 시트") : proposal.label ?? proposal.id}
         <span className="ml-1.5 font-normal text-muted-foreground">
           {proposal.target === "venue"
             ? "공간"
@@ -82,23 +149,49 @@ export function ProposalCard({
               ? "파트너"
               : proposal.target === "project"
                 ? "프로젝트"
-                : "Drive 파일"}
+                : proposal.target === "drive_file"
+                  ? "Drive 파일"
+                  : "구글 시트"}
         </span>
       </p>
       {proposal.reason && (
         <p className="mt-0.5 text-[11px] text-muted-foreground">{proposal.reason}</p>
       )}
 
-      <dl className="mt-2 space-y-1">
-        {Object.entries(accepted).map(([field, value]) => (
-          <div key={field} className="flex gap-2 text-xs">
-            <dt className="w-20 shrink-0 text-muted-foreground">
-              {fieldLabel(proposal.target, field)}
-            </dt>
-            <dd className="text-foreground">{displayValue(value)}</dd>
-          </div>
-        ))}
-      </dl>
+      {isSheetCreate ? (
+        <>
+          <dl className="mt-2 space-y-1 text-xs">
+            <div className="flex gap-2">
+              <dt className="w-20 shrink-0 text-muted-foreground">저장 폴더</dt>
+              <dd className="text-foreground">
+                {sheetFolderPath(typeof sheet?.folderName === "string" ? sheet.folderName : undefined)}
+              </dd>
+            </div>
+            <div className="flex gap-2">
+              <dt className="w-20 shrink-0 text-muted-foreground">탭</dt>
+              <dd className="text-foreground">{sheetTabs.join(", ") || "Sheet1"}</dd>
+            </div>
+            <div className="flex gap-2">
+              <dt className="w-20 shrink-0 text-muted-foreground">크기</dt>
+              <dd className="text-foreground">
+                총 {sheetRowCount}행 {sheetColumnCount}열 · {sheetCellCount}칸
+              </dd>
+            </div>
+          </dl>
+          <SheetPreview data={sheetData as Record<string, string[][]>} />
+        </>
+      ) : (
+        <dl className="mt-2 space-y-1">
+          {Object.entries(accepted).map(([field, value]) => (
+            <div key={field} className="flex gap-2 text-xs">
+              <dt className="w-20 shrink-0 text-muted-foreground">
+                {fieldLabel(proposal.target, field)}
+              </dt>
+              <dd className="text-foreground">{displayValue(value)}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
 
       {rejected.length > 0 && (
         // 버린 칸을 감추면 "왜 이건 안 들어갔지"를 알 수 없다.
@@ -114,9 +207,21 @@ export function ProposalCard({
       {error && <p className="mt-2 text-[11px] text-destructive">{error}</p>}
 
       {state === "done" ? (
-        <p className="mt-2 flex items-center gap-1 text-[11px] text-muted-foreground">
-          <Check className="size-3" /> 반영했습니다
-        </p>
+        <div className="mt-2 text-[11px] text-muted-foreground">
+          <p className="flex items-center gap-1">
+            <Check className="size-3" /> {isSheetCreate ? "시트를 만들었습니다" : "반영했습니다"}
+          </p>
+          {sheetUrl && (
+            <a
+              href={sheetUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-1 inline-block text-primary underline underline-offset-2"
+            >
+              구글 시트 열기
+            </a>
+          )}
+        </div>
       ) : state === "cancelled" ? (
         <p className="mt-2 text-[11px] text-muted-foreground">취소했습니다</p>
       ) : (
@@ -128,7 +233,7 @@ export function ProposalCard({
             disabled={state === "saving" || nothingToApply}
             title={nothingToApply ? "적용할 수 있는 항목이 없습니다" : undefined}
           >
-            {state === "saving" ? "저장 중…" : "저장"}
+            {state === "saving" ? (isSheetCreate ? "시트 만드는 중…" : "저장 중…") : isSheetCreate ? "시트 만들기" : "저장"}
           </Button>
           <Button
             size="sm"
