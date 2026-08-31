@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyAgentApiKey } from "@/lib/agentAuth";
 import { auditLog } from "@/lib/agentAudit";
 import { prisma } from "@/lib/prisma";
+import { normalizeCompany } from "@/lib/companyFinance";
 
 export async function GET(req: NextRequest) {
   if (!verifyAgentApiKey(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -17,6 +18,7 @@ export async function GET(req: NextRequest) {
   if (q) where.OR = [
     { name: { contains: q, mode: "insensitive" } },
     { client: { contains: q, mode: "insensitive" } },
+    { company: { contains: q, mode: "insensitive" } },
     { assignee: { contains: q, mode: "insensitive" } },
   ];
 
@@ -29,6 +31,7 @@ export async function GET(req: NextRequest) {
       skip: (page - 1) * limit,
       select: {
         id: true, name: true, client: true, status: true, progress: true,
+        company: true,
         assignee: true, announceDate: true, deadline: true,
         revenue: true, cost: true, memo: true, createdAt: true, updatedAt: true,
       },
@@ -42,13 +45,18 @@ export async function POST(req: NextRequest) {
   if (!verifyAgentApiKey(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = await req.json();
-  const { name, client, announceDate, deadline, status, progress, assignee, memo, revenue, cost, dryRun } = body;
+  const { name, client, company, announceDate, deadline, status, progress, assignee, memo, revenue, cost, dryRun } = body;
 
   if (!name) return NextResponse.json({ error: "name은 필수입니다." }, { status: 400 });
+  const normalizedCompany = company == null || company === "" ? null : normalizeCompany(company);
+  if (company != null && company !== "" && !normalizedCompany) {
+    return NextResponse.json({ error: "company는 인포피아, 노바웨이, 클로원 중 하나여야 합니다." }, { status: 400 });
+  }
 
   const data = {
     name,
     client: client ?? null,
+    company: normalizedCompany,
     announceDate: announceDate ?? null,
     deadline: deadline ?? null,
     status: status ?? "active",

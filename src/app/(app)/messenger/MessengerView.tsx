@@ -7,8 +7,8 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Send, MessageCircle, ArrowLeft, CalendarPlus, Sparkles } from "lucide-react";
-import { sendMessage } from "@/app/actions/message";
+import { Send, MessageCircle, ArrowLeft, CalendarPlus, Sparkles, Paperclip, FileText, X, Bot } from "lucide-react";
+import { sendMessage, sendMessageWithAttachment } from "@/app/actions/message";
 import { createCalendarEvent } from "@/app/actions/calendar";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -17,6 +17,7 @@ import { MessageContent } from "@/components/messenger/MessageContent";
 import { AssistantPanel } from "@/components/messenger/AssistantPanel";
 import { useMessenger } from "@/lib/messenger-store";
 import { useVisiblePolling } from "@/lib/useVisiblePolling";
+import { formatKoreanShortDate, formatKoreanTime, koreanDateKey } from "@/lib/dateFormat";
 
 interface User {
   id: string;
@@ -37,6 +38,11 @@ interface Message {
   content: string;
   createdAt: string;
   readAt: string | null;
+  attachmentDriveFileId: string | null;
+  attachmentName: string | null;
+  attachmentMimeType: string | null;
+  attachmentSizeBytes: number | null;
+  attachmentUrl: string | null;
 }
 
 interface ContextMenu {
@@ -54,23 +60,24 @@ const COLOR_OPTIONS = [
   { value: "gray",   label: "회색",   class: "bg-gray-400" },
 ];
 
+const MAX_MESSENGER_FILE_SIZE = 50 * 1024 * 1024;
+
 function initials(name: string | null) {
   return (name ?? "?").slice(0, 2).toUpperCase();
 }
 
 function timeStr(iso: string) {
-  const d = new Date(iso);
-  const now = new Date();
-  const isToday = d.toDateString() === now.toDateString();
-  if (isToday) return d.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" });
-  return d.toLocaleDateString("ko-KR", { month: "short", day: "numeric" });
+  if (koreanDateKey(iso) === koreanDateKey(new Date())) return formatKoreanTime(iso);
+  return formatKoreanShortDate(iso);
 }
 
-function todayStr() {
-  return new Date().toISOString().split("T")[0];
+function formatFileSize(size: number | null) {
+  if (!size || size <= 0) return "파일";
+  if (size < 1024 * 1024) return `${Math.max(1, Math.round(size / 1024))}KB`;
+  return `${(size / (1024 * 1024)).toFixed(size >= 10 * 1024 * 1024 ? 0 : 1)}MB`;
 }
 
-export function MessengerView({ myId, users }: { myId: string; users: User[] }) {
+export function MessengerView({ myId, users, todayDate }: { myId: string; users: User[]; todayDate: string }) {
   // 대화 목록은 AppShell 의 MessengerProvider 가 한 번만 폴링해 나눠준다.
   // 여기서 또 폴링하면 플로팅 위젯 · 헤더와 합쳐 요청이 세 배가 된다.
   const { conversations, refresh: refreshConversations } = useMessenger();
@@ -82,8 +89,11 @@ export function MessengerView({ myId, users }: { myId: string; users: User[] }) 
   const [showList, setShowList] = useState(true);
   // 사람 대화와 배타적이다. 둘이 동시에 열리면 어느 쪽을 보고 있는지 알 수 없다.
   const [assistantOpen, setAssistantOpen] = useState(false);
+  const [assistantDraft, setAssistantDraft] = useState("");
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // 우클릭 컨텍스트 메뉴
   const [contextMenu, setContextMenu] = useState<ContextMenu | null>(null);
@@ -92,7 +102,7 @@ export function MessengerView({ myId, users }: { myId: string; users: User[] }) 
   // 캘린더 등록 모달
   const [calModal, setCalModal] = useState(false);
   const [calTitle, setCalTitle] = useState("");
-  const [calDate, setCalDate] = useState(todayStr());
+  const [calDate, setCalDate] = useState(todayDate);
   const [calColor, setCalColor] = useState("blue");
   const [calSaving, setCalSaving] = useState(false);
 
@@ -139,9 +149,20 @@ export function MessengerView({ myId, users }: { myId: string; users: User[] }) 
     setContextMenu({ x, y, message: msg });
   }
 
+  function openAssistantForFile(message: Message) {
+    if (!message.attachmentDriveFileId || !message.attachmentName) return;
+    setAssistantDraft(
+      `[첨부파일 이동 요청]\n파일명: ${message.attachmentName}\nDrive 파일 ID: ${message.attachmentDriveFileId}\n현재 저장 위치: 천우영 시스템/메신저\n요청: 이 파일을 <프로젝트명 또는 견적서> 폴더로 보내줘. 먼저 이동 제안만 보여줘.`,
+    );
+    setContextMenu(null);
+    setAssistantOpen(true);
+    setSelectedUser(null);
+    setShowList(false);
+  }
+
   function openCalModal(msg: Message) {
     setCalTitle(msg.content.slice(0, 60));
-    setCalDate(todayStr());
+    setCalDate(todayDate);
     setCalColor("blue");
     setContextMenu(null);
     setCalModal(true);
@@ -167,19 +188,44 @@ export function MessengerView({ myId, users }: { myId: string; users: User[] }) 
     setSelectedUser(user);
     setSelectedConvId(existing?.conversationId ?? null);
     setMessages([]);
+    setSelectedFile(null);
     setShowList(false);
     inputRef.current?.focus();
     if (existing) fetchMessages(existing.conversationId);
   }
 
+  function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0] ?? null;
+    if (file && file.size > MAX_MESSENGER_FILE_SIZE) {
+      toast.error("메신저 첨부파일은 50MB 이하만 보낼 수 있습니다.");
+      setSelectedFile(null);
+      event.target.value = "";
+      return;
+    }
+    setSelectedFile(file);
+    // 같은 파일을 다시 선택해도 change 이벤트가 발생하도록 초기화한다.
+    event.target.value = "";
+  }
+
+  function clearSelectedFile() {
+    setSelectedFile(null);
+  }
+
   async function handleSend() {
-    if (!input.trim() || !selectedUser) return;
+    if ((!input.trim() && !selectedFile) || !selectedUser) return;
     setSending(true);
     const text = input.trim();
     const receiverId = selectedUser.id;
     setInput("");
     try {
-      await sendMessage(receiverId, text);
+      if (selectedFile) {
+        const formData = new FormData();
+        formData.set("file", selectedFile);
+        await sendMessageWithAttachment(receiverId, text, formData);
+        setSelectedFile(null);
+      } else {
+        await sendMessage(receiverId, text);
+      }
 
       // 첫 메시지면 대화가 방금 생겼으므로 id 를 찾아야 한다.
       const res = await fetch("/api/messenger/conversations");
@@ -219,7 +265,7 @@ export function MessengerView({ myId, users }: { myId: string; users: User[] }) 
           <div className="flex-1 overflow-y-auto">
             {/* 비서는 사람이 아니라 목록 맨 위에 고정으로 둔다. 직원 사이에 섞이면 찾기 어렵다. */}
             <button
-              onClick={() => { setAssistantOpen(true); setSelectedUser(null); setShowList(false); }}
+              onClick={() => { setAssistantDraft(""); setAssistantOpen(true); setSelectedUser(null); setShowList(false); }}
               className={cn(
                 "w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/50 transition-colors text-left",
                 assistantOpen && "bg-accent",
@@ -264,7 +310,8 @@ export function MessengerView({ myId, users }: { myId: string; users: User[] }) 
                       </div>
                       {conv.lastMsg && (
                         <p className={cn("text-xs truncate", conv.unread > 0 ? "text-foreground font-medium" : "text-muted-foreground")}>
-                          {conv.lastMsg.senderId === myId ? "나: " : ""}{conv.lastMsg.content}
+                          {conv.lastMsg.senderId === myId ? "나: " : ""}
+                          {conv.lastMsg.attachmentName ? `📎 ${conv.lastMsg.attachmentName}` : conv.lastMsg.content}
                         </p>
                       )}
                     </div>
@@ -303,7 +350,7 @@ export function MessengerView({ myId, users }: { myId: string; users: User[] }) 
                 </div>
                 <span className="text-sm font-semibold text-foreground">ERP 비서</span>
               </div>
-              <AssistantPanel />
+              <AssistantPanel key={assistantDraft || "assistant"} initialQuestion={assistantDraft} />
             </>
           ) : !selectedUser ? (
             <div className="flex flex-1 flex-col items-center justify-center gap-3 py-12 text-center">
@@ -324,7 +371,7 @@ export function MessengerView({ myId, users }: { myId: string; users: User[] }) 
                 <div className="flex flex-col min-w-0">
                   <span className="text-sm font-semibold text-foreground">{selectedUser.name}</span>
                 </div>
-                <span className="text-xs text-muted-foreground ml-auto">메시지 우클릭 → 캘린더 등록</span>
+                <span className="text-xs text-muted-foreground ml-auto">메시지 우클릭 → 캘린더 · 파일 정리</span>
               </div>
 
               <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
@@ -347,10 +394,40 @@ export function MessengerView({ myId, users }: { myId: string; users: User[] }) 
                       )}
                       <div className={cn("max-w-[70%] space-y-0.5", isMine && "items-end flex flex-col")}>
                         <div className={cn(
-                          "px-3 py-2 rounded-2xl text-sm leading-relaxed select-text cursor-context-menu",
+                          "space-y-2 rounded-2xl px-3 py-2 text-sm leading-relaxed select-text cursor-context-menu",
                           isMine ? "bg-primary text-primary-foreground rounded-tr-sm" : "bg-muted text-foreground rounded-tl-sm"
                         )}>
-                          <MessageContent content={msg.content} />
+                          {msg.content && <MessageContent content={msg.content} />}
+                          {msg.attachmentDriveFileId && msg.attachmentUrl && (
+                            <a
+                              href={msg.attachmentUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className={cn(
+                                "flex min-w-52 max-w-full items-center gap-2.5 rounded-xl border px-2.5 py-2 transition-colors",
+                                isMine
+                                  ? "border-primary-foreground/20 bg-primary-foreground/10 hover:bg-primary-foreground/20"
+                                  : "border-border bg-background/70 hover:bg-background",
+                              )}
+                              onClick={(event) => event.stopPropagation()}
+                            >
+                              <span className={cn(
+                                "flex size-8 shrink-0 items-center justify-center rounded-lg",
+                                isMine ? "bg-primary-foreground/15" : "bg-primary/10 text-primary",
+                              )}>
+                                <FileText className="size-4" aria-hidden="true" />
+                              </span>
+                              <span className="min-w-0">
+                                <span className="block truncate text-xs font-medium">{msg.attachmentName ?? "첨부파일"}</span>
+                                <span className={cn(
+                                  "block text-[10px]",
+                                  isMine ? "text-primary-foreground/70" : "text-muted-foreground",
+                                )}>
+                                  {formatFileSize(msg.attachmentSizeBytes)} · Drive에서 열기
+                                </span>
+                              </span>
+                            </a>
+                          )}
                         </div>
                         <span className="text-[10px] text-muted-foreground px-1">{timeStr(msg.createdAt)}</span>
                       </div>
@@ -361,7 +438,40 @@ export function MessengerView({ myId, users }: { myId: string; users: User[] }) 
               </div>
 
               <div className="px-4 py-3 border-t border-border shrink-0">
+                {selectedFile && (
+                  <div className="mb-2 flex items-center gap-2 rounded-lg border border-border bg-muted/40 px-2.5 py-2">
+                    <FileText className="size-4 shrink-0 text-primary" aria-hidden="true" />
+                    <span className="min-w-0 flex-1 truncate text-xs font-medium">{selectedFile.name}</span>
+                    <span className="shrink-0 text-[10px] text-muted-foreground">{formatFileSize(selectedFile.size)}</span>
+                    <button
+                      type="button"
+                      onClick={clearSelectedFile}
+                      className="rounded-md p-1 text-muted-foreground hover:bg-background hover:text-foreground"
+                      aria-label="첨부파일 선택 취소"
+                    >
+                      <X className="size-3.5" aria-hidden="true" />
+                    </button>
+                  </div>
+                )}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  className="hidden"
+                  onChange={handleFileChange}
+                />
                 <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={sending}
+                    className="h-9 w-9 shrink-0"
+                    aria-label="파일 첨부"
+                    title="파일 첨부 (최대 50MB)"
+                  >
+                    <Paperclip className="size-3.5" aria-hidden="true" />
+                  </Button>
                   <Input
                     ref={inputRef}
                     value={input}
@@ -371,9 +481,11 @@ export function MessengerView({ myId, users }: { myId: string; users: User[] }) 
                     className="flex-1"
                     disabled={sending}
                   />
-                  <Button size="icon" onClick={handleSend} disabled={!input.trim() || sending}
-                    className="h-9 py-2 bg-primary hover:bg-primary/90 text-primary-foreground shrink-0">
-                    <Send className="size-3.5" />
+                  <Button size="icon" onClick={handleSend} disabled={(!input.trim() && !selectedFile) || sending}
+                    className="h-9 py-2 bg-primary hover:bg-primary/90 text-primary-foreground shrink-0"
+                    aria-label="메시지 전송"
+                    title="메시지 전송">
+                    <Send className="size-3.5" aria-hidden="true" />
                   </Button>
                 </div>
               </div>
@@ -389,13 +501,26 @@ export function MessengerView({ myId, users }: { myId: string; users: User[] }) 
           className="fixed z-50 bg-popover border border-border rounded-lg shadow-lg py-1 min-w-[160px]"
           style={{ top: contextMenu.y, left: contextMenu.x }}
         >
-          <button
-            onClick={() => openCalModal(contextMenu.message)}
-            className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors"
-          >
-            <CalendarPlus className="size-3.5 text-primary" />
-            캘린더에 등록
-          </button>
+          {contextMenu.message.attachmentDriveFileId && (
+            <button
+              type="button"
+              onClick={() => openAssistantForFile(contextMenu.message)}
+              className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm text-foreground transition-colors hover:bg-muted"
+            >
+              <Bot className="size-3.5 text-primary" aria-hidden="true" />
+              AI에게 파일 정리 요청
+            </button>
+          )}
+          {contextMenu.message.content && (
+            <button
+              type="button"
+              onClick={() => openCalModal(contextMenu.message)}
+              className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm text-foreground transition-colors hover:bg-muted"
+            >
+              <CalendarPlus className="size-3.5 text-primary" />
+              캘린더에 등록
+            </button>
+          )}
         </div>
       )}
 

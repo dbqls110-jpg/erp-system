@@ -19,6 +19,19 @@ import { buildAssistantPrompt } from "@/lib/assistantPrompt";
 const BRIDGE_STALE_MS = 3 * 60 * 1000;
 const AGENT_TYPE = "agent-1";
 const MAX_QUESTION_LEN = 2000;
+const INTERNAL_ASSISTANT_MARKERS = [
+  "[ERP AI 평가",
+  "[배포 검증]",
+  "연결 시험이다.",
+  "연결 확인 테스트입니다.",
+  "연결 테스트",
+  "두 번째 연결 테스트",
+];
+
+function isInternalAssistantQuestion(question: string) {
+  const normalized = question.trim();
+  return INTERNAL_ASSISTANT_MARKERS.some((marker) => normalized.startsWith(marker));
+}
 
 interface Turn {
   id: string;
@@ -65,7 +78,7 @@ export async function GET(req: NextRequest) {
     const [job, heartbeat] = await Promise.all([
       prisma.agentJob.findFirst({
         // job id만 알아도 남의 대화를 읽을 수 없도록 소유자 조건을 함께 건다.
-        where: { id: jobId, userId: session.user.id },
+        where: { id: jobId, userId: session.user.id, visibility: "user" },
         select: {
           id: true, input: true, userInput: true, output: true, status: true,
           errorMsg: true, createdAt: true, completedAt: true,
@@ -80,12 +93,17 @@ export async function GET(req: NextRequest) {
 
     if (!job) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
+    const turn = toTurn(job);
+    if (isInternalAssistantQuestion(turn.question)) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+
     const online = heartbeat
       ? Date.now() - heartbeat.lastSeenAt.getTime() < BRIDGE_STALE_MS
       : false;
 
     return NextResponse.json({
-      turn: toTurn(job),
+      turn,
       bridge: {
         online,
         lastSeenAt: heartbeat?.lastSeenAt.toISOString() ?? null,
@@ -98,7 +116,7 @@ export async function GET(req: NextRequest) {
   const [jobs, heartbeat] = await Promise.all([
     prisma.agentJob.findMany({
       // 남의 질문이 보이면 안 된다. 본인 것만 준다.
-      where: { userId: session.user.id },
+      where: { userId: session.user.id, visibility: "user" },
       orderBy: { createdAt: "desc" },
       take: limit,
       select: {
@@ -117,7 +135,7 @@ export async function GET(req: NextRequest) {
   const legacyJobs = legacyJobIds.length
     ? await prisma.agentJob.findMany({
         // 새 job은 큰 input을 목록 응답에서 제외하고, 옛 job에만 폴백용 원문을 읽는다.
-        where: { userId: session.user.id, id: { in: legacyJobIds } },
+        where: { userId: session.user.id, visibility: "user", id: { in: legacyJobIds } },
         select: { id: true, input: true },
       })
     : [];
@@ -127,10 +145,13 @@ export async function GET(req: NextRequest) {
     ? Date.now() - heartbeat.lastSeenAt.getTime() < BRIDGE_STALE_MS
     : false;
 
+  const turns = jobs
+    .reverse()
+    .map((job) => toTurn({ ...job, input: legacyInputById.get(job.id) }))
+    .filter((turn) => !isInternalAssistantQuestion(turn.question));
+
   return NextResponse.json({
-    turns: jobs.reverse().map((job) =>
-      toTurn({ ...job, input: legacyInputById.get(job.id) }),
-    ),
+    turns,
     bridge: {
       online,
       // 꺼져 있으면 화면에서 미리 알려 준다. 물어보고 한참 기다리다 실패하는 것보다 낫다.
@@ -163,7 +184,11 @@ export async function POST(req: NextRequest) {
   // 같은 사람이 앞선 질문의 답을 기다리는 중이면 새로 받지 않는다. 브릿지가 한 번에
   // 하나씩 처리하므로, 쌓아 두면 마지막 답까지 하염없이 기다리게 된다.
   const pending = await prisma.agentJob.findFirst({
-    where: { userId: session.user.id, status: { in: ["pending", "accepted", "processing"] } },
+    where: {
+      userId: session.user.id,
+      visibility: isInternalAssistantQuestion(question) ? "internal" : "user",
+      status: { in: ["pending", "accepted", "processing"] },
+    },
     select: { id: true },
   });
   if (pending) {
@@ -179,6 +204,7 @@ export async function POST(req: NextRequest) {
     data: {
       agentType: AGENT_TYPE,
       userId: session.user.id,
+      visibility: "user",
       status: "pending",
       input: prompt,
       userInput: question,

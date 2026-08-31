@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { ExternalLink, Pencil, Trash2, Plus, Sheet } from "lucide-react";
 import { createSheetLink, updateSheetLink, deleteSheetLink } from "@/app/actions/sheets";
 
@@ -46,25 +47,43 @@ function Modal({
   const [description, setDescription] = useState(initial?.description ?? "");
   const [category, setCategory] = useState(initial?.category ?? "");
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!name.trim() || !url.trim()) return;
+    if (!name.trim()) {
+      setError("시트 이름을 입력해 주세요.");
+      return;
+    }
+    if (!url.trim()) {
+      setError("URL을 입력해 주세요.");
+      return;
+    }
     setLoading(true);
-    await onSave({ name, url, description, category });
-    setLoading(false);
-    onClose();
+    setError(null);
+    try {
+      await onSave({ name: name.trim(), url: url.trim(), description: description.trim(), category });
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "시트를 저장하지 못했습니다.");
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
       <form
         onSubmit={handleSubmit}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="sheet-modal-title"
         className="bg-white rounded-xl shadow-xl w-full max-w-md p-6 space-y-4"
       >
-        <h2 className="text-base font-semibold text-gray-900">
+        <h2 id="sheet-modal-title" className="text-base font-semibold text-gray-900">
           {initial ? "시트 수정" : "시트 추가"}
         </h2>
+        {error && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
         <div className="space-y-3">
           <div>
             <label className="text-xs font-medium text-gray-600 mb-1 block">시트 이름 *</label>
@@ -137,6 +156,7 @@ function Modal({
 }
 
 export function SheetList({ sheets, isAdmin }: Props) {
+  const router = useRouter();
   const [showAdd, setShowAdd] = useState(false);
   const [editing, setEditing] = useState<SheetLink | null>(null);
 
@@ -151,19 +171,25 @@ export function SheetList({ sheets, isAdmin }: Props) {
 
   async function handleDelete(id: string) {
     if (!confirm("삭제하시겠습니까?")) return;
-    await deleteSheetLink(id);
+    try {
+      await deleteSheetLink(id);
+      router.refresh();
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : "시트를 삭제하지 못했습니다.");
+    }
   }
 
   return (
     <div>
       <div className="flex justify-end mb-6">
-        <button
+        {isAdmin && <button
+          type="button"
           onClick={() => setShowAdd(true)}
           className="flex items-center gap-2 px-4 py-2 rounded-lg bg-violet-600 text-white text-sm font-medium hover:bg-violet-700"
         >
           <Plus size={16} />
           시트 추가
-        </button>
+        </button>}
       </div>
 
       {sheets.length === 0 ? (
@@ -215,15 +241,21 @@ export function SheetList({ sheets, isAdmin }: Props) {
                         </div>
                       </div>
                       <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button
-                          onClick={e => { e.preventDefault(); setEditing(sheet); }}
-                          className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-700"
-                        >
-                          <Pencil size={14} />
-                        </button>
                         {isAdmin && (
                           <button
-                            onClick={e => { e.preventDefault(); handleDelete(sheet.id); }}
+                            type="button"
+                            onClick={e => { e.preventDefault(); setEditing(sheet); }}
+                            aria-label={`${sheet.name} 수정`}
+                            className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-700"
+                          >
+                            <Pencil size={14} />
+                          </button>
+                        )}
+                        {isAdmin && (
+                          <button
+                            type="button"
+                            onClick={e => { e.preventDefault(); void handleDelete(sheet.id); }}
+                            aria-label={`${sheet.name} 삭제`}
                             className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500"
                           >
                             <Trash2 size={14} />
@@ -245,6 +277,7 @@ export function SheetList({ sheets, isAdmin }: Props) {
           onClose={() => setShowAdd(false)}
           onSave={async (data) => {
             await createSheetLink(data);
+            router.refresh();
           }}
         />
       )}
@@ -254,6 +287,7 @@ export function SheetList({ sheets, isAdmin }: Props) {
           onClose={() => setEditing(null)}
           onSave={async (data) => {
             await updateSheetLink(editing.id, data);
+            router.refresh();
           }}
         />
       )}

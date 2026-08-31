@@ -1,3 +1,5 @@
+import { FILE_CATEGORIES } from "@/lib/fileCategory";
+
 /**
  * AI 가 내놓은 변경 제안을 검사하고 실제로 적용한다.
  *
@@ -35,6 +37,11 @@ export const EDITABLE_FIELDS = {
     deadline: "마감일",
     progress: "진행률",
     memo: "비고",
+  },
+  drive_file: {
+    destination: "이동 대상",
+    projectId: "프로젝트",
+    category: "분류 폴더",
   },
 } as const;
 
@@ -115,6 +122,34 @@ export function validateProposal(proposal: Proposal): ValidatedProposal {
       continue;
     }
 
+    if (proposal.target === "drive_file") {
+      if (field === "destination") {
+        if (value !== "project" && value !== "category") {
+          rejected.push({ field, reason: "프로젝트 또는 분류 폴더만 선택할 수 있습니다." });
+          continue;
+        }
+        accepted[field] = value;
+        continue;
+      }
+      if (field === "projectId") {
+        if (typeof value !== "string" || !value.trim() || value.length > 100) {
+          rejected.push({ field, reason: "유효한 프로젝트를 지정해야 합니다." });
+          continue;
+        }
+        accepted[field] = value.trim();
+        continue;
+      }
+      if (field === "category") {
+        const categories = new Set(FILE_CATEGORIES.map((category) => category.folder));
+        if (typeof value !== "string" || !categories.has(value)) {
+          rejected.push({ field, reason: "허용된 분류 폴더가 아닙니다." });
+          continue;
+        }
+        accepted[field] = value;
+        continue;
+      }
+    }
+
     if (value === null) {
       accepted[field] = null;
       continue;
@@ -155,6 +190,18 @@ export function validateProposal(proposal: Proposal): ValidatedProposal {
       continue;
     }
     accepted[field] = value.trim();
+  }
+
+  if (proposal.target === "drive_file") {
+    const destination = accepted.destination;
+    if (destination === "project" && typeof accepted.projectId !== "string") {
+      rejected.push({ field: "projectId", reason: "프로젝트 폴더로 보내려면 프로젝트를 지정해야 합니다." });
+      delete accepted.destination;
+    }
+    if (destination === "category" && typeof accepted.category !== "string") {
+      rejected.push({ field: "category", reason: "분류 폴더를 지정해야 합니다." });
+      delete accepted.destination;
+    }
   }
 
   return { proposal, accepted, rejected };

@@ -37,6 +37,7 @@ model User {
   leaveRequests    LeaveRequest[]
   expenses         Expense[]
   businessCards    BusinessCard[]
+  companyFinanceEntries CompanyFinanceEntry[]
   calendarEvents   CalendarEvent[]
   conversationsAsA Conversation[]  @relation("ConvA")
   conversationsAsB Conversation[]  @relation("ConvB")
@@ -155,6 +156,7 @@ model Project {
   id           String   @id @default(cuid())
   name         String
   client       String?
+  company      String? // 인포피아 | 노바웨이 | 클로원
   announceDate String?
   deadline     String?
   status       String   @default("active") // "active" | "completed" | "on_hold"
@@ -260,6 +262,27 @@ model Expense {
   @@map("expenses")
 }
 
+// ─── 회사 매출·매입 ───────────────────────────────────────
+// 프로젝트 손익과 분리된 회사 장부. 회사별 분기 집계는 이 모델만 사용한다.
+model CompanyFinanceEntry {
+  id          String   @id @default(cuid())
+  company     String   // "인포피아" | "노바웨이" | "클로원"
+  type        String   // "revenue" | "cost"
+  date        String   // "YYYY-MM-DD"
+  title       String
+  amount      Float
+  memo        String?
+  createdById String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  createdBy User @relation(fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@index([company, date])
+  @@index([date])
+  @@map("company_finance_entries")
+}
+
 // ─── 메신저 ───────────────────────────────────────────────
 model Conversation {
   id            String   @id @default(cuid())
@@ -277,18 +300,24 @@ model Conversation {
 }
 
 model Message {
-  id             String    @id @default(cuid())
-  conversationId String
-  senderId       String
-  content        String
-  readAt         DateTime?
-  createdAt      DateTime  @default(now())
+  id                    String    @id @default(cuid())
+  conversationId        String
+  senderId              String
+  content               String
+  attachmentDriveFileId String?
+  attachmentName        String?
+  attachmentMimeType    String?
+  attachmentSizeBytes   Int?
+  attachmentUrl         String?
+  readAt                DateTime?
+  createdAt             DateTime  @default(now())
 
   conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   sender       User         @relation("MessageSender", fields: [senderId], references: [id], onDelete: Cascade)
 
   @@index([conversationId, createdAt])
   @@index([conversationId, readAt, senderId])
+  @@index([attachmentDriveFileId])
   @@map("messages")
 }
 
@@ -414,6 +443,8 @@ model AgentJob {
   agentType String // "hermes" | "marketer"
   userId    String // 요청자 userId
   status    String @default("pending") // "pending" | "accepted" | "processing" | "completed" | "error"
+  /// 운영 비서 대화와 내부 평가/fixture 작업을 분리한다. 브릿지는 모두 처리할 수 있지만 사용자 화면에는 user만 노출한다.
+  visibility String @default("user") // "user" | "internal"
   input     String // 브릿지에 보낼 프롬프트 전체(지시문 + 주입 자료 + 질문)
 
   /// 사람이 실제로 친 말.
@@ -435,7 +466,7 @@ model AgentJob {
   deltas AgentJobDelta[]
 
   @@index([agentType, status, createdAt])
-  @@index([userId, createdAt])
+  @@index([userId, visibility, createdAt])
   @@map("agent_jobs")
 }
 

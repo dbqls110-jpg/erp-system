@@ -5,7 +5,7 @@ import { Trash2 } from "lucide-react";
 import { deleteLeave } from "@/app/actions/leave";
 import { toast } from "sonner";
 
-export function LeaveDeleteButton({ id }: { id: string }) {
+export function LeaveDeleteButton({ id, label }: { id: string; label: string }) {
   const [isPending, startTransition] = useTransition();
 
   function handleDelete() {
@@ -22,10 +22,12 @@ export function LeaveDeleteButton({ id }: { id: string }) {
 
   return (
     <button
+      type="button"
       onClick={handleDelete}
       disabled={isPending}
       className="text-muted-foreground hover:text-destructive transition-colors disabled:opacity-50 shrink-0"
-      title="삭제"
+      title={`${label} 삭제`}
+      aria-label={`${label} 삭제`}
     >
       <Trash2 size={14} />
     </button>

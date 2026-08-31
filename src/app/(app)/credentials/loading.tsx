@@ -7,7 +7,8 @@
  */
 export default function Loading() {
   return (
-    <div className="space-y-6 animate-pulse">
+    <div className="space-y-6 animate-pulse" role="status" aria-label="인증 정보를 불러오는 중">
+      <p className="text-sm text-muted-foreground">인증 정보를 불러오는 중…</p>
       <div className="h-8 w-32 bg-muted rounded-lg" />
       <div className="h-10 bg-muted rounded-lg" />
       <div className="space-y-2">

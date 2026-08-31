@@ -7,6 +7,7 @@ import { Clock, FolderKanban, Banknote, Calendar, CalendarCheck, Palmtree } from
 import { format } from "date-fns";
 import { ko } from "date-fns/locale";
 import Link from "next/link";
+import { summarizeAttendance } from "@/lib/attendanceSummary";
 
 export default async function DashboardPage() {
   const session = await getServerSession(authOptions);
@@ -59,7 +60,7 @@ export default async function DashboardPage() {
   ]);
 
   const attendance = monthlyAttendance.find((r) => r.date === today) ?? null;
-  const workDaysCount = monthlyAttendance.filter((r) => r.clockIn).length;
+  const attendanceSummary = summarizeAttendance(monthlyAttendance);
 
   const totalOther = expenses._sum.amount ?? 0;
   const totalFixed = fixedExpenses._sum.amount ?? 0;
@@ -108,8 +109,10 @@ export default async function DashboardPage() {
       menuKey: "attendance",
       title: "이번달 근무일수",
       icon: <CalendarCheck size={16} className="text-primary" />,
-      value: `${workDaysCount}일`,
-      sub: `${month}월 출근 기록 기준`,
+      value: `${attendanceSummary.workDays}일`,
+      sub: attendanceSummary.uncalculatedHours > 0
+        ? `${month}월 출근 기록 · 미퇴근 ${attendanceSummary.missingClockOut}건`
+        : `${month}월 출근 기록 기준`,
     },
     {
       href: "/leave",

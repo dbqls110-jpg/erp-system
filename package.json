@@ -11,7 +11,7 @@
     "sheet:create": "node scripts/create-erp-sheet.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
-    "render-build": "prisma generate && prisma migrate deploy && next build"
+    "render-build": "prisma generate && prisma migrate deploy && npx tsc --noEmit && next build"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.2",
@@ -27,6 +27,7 @@
     "next": "16.2.6",
     "next-auth": "^4.24.14",
     "next-themes": "^0.4.6",
+    "pdf-parse": "^2.4.5",
     "pg": "^8.22.0",
     "prisma": "^7.8.0",
     "react": "19.2.4",
@@ -35,7 +36,8 @@
     "shadcn": "^4.9.0",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.6.0",
-    "tw-animate-css": "^1.4.0"
+    "tw-animate-css": "^1.4.0",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

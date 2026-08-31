@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { canEditMenu } from "@/lib/permissions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CredentialTable } from "./CredentialTable";
+import { ShieldCheck } from "lucide-react";
 
 // 인증/권한은 (app)/layout.tsx 가 담당한다(세션 없으면 /login, pending 이면 /pending).
 export default async function CredentialsPage() {
@@ -13,9 +14,19 @@ export default async function CredentialsPage() {
   const canEdit = session?.user?.id
     ? await canEditMenu(session.user.id, "credentials", session.user.role)
     : false;
-  const credentials = await prisma.credential.findMany({
+  // 목록 응답에는 민감한 값 자체를 포함하지 않는다. 아이디·비밀번호는
+  // 사용자가 명시적으로 요청한 순간 서버에서 권한 확인과 감사 기록 후 반환한다.
+  const credentialsWithSecrets = await prisma.credential.findMany({
     orderBy: [{ order: "asc" }, { createdAt: "asc" }],
+    select: { id: true, name: true, company: true, category: true, memo: true, url: true, username: true, password: true },
   });
+  const credentials = credentialsWithSecrets.map(({ username, password, ...credential }) => ({
+    ...credential,
+    username: null,
+    password: null,
+    hasUsername: Boolean(username),
+    hasPassword: Boolean(password),
+  }));
 
   return (
     <div className="space-y-4">
@@ -31,6 +42,10 @@ export default async function CredentialsPage() {
           </CardTitle>
         </CardHeader>
         <CardContent>
+          <div className="mb-4 flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-700 dark:text-amber-400" role="note">
+            <ShieldCheck className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+            <p>아이디·비밀번호를 표시하거나 복사하면 서버에서 권한을 다시 확인하고 접근 기록을 남깁니다.</p>
+          </div>
           <CredentialTable initialData={credentials} canEdit={canEdit} />
         </CardContent>
       </Card>

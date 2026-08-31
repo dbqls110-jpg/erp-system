@@ -7,11 +7,11 @@ interface Props {
   categoryData: { name: string; value: number; color: string }[];
   dailyData: { date: string; amount: number }[];
   budget?: number;
-  totalExpense: number;
+  plannedExpense: number;
+  usagePercent: number;
 }
 
-export function FinanceCharts({ categoryData, dailyData, budget, totalExpense }: Props) {
-  const usagePercent = budget ? Math.min(Math.round((totalExpense / budget) * 100), 100) : 0;
+export function FinanceCharts({ categoryData, dailyData, budget, plannedExpense, usagePercent }: Props) {
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -46,11 +46,12 @@ export function FinanceCharts({ categoryData, dailyData, budget, totalExpense }:
             {budget && (
               <div className="mt-3">
                 <div className="flex justify-between text-xs text-muted-foreground mb-1">
-                  <span>예산 사용률</span><span>{usagePercent}%</span>
+                  <span>예산 사용률 · 고정비 포함</span><span>{usagePercent}%</span>
                 </div>
                 <div className="h-2 rounded-full bg-muted overflow-hidden">
                   <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${usagePercent}%` }} />
                 </div>
+                <p className="mt-1 text-[10px] text-muted-foreground">기준 지출 {plannedExpense.toLocaleString()}원</p>
               </div>
             )}
           </CardContent>

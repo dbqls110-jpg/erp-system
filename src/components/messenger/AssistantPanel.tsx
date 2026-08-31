@@ -36,10 +36,10 @@ const TERMINAL_STATUSES: AssistantStatus[] = ["completed", "error"];
 const POLLING_TIMEOUT_MS = 3 * 60 * 1000;
 
 // 뒤로가기 버튼은 MessengerDock 헤더에 있다. 같은 자리에 두 개를 두면 헷갈린다.
-export function AssistantPanel() {
+export function AssistantPanel({ initialQuestion = "" }: { initialQuestion?: string }) {
   const [turns, setTurns] = useState<AssistantTurn[]>([]);
   const [bridge, setBridge] = useState<AssistantResponse["bridge"] | null>(null);
-  const [input, setInput] = useState("");
+  const [input, setInput] = useState(initialQuestion);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [pollingId, setPollingId] = useState<string | null>(null);
@@ -264,6 +264,8 @@ export function AssistantPanel() {
             onClick={() => void handleSend()}
             disabled={!input.trim() || !bridge?.online || sending}
             className="size-8 shrink-0"
+            aria-label="질문 전송"
+            title="질문 전송"
           >
             <Send className="size-3.5" />
           </Button>

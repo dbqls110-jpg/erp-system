@@ -13,6 +13,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { LogOut, Menu, Mail, ExternalLink, LayoutDashboard, MessageCircle } from "lucide-react";
 import { clockOut } from "@/app/actions/attendance";
+import { useEffect, useRef } from "react";
 import { useMessenger } from "@/lib/messenger-store";
 
 const pageTitle: Record<string, string> = {
@@ -23,6 +24,13 @@ const pageTitle: Record<string, string> = {
   "/calendar": "캘린더",
   "/business-cards": "명함 관리",
   "/finance": "재무 관리",
+  "/company-finance": "회사 매출·매입",
+  "/customers": "거래처 관리",
+  "/partners": "파트너 관리",
+  "/venues": "공간 DB",
+  "/credentials": "ID 관리",
+  "/sheets": "구글 시트",
+  "/projects/stats": "프로젝트 통계",
   "/admin": "관리자",
   "/messenger": "메신저",
 };
@@ -50,12 +58,44 @@ const roleLabel: Record<string, { label: string }> = {
 export function Header({ user, onMobileMenuOpen }: HeaderProps) {
   const pathname = usePathname();
   const router = useRouter();
-
   // 미읽음 수는 MessengerProvider 가 이미 가져오는 대화 목록에서 나온다.
   // 예전에는 여기서 /api/messenger/unread 를 따로 30초마다 폴링했는데, 그 응답은
   // /conversations 의 대화별 unread 합계와 같은 값이었다. 요청 하나가 통째로 낭비였다.
-  const { unreadTotal: unread } = useMessenger();
-  const title = Object.entries(pageTitle).find(([key]) => pathname === key || pathname.startsWith(key + "/"))?.[1] ?? "";
+  const { unreadTotal: unread, refresh } = useMessenger();
+
+  // 페이지 이동 시 즉시 갱신한다. 주기 폴링과 탭 가시성 게이팅은
+  // MessengerProvider의 useVisiblePolling이 중앙에서 담당한다.
+  const visibleRef = useRef(true);
+  useEffect(() => {
+    const onVisibilityChange = () => {
+      visibleRef.current = document.visibilityState === "visible";
+    };
+
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", onVisibilityChange);
+  }, []);
+
+  useEffect(() => {
+    if (visibleRef.current) void refresh();
+  }, [pathname, refresh]);
+  const title = Object.entries(pageTitle)
+    .sort(([left], [right]) => right.length - left.length)
+    .find(([key]) => pathname === key || pathname.startsWith(key + "/"))?.[1] ?? "";
+  useEffect(() => {
+    const nextTitle = title ? `${title} | 사내 ERP 시스템` : "사내 ERP 시스템";
+    const applyTitle = () => {
+      if (document.title !== nextTitle) document.title = nextTitle;
+    };
+
+    // Next's metadata manager can restore the root title after hydration. Keep
+    // the visible browser title aligned with the route without changing the DOM
+    // markup used for the server render.
+    applyTitle();
+    const titleElement = document.querySelector("title");
+    const observer = titleElement ? new MutationObserver(applyTitle) : null;
+    observer?.observe(titleElement!, { childList: true, characterData: true, subtree: true });
+    return () => observer?.disconnect();
+  }, [title]);
   const initials = user.name
     ? user.name.slice(0, 2).toUpperCase()
     : user.email?.slice(0, 2).toUpperCase() ?? "?";
@@ -73,15 +113,16 @@ export function Header({ user, onMobileMenuOpen }: HeaderProps) {
         {onMobileMenuOpen && (
           <button
             onClick={onMobileMenuOpen}
+            aria-label="메뉴 열기"
             className="lg:hidden text-muted-foreground hover:text-foreground p-1"
           >
             <Menu size={20} />
           </button>
         )}
-        <p className="text-sm font-semibold text-foreground">{title}</p>
+        <h1 className="text-sm font-semibold text-foreground">{title || "사내 ERP 시스템"}</h1>
       </div>
       <div className="flex items-center gap-3">
-        <Link href="/messenger" className="relative text-muted-foreground hover:text-primary transition-colors">
+        <Link href="/messenger" aria-label="메신저" className="relative text-muted-foreground hover:text-primary transition-colors">
           <MessageCircle size={20} />
           {unread > 0 && (
             <span className="absolute -top-1 -right-1 h-4 min-w-4 px-0.5 rounded-full bg-destructive text-white text-[10px] flex items-center justify-center font-bold">

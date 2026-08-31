@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toneBadgeClass } from "@/lib/badge-tone";
+import { formatKoreanDateTime } from "@/lib/dateFormat";
 
 interface IndexFolder {
   id: string;
@@ -36,7 +37,7 @@ interface SyncResult {
 
 function formatDate(value: string | null) {
   if (!value) return "아직 동기화 안 됨";
-  return new Date(value).toLocaleString("ko-KR", { dateStyle: "short", timeStyle: "short" });
+  return formatKoreanDateTime(value);
 }
 
 export function DriveIndexPanel({ initialStatus }: { initialStatus: DriveIndexInitialStatus }) {

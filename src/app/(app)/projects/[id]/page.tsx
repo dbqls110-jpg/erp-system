@@ -65,6 +65,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
           </div>
           <div className="flex items-center gap-4 text-sm text-muted-foreground flex-wrap">
             {project.client && <span className="flex items-center gap-1"><Building size={13} />{project.client}</span>}
+            {project.company && <span className="flex items-center gap-1"><Building size={13} />귀속 회사 {project.company}</span>}
             {project.assignee && <span className="flex items-center gap-1"><User size={13} />{project.assignee}</span>}
             {project.deadline && <span className="flex items-center gap-1"><Calendar size={13} />마감 {project.deadline}</span>}
             {project.revenue != null && (

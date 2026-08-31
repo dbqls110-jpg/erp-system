@@ -9,6 +9,10 @@ import {
   validateProposal,
   type ProposalTarget,
 } from "@/lib/assistantProposal";
+import {
+  moveMessengerFileToCategory,
+  moveMessengerFileToProject,
+} from "@/lib/googleDrive";
 
 /**
  * 비서가 내놓은 변경 제안을 실제로 적용한다.
@@ -24,6 +28,7 @@ const MENU_FOR: Record<ProposalTarget, string> = {
   venue: "venues",
   partner: "partners",
   project: "projects",
+  drive_file: "messenger",
 };
 
 export async function POST(req: NextRequest) {
@@ -43,7 +48,7 @@ export async function POST(req: NextRequest) {
 
   // 본인 대화의 답변만 적용할 수 있다. 남의 job id 를 넣어도 찾지 못한다.
   const job = await prisma.agentJob.findFirst({
-    where: { id: jobId, userId: session.user.id },
+    where: { id: jobId, userId: session.user.id, visibility: "user" },
     select: { output: true, status: true },
   });
   if (!job) return NextResponse.json({ error: "대화를 찾을 수 없습니다." }, { status: 404 });
@@ -76,7 +81,42 @@ export async function POST(req: NextRequest) {
 
   try {
     let name: string;
-    if (proposal.target === "venue") {
+    let moveResult: { name: string; folderPath: string; driveUrl: string } | null = null;
+    if (proposal.target === "drive_file") {
+      // 파일 ID만 알고 있으면 누구나 다른 파일을 옮길 수 없도록
+      // 현재 사용자가 참여한 대화의 첨부파일인지 먼저 확인한다.
+      const attachment = await prisma.message.findFirst({
+        where: {
+          attachmentDriveFileId: proposal.id,
+          conversation: {
+            OR: [{ participantA: session.user.id }, { participantB: session.user.id }],
+          },
+        },
+        select: { attachmentName: true },
+      });
+      if (!attachment) {
+        return NextResponse.json({ error: "이 첨부파일을 이동할 권한이 없습니다." }, { status: 403 });
+      }
+
+      const destination = accepted.destination;
+      if (destination === "project") {
+        const projectId = typeof accepted.projectId === "string" ? accepted.projectId : "";
+        const project = await prisma.project.findUnique({
+          where: { id: projectId },
+          select: { name: true, createdAt: true },
+        });
+        if (!project) {
+          return NextResponse.json({ error: "지정한 프로젝트를 찾을 수 없습니다." }, { status: 404 });
+        }
+        const category = typeof accepted.category === "string" ? accepted.category : undefined;
+        moveResult = await moveMessengerFileToProject(proposal.id, project, category);
+      } else if (destination === "category" && typeof accepted.category === "string") {
+        moveResult = await moveMessengerFileToCategory(proposal.id, accepted.category);
+      } else {
+        return NextResponse.json({ error: "파일을 보낼 폴더가 올바르지 않습니다." }, { status: 400 });
+      }
+      name = moveResult.name;
+    } else if (proposal.target === "venue") {
       const row = await prisma.venue.update({
         where: { id: proposal.id },
         data: accepted,
@@ -111,6 +151,7 @@ export async function POST(req: NextRequest) {
           applied: JSON.parse(JSON.stringify(accepted)),
           rejected: rejected.map((r) => `${r.field}: ${r.reason}`),
           by: session.user.id,
+          ...(moveResult ? { folderPath: moveResult.folderPath, driveUrl: moveResult.driveUrl } : {}),
         },
       },
     });

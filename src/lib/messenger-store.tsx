@@ -20,7 +20,12 @@ export interface MessengerUser {
 export interface ConvItem {
   conversationId: string;
   other: MessengerUser;
-  lastMsg: { content: string; senderId: string; createdAt: string } | null;
+  lastMsg: {
+    content: string;
+    senderId: string;
+    createdAt: string;
+    attachmentName?: string | null;
+  } | null;
   unread: number;
 }
 

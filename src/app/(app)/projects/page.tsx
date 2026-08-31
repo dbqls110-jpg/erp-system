@@ -82,6 +82,7 @@ export default async function ProjectsPage({
                       </div>
                     </div>
                     {p.client && <p className="text-sm text-muted-foreground">{p.client}</p>}
+                    {p.company && <p className="text-xs text-primary">귀속 회사 · {p.company}</p>}
                   </CardHeader>
                   <CardContent className="space-y-3">
                     <div>

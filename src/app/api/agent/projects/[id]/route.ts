@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyAgentApiKey } from "@/lib/agentAuth";
 import { auditLog } from "@/lib/agentAudit";
 import { prisma } from "@/lib/prisma";
+import { normalizeCompany } from "@/lib/companyFinance";
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   if (!verifyAgentApiKey(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -13,10 +14,19 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const existing = await prisma.project.findUnique({ where: { id } });
   if (!existing) return NextResponse.json({ error: "프로젝트를 찾을 수 없습니다." }, { status: 404 });
 
-  const allowed = ["name", "client", "announceDate", "deadline", "status", "progress", "assignee", "memo", "revenue", "cost"] as const;
+  const allowed = ["name", "client", "company", "announceDate", "deadline", "status", "progress", "assignee", "memo", "revenue", "cost"] as const;
   const data: Record<string, unknown> = {};
   for (const key of allowed) {
     if (key in rest) data[key] = rest[key];
+  }
+  if ("company" in data && data.company !== null && data.company !== "") {
+    const normalizedCompany = normalizeCompany(data.company);
+    if (!normalizedCompany) {
+      return NextResponse.json({ error: "company는 인포피아, 노바웨이, 클로원 중 하나여야 합니다." }, { status: 400 });
+    }
+    data.company = normalizedCompany;
+  } else if ("company" in data) {
+    data.company = null;
   }
 
   if (dryRun === true) {

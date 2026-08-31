@@ -47,6 +47,7 @@ export const MENU_KEYS = [
   { key: "partners", label: "파트너" },
   { key: "venues", label: "공간 DB" },
   { key: "finance", label: "재무 관리" },
+  { key: "companyFinance", label: "회사 매출·매입" },
   { key: "sheets", label: "구글 시트" },
   { key: "credentials", label: "ID 관리" },
   { key: "admin", label: "관리자" },
@@ -87,6 +88,7 @@ export const DEFAULT_MENU_RULES: Record<string, { view: string[]; edit: string[]
   venues: { view: MEMBER_UP, edit: MANAGER_UP },
 
   finance: { view: MANAGER_UP, edit: ADMIN_ONLY },
+  companyFinance: { view: MANAGER_UP, edit: MANAGER_UP },
   sheets: { view: MANAGER_UP, edit: MANAGER_UP },
   credentials: { view: MANAGER_UP, edit: MANAGER_UP },
 

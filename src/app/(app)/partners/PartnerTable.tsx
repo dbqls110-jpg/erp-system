@@ -557,17 +557,23 @@ export function PartnerTable({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <p className="mt-1 text-sm text-muted-foreground">파트너 개인별 계약 현황</p>
+          <div className="flex items-center gap-2.5">
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+              <Handshake className="size-4" aria-hidden="true" />
+            </span>
+            <h1 className="truncate text-xl font-semibold tracking-tight text-foreground">파트너 관리</h1>
+          </div>
+          <p className="mt-2 text-sm text-muted-foreground">파트너 개인별 계약 현황</p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" className="h-9 py-2" onClick={() => router.refresh()}>
+        <div className="flex shrink-0 gap-2">
+          <Button variant="outline" className="h-9 rounded-lg px-3 shadow-xs" onClick={() => router.refresh()}>
             <RefreshCw className="size-3.5" /> 새로고침
           </Button>
           {canEdit && (
             <Button
-              className="h-9 py-2"
+              className="h-9 rounded-lg px-3 shadow-xs"
               onClick={() => setDialog({ initial: { ...emptyForm }, id: null, key: Date.now() })}
             >
               <Plus className="size-3.5" /> 등록
@@ -576,8 +582,8 @@ export function PartnerTable({
         </div>
       </div>
 
-      <Card className="shadow-xs">
-        <CardContent className="space-y-3 pt-(--card-spacing)">
+      <Card className="border-border/70 bg-card/80 shadow-sm">
+        <CardContent className="space-y-3 p-4 sm:p-5">
           <div className="flex flex-wrap items-center gap-3">
             <span className="w-20 shrink-0 text-sm text-muted-foreground">거래상태</span>
             <select
@@ -622,24 +628,24 @@ export function PartnerTable({
         </CardContent>
       </Card>
 
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm">
           총 <span className="font-semibold text-primary">{filtered.length}</span>건
           {filtered.length !== initialData.length && (
             <span className="ml-1 text-muted-foreground">(전체 {initialData.length}건)</span>
           )}
         </p>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex w-full min-w-0 flex-col gap-1.5 sm:w-auto sm:flex-row sm:items-center">
           <Button
             variant="outline"
-            className="h-8"
+            className="h-8 shrink-0 rounded-lg px-3"
             onClick={downloadCsv}
             disabled={filtered.length === 0}
           >
             <Download className="size-3.5" /> 엑셀 다운로드
           </Button>
           <select
-            className={`${SELECT_CLASS} w-32`}
+            className={`${SELECT_CLASS} w-full min-w-[10rem] shrink-0 whitespace-nowrap sm:w-40`}
             value={sort}
             onChange={(e) => setSort(e.target.value)}
           >
@@ -647,7 +653,7 @@ export function PartnerTable({
             <option value="name">이름순</option>
           </select>
           <select
-            className={`${SELECT_CLASS} w-28`}
+            className={`${SELECT_CLASS} w-full min-w-[9.5rem] shrink-0 whitespace-nowrap sm:w-36`}
             value={String(pageSize)}
             onChange={(e) => setPageSize(Number(e.target.value))}
           >
@@ -658,18 +664,49 @@ export function PartnerTable({
         </div>
       </div>
 
-      <Card className="shadow-xs py-0">
+      <Card className="overflow-hidden border-border/70 py-0 shadow-sm">
         <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <Table className="mx-auto w-auto table-auto [&_:is(th,td)]:px-4 [&_:is(th,td)]:py-3">
+          <div className="space-y-2 p-3 md:hidden">
+            {shown.length === 0 ? (
+              <div className="flex flex-col items-center gap-3 py-10 text-center">
+                <Handshake className="size-6 text-muted-foreground" />
+                <p className="text-sm text-muted-foreground">{initialData.length === 0 ? "아직 등록된 항목이 없습니다" : "조건에 맞는 파트너가 없습니다"}</p>
+              </div>
+            ) : shown.map((p) => (
+              <article key={p.id} className="rounded-xl border border-border p-3">
+                <div className="flex items-start justify-between gap-3">
+                  {canEdit ? (
+                    <button type="button" onClick={() => setRateDialog({ partner: p, key: Date.now() })} className="truncate text-left font-medium hover:text-primary hover:underline" aria-label={`${p.name} 단가 관리`}>{p.name}</button>
+                  ) : (
+                    <h3 className="truncate font-medium">{p.name}</h3>
+                  )}
+                  <Badge variant="outline" className="shrink-0">{p.contractStatus}</Badge>
+                </div>
+                <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                  <div><dt className="inline">직업 </dt><dd className="inline text-foreground">{p.job ?? "-"}</dd></div>
+                  <div><dt className="inline">연락처 </dt><dd className="inline text-foreground">{p.phone ?? "-"}</dd></div>
+                  <div><dt className="inline">단가 </dt><dd className="inline text-foreground">{p.rates.length === 0 ? formatRate(p.rate, p.rateUnit) : `${p.rates.length}개 항목`}</dd></div>
+                  <div><dt className="inline">정산 </dt><dd className="inline text-foreground">{p.settlementType ?? "-"}</dd></div>
+                  <div className="col-span-2 truncate"><dt className="inline">프로젝트 </dt><dd className="inline text-foreground">{p.projectNames.length === 0 ? "-" : p.projectNames.join(", ")}</dd></div>
+                </dl>
+                {canEdit && (
+                  <div className="mt-3 flex justify-end gap-2 border-t border-border pt-2">
+                    <button type="button" onClick={() => setPaymentDialog({ partner: p, key: Date.now() })} className="rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-muted hover:text-primary" aria-label={`${p.name} 실제 지급 이력`}><ReceiptText className="mr-1 inline size-3.5" />지급 이력</button>
+                    <button type="button" onClick={() => setDialog({ id: p.id, key: Date.now(), initial: { name: p.name, job: p.job ?? "", phone: p.phone ?? "", rate: p.rate === null ? "" : String(p.rate), rateUnit: p.rateUnit ?? "건당", contractStatus: p.contractStatus, settlementType: p.settlementType ?? "", memo: p.memo ?? "" } })} className="rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-muted hover:text-primary" aria-label={`${p.name} 수정`}><Pencil className="mr-1 inline size-3.5" />수정</button>
+                    <button type="button" onClick={() => handleDelete(p)} disabled={busyId === p.id} className="rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-muted hover:text-destructive" aria-label={`${p.name} 삭제`}><Trash2 className="mr-1 inline size-3.5" />삭제</button>
+                  </div>
+                )}
+              </article>
+            ))}
+          </div>
+          <div className="hidden overflow-x-auto md:block">
+            <p className="mb-2 text-xs text-muted-foreground md:hidden">표를 좌우로 밀어 더 많은 열을 볼 수 있습니다.</p>
+            <Table className="w-full min-w-[820px] table-auto [&_:is(th,td)]:px-4 [&_:is(th,td)]:py-3">
               <TableHeader>
-                <TableRow>
+                <TableRow className="bg-muted/40 hover:bg-muted/40">
                   <TableHead className="whitespace-nowrap">이름</TableHead>
                   <TableHead className="whitespace-nowrap">직업</TableHead>
-                  <TableHead className="whitespace-nowrap">거래상태</TableHead>
-                  {/* 내용 기준으로 배치해 값 사이의 불필요한 간격을 줄인다. 남는 폭은 단가처럼
-                      실제 내용이 길어질 수 있는 열 하나에만 맡기고, 빈 프로젝트 열에는 주지 않는다. */}
-                  <TableHead className="w-full whitespace-nowrap text-right">단가</TableHead>
+                  <TableHead className="whitespace-nowrap">거래상태 · 단가</TableHead>
                   <TableHead className="whitespace-nowrap">정산방식</TableHead>
                   <TableHead className="whitespace-nowrap">연락처</TableHead>
                   <TableHead className="whitespace-nowrap">진행한 프로젝트</TableHead>
@@ -679,7 +716,7 @@ export function PartnerTable({
               <TableBody>
                 {shown.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={canEdit ? 8 : 7} className="py-12 text-center">
+                    <TableCell colSpan={canEdit ? 7 : 6} className="py-12 text-center">
                       <div className="flex flex-col items-center gap-3">
                         <Handshake className="size-6 text-muted-foreground" />
                         <p className="text-sm text-muted-foreground">
@@ -692,7 +729,7 @@ export function PartnerTable({
                   </TableRow>
                 ) : (
                   shown.map((p) => (
-                    <TableRow key={p.id}>
+                    <TableRow key={p.id} className="group transition-colors hover:bg-muted/30">
                       <TableCell className="font-medium whitespace-nowrap">
                         <div className="flex items-center gap-2">
                           {canEdit ? (
@@ -720,28 +757,27 @@ export function PartnerTable({
                       </TableCell>
                       <TableCell className="whitespace-nowrap text-muted-foreground">{p.job ?? "-"}</TableCell>
                       <TableCell>
-                        <Badge variant="outline" className={toneBadgeClass(statusTone(p.contractStatus))}>
-                          {p.contractStatus}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right text-muted-foreground tabular-nums">
-                        {p.rates.length === 0 ? (
-                          formatRate(p.rate, p.rateUnit)
-                        ) : (
-                          // 항목마다 한 줄씩 편다. "포스터 50만 외 2건" 처럼 접으면 나머지를
-                          // 보려고 또 눌러야 하는데, 단가는 목록에서 바로 비교하려고 보는 값이다.
-                          // 하나뿐인 파트너는 자연히 한 줄로 끝난다.
-                          <div className="space-y-0.5">
-                            {p.rates.map((rate) => (
-                              <div key={rate.id} className="flex justify-end gap-2 whitespace-nowrap">
-                                <span className="min-w-16 text-muted-foreground">{rate.item}</span>
-                                <span className="tabular-nums text-foreground">
-                                  {rate.amount.toLocaleString()}원 / {rate.unit}
-                                </span>
+                        <div className="flex min-w-28 flex-col items-start gap-1">
+                          <Badge variant="outline" className={toneBadgeClass(statusTone(p.contractStatus))}>
+                            {p.contractStatus}
+                          </Badge>
+                          <div className="text-xs text-muted-foreground tabular-nums">
+                            {p.rates.length === 0 ? (
+                              <span>단가 {formatRate(p.rate, p.rateUnit)}</span>
+                            ) : (
+                              <div className="space-y-0.5">
+                                {p.rates.map((rate) => (
+                                  <div key={rate.id} className="whitespace-nowrap">
+                                    <span className="mr-1 text-muted-foreground">{rate.item}</span>
+                                    <span className="text-foreground">
+                                      {rate.amount.toLocaleString()}원 / {rate.unit}
+                                    </span>
+                                  </div>
+                                ))}
                               </div>
-                            ))}
+                            )}
                           </div>
-                        )}
+                        </div>
                       </TableCell>
                       <TableCell className="whitespace-nowrap text-muted-foreground">{p.settlementType ?? "-"}</TableCell>
                       <TableCell className="text-muted-foreground tabular-nums">{p.phone ?? "-"}</TableCell>
@@ -760,6 +796,7 @@ export function PartnerTable({
                         <TableCell>
                           <div className="flex items-center gap-1.5">
                             <button
+                              type="button"
                               onClick={() =>
                                 setDialog({
                                   id: p.id,
@@ -778,14 +815,17 @@ export function PartnerTable({
                               }
                               className="text-muted-foreground transition-colors hover:text-primary"
                               title="수정"
+                              aria-label={`${p.name} 수정`}
                             >
                               <Pencil className="size-3.5" />
                             </button>
                             <button
+                              type="button"
                               onClick={() => handleDelete(p)}
                               disabled={busyId === p.id}
                               className="text-muted-foreground transition-colors hover:text-destructive"
                               title="삭제"
+                              aria-label={`${p.name} 삭제`}
                             >
                               <Trash2 className="size-3.5" />
                             </button>

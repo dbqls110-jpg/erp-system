@@ -110,7 +110,13 @@ export default async function CalendarPage() {
   return (
     <div className="space-y-4">
       <div><p className="mt-1 text-sm text-muted-foreground">프로젝트와 휴가 일정을 한눈에 확인하세요.</p></div>
-      <CalendarView initialEvents={events} currentYear={year} currentMonth={month} projectOptions={projectOptions} />
+      <CalendarView
+        initialEvents={events}
+        currentYear={year}
+        currentMonth={month}
+        todayDate={`${year}-${monthStr}-${String(now.getDate()).padStart(2, "0")}`}
+        projectOptions={projectOptions}
+      />
     </div>
   );
 }

@@ -14,6 +14,7 @@ import { BudgetSetButton } from "./BudgetSetButton";
 import { ExpenseDeleteButton } from "./ExpenseDeleteButton";
 import { FinanceMonthNav } from "./FinanceMonthNav";
 import { FixedExpensePanel } from "./FixedExpensePanel";
+import { calculateBudgetMetrics } from "@/lib/financeMetrics";
 
 const categoryLabel: Record<string, string> = {
   rent: "임차료", salary: "인건비", telecom: "통신비",
@@ -83,11 +84,8 @@ export default async function FinancePage({
   const otherExpenses = expenses.filter(e => !e.fixedExpenseId);
   const totalOther = otherExpenses.reduce((sum, e) => sum + e.amount, 0);
 
-  const totalExpense = expenses.reduce((sum, e) => sum + e.amount, 0);
-
-  // 잔여 예산 = 예산 - 고정비 전체 - 기타 지출
-  const remaining = budget ? budget.amount - totalFixed - totalOther : null;
-  const usagePercent = budget ? Math.min(Math.round(((totalFixed + totalOther) / budget.amount) * 100), 100) : 0;
+  // 카드·차트 공통 기준: 납부 여부와 관계없이 해당 월 고정비 전체 + 기타 지출.
+  const budgetMetrics = calculateBudgetMetrics(budget?.amount ?? null, totalFixed, totalOther);
 
   // 카테고리별 집계 (실지출 + 미납부 고정비 포함)
   const byCategory = expenses.reduce((acc, e) => {
@@ -116,9 +114,14 @@ export default async function FinancePage({
       <div className="flex items-center justify-between">
         <div><p className="mt-1 text-sm text-muted-foreground">월별 예산과 지출 내역을 관리합니다.</p></div>
         <div className="flex items-center gap-3 flex-wrap">
-          <FinanceMonthNav year={year} month={month} />
+          <FinanceMonthNav
+            year={year}
+            month={month}
+            currentYear={now.getFullYear()}
+            currentMonth={now.getMonth() + 1}
+          />
           {isAdmin && <BudgetSetButton year={year} month={month} currentAmount={budget?.amount} />}
-          <ExpenseAddButton />
+          <ExpenseAddButton initialDate={`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`} />
         </div>
       </div>
 
@@ -145,18 +148,18 @@ export default async function FinancePage({
             <CardTitle className={`text-2xl font-semibold tabular-nums @[250px]/card:text-3xl ${totalOther > 0 ? "text-destructive" : "text-foreground"}`}>{totalOther.toLocaleString()}원</CardTitle>
           </CardHeader>
           <CardContent>
-            {budget && <p className="text-xs text-muted-foreground mt-1">예산의 {usagePercent}% 소진</p>}
+            {budget && <p className="text-xs text-muted-foreground mt-1">예산의 {budgetMetrics.usagePercent}% 소진 (고정비 포함)</p>}
           </CardContent>
         </Card>
         <Card className="@container/card h-full shadow-xs">
           <CardHeader>
             <CardDescription>잔여 예산</CardDescription>
-            <CardTitle className={`text-2xl font-semibold tabular-nums @[250px]/card:text-3xl ${remaining !== null && remaining < 0 ? "text-destructive" : "text-primary"}`}>
-              {remaining !== null ? `${remaining.toLocaleString()}원` : "미설정"}
+            <CardTitle className={`text-2xl font-semibold tabular-nums @[250px]/card:text-3xl ${budgetMetrics.remaining !== null && budgetMetrics.remaining < 0 ? "text-destructive" : "text-primary"}`}>
+              {budgetMetrics.remaining !== null ? `${budgetMetrics.remaining.toLocaleString()}원` : "미설정"}
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {remaining !== null && <p className="text-xs text-muted-foreground mt-1">고정비 포함 차감</p>}
+            {budgetMetrics.remaining !== null && <p className="text-xs text-muted-foreground mt-1">고정비 포함 차감</p>}
           </CardContent>
         </Card>
       </div>
@@ -181,7 +184,13 @@ export default async function FinancePage({
 
       {/* 차트 */}
       {(categoryData.length > 0 || dailyData.length > 0) && (
-        <FinanceCharts categoryData={categoryData} dailyData={dailyData} budget={budget?.amount} totalExpense={totalExpense} />
+        <FinanceCharts
+          categoryData={categoryData}
+          dailyData={dailyData}
+          budget={budget?.amount}
+          plannedExpense={budgetMetrics.plannedExpense}
+          usagePercent={budgetMetrics.usagePercent}
+        />
       )}
 
       {/* 지출 내역 */}

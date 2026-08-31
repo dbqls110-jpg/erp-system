@@ -18,6 +18,7 @@ import {
   KeyRound,
   Sheet,
   X,
+  BarChart2,
 } from "lucide-react";
 
 interface NavItem {
@@ -61,6 +62,7 @@ const navGroups: NavGroup[] = [
       { label: "파트너", href: "/partners", icon: Handshake, menuKey: "partners" },
       { label: "공간 DB", href: "/venues", icon: MapPin, menuKey: "venues" },
       { label: "재무 관리", href: "/finance", icon: Banknote, menuKey: "finance" },
+      { label: "회사 매출·매입", href: "/company-finance", icon: BarChart2, menuKey: "companyFinance" },
       { label: "구글 시트", href: "/sheets", icon: Sheet, menuKey: "sheets" },
       { label: "ID 관리", href: "/credentials", icon: KeyRound, menuKey: "credentials" },
     ],
