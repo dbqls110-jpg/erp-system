@@ -58,4 +58,35 @@ describe("견적서 금액 추출", () => {
     expect(result.revenue).toBe(1_200_000);
     expect(result.cost).toBe(700_000);
   });
+
+  it.each([
+    ["총액 1억원", 100_000_000],
+    ["총액 3,000만원", 30_000_000],
+    ["총액 1억 2,000만원", 120_000_000],
+    ["총액 2억 5,000만원", 250_000_000],
+    ["총액 1억2천만원", 120_000_000],
+  ])("억·만 표기 %s를 정확히 읽는다", (text, expected) => {
+    expect(parseQuoteText(text).revenue).toBe(expected);
+  });
+
+  it("억 뒤에 만 금액이 없으면 억만 읽는다", () => {
+    expect(parseQuoteText("총액 1억").revenue).toBe(100_000_000);
+  });
+
+  it("억 없이 만원 금액을 읽는다", () => {
+    expect(parseQuoteText("총액 2,000만원").revenue).toBe(20_000_000);
+  });
+
+  it("단위 없는 원 금액은 기존처럼 읽는다", () => {
+    expect(parseQuoteText("총액 5,500,000원").revenue).toBe(5_500_000);
+  });
+
+  it("억과 만 사이의 줄바꿈을 허용한다", () => {
+    expect(parseQuoteText("총액 1억 2천만 원").revenue).toBe(120_000_000);
+    expect(parseQuoteText("총액 1억\n2천만 원").revenue).toBe(120_000_000);
+  });
+
+  it("천·백으로 이어진 만원 금액을 단위별로 계산한다", () => {
+    expect(parseQuoteText("총액 3천5백만원").revenue).toBe(35_000_000);
+  });
 });

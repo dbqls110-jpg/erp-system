@@ -43,16 +43,52 @@ type MoneyCandidate = {
   distance: number;
 };
 
+const ARABIC_NUMBER_PATTERN = String.raw`(?:[0-9]{1,3}(?:[,\s][0-9]{3})+|[0-9]+(?:\.[0-9]+)?)`;
+const KOREAN_NUMBER_PATTERN = String.raw`[0-9]+(?:\s*(?:십|백|천)\s*[0-9]*)+`;
+const AMOUNT_NUMBER_PATTERN = String.raw`(?:${ARABIC_NUMBER_PATTERN}|${KOREAN_NUMBER_PATTERN})`;
+
 function numberPattern(): RegExp {
-  // 금액 앞의 통화 기호와 뒤의 한국어 단위를 모두 허용한다.
-  return /(?:₩|￦|\$)?\s*([0-9]{1,3}(?:[,\s][0-9]{3})+|[0-9]+(?:\.[0-9]+)?)\s*(억|천만|백만|만원|천원|만|천|원)?/gi;
+  // 억과 만이 함께 있는 표현을 한 후보로 잡아 두 단위의 금액을 합산할 수 있게 한다.
+  return new RegExp(
+    String.raw`(?:₩|￦|\$)?\s*((?:${ARABIC_NUMBER_PATTERN}\s*억(?:\s*${AMOUNT_NUMBER_PATTERN}\s*만(?:\s*원)?|\s*원)?)|(?:${AMOUNT_NUMBER_PATTERN}\s*만(?:\s*원)?)|(?:${ARABIC_NUMBER_PATTERN}\s*(?:천만|백만|만원|천원|만|천|백|십|원)?))(?![0-9십백천])`,
+    "giu",
+  );
 }
 
-function toMoney(raw: string, unit?: string): number | null {
-  const numeric = Number(raw.replace(/[\s,]/g, ""));
-  if (!Number.isFinite(numeric) || numeric < 0) return null;
+function parseAmountNumber(raw: string): number | null {
+  const normalized = raw.replace(/[\s,]/g, "");
+  if (/^[0-9]+(?:\.[0-9]+)?$/u.test(normalized)) {
+    const numeric = Number(normalized);
+    return Number.isFinite(numeric) && numeric >= 0 ? numeric : null;
+  }
 
-  const multiplier = unit?.toLowerCase() === "억"
+  if (!/^[0-9]+(?:(?:십|백|천)[0-9]*)+$/u.test(normalized)) return null;
+
+  let total = 0;
+  let current = 0;
+  for (const character of normalized) {
+    if (/^[0-9]$/u.test(character)) {
+      current = current * 10 + Number(character);
+      continue;
+    }
+
+    const multiplier = character === "천" ? 1_000 : character === "백" ? 100 : 10;
+    const value = (current || 1) * multiplier;
+    if (!Number.isSafeInteger(value)) return null;
+    total += value;
+    if (!Number.isSafeInteger(total)) return null;
+    current = 0;
+  }
+
+  const result = total + current;
+  return Number.isSafeInteger(result) ? result : null;
+}
+
+function moneyForUnit(raw: string, unit: string): number | null {
+  const numeric = parseAmountNumber(raw);
+  if (numeric === null) return null;
+
+  const multiplier = unit.toLowerCase() === "억"
     ? 100_000_000
     : unit === "천만"
       ? 10_000_000
@@ -62,9 +98,47 @@ function toMoney(raw: string, unit?: string): number | null {
           ? 10_000
           : unit === "천원" || unit === "천"
             ? 1_000
-            : 1;
+            : unit === "백"
+              ? 100
+              : unit === "십"
+                ? 10
+                : 1;
   const result = Math.round(numeric * multiplier);
   return Number.isSafeInteger(result) ? result : null;
+}
+
+function sumMoneyValues(values: Array<number | null>): number | null {
+  let result = 0;
+  for (const value of values) {
+    if (value === null) return null;
+    result += value;
+    if (!Number.isSafeInteger(result)) return null;
+  }
+  return result;
+}
+
+function toMoney(raw: string, unit?: string): number | null {
+  const normalized = raw
+    .replace(/[₩￦$]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (unit) return moneyForUnit(normalized, unit);
+
+  const eokMatch = normalized.match(/^(.+?)\s*억(?:\s*(.+?)\s*만)?\s*원?$/u);
+  if (eokMatch) {
+    return sumMoneyValues([
+      moneyForUnit(eokMatch[1], "억"),
+      ...(eokMatch[2] === undefined ? [] : [moneyForUnit(eokMatch[2], "만")]),
+    ]);
+  }
+
+  const manMatch = normalized.match(/^(.+?)\s*만\s*원?$/u);
+  if (manMatch) return moneyForUnit(manMatch[1], "만");
+
+  const simpleMatch = normalized.match(/^(.+?)\s*(천만|백만|만원|천원|만|천|백|십|원)$/u);
+  if (simpleMatch) return moneyForUnit(simpleMatch[1], simpleMatch[2]);
+
+  return moneyForUnit(normalized, "");
 }
 
 function extractMoneyCandidates(text: string, labelExpressions: string[]): MoneyCandidate[] {
@@ -83,7 +157,7 @@ function extractMoneyCandidates(text: string, labelExpressions: string[]): Money
       const moneyRegex = numberPattern();
       let moneyMatch: RegExpExecArray | null;
       while ((moneyMatch = moneyRegex.exec(window)) !== null) {
-        const value = toMoney(moneyMatch[1], moneyMatch[2]);
+        const value = toMoney(moneyMatch[1]);
         if (value === null) continue;
         const moneyIndex = start + moneyMatch.index;
         const distance = Math.abs(moneyIndex - labelMatch.index);
