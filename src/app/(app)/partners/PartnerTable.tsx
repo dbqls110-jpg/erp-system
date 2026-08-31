@@ -556,18 +556,24 @@ export function PartnerTable({
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="mt-1 text-sm text-muted-foreground">파트너 개인별 계약 현황</p>
+          <div className="flex items-center gap-2.5">
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+              <Handshake className="size-4" aria-hidden="true" />
+            </span>
+            <h1 className="truncate text-xl font-semibold tracking-tight text-foreground">파트너 관리</h1>
+          </div>
+          <p className="mt-2 text-sm text-muted-foreground">파트너 개인별 계약 현황</p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" className="h-9 py-2" onClick={() => router.refresh()}>
+        <div className="flex shrink-0 gap-2">
+          <Button variant="outline" className="h-9 rounded-lg px-3 shadow-xs" onClick={() => router.refresh()}>
             <RefreshCw className="size-3.5" /> 새로고침
           </Button>
           {canEdit && (
             <Button
-              className="h-9 py-2"
+              className="h-9 rounded-lg px-3 shadow-xs"
               onClick={() => setDialog({ initial: { ...emptyForm }, id: null, key: Date.now() })}
             >
               <Plus className="size-3.5" /> 등록
@@ -576,8 +582,8 @@ export function PartnerTable({
         </div>
       </div>
 
-      <Card className="shadow-xs">
-        <CardContent className="space-y-3 pt-(--card-spacing)">
+      <Card className="border-border/70 bg-card/80 shadow-sm">
+        <CardContent className="space-y-3 p-4 sm:p-5">
           <div className="flex flex-wrap items-center gap-3">
             <span className="w-20 shrink-0 text-sm text-muted-foreground">거래상태</span>
             <select
@@ -629,17 +635,17 @@ export function PartnerTable({
             <span className="ml-1 text-muted-foreground">(전체 {initialData.length}건)</span>
           )}
         </p>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex w-full min-w-0 flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
           <Button
             variant="outline"
-            className="h-8"
+            className="h-9 shrink-0 rounded-lg px-3"
             onClick={downloadCsv}
             disabled={filtered.length === 0}
           >
             <Download className="size-3.5" /> 엑셀 다운로드
           </Button>
           <select
-            className={`${SELECT_CLASS} w-32`}
+            className={`${SELECT_CLASS} h-9 w-full min-w-[10rem] shrink-0 whitespace-nowrap sm:w-40`}
             value={sort}
             onChange={(e) => setSort(e.target.value)}
           >
@@ -647,7 +653,7 @@ export function PartnerTable({
             <option value="name">이름순</option>
           </select>
           <select
-            className={`${SELECT_CLASS} w-28`}
+            className={`${SELECT_CLASS} h-9 w-full min-w-[9.5rem] shrink-0 whitespace-nowrap sm:w-36`}
             value={String(pageSize)}
             onChange={(e) => setPageSize(Number(e.target.value))}
           >
@@ -658,7 +664,7 @@ export function PartnerTable({
         </div>
       </div>
 
-      <Card className="shadow-xs py-0">
+      <Card className="overflow-hidden border-border/70 py-0 shadow-sm">
         <CardContent className="p-0">
           <div className="space-y-2 p-3 md:hidden">
             {shown.length === 0 ? (
@@ -695,9 +701,9 @@ export function PartnerTable({
           </div>
           <div className="hidden overflow-x-auto md:block">
             <p className="mb-2 text-xs text-muted-foreground md:hidden">표를 좌우로 밀어 더 많은 열을 볼 수 있습니다.</p>
-            <Table className="mx-auto w-auto table-auto [&_:is(th,td)]:px-4 [&_:is(th,td)]:py-3">
+            <Table className="w-full min-w-[980px] table-auto [&_:is(th,td)]:px-4 [&_:is(th,td)]:py-3">
               <TableHeader>
-                <TableRow>
+                <TableRow className="bg-muted/40 hover:bg-muted/40">
                   <TableHead className="whitespace-nowrap">이름</TableHead>
                   <TableHead className="whitespace-nowrap">직업</TableHead>
                   <TableHead className="whitespace-nowrap">거래상태</TableHead>
@@ -726,7 +732,7 @@ export function PartnerTable({
                   </TableRow>
                 ) : (
                   shown.map((p) => (
-                    <TableRow key={p.id}>
+                    <TableRow key={p.id} className="group transition-colors hover:bg-muted/30">
                       <TableCell className="font-medium whitespace-nowrap">
                         <div className="flex items-center gap-2">
                           {canEdit ? (
