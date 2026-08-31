@@ -173,10 +173,12 @@ if (-not $Yes) {
 Invoke-Git @("diff", "--check", "HEAD", "--") | Out-Host
 Invoke-Git (@("add", "--") + $candidatePaths) | Out-Host
 
-$stagedPaths = @(Invoke-Git @("diff", "--cached", "--name-only", "--")) |
-    Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
-    ForEach-Object { Normalize-GitPath $_ } |
-    Sort-Object -Unique
+$stagedPaths = @(
+    Invoke-Git @("diff", "--cached", "--name-only", "--") |
+        Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
+        ForEach-Object { Normalize-GitPath $_ } |
+        Sort-Object -Unique
+)
 
 if ($stagedPaths.Count -eq 0) {
     Write-Host "No staged changes were found; commit and push were skipped."

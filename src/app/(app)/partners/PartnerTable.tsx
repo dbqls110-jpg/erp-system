@@ -701,15 +701,12 @@ export function PartnerTable({
           </div>
           <div className="hidden overflow-x-auto md:block">
             <p className="mb-2 text-xs text-muted-foreground md:hidden">표를 좌우로 밀어 더 많은 열을 볼 수 있습니다.</p>
-            <Table className="w-full min-w-[980px] table-auto [&_:is(th,td)]:px-4 [&_:is(th,td)]:py-3">
+            <Table className="w-full min-w-[820px] table-auto [&_:is(th,td)]:px-4 [&_:is(th,td)]:py-3">
               <TableHeader>
                 <TableRow className="bg-muted/40 hover:bg-muted/40">
                   <TableHead className="whitespace-nowrap">이름</TableHead>
                   <TableHead className="whitespace-nowrap">직업</TableHead>
-                  <TableHead className="whitespace-nowrap">거래상태</TableHead>
-                  {/* 내용 기준으로 배치해 값 사이의 불필요한 간격을 줄인다. 남는 폭은 단가처럼
-                      실제 내용이 길어질 수 있는 열 하나에만 맡기고, 빈 프로젝트 열에는 주지 않는다. */}
-                  <TableHead className="w-full whitespace-nowrap text-right">단가</TableHead>
+                  <TableHead className="whitespace-nowrap">거래상태 · 단가</TableHead>
                   <TableHead className="whitespace-nowrap">정산방식</TableHead>
                   <TableHead className="whitespace-nowrap">연락처</TableHead>
                   <TableHead className="whitespace-nowrap">진행한 프로젝트</TableHead>
@@ -719,7 +716,7 @@ export function PartnerTable({
               <TableBody>
                 {shown.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={canEdit ? 8 : 7} className="py-12 text-center">
+                    <TableCell colSpan={canEdit ? 7 : 6} className="py-12 text-center">
                       <div className="flex flex-col items-center gap-3">
                         <Handshake className="size-6 text-muted-foreground" />
                         <p className="text-sm text-muted-foreground">
@@ -760,28 +757,27 @@ export function PartnerTable({
                       </TableCell>
                       <TableCell className="whitespace-nowrap text-muted-foreground">{p.job ?? "-"}</TableCell>
                       <TableCell>
-                        <Badge variant="outline" className={toneBadgeClass(statusTone(p.contractStatus))}>
-                          {p.contractStatus}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right text-muted-foreground tabular-nums">
-                        {p.rates.length === 0 ? (
-                          formatRate(p.rate, p.rateUnit)
-                        ) : (
-                          // 항목마다 한 줄씩 편다. "포스터 50만 외 2건" 처럼 접으면 나머지를
-                          // 보려고 또 눌러야 하는데, 단가는 목록에서 바로 비교하려고 보는 값이다.
-                          // 하나뿐인 파트너는 자연히 한 줄로 끝난다.
-                          <div className="space-y-0.5">
-                            {p.rates.map((rate) => (
-                              <div key={rate.id} className="flex justify-end gap-2 whitespace-nowrap">
-                                <span className="min-w-16 text-muted-foreground">{rate.item}</span>
-                                <span className="tabular-nums text-foreground">
-                                  {rate.amount.toLocaleString()}원 / {rate.unit}
-                                </span>
+                        <div className="flex min-w-28 flex-col items-start gap-1">
+                          <Badge variant="outline" className={toneBadgeClass(statusTone(p.contractStatus))}>
+                            {p.contractStatus}
+                          </Badge>
+                          <div className="text-xs text-muted-foreground tabular-nums">
+                            {p.rates.length === 0 ? (
+                              <span>단가 {formatRate(p.rate, p.rateUnit)}</span>
+                            ) : (
+                              <div className="space-y-0.5">
+                                {p.rates.map((rate) => (
+                                  <div key={rate.id} className="whitespace-nowrap">
+                                    <span className="mr-1 text-muted-foreground">{rate.item}</span>
+                                    <span className="text-foreground">
+                                      {rate.amount.toLocaleString()}원 / {rate.unit}
+                                    </span>
+                                  </div>
+                                ))}
                               </div>
-                            ))}
+                            )}
                           </div>
-                        )}
+                        </div>
                       </TableCell>
                       <TableCell className="whitespace-nowrap text-muted-foreground">{p.settlementType ?? "-"}</TableCell>
                       <TableCell className="text-muted-foreground tabular-nums">{p.phone ?? "-"}</TableCell>
