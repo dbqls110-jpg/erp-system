@@ -72,6 +72,20 @@ const UPDATE_FORMAT = [
   "- 블록 밖에는 무엇을 왜 바꾸려는지 한 줄로 적으세요.",
 ].join("\n");
 
+const DRIVE_MOVE_FORMAT = [
+  "[첨부파일 이동 요청]이 질문에 포함되어 있으면 파일을 직접 옮기지 말고 확인용 제안만 만든다.",
+  "프로젝트 폴더로 보낼 때는 [ERP 자료]의 프로젝트 id를 그대로 사용하고 destination은 project로 한다.",
+  "프로젝트 없이 분류 폴더로 보낼 때는 destination을 category로 하고 category는 견적서·계약서·포스터·제안서·과업지시서·정산서·기획안·도면·사진 중 하나만 사용한다.",
+  "응답에는 아래 형식의 erp-update 블록을 하나만 포함한다.",
+  "",
+  "```erp-update",
+  '{"target":"drive_file","id":"<Drive 파일 ID>","label":"파일명","changes":{"destination":"project","projectId":"<ERP 프로젝트 id>","category":"견적서"},"reason":"이동 이유"}',
+  "```",
+  "",
+  "분류 폴더만 지정된 요청은 category만 포함한다:",
+  '{"target":"drive_file","id":"<Drive 파일 ID>","label":"파일명","changes":{"destination":"category","category":"견적서"},"reason":"파일명과 요청에 따른 분류"}',
+].join("\n");
+
 export interface AssistantPrompt {
   prompt: string;
   topics: string[];
@@ -83,7 +97,7 @@ export async function buildAssistantPrompt(question: string): Promise<AssistantP
   const context = await buildAgentContext(question);
   const contextJson = JSON.stringify(context.data, null, 2);
 
-  const parts = [SYSTEM_FRAME, "", TABLE_FORMAT, "", UPDATE_FORMAT, "", "[ERP 자료]"];
+  const parts = [SYSTEM_FRAME, "", TABLE_FORMAT, "", UPDATE_FORMAT, "", DRIVE_MOVE_FORMAT, "", "[ERP 자료]"];
 
   if (context.topics.length === 0) {
     // 주제를 못 알아들었을 때 빈 객체만 던지면 AI 가 "자료가 없다"로 오해한다.

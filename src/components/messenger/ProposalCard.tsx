@@ -76,7 +76,13 @@ export function ProposalCard({
       <p className="text-xs font-medium text-foreground">
         {proposal.label ?? proposal.id}
         <span className="ml-1.5 font-normal text-muted-foreground">
-          {proposal.target === "venue" ? "공간" : proposal.target === "partner" ? "파트너" : "프로젝트"}
+          {proposal.target === "venue"
+            ? "공간"
+            : proposal.target === "partner"
+              ? "파트너"
+              : proposal.target === "project"
+                ? "프로젝트"
+                : "Drive 파일"}
         </span>
       </p>
       {proposal.reason && (
