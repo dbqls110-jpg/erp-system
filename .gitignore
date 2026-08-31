@@ -97,3 +97,6 @@ __pycache__/
 # 저장소 루트에 남은 ERP와 무관한 작업용 파이썬 산출물
 /venue_*.py
 /scripts/tmp/
+
+# DB 백업(자료가 들어 있다. 절대 커밋 금지)
+/backup/

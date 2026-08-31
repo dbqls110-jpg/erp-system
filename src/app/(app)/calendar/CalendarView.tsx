@@ -247,7 +247,7 @@ export function CalendarView({
             <Button variant="ghost" size="sm" onClick={nextMonth} disabled={loading} aria-label="다음 달"><ChevronRight size={16} /></Button>
           </div>
 
-          <div className="grid grid-cols-7 mb-2">
+          <div className="grid grid-cols-7 mb-2 border-b border-border">
             {["일", "월", "화", "수", "목", "금", "토"].map((d, i) => (
               <div key={d} className={cn("text-center text-xs font-medium py-1", i === 0 ? "text-destructive" : i === 6 ? "text-primary" : "text-muted-foreground")}>
                 {d}
@@ -256,7 +256,7 @@ export function CalendarView({
           </div>
 
           <div className="grid grid-cols-7 gap-px bg-border rounded-lg overflow-hidden">
-            {blanks.map((i) => <div key={`b-${i}`} className="bg-background min-h-[80px]" />)}
+            {blanks.map((i) => <div key={`b-${i}`} className="bg-muted/30 min-h-[80px]" />)}
             {days.map((day) => {
               const dateStr = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
               const dayEvents = getEventsForDay(day);
@@ -317,6 +317,9 @@ export function CalendarView({
                 </div>
               );
             })}
+            {Array.from({ length: (7 - ((firstDay + daysInMonth) % 7)) % 7 }, (_, i) => (
+              <div key={`e-${i}`} className="bg-muted/30 min-h-[80px]" />
+            ))}
           </div>
 
           <div className="flex flex-wrap gap-4 mt-4 text-xs text-muted-foreground">
