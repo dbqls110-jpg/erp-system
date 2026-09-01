@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toneBadgeClass } from "@/lib/badge-tone";
 import { prisma } from "@/lib/prisma";
+import { RESPONSIVE_CONTENT_SELECT_CLASS } from "@/lib/selectStyles";
 import { CustomerCreateButton } from "./CustomerCreateButton";
 
 type CustomerSearchParams = Promise<Record<string, string | string[] | undefined>>;
@@ -94,8 +95,8 @@ export default async function CustomersPage({ searchParams }: { searchParams?: C
         <p className="text-sm">총 <span className="font-semibold text-primary">{rows.length}</span>건</p>
         <div className="flex w-full min-w-0 flex-col gap-1.5 sm:w-auto sm:flex-row sm:items-center">
           <Button variant="outline" className="h-8 shrink-0 rounded-lg px-3"><Download className="size-3.5" /> 엑셀 다운로드</Button>
-          <select defaultValue="updated" aria-label="정렬" className="h-8 w-full min-w-[10rem] shrink-0 whitespace-nowrap rounded-2xl border border-transparent bg-input/50 px-3 text-sm text-foreground sm:w-40"><option value="updated">최종수정일순</option><option value="name">회사명순</option></select>
-          <select defaultValue="10" aria-label="페이지 크기" className="h-8 w-full min-w-[9.5rem] shrink-0 whitespace-nowrap rounded-2xl border border-transparent bg-input/50 px-3 text-sm text-foreground sm:w-36"><option value="10">10개씩 보기</option><option value="20">20개씩 보기</option><option value="50">50개씩 보기</option></select>
+          <select defaultValue="updated" aria-label="정렬" className={`h-8 ${RESPONSIVE_CONTENT_SELECT_CLASS} rounded-2xl border border-transparent bg-input/50 px-3 text-sm text-foreground`}><option value="updated">최종수정일순</option><option value="name">회사명순</option></select>
+          <select defaultValue="10" aria-label="페이지 크기" className={`h-8 ${RESPONSIVE_CONTENT_SELECT_CLASS} rounded-2xl border border-transparent bg-input/50 px-3 text-sm text-foreground`}><option value="10">10개씩 보기</option><option value="20">20개씩 보기</option><option value="50">50개씩 보기</option></select>
         </div>
       </div>
 

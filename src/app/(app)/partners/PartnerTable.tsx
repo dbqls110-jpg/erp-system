@@ -20,6 +20,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { toneBadgeClass } from "@/lib/badge-tone";
+import { RESPONSIVE_CONTENT_SELECT_CLASS } from "@/lib/selectStyles";
 import {
   addPartnerRate,
   createPartner,
@@ -645,7 +646,7 @@ export function PartnerTable({
             <Download className="size-3.5" /> 엑셀 다운로드
           </Button>
           <select
-            className={`${SELECT_CLASS} w-full min-w-[10rem] shrink-0 whitespace-nowrap sm:w-40`}
+            className={`${SELECT_CLASS} ${RESPONSIVE_CONTENT_SELECT_CLASS}`}
             value={sort}
             onChange={(e) => setSort(e.target.value)}
           >
@@ -653,7 +654,7 @@ export function PartnerTable({
             <option value="name">이름순</option>
           </select>
           <select
-            className={`${SELECT_CLASS} w-full min-w-[9.5rem] shrink-0 whitespace-nowrap sm:w-36`}
+            className={`${SELECT_CLASS} ${RESPONSIVE_CONTENT_SELECT_CLASS}`}
             value={String(pageSize)}
             onChange={(e) => setPageSize(Number(e.target.value))}
           >
