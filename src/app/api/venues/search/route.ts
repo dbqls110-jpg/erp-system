@@ -1,5 +1,6 @@
 import { getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
+import type { Prisma } from "@prisma/client";
 
 import { authOptions } from "@/lib/auth";
 import { requireMenuAccess } from "@/lib/permissions";
@@ -7,13 +8,13 @@ import { prisma } from "@/lib/prisma";
 import { rankVenues, type MatchQuery, type MatchResult } from "@/lib/venueMatch";
 
 const MAX_LIMIT = 50;
+const MAX_CURSOR_IDS = 10_000;
 const DAYS = ["평일", "토", "일", "공휴일"] as const;
 
-const venueSelect = {
+// 순위 계산과 거리·신뢰도 계산에 실제로 필요한 열만 첫 조회에 남긴다.
+const venueRankSelect = {
   id: true,
-  name: true,
   district: true,
-  type: true,
   capacityMin: true,
   capacityMax: true,
   price: true,
@@ -34,12 +35,28 @@ const venueSelect = {
   beam: true,
   sound: true,
   phone: true,
+  calledAt: true,
+} as const;
+
+// 예약 URL·좌표·신청 방법은 잘라낸 한 페이지에 대해서만 채운다.
+const venueDisplaySelect = {
+  id: true,
+  name: true,
+  district: true,
+  type: true,
+  capacityMin: true,
+  capacityMax: true,
+  phone: true,
   reserveUrl: true,
   reserveMethod: true,
   lat: true,
   lng: true,
-  calledAt: true,
 } as const;
+
+type SearchCursor = {
+  candidateIds: string[];
+  blockedCount: number;
+};
 
 type SearchBody = {
   name?: unknown;
@@ -53,6 +70,7 @@ type SearchBody = {
   needs?: unknown;
   commercial?: unknown;
   limit?: unknown;
+  searchCursor?: unknown;
 };
 
 function positiveNumber(value: unknown): number | undefined {
@@ -111,7 +129,88 @@ function parseQuery(body: SearchBody) {
     type: nonEmptyString(body.type),
     limit,
     offset,
+    searchCursor: parseSearchCursor(body.searchCursor),
   };
+}
+
+function parseSearchCursor(value: unknown): SearchCursor | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+
+  const cursor = value as Record<string, unknown>;
+  const candidateIds = cursor.candidateIds;
+  const blockedCount = cursor.blockedCount;
+  if (
+    !Array.isArray(candidateIds) ||
+    candidateIds.length > MAX_CURSOR_IDS ||
+    candidateIds.some((id) => typeof id !== "string" || id.length === 0) ||
+    typeof blockedCount !== "number" ||
+    !Number.isInteger(blockedCount) ||
+    blockedCount < 0
+  ) {
+    return undefined;
+  }
+
+  return { candidateIds, blockedCount };
+}
+
+type BlockerField =
+  | "commercialUse"
+  | "saturday"
+  | "sunday"
+  | "holiday"
+  | "parking"
+  | "hvac";
+
+function allowedUnlessExact(field: BlockerField, value: string): Prisma.VenueWhereInput {
+  return {
+    OR: [
+      { [field]: null },
+      { NOT: { [field]: value } },
+    ],
+  };
+}
+
+function allowedUnlessUnavailable(field: "parking" | "hvac"): Prisma.VenueWhereInput {
+  return {
+    OR: [
+      { [field]: null },
+      {
+        AND: [
+          { NOT: { [field]: "N" } },
+          { NOT: { [field]: { contains: "불가" } } },
+          { NOT: { [field]: { contains: "없음" } } },
+        ],
+      },
+    ],
+  };
+}
+
+function buildBlockerFilters(query: MatchQuery) {
+  const blocked: Prisma.VenueWhereInput[] = [];
+  const allowed: Prisma.VenueWhereInput[] = [];
+
+  const addExactBlocker = (field: BlockerField) => {
+    blocked.push({ [field]: "불가" });
+    allowed.push(allowedUnlessExact(field, "불가"));
+  };
+
+  // 정원·예산은 venueMatch 의 완화 규칙을 유지해야 하므로 DB에서 제외하지 않는다.
+  if (query.commercial) addExactBlocker("commercialUse");
+
+  if (query.dayOfWeek === "토") addExactBlocker("saturday");
+  if (query.dayOfWeek === "일") addExactBlocker("sunday");
+  if (query.dayOfWeek === "공휴일") addExactBlocker("holiday");
+
+  if (query.needs?.parking) {
+    blocked.push({ OR: [{ parking: "N" }, { parking: { contains: "불가" } }, { parking: { contains: "없음" } }] });
+    allowed.push(allowedUnlessUnavailable("parking"));
+  }
+  if (query.needs?.hvac) {
+    blocked.push({ OR: [{ hvac: "N" }, { hvac: { contains: "불가" } }, { hvac: { contains: "없음" } }] });
+    allowed.push(allowedUnlessUnavailable("hvac"));
+  }
+
+  return { blocked, allowed };
 }
 
 function compareResults(left: MatchResult, right: MatchResult) {
@@ -136,8 +235,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "검색 조건 형식이 올바르지 않습니다." }, { status: 400 });
   }
 
-  const { query, name, district, type, limit, offset } = parseQuery(rawBody as SearchBody);
-  const where = {
+  const { query, name, district, type, limit, offset, searchCursor } = parseQuery(rawBody as SearchBody);
+  const baseWhere: Prisma.VenueWhereInput = {
     ...(district ? { district } : {}),
     ...(type ? { type } : {}),
     // 이름은 DB 에서 거른다. 3,721건을 전부 읽어 와서 자바스크립트로 거르면
@@ -145,25 +244,88 @@ export async function POST(request: Request) {
     ...(name ? { name: { contains: name, mode: "insensitive" as const } } : {}),
   };
 
+  const { blocked: blockerWhere, allowed: allowedWhere } = buildBlockerFilters(query);
+  const rankWhere: Prisma.VenueWhereInput = allowedWhere.length
+    ? { AND: [baseWhere, ...allowedWhere] }
+    : baseWhere;
+
   // 한 번에 읽는다. 나눠 읽으면 메모리는 아끼지만 왕복이 늘어 훨씬 느리다.
   // 실측: 3,721건 전체를 한 번에 1,427ms, 200건씩 19번 나눠 읽으면 3,857ms.
   // 좁은 select 라 전체를 담아도 부담이 없고, 자치구만 정해도 209ms 로 떨어진다.
-  const venues = await prisma.venue.findMany({ where, select: venueSelect });
+  // 이제 그 한 번의 조회는 순위 열만 대상으로 하고, 화면 열은 잘라낸 뒤 보충한다.
+  let bestCandidates: MatchResult[];
+  let total: number;
+  let blockedCount: number;
+  let nextCursor: SearchCursor | undefined;
 
-  const ranked = rankVenues(venues, query);
-  const total = ranked.candidates.length;
-  const blockedCount = ranked.blocked.length;
-  // rankVenues 가 이미 점수순으로 정렬해 두지만, 동점 처리 기준이 여기와 달라
-  // 한 번 더 정렬한 뒤 자른다.
-  const bestCandidates: MatchResult[] = ranked.candidates
-    .sort(compareResults)
-    .slice(offset, offset + limit);
+  if (offset > 0 && searchCursor) {
+    const pageIds = searchCursor.candidateIds.slice(offset, offset + limit);
+    const venues = pageIds.length === 0
+      ? []
+      : await prisma.venue.findMany({
+          where: { AND: [rankWhere, { id: { in: pageIds } }] },
+          select: venueRankSelect,
+        });
+    const ranked = rankVenues(
+      venues.map((venue) => ({ ...venue, name: "", type: null, lat: null, lng: null })),
+      query,
+    );
+    const candidatesById = new Map(ranked.candidates.map((candidate) => [candidate.venue.id, candidate]));
+
+    // DB의 IN 조회 순서에 의존하지 않고 첫 페이지에서 확정한 순서를 그대로 쓴다.
+    bestCandidates = pageIds.flatMap((id) => {
+      const candidate = candidatesById.get(id);
+      return candidate ? [candidate] : [];
+    });
+    total = searchCursor.candidateIds.length;
+    blockedCount = searchCursor.blockedCount;
+  } else {
+    const blockedCountPromise = blockerWhere.length === 0
+      ? Promise.resolve(0)
+      : prisma.venue.count({ where: { AND: [baseWhere, { OR: blockerWhere }] } });
+    const [venues, databaseBlockedCount] = await Promise.all([
+      prisma.venue.findMany({ where: rankWhere, select: venueRankSelect }),
+      blockedCountPromise,
+    ]);
+    const ranked = rankVenues(
+      venues.map((venue) => ({ ...venue, name: "", type: null, lat: null, lng: null })),
+      query,
+    );
+    // rankVenues 가 이미 점수순으로 정렬해 두지만, 동점 처리 기준이 여기와 달라
+    // 한 번 더 정렬한 뒤 자른다.
+    const orderedCandidates = ranked.candidates.sort(compareResults);
+    total = orderedCandidates.length;
+    blockedCount = databaseBlockedCount + ranked.blocked.length;
+    bestCandidates = orderedCandidates.slice(offset, offset + limit);
+    if (total > limit) {
+      nextCursor = {
+        candidateIds: orderedCandidates.map((candidate) => candidate.venue.id),
+        blockedCount,
+      };
+    }
+  }
+
+  const pageIds = bestCandidates.map((candidate) => candidate.venue.id);
+  const displayVenues = pageIds.length === 0
+    ? []
+    : await prisma.venue.findMany({ where: { id: { in: pageIds } }, select: venueDisplaySelect });
+  const displayVenuesById = new Map(displayVenues.map((venue) => [venue.id, venue]));
 
   return NextResponse.json({
     candidates: bestCandidates.map((result) => {
-      const venue = result.venue as typeof result.venue & {
-        reserveUrl: string | null;
-        reserveMethod: string | null;
+      const displayVenue = displayVenuesById.get(result.venue.id);
+      const venue = {
+        id: displayVenue?.id ?? result.venue.id,
+        name: displayVenue?.name ?? "",
+        district: displayVenue ? displayVenue.district : result.venue.district,
+        type: displayVenue?.type ?? null,
+        capacityMin: displayVenue ? displayVenue.capacityMin : result.venue.capacityMin,
+        capacityMax: displayVenue ? displayVenue.capacityMax : result.venue.capacityMax,
+        phone: displayVenue ? displayVenue.phone : result.venue.phone,
+        reserveUrl: displayVenue?.reserveUrl ?? null,
+        reserveMethod: displayVenue?.reserveMethod ?? null,
+        lat: displayVenue?.lat ?? null,
+        lng: displayVenue?.lng ?? null,
       };
       return {
         venue: {
@@ -194,5 +356,6 @@ export async function POST(request: Request) {
     total,
     offset,
     limit,
+    ...(nextCursor ? { searchCursor: nextCursor } : {}),
   });
 }

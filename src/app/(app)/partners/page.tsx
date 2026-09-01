@@ -14,12 +14,34 @@ export default async function PartnersPage() {
     requireMenuAccess(session!.user.id, "partners", session!.user.role),
     prisma.partner.findMany({
       orderBy: { updatedAt: "desc" },
-      include: {
-        projects: { include: { project: { select: { id: true, name: true } } } },
-        rates: { orderBy: { order: "asc" } },
+      select: {
+        id: true,
+        name: true,
+        job: true,
+        phone: true,
+        rate: true,
+        rateUnit: true,
+        contractStatus: true,
+        settlementType: true,
+        memo: true,
+        projects: { select: { project: { select: { name: true } } } },
+        rates: {
+          orderBy: { order: "asc" },
+          select: { id: true, item: true, amount: true, unit: true, memo: true },
+        },
         payments: {
           orderBy: { createdAt: "desc" },
-          include: { project: { select: { id: true, name: true } } },
+          select: {
+            id: true,
+            item: true,
+            amount: true,
+            unit: true,
+            quantity: true,
+            paidOn: true,
+            memo: true,
+            projectId: true,
+            project: { select: { name: true } },
+          },
         },
       },
     }),

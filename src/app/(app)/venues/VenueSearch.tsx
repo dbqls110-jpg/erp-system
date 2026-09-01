@@ -67,6 +67,12 @@ interface SearchResult {
   total: number;
   offset: number;
   limit: number;
+  searchCursor?: SearchCursor;
+}
+
+interface SearchCursor {
+  candidateIds: string[];
+  blockedCount: number;
 }
 
 interface VenueSearchProps {
@@ -183,6 +189,7 @@ export function VenueSearch({ districts, venueTypes }: VenueSearchProps) {
   const [error, setError] = useState<string | null>(null);
   const [openVenueId, setOpenVenueId] = useState<string | null>(null);
   const tableRef = useRef<HTMLDivElement>(null);
+  const searchCursorRef = useRef<{ key: string; cursor: SearchCursor } | null>(null);
 
   function setField<Key extends keyof FormState>(key: Key, value: FormState[Key]) {
     setForm((current) => ({ ...current, [key]: value }));
@@ -193,6 +200,8 @@ export function VenueSearch({ districts, venueTypes }: VenueSearchProps) {
    *
    * form 을 고쳐 다시 검색하는 것과 다음 장으로 넘어가는 것은 다른 일이다. 페이지
    * 번호를 상태로 두면 조건을 바꿨을 때 3페이지에 머문 채 결과가 갈리는 일이 생긴다.
+   * 첫 조회가 확정한 후보 ID 순서를 커서로 되돌려 보내면 다음 장에서 같은 순위 계산을
+   * 다시 하지 않아도 되고, 서버 메모리에 사용자별 결과를 붙잡아 둘 필요도 없다.
    */
   async function search(offset = 0) {
     const body: Record<string, unknown> = {
@@ -218,6 +227,13 @@ export function VenueSearch({ districts, venueTypes }: VenueSearchProps) {
     if (form.district !== "전체") body.district = form.district;
     if (form.type !== "전체") body.type = form.type;
 
+    const searchKey = JSON.stringify({ ...body, offset: undefined });
+    const savedCursor = offset > 0 && searchCursorRef.current?.key === searchKey
+      ? searchCursorRef.current.cursor
+      : undefined;
+    if (savedCursor) body.searchCursor = savedCursor;
+    if (offset === 0) searchCursorRef.current = null;
+
     setIsLoading(true);
     setError(null);
     try {
@@ -228,6 +244,11 @@ export function VenueSearch({ districts, venueTypes }: VenueSearchProps) {
       });
       const payload = (await response.json()) as SearchResult & { error?: string };
       if (!response.ok) throw new Error(payload.error ?? "검색하지 못했습니다.");
+      if (payload.searchCursor) {
+        searchCursorRef.current = { key: searchKey, cursor: payload.searchCursor };
+      } else if (!savedCursor) {
+        searchCursorRef.current = null;
+      }
       setResult(payload);
       // 다음 장으로 넘어가면 표 위쪽이 화면 밖에 있다. 목록 맨 위로 올려 준다.
       if (offset > 0) tableRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -243,6 +264,7 @@ export function VenueSearch({ districts, venueTypes }: VenueSearchProps) {
     setForm(initialForm);
     setResult(null);
     setError(null);
+    searchCursorRef.current = null;
   }
 
   const pins = result?.candidates.flatMap(({ venue }) => {
