@@ -38,10 +38,10 @@ import {
   makeDriveClient,
 } from "./lib/drive.mjs";
 
-const SOURCE_NAME = "seoul_rental_spaces_integrated_clean.csv";
+const SOURCE_NAME = "서울경기_대관공간_DB.csv";
 const COORDS_NAME = "venue_coordinates.csv";
 /** --local 로 돌릴 때만 쓰는 PC 경로. 평소 경로는 드라이브다. */
-const LOCAL_DIR = String.raw`C:\Users\cybjs\Documents\Codex\seoul-db\outputs`;
+const LOCAL_DIR = String.raw`C:\장소\DB`;
 
 const DRY_RUN = process.argv.includes("--dry-run");
 const USE_LOCAL = process.argv.includes("--local");

@@ -25,24 +25,27 @@ import {
 
 const DRY_RUN = process.argv.includes("--dry-run");
 
-const SOURCE_DIR = String.raw`C:\Users\cybjs\Documents\Codex\seoul-db\outputs`;
+// 2026-09-02: 원본 정리 결과가 이 폴더로 옮겨졌다. 좌표 CSV 만 예전 위치에 남아 있다.
+const SOURCE_DIR = String.raw`C:\장소\DB`;
+const COORDS_DIR = String.raw`C:\Users\cybjs\Documents\Codex\seoul-db\outputs`;
 const FILES = [
   {
-    name: "seoul_rental_spaces_integrated_clean.csv",
+    name: "서울경기_대관공간_DB.csv",
     mimeType: "text/csv",
-    note: "정본 CSV (utf-8-sig, 3721행 x 150열)",
+    note: "정본 CSV (정리 후 3,709행 x 147열)",
   },
   {
     // 좌표를 빼먹으면 드라이브에서 적재했을 때 지도에 핀이 하나도 안 찍힌다.
     // 다시 지오코딩하면 카카오 쿼터를 또 쓴다.
     name: "venue_coordinates.csv",
+    dir: COORDS_DIR,
     mimeType: "text/csv",
-    note: "지오코딩 결과 (좌표)",
+    note: "지오코딩 결과. 새 정본에 좌표 열이 없어 이 파일이 계속 필요하다.",
   },
   {
-    name: "서울경기_대관공간_DB_0826_0133.xlsx",
+    name: "서울경기_대관공간_DB.xlsx",
     mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    note: "최신 엑셀 (9탭)",
+    note: "정본 엑셀",
   },
 ];
 
@@ -58,7 +61,7 @@ async function main() {
 
   const targets = [];
   for (const f of FILES) {
-    const full = path.join(SOURCE_DIR, f.name);
+    const full = path.join(f.dir ?? SOURCE_DIR, f.name);
     if (!fs.existsSync(full)) {
       console.log(`  건너뜀 (파일 없음): ${f.name}`);
       continue;
