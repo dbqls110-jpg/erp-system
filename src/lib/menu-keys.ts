@@ -41,6 +41,7 @@ export const MENU_KEYS = [
   { key: "attendance", label: "근태 관리" },
   { key: "leave", label: "휴가 관리" },
   { key: "projects", label: "프로젝트" },
+  { key: "inquiries", label: "문의" },
   { key: "calendar", label: "캘린더" },
   { key: "messenger", label: "메신저" },
   { key: "customers", label: "거래처" },
@@ -78,6 +79,8 @@ export const DEFAULT_MENU_RULES: Record<string, { view: string[]; edit: string[]
   leave: { view: MEMBER_UP, edit: ADMIN_ONLY },
 
   projects: { view: MANAGER_UP, edit: MANAGER_UP },
+  // 문의는 고객 연락처와 문의 내용이라 팀장 이상만 본다.
+  inquiries: { view: MANAGER_UP, edit: MANAGER_UP },
   // 파트너·거래처도 캘린더를 본다. 다만 자기가 참여한 프로젝트의 일정만 보이고
   // (src/lib/calendarVisibility.ts) 고칠 수는 없다. 여기서 view 를 주지 않으면
   // 가시성 로직이 아무리 정확해도 문 앞에서 막혀 빈 화면조차 못 본다.

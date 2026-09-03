@@ -19,6 +19,7 @@ import {
   FileSpreadsheet,
   X,
   ChartNoAxesCombined,
+  Inbox,
 } from "lucide-react";
 
 interface NavItem {
@@ -52,6 +53,7 @@ const navGroups: NavGroup[] = [
     label: "업무",
     items: [
       { label: "프로젝트", href: "/projects", icon: FolderKanban, menuKey: "projects" },
+      { label: "문의", href: "/inquiries", icon: Inbox, menuKey: "inquiries" },
       { label: "캘린더", href: "/calendar", icon: CalendarDays, menuKey: "calendar" },
       { label: "메신저", href: "/messenger", icon: MessageCircle, menuKey: "messenger" },
     ],

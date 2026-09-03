@@ -18,6 +18,7 @@ describe("메뉴 권한 진입점", () => {
     ["src/app/(app)/finance/page.tsx", "finance"],
     ["src/app/(app)/leave/page.tsx", "leave"],
     ["src/app/(app)/messenger/page.tsx", "messenger"],
+    ["src/app/(app)/inquiries/page.tsx", "inquiries"],
     ["src/app/(app)/partners/page.tsx", "partners"],
     ["src/app/(app)/projects/page.tsx", "projects"],
     ["src/app/(app)/projects/stats/page.tsx", "projects"],
@@ -58,6 +59,7 @@ describe("공유 자료를 바꾸는 서버 액션 권한", () => {
     ],
     ["src/app/actions/finance.ts", ["addExpense"], "finance"],
     ["src/app/actions/fixedExpense.ts", ["checkFixedExpense", "uncheckFixedExpense"], "finance"],
+    ["src/app/actions/inquiries.ts", ["updateInquiryStage", "updateInquiryMemo"], "inquiries"],
   ] as const;
 
   it.each(guardedActions)("%s 의 공유 자료 액션은 수정 권한을 확인한다", (file, functions, menuKey) => {
