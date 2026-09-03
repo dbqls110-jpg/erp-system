@@ -49,7 +49,7 @@ function toForm(customer: CustomerEditData): FormState {
   };
 }
 
-export function CustomerEditButton({ customer, industries }: { customer: CustomerEditData; industries: string[] }) {
+export function CustomerEditButton({ customer, industries, iconOnly = false }: { customer: CustomerEditData; industries: string[]; iconOnly?: boolean }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState(() => toForm(customer));
@@ -85,9 +85,16 @@ export function CustomerEditButton({ customer, industries }: { customer: Custome
 
   return (
     <>
-      <Button type="button" variant="ghost" className="h-8 px-2 text-xs" onClick={() => handleOpenChange(true)}>
-        <Pencil className="size-3.5" /> 수정
-      </Button>
+      <button
+        type="button"
+        onClick={() => handleOpenChange(true)}
+        className={iconOnly ? "text-muted-foreground transition-colors hover:text-primary" : "rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-muted hover:text-primary"}
+        title={iconOnly ? "수정" : undefined}
+        aria-label={`${customer.name} 수정`}
+      >
+        <Pencil className={iconOnly ? "size-3.5" : "mr-1 inline size-3.5"} />
+        {!iconOnly && "수정"}
+      </button>
       <Dialog open={open} onOpenChange={handleOpenChange}>
         <DialogContent className="max-w-md">
           <DialogHeader>
