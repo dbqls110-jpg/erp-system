@@ -96,7 +96,7 @@ export function CustomerEditButton({ customer, industries, iconOnly = false }: {
         {!iconOnly && "수정"}
       </button>
       <Dialog open={open} onOpenChange={handleOpenChange}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>거래처 수정</DialogTitle>
           </DialogHeader>

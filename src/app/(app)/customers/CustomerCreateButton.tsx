@@ -59,7 +59,7 @@ export function CustomerCreateButton({ industries }: { industries: string[] }) {
         <Plus className="size-3.5" /> 등록
       </Button>
       <Dialog open={open} onOpenChange={handleOpenChange}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>거래처 등록</DialogTitle>
           </DialogHeader>

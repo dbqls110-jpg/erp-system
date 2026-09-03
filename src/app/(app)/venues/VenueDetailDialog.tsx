@@ -280,7 +280,7 @@ export function VenueDetailDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) handleClose(); }}>
-      <DialogContent className="max-h-[85vh] max-w-3xl overflow-y-auto">
+      <DialogContent className="max-h-[85vh] sm:max-w-3xl overflow-y-auto">
         {isLoading && (
           <div className="space-y-2 py-8 text-center text-sm text-muted-foreground" role="status">
             <p>공간 정보를 불러오는 중입니다.</p>

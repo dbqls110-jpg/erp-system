@@ -103,7 +103,7 @@ function PartnerDialog({
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="text-base">{isEdit ? "파트너 수정" : "파트너 등록"}</DialogTitle>
         </DialogHeader>
@@ -295,7 +295,7 @@ function PartnerRatesDialog({
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
-      <DialogContent className="max-h-[85vh] max-w-3xl overflow-y-auto">
+      <DialogContent className="max-h-[85vh] sm:max-w-3xl overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-base">{partnerName} 단가 관리</DialogTitle>
         </DialogHeader>
@@ -688,7 +688,21 @@ export function PartnerTable({
                   <div><dt className="inline">연락처 </dt><dd className="inline text-foreground">{p.phone ?? "-"}</dd></div>
                   <div><dt className="inline">단가 </dt><dd className="inline text-foreground">{p.rates.length === 0 ? formatRate(p.rate, p.rateUnit) : `${p.rates.length}개 항목`}</dd></div>
                   <div><dt className="inline">정산 </dt><dd className="inline text-foreground">{p.settlementType ?? "-"}</dd></div>
-                  <div className="col-span-2 truncate"><dt className="inline">프로젝트 </dt><dd className="inline text-foreground">{p.projectNames.length === 0 ? "-" : p.projectNames.join(", ")}</dd></div>
+                  <div className="col-span-2 flex min-w-0 gap-1">
+                    <dt className="shrink-0">{p.projectNames.length > 0 ? "프로젝트" : p.memo ? "비고" : "프로젝트"}</dt>
+                    <dd
+                      className="min-w-0 truncate text-foreground"
+                      title={p.projectNames.length > 0 ? p.projectNames.join(", ") : p.memo ?? undefined}
+                    >
+                      {p.projectNames.length > 0 ? (
+                        p.projectNames.join(", ")
+                      ) : p.memo ? (
+                        <span className="text-amber-700 dark:text-amber-300">{p.memo}</span>
+                      ) : (
+                        "-"
+                      )}
+                    </dd>
+                  </div>
                 </dl>
                 {canEdit && (
                   <div className="mt-3 flex justify-end gap-2 border-t border-border pt-2">
@@ -785,7 +799,17 @@ export function PartnerTable({
                       <TableCell className="text-muted-foreground">
                         {/* 건수만 적으면 "어느 프로젝트였지"를 다시 찾아봐야 한다. 이름을 보여준다. */}
                         {p.projectNames.length === 0 ? (
-                          "-"
+                          p.memo ? (
+                            <span
+                              className="block max-w-[240px] truncate text-amber-700 dark:text-amber-300"
+                              title={p.memo}
+                            >
+                              <span className="mr-1 text-[11px] font-medium">비고:</span>
+                              {p.memo}
+                            </span>
+                          ) : (
+                            "-"
+                          )
                         ) : (
                           <span title={p.projectNames.join(", ")}>
                             {p.projectNames.slice(0, 2).join(", ")}

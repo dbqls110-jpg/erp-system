@@ -565,7 +565,7 @@ export function MessengerView({ myId, myUser, users, todayDate }: { myId: string
 
       {/* 캘린더 등록 모달 */}
       <Dialog open={calModal} onOpenChange={(o) => { if (!o) setCalModal(false); }}>
-        <DialogContent className="max-w-sm">
+        <DialogContent className="sm:max-w-sm">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <CalendarPlus size={16} className="text-primary" />

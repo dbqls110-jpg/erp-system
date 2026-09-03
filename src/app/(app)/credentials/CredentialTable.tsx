@@ -420,7 +420,7 @@ export function CredentialTable({
       </Card>
 
       <Dialog open={!!dialog} onOpenChange={(o) => { if (!o) setDialog(null); }}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="text-base">
               {dialog?.mode === "edit" ? "계정 수정" : "새 계정 추가"}

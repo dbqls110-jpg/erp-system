@@ -202,7 +202,7 @@ export function FixedExpensePanel({ items, checkedIds, year, month, isAdmin }: P
       </div>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-sm">
+        <DialogContent className="sm:max-w-sm">
           <DialogHeader>
             <DialogTitle>{editingId ? "고정비 수정" : "고정비 항목 추가"}</DialogTitle>
           </DialogHeader>

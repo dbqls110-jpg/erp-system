@@ -346,7 +346,7 @@ export function CalendarView({
 
       {/* 일정 상세 모달 */}
       <Dialog open={modal.mode === "detail"} onOpenChange={(o) => { if (!o) setModal({ mode: "closed" }); }}>
-        <DialogContent className="max-w-sm">
+        <DialogContent className="sm:max-w-sm">
           <DialogHeader>
             <DialogTitle className="text-base">
               {modal.mode === "detail" && formatDate(modal.date)} 일정
@@ -411,7 +411,7 @@ export function CalendarView({
 
       {/* 일정 생성 모달 */}
       <Dialog open={modal.mode === "create"} onOpenChange={(o) => { if (!o) setModal({ mode: "closed" }); }}>
-        <DialogContent className="max-w-sm">
+        <DialogContent className="sm:max-w-sm">
           <DialogHeader>
             <DialogTitle className="text-base">
               {modal.mode === "create" && formatDate(modal.date)} 일정 추가
@@ -484,7 +484,7 @@ export function CalendarView({
 
       {/* 일정 수정 모달 */}
       <Dialog open={modal.mode === "edit"} onOpenChange={(o) => { if (!o) setModal({ mode: "closed" }); }}>
-        <DialogContent className="max-w-sm">
+        <DialogContent className="sm:max-w-sm">
           <DialogHeader>
             <DialogTitle className="text-base">
               {modal.mode === "edit" && formatDate(modal.event.date)} 일정 수정
