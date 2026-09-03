@@ -1,7 +1,6 @@
 "use server";
 
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { requireEditAccess } from "@/lib/actionGuards";
 import { prisma } from "@/lib/prisma";
 import { uploadFileToDrive, deleteFileFromDrive } from "@/lib/googleDrive";
 import { revalidatePath } from "next/cache";
@@ -9,8 +8,7 @@ import { revalidatePath } from "next/cache";
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
 
 export async function uploadProjectFile(projectId: string, formData: FormData) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id) throw new Error("Unauthorized");
+  const session = await requireEditAccess("projects");
   if (!session.accessToken) throw new Error("Google Drive 권한이 없습니다. 재로그인 해주세요.");
 
   const file = formData.get("file") as File;
@@ -44,8 +42,7 @@ export async function uploadProjectFile(projectId: string, formData: FormData) {
 }
 
 export async function deleteProjectFile(fileId: string, projectId: string) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id) throw new Error("Unauthorized");
+  const session = await requireEditAccess("projects");
   if (!session.accessToken) throw new Error("Google Drive 권한이 없습니다. 재로그인 해주세요.");
 
   const file = await prisma.projectFile.findUnique({ where: { id: fileId } });

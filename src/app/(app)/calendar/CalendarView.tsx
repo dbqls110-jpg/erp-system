@@ -219,6 +219,7 @@ export function CalendarView({
   }
 
   async function handleDelete(id: string, title: string) {
+    if (!confirm(`"${title}" 일정을 삭제하시겠습니까?`)) return;
     setDeletingId(id);
     try {
       await deleteCalendarEvent(id);
@@ -234,6 +235,7 @@ export function CalendarView({
 
   const blanks = Array.from({ length: firstDay }, (_, i) => i);
   const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
+  const hasVisibleEvents = days.some((day) => getEventsForDay(day).length > 0);
 
   return (
     <>
@@ -321,6 +323,16 @@ export function CalendarView({
               <div key={`e-${i}`} className="bg-muted/30 min-h-[80px]" />
             ))}
           </div>
+
+          {!hasVisibleEvents && (
+            <p className="mt-4 text-center text-sm text-muted-foreground">
+              {isExternalViewer
+                ? "이 달에는 표시할 프로젝트 마감일이 없습니다."
+                : canEditCalendar
+                  ? "이 달에는 등록된 일정이 없습니다. 날짜를 눌러 추가하세요."
+                  : "이 달에는 등록된 일정이 없습니다."}
+            </p>
+          )}
 
           <div className="flex flex-wrap gap-4 mt-4 text-xs text-muted-foreground">
             <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-destructive inline-block" />마감일</span>

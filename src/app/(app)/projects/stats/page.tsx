@@ -1,3 +1,6 @@
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
+import { requireMenuAccess } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { RevenueCharts } from "./RevenueChartsWrapper";
@@ -11,6 +14,8 @@ function getQuarter(month: number) {
 }
 
 export default async function ProjectStatsPage() {
+  const session = await getServerSession(authOptions);
+  await requireMenuAccess(session!.user.id, "projects", session!.user.role);
   const year = now.getFullYear();
 
   const projects = await prisma.project.findMany({

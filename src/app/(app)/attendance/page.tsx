@@ -1,5 +1,6 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { requireMenuAccess } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -26,6 +27,7 @@ function isOvertime(d: Date | null) {
 
 export default async function AttendancePage() {
   const session = await getServerSession(authOptions);
+  await requireMenuAccess(session!.user.id, "attendance", session!.user.role);
   const now = new Date();
   const today = format(now, "yyyy-MM-dd");
   const isAdmin = session?.user?.role === "admin";

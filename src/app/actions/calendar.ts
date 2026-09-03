@@ -1,6 +1,7 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
+import { requireEditAccess } from "@/lib/actionGuards";
 import { revalidatePath } from "next/cache";
 import { createNotionEvent, updateNotionEvent, archiveNotionEvent } from "@/lib/notion";
 import { getCalendarViewer } from "@/lib/calendarViewer";
@@ -13,6 +14,7 @@ import { canEditCalendar } from "@/lib/calendarVisibility";
  * 기록이 밖에서 바뀐다. 바꿔 달라는 말은 메신저로 받는 편이 맞다.
  */
 async function requireCalendarEditor() {
+  await requireEditAccess("calendar");
   const viewer = await getCalendarViewer();
   if (!viewer) throw new Error("Unauthorized");
   if (!canEditCalendar(viewer)) throw new Error("일정을 바꿀 권한이 없습니다.");

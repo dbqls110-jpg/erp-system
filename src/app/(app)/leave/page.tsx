@@ -1,5 +1,6 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { requireMenuAccess } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -22,6 +23,7 @@ const statusLabel: Record<string, { label: string; tone: "amber" | "green" | "re
 
 export default async function LeavePage() {
   const session = await getServerSession(authOptions);
+  await requireMenuAccess(session!.user.id, "leave", session!.user.role);
   const year = new Date().getFullYear();
   const isAdmin = session?.user?.role === "admin";
 

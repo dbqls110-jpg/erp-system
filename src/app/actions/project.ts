@@ -2,6 +2,7 @@
 
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { requireEditAccess } from "@/lib/actionGuards";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { uploadProjectFile } from "@/app/actions/projectFile";
@@ -31,8 +32,7 @@ function parseOptionalCompany(rawValue: FormDataEntryValue | null): string | nul
 }
 
 export async function createProject(formData: FormData): Promise<CreateProjectResult> {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id) throw new Error("Unauthorized");
+  const session = await requireEditAccess("projects");
 
   const quoteFileEntry = formData.get("quoteFile");
   const quoteFile = quoteFileEntry instanceof File && quoteFileEntry.size > 0 ? quoteFileEntry : null;
@@ -97,8 +97,7 @@ export async function createProject(formData: FormData): Promise<CreateProjectRe
 }
 
 export async function updateProject(id: string, formData: FormData) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id) throw new Error("Unauthorized");
+  await requireEditAccess("projects");
 
   const revenue = parseOptionalAmount(formData.get("revenue"), "매출");
   const cost = parseOptionalAmount(formData.get("cost"), "매입");
@@ -131,8 +130,7 @@ export async function deleteProject(id: string) {
 }
 
 export async function addChecklistItem(projectId: string, content: string) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id) throw new Error("Unauthorized");
+  await requireEditAccess("projects");
 
   const normalizedContent = content.trim();
   if (!normalizedContent) throw new Error("체크리스트 항목 내용을 입력해 주세요.");
@@ -148,8 +146,7 @@ export async function addChecklistItem(projectId: string, content: string) {
 }
 
 export async function updateChecklistItem(itemId: string, projectId: string, content: string) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id) throw new Error("Unauthorized");
+  await requireEditAccess("projects");
 
   const normalizedContent = content.trim();
   if (!normalizedContent) throw new Error("체크리스트 항목 내용을 입력해 주세요.");
@@ -167,8 +164,7 @@ export async function updateChecklistItem(itemId: string, projectId: string, con
 }
 
 export async function toggleChecklistItem(itemId: string, projectId: string) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id) throw new Error("Unauthorized");
+  await requireEditAccess("projects");
 
   const item = await prisma.checklistItem.findUnique({ where: { id: itemId } });
   if (!item) return;
@@ -188,8 +184,7 @@ export async function toggleChecklistItem(itemId: string, projectId: string) {
 }
 
 export async function deleteChecklistItem(itemId: string, projectId: string) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id) throw new Error("Unauthorized");
+  await requireEditAccess("projects");
 
   await prisma.checklistItem.delete({ where: { id: itemId } });
   await updateProgress(projectId);
@@ -198,8 +193,7 @@ export async function deleteChecklistItem(itemId: string, projectId: string) {
 }
 
 export async function updateProjectMemo(id: string, memo: string) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id) throw new Error("Unauthorized");
+  await requireEditAccess("projects");
 
   await prisma.project.update({ where: { id }, data: { memo: memo || null } });
   revalidatePath(`/projects/${id}`);

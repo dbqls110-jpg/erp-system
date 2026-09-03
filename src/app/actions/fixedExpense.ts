@@ -2,6 +2,7 @@
 
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { requireEditAccess } from "@/lib/actionGuards";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 
@@ -43,8 +44,7 @@ export async function deleteFixedExpense(id: string) {
 }
 
 export async function checkFixedExpense(fixedExpenseId: string, year: number, month: number) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id) throw new Error("Unauthorized");
+  const session = await requireEditAccess("finance");
 
   const fixed = await prisma.fixedExpense.findUnique({ where: { id: fixedExpenseId } });
   if (!fixed) throw new Error("고정비 항목을 찾을 수 없습니다.");
@@ -66,8 +66,7 @@ export async function checkFixedExpense(fixedExpenseId: string, year: number, mo
 }
 
 export async function uncheckFixedExpense(fixedExpenseId: string, year: number, month: number) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id) throw new Error("Unauthorized");
+  await requireEditAccess("finance");
 
   const monthStr = String(month).padStart(2, "0");
   await prisma.expense.deleteMany({

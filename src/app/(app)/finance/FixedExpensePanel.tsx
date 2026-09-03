@@ -87,6 +87,7 @@ export function FixedExpensePanel({ items, checkedIds, year, month, isAdmin }: P
   }
 
   function handleDelete(item: FixedExpenseItem) {
+    if (!confirm(`"${item.name}" 고정비 항목을 삭제하시겠습니까?`)) return;
     setPendingId(item.id);
     startTransition(async () => {
       try {

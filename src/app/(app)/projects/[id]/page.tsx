@@ -1,5 +1,6 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { requireMenuAccess } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import { notFound } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
@@ -23,6 +24,7 @@ const statusConfig: Record<string, { label: string; class: string }> = {
 export default async function ProjectDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const session = await getServerSession(authOptions);
+  await requireMenuAccess(session!.user.id, "projects", session!.user.role);
   const isAdmin = session?.user?.role === "admin";
   const hasDriveAccess = !!session?.accessToken;
 

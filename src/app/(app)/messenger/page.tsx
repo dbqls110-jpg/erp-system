@@ -1,10 +1,12 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { requireMenuAccess } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import { MessengerView } from "./MessengerView";
 
 export default async function MessengerPage() {
   const session = await getServerSession(authOptions);
+  await requireMenuAccess(session!.user.id, "messenger", session!.user.role);
   const now = new Date();
   const todayDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
 
