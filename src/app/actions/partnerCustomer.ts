@@ -15,6 +15,7 @@ export async function createCustomer(data: {
   phone?: string;
   email?: string;
   category?: string;
+  industry?: string;
   status?: string;
   memo?: string;
 }) {
@@ -35,6 +36,7 @@ export async function createCustomer(data: {
       phone: data.phone?.trim() || null,
       email: data.email?.trim() || null,
       category,
+      industry: data.industry?.trim() || null,
       status,
       memo: data.memo?.trim() || null,
     },
@@ -50,6 +52,7 @@ export async function updateCustomer(
     phone: string;
     email: string;
     category: string;
+    industry: string;
     status: string;
     memo: string;
   }>,

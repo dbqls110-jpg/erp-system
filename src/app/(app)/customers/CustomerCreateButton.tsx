@@ -17,11 +17,12 @@ const EMPTY_FORM = {
   phone: "",
   email: "",
   category: "고객사",
+  industry: "",
   status: "거래중",
   memo: "",
 };
 
-export function CustomerCreateButton() {
+export function CustomerCreateButton({ industries }: { industries: string[] }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
@@ -86,6 +87,13 @@ export function CustomerCreateButton() {
                 <option value="협력사">협력사</option>
                 <option value="공급사">공급사</option>
               </select>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="customer-create-industry">업종</Label>
+              <Input id="customer-create-industry" list="customer-create-industry-options" value={form.industry} onChange={(event) => set("industry")(event.target.value)} placeholder="예: 제조업, IT" />
+              <datalist id="customer-create-industry-options">
+                {industries.map((industry) => <option key={industry} value={industry} />)}
+              </datalist>
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="customer-create-status">상태</Label>
