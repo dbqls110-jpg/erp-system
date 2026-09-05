@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { toast } from "sonner";
-import { Inbox, Mail, Phone, UserRound } from "lucide-react";
+import { CalendarDays, ChevronLeft, ChevronRight, Inbox, Mail, Phone, UserRound } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -13,14 +14,21 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { updateInquiryMemo, updateInquiryStage } from "@/app/actions/inquiries";
+import { createProjectFromInquiry, updateInquiryMemo, updateInquiryStage } from "@/app/actions/inquiries";
 import {
+  formatInquiryMonth,
   formatCurrentDateTime,
   formatSheetDateTime,
+  getCurrentInquiryMonth,
   getFollowupAge,
+  getInquiryClosePoint,
   INQUIRY_STAGES,
   shouldHideInquiry,
+  shiftInquiryMonth,
+  summarizeInquiries,
   type InquiryRecord,
   type InquiryStage,
 } from "@/lib/inquiries";
@@ -32,6 +40,7 @@ const STAGE_STYLES: Record<InquiryStage, { dot: string; badge: string }> = {
   "1차 연락": { dot: "bg-sky-500", badge: "border-sky-200 bg-sky-50 text-sky-700" },
   "2차 연락": { dot: "bg-amber-500", badge: "border-amber-200 bg-amber-50 text-amber-700" },
   "3차 연락": { dot: "bg-orange-500", badge: "border-orange-200 bg-orange-50 text-orange-700" },
+  성사: { dot: "bg-violet-500", badge: "border-violet-200 bg-violet-50 text-violet-700" },
   종료: { dot: "bg-emerald-500", badge: "border-emerald-200 bg-emerald-50 text-emerald-700" },
 };
 
@@ -48,6 +57,10 @@ function displayValue(value: string): string {
   return value || "-";
 }
 
+function suggestedProjectName(inquiry: InquiryRecord): string {
+  return [inquiry.name, inquiry.rentalType].filter(Boolean).join(" ") || "새 프로젝트";
+}
+
 export function InquiriesKanban({ initialInquiries, canEdit }: Props) {
   const [inquiries, setInquiries] = useState(initialInquiries);
   const [now, setNow] = useState(() => new Date());
@@ -56,15 +69,44 @@ export function InquiriesKanban({ initialInquiries, canEdit }: Props) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [memoDraft, setMemoDraft] = useState("");
   const [memoSaving, setMemoSaving] = useState(false);
+  const [summaryMonth, setSummaryMonth] = useState(() => getCurrentInquiryMonth());
+  const [projectInquiry, setProjectInquiry] = useState<InquiryRecord | null>(null);
+  const [projectNameDraft, setProjectNameDraft] = useState("");
+  const [projectSaving, setProjectSaving] = useState(false);
 
   useVisiblePolling(() => setNow(new Date()), 60_000, { immediate: false });
 
   const visibleInquiries = inquiries.filter((inquiry) => !shouldHideInquiry(inquiry, now));
   const selected = selectedId ? visibleInquiries.find((inquiry) => inquiry.id === selectedId) ?? null : null;
+  const summary = summarizeInquiries(inquiries, summaryMonth);
+  const currentMonth = getCurrentInquiryMonth(now);
+  const summaryTitle = summaryMonth === currentMonth ? "이번 달" : formatInquiryMonth(summaryMonth);
 
   const openDetail = (inquiry: InquiryRecord) => {
     setSelectedId(inquiry.id);
     setMemoDraft(inquiry.memo);
+  };
+
+  const openProjectDialog = (inquiry: InquiryRecord) => {
+    setProjectInquiry(inquiry);
+    setProjectNameDraft(suggestedProjectName(inquiry));
+  };
+
+  const createProject = async () => {
+    if (!projectInquiry || projectSaving) return;
+    setProjectSaving(true);
+    try {
+      const result = await createProjectFromInquiry(projectInquiry.identity, projectNameDraft);
+      setInquiries((current) => current.map((item) => item.id === projectInquiry.id
+        ? { ...item, projectName: result.projectName, projectId: result.projectId }
+        : item));
+      setProjectInquiry(null);
+      toast.success(result.reused ? `기존 프로젝트 ‘${result.projectName}’에 연결했습니다.` : `프로젝트 ‘${result.projectName}’를 만들었습니다.`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "프로젝트 생성 실패", { duration: 10000 });
+    } finally {
+      setProjectSaving(false);
+    }
   };
 
   const setSaving = (id: string, saving: boolean) => {
@@ -88,6 +130,7 @@ export function InquiriesKanban({ initialInquiries, canEdit }: Props) {
       ...(nextStage === "2차 연락" ? { contact2At: optimisticTimestamp } : {}),
       ...(nextStage === "3차 연락" ? { contact3At: optimisticTimestamp } : {}),
       ...(nextStage === "종료" ? { closedAt: optimisticTimestamp } : {}),
+      ...(nextStage === "성사" ? { wonAt: optimisticTimestamp } : {}),
     };
     setInquiries((current) => current.map((item) => item.id === inquiry.id ? optimistic : item));
     setSaving(inquiry.id, true);
@@ -102,6 +145,7 @@ export function InquiriesKanban({ initialInquiries, canEdit }: Props) {
           ...(nextStage === "2차 연락" ? { contact2At: result.timestamp } : {}),
           ...(nextStage === "3차 연락" ? { contact3At: result.timestamp } : {}),
           ...(nextStage === "종료" ? { closedAt: result.timestamp } : {}),
+          ...(nextStage === "성사" ? { wonAt: result.timestamp } : {}),
         };
       }));
       toast.success(`‘${nextStage}’ 단계로 옮겼습니다.`);
@@ -132,6 +176,44 @@ export function InquiriesKanban({ initialInquiries, canEdit }: Props) {
   return (
     <>
       <div className="rounded-2xl border border-border bg-muted/20 p-3 sm:p-4">
+        <div className="mb-3 rounded-xl border border-border bg-background px-3 py-2.5 sm:px-4">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+              <CalendarDays className="size-4 text-primary" />
+              <span>{summaryTitle} 문의 요약</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="size-7"
+                aria-label="이전 달"
+                onClick={() => setSummaryMonth((current) => shiftInquiryMonth(current, -1))}
+              >
+                <ChevronLeft className="size-4" />
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="size-7"
+                aria-label="다음 달"
+                onClick={() => setSummaryMonth((current) => shiftInquiryMonth(current, 1))}
+              >
+                <ChevronRight className="size-4" />
+              </Button>
+            </div>
+          </div>
+          <div className="mt-2 space-y-1 text-xs text-muted-foreground sm:text-sm">
+            <p>
+              {summaryTitle} 문의 <span className="font-semibold text-foreground">{summary.inquiryCount}</span>건 · 1차 <span className="font-semibold text-foreground">{summary.contact1Count}</span> · 2차 <span className="font-semibold text-foreground">{summary.contact2Count}</span> · 3차 <span className="font-semibold text-foreground">{summary.contact3Count}</span> · 성사 <span className="font-semibold text-foreground">{summary.wonCount}</span>
+            </p>
+            <p>
+              이탈&nbsp; 문의 <span className="font-semibold text-foreground">{summary.dropOff["연락 전"]}</span> · 1차 <span className="font-semibold text-foreground">{summary.dropOff["1차"]}</span> · 2차 <span className="font-semibold text-foreground">{summary.dropOff["2차"]}</span> · 3차 <span className="font-semibold text-foreground">{summary.dropOff["3차"]}</span>
+            </p>
+          </div>
+        </div>
         <div className="mb-3 flex items-center justify-between gap-3 px-1">
           <div className="text-sm text-muted-foreground">
             전체 <span className="font-semibold text-foreground">{visibleInquiries.length}</span>건
@@ -158,7 +240,7 @@ export function InquiriesKanban({ initialInquiries, canEdit }: Props) {
         )}
 
         <div className="overflow-x-auto pb-2">
-          <div className="grid min-w-[1180px] grid-cols-5 gap-3">
+          <div className="grid min-w-[1420px] grid-cols-6 gap-3">
             {INQUIRY_STAGES.map((stage) => {
               const items = visibleInquiries.filter((inquiry) => inquiry.status === stage);
               const style = STAGE_STYLES[stage];
@@ -223,10 +305,43 @@ export function InquiriesKanban({ initialInquiries, canEdit }: Props) {
                           <p className="mt-3 line-clamp-3 whitespace-pre-wrap text-xs leading-5 text-foreground/85">
                             {displayValue(inquiry.content)}
                           </p>
+                          {inquiry.status === "종료" && (
+                            <p className="mt-2 text-[11px] font-medium text-muted-foreground">
+                              {getInquiryClosePoint(inquiry)}에서 종료
+                            </p>
+                          )}
                           <div className="mt-3 space-y-1 border-t border-border/70 pt-2 text-[11px] text-muted-foreground">
                             <p className="flex items-center gap-1.5 truncate"><Phone className="size-3 shrink-0" />{displayValue(inquiry.phone)}</p>
                             <p className="flex items-center gap-1.5 truncate"><Mail className="size-3 shrink-0" />{displayValue(inquiry.email)}</p>
                           </div>
+                          {inquiry.status === "성사" && (
+                            <div className="mt-3 border-t border-border/70 pt-2">
+                              {inquiry.projectName ? (
+                                <Link
+                                  href={inquiry.projectId ? `/projects/${inquiry.projectId}` : "/projects"}
+                                  onClick={(event) => event.stopPropagation()}
+                                  className="block truncate text-xs font-medium text-primary hover:underline"
+                                  title={inquiry.projectId ? `프로젝트 ${inquiry.projectName}로 이동` : "프로젝트 목록에서 확인"}
+                                >
+                                  프로젝트 {inquiry.projectName}
+                                </Link>
+                              ) : canEdit ? (
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-7 w-full text-xs"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    openProjectDialog(inquiry);
+                                  }}
+                                  disabled={saving || projectSaving}
+                                >
+                                  프로젝트로 만들기
+                                </Button>
+                              ) : null}
+                            </div>
+                          )}
                         </article>
                       );
                     })}
@@ -258,7 +373,19 @@ export function InquiriesKanban({ initialInquiries, canEdit }: Props) {
                 <DetailField label="1차 연락일시" value={displayDate(selected.contact1At)} />
                 <DetailField label="2차 연락일시" value={displayDate(selected.contact2At)} />
                 <DetailField label="3차 연락일시" value={displayDate(selected.contact3At)} />
+                <DetailField label="성사일시" value={displayDate(selected.wonAt)} />
                 <DetailField label="종료일시" value={displayDate(selected.closedAt)} />
+                {selected.projectName && (
+                  <div className="sm:col-span-2">
+                    {selected.projectId ? (
+                      <Link href={`/projects/${selected.projectId}`} className="text-sm font-medium text-primary hover:underline">
+                        프로젝트 {selected.projectName}
+                      </Link>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">프로젝트 {selected.projectName}</p>
+                    )}
+                  </div>
+                )}
                 <div className="sm:col-span-2">
                   <DetailField label="문의 내용" value={displayValue(selected.content)} multiline />
                 </div>
@@ -274,6 +401,47 @@ export function InquiriesKanban({ initialInquiries, canEdit }: Props) {
                   </Button>
                 </DialogFooter>
               )}
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={Boolean(projectInquiry)}
+        onOpenChange={(open) => {
+          if (!open && !projectSaving) setProjectInquiry(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          {projectInquiry && (
+            <>
+              <DialogHeader>
+                <DialogTitle>프로젝트로 만들기</DialogTitle>
+                <DialogDescription>
+                  거래처·프로젝트를 만들고 프로젝트 시트에 한 줄을 추가합니다. 이름은 저장 전에 수정할 수 있습니다.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-2">
+                <Label htmlFor="inquiry-project-name">프로젝트명</Label>
+                <Input
+                  id="inquiry-project-name"
+                  value={projectNameDraft}
+                  onChange={(event) => setProjectNameDraft(event.target.value)}
+                  disabled={projectSaving}
+                  autoFocus
+                />
+              </div>
+              <div className="rounded-lg bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+                대관 유형: {displayValue(projectInquiry.rentalType)} · 희망 지역: {displayValue(projectInquiry.desiredArea)}
+              </div>
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setProjectInquiry(null)} disabled={projectSaving}>
+                  취소
+                </Button>
+                <Button type="button" onClick={() => void createProject()} disabled={projectSaving || !projectNameDraft.trim()}>
+                  {projectSaving ? "생성 중..." : "프로젝트 만들기"}
+                </Button>
+              </DialogFooter>
             </>
           )}
         </DialogContent>

@@ -377,7 +377,13 @@ export function MessengerView({ myId, myUser, users, todayDate }: { myId: string
           {assistantOpen ? (
             <>
               <div className="h-14 px-4 flex items-center gap-3 border-b border-border shrink-0">
-                <button onClick={() => setShowList(true)} className="sm:hidden text-muted-foreground hover:text-foreground mr-1">
+                <button
+                  type="button"
+                  onClick={() => setShowList(true)}
+                  aria-label="대화 목록으로 돌아가기"
+                  title="대화 목록으로 돌아가기"
+                  className="sm:hidden text-muted-foreground hover:text-foreground mr-1"
+                >
                   <ArrowLeft className="size-3.5" />
                 </button>
                 <div className="flex size-8 items-center justify-center rounded-full bg-primary/10">
@@ -396,7 +402,13 @@ export function MessengerView({ myId, myUser, users, todayDate }: { myId: string
           ) : (
             <>
               <div className="h-14 px-4 flex items-center gap-3 border-b border-border shrink-0">
-                <button onClick={() => setShowList(true)} className="sm:hidden text-muted-foreground hover:text-foreground mr-1">
+                <button
+                  type="button"
+                  onClick={() => setShowList(true)}
+                  aria-label="대화 목록으로 돌아가기"
+                  title="대화 목록으로 돌아가기"
+                  className="sm:hidden text-muted-foreground hover:text-foreground mr-1"
+                >
                   <ArrowLeft className="size-3.5" />
                 </button>
                 <Avatar className="h-8 w-8">
@@ -596,7 +608,9 @@ export function MessengerView({ myId, myUser, users, todayDate }: { myId: string
                 {COLOR_OPTIONS.map((c) => (
                   <button
                     key={c.value}
+                    type="button"
                     onClick={() => setCalColor(c.value)}
+                    aria-label={`${c.label} 색상 선택`}
                     title={c.label}
                     className={cn(
                       "w-6 h-6 rounded-full transition-all",

@@ -374,7 +374,12 @@ export function CredentialTable({
                             </div>
                           ) : <span className="text-muted-foreground">—</span>}
                         </TableCell>
-                        <TableCell className="py-2.5 text-muted-foreground max-w-[120px] truncate">{c.memo ?? "—"}</TableCell>
+                        <TableCell
+                          className="py-2.5 text-muted-foreground max-w-[120px] truncate"
+                          title={c.memo ?? undefined}
+                        >
+                          {c.memo ?? "—"}
+                        </TableCell>
                         <TableCell className="py-2.5">
                           {c.url ? (
                             <a href={c.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-primary hover:underline text-xs truncate max-w-[140px]">

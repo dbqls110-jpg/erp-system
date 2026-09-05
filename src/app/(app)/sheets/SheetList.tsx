@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ExternalLink, Pencil, Trash2, Plus, Sheet } from "lucide-react";
 import { createSheetLink, updateSheetLink, deleteSheetLink } from "@/app/actions/sheets";
+import { toneBadgeClass } from "@/lib/badge-tone";
 
 interface SheetLink {
   id: string;
@@ -20,17 +21,16 @@ interface Props {
   isAdmin: boolean;
 }
 
-const CATEGORY_COLORS: Record<string, string> = {
-  재무: "bg-blue-100 text-blue-700",
-  프로젝트: "bg-violet-100 text-violet-700",
-  인사: "bg-green-100 text-green-700",
-  마케팅: "bg-orange-100 text-orange-700",
-  기타: "bg-gray-100 text-gray-600",
+const CATEGORY_TONES: Record<string, Parameters<typeof toneBadgeClass>[0]> = {
+  재무: "blue",
+  프로젝트: "violet",
+  인사: "green",
+  마케팅: "amber",
+  기타: "gray",
 };
 
 function getCategoryColor(cat: string | null) {
-  if (!cat) return "bg-gray-100 text-gray-600";
-  return CATEGORY_COLORS[cat] ?? "bg-gray-100 text-gray-600";
+  return toneBadgeClass(cat ? CATEGORY_TONES[cat] ?? "gray" : "gray");
 }
 
 function Modal({
@@ -78,17 +78,17 @@ function Modal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="sheet-modal-title"
-        className="bg-white rounded-xl shadow-xl w-full max-w-md p-6 space-y-4"
+        className="bg-white dark:bg-card rounded-xl shadow-xl w-full max-w-md p-6 space-y-4"
       >
-        <h2 id="sheet-modal-title" className="text-base font-semibold text-gray-900">
+        <h2 id="sheet-modal-title" className="text-base font-semibold text-gray-900 dark:text-foreground">
           {initial ? "시트 수정" : "시트 추가"}
         </h2>
-        {error && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
+        {error && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-500/10 dark:text-red-300">{error}</p>}
         <div className="space-y-3">
           <div>
-            <label className="text-xs font-medium text-gray-600 mb-1 block">시트 이름 *</label>
+            <label className="text-xs font-medium text-gray-600 dark:text-muted-foreground mb-1 block">시트 이름 *</label>
             <input
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-400"
+              className="w-full border border-gray-200 dark:border-input dark:bg-background dark:text-foreground dark:placeholder:text-muted-foreground rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-400"
               value={name}
               onChange={e => setName(e.target.value)}
               placeholder="예: 2026 재무 현황"
@@ -96,9 +96,9 @@ function Modal({
             />
           </div>
           <div>
-            <label className="text-xs font-medium text-gray-600 mb-1 block">URL *</label>
+            <label className="text-xs font-medium text-gray-600 dark:text-muted-foreground mb-1 block">URL *</label>
             <input
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-400"
+              className="w-full border border-gray-200 dark:border-input dark:bg-background dark:text-foreground dark:placeholder:text-muted-foreground rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-400"
               value={url}
               onChange={e => setUrl(e.target.value)}
               placeholder="https://docs.google.com/spreadsheets/d/..."
@@ -106,9 +106,9 @@ function Modal({
             />
           </div>
           <div>
-            <label className="text-xs font-medium text-gray-600 mb-1 block">카테고리</label>
+            <label className="text-xs font-medium text-gray-600 dark:text-muted-foreground mb-1 block">카테고리</label>
             <select
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-400"
+              className="w-full border border-gray-200 dark:border-input dark:bg-background dark:text-foreground rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-400"
               value={category}
               onChange={e => setCategory(e.target.value)}
             >
@@ -125,9 +125,9 @@ function Modal({
             </select>
           </div>
           <div>
-            <label className="text-xs font-medium text-gray-600 mb-1 block">설명</label>
+            <label className="text-xs font-medium text-gray-600 dark:text-muted-foreground mb-1 block">설명</label>
             <input
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-400"
+              className="w-full border border-gray-200 dark:border-input dark:bg-background dark:text-foreground dark:placeholder:text-muted-foreground rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-400"
               value={description}
               onChange={e => setDescription(e.target.value)}
               placeholder="간단한 설명"
@@ -138,14 +138,14 @@ function Modal({
           <button
             type="button"
             onClick={onClose}
-            className="flex-1 py-2 rounded-lg border border-gray-200 text-sm text-gray-600 hover:bg-gray-50"
+            className="flex-1 py-2 rounded-lg border border-gray-200 dark:border-border text-sm text-gray-600 dark:text-muted-foreground hover:bg-gray-50 dark:hover:bg-muted"
           >
             취소
           </button>
           <button
             type="submit"
             disabled={loading}
-            className="flex-1 py-2 rounded-lg bg-violet-600 text-white text-sm font-medium hover:bg-violet-700 disabled:opacity-50"
+            className="flex-1 py-2 rounded-lg bg-violet-600 dark:bg-violet-500 text-white text-sm font-medium hover:bg-violet-700 dark:hover:bg-violet-400 disabled:opacity-50"
           >
             {loading ? "저장 중..." : "저장"}
           </button>
@@ -185,7 +185,7 @@ export function SheetList({ sheets, isAdmin }: Props) {
         {isAdmin && <button
           type="button"
           onClick={() => setShowAdd(true)}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-violet-600 text-white text-sm font-medium hover:bg-violet-700"
+          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-violet-600 dark:bg-violet-500 text-white text-sm font-medium hover:bg-violet-700 dark:hover:bg-violet-400"
         >
           <Plus size={16} />
           시트 추가
@@ -193,7 +193,7 @@ export function SheetList({ sheets, isAdmin }: Props) {
       </div>
 
       {sheets.length === 0 ? (
-        <div className="text-center py-20 text-gray-400">
+        <div className="text-center py-20 text-gray-400 dark:text-muted-foreground">
           <Sheet size={40} className="mx-auto mb-3 opacity-30" />
           <p className="text-sm">등록된 시트가 없습니다</p>
         </div>
@@ -205,7 +205,7 @@ export function SheetList({ sheets, isAdmin }: Props) {
                 <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${getCategoryColor(cat)}`}>
                   {cat}
                 </span>
-                <span className="text-xs text-gray-400">{grouped[cat].length}개</span>
+                <span className="text-xs text-gray-400 dark:text-muted-foreground">{grouped[cat].length}개</span>
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
                 {grouped[cat].map(sheet => (
@@ -214,16 +214,16 @@ export function SheetList({ sheets, isAdmin }: Props) {
                     href={sheet.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="group bg-white border border-gray-100 rounded-xl p-3.5 hover:shadow-md hover:border-violet-200 transition-all block"
+                    className="group bg-white dark:bg-card border border-gray-100 dark:border-border rounded-xl p-3.5 hover:shadow-md hover:border-violet-200 dark:hover:border-violet-500/50 transition-all block"
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex items-center gap-3 min-w-0">
-                        <div className="w-10 h-10 rounded-lg bg-green-50 flex items-center justify-center shrink-0">
-                          <Sheet size={20} className="text-green-600" />
+                        <div className="w-10 h-10 rounded-lg bg-green-50 dark:bg-green-500/15 flex items-center justify-center shrink-0">
+                          <Sheet size={20} className="text-green-600 dark:text-green-400" />
                         </div>
                         <div className="min-w-0">
                           <div className="flex items-center gap-1.5">
-                            <p className="truncate text-base font-semibold text-gray-900">{sheet.name}</p>
+                            <p className="truncate text-base font-semibold text-gray-900 dark:text-foreground">{sheet.name}</p>
                             {sheet.externalOwner && (
                               // 옮길 수 없는 시트라는 뜻이다. 그냥 두면 "왜 이것만
                               // 정리가 안 됐지"를 계속 다시 묻게 된다.
@@ -236,7 +236,7 @@ export function SheetList({ sheets, isAdmin }: Props) {
                             )}
                           </div>
                           {sheet.description && (
-                            <p className="mt-0.5 truncate text-sm text-gray-500">{sheet.description}</p>
+                            <p className="mt-0.5 truncate text-sm text-gray-500 dark:text-muted-foreground">{sheet.description}</p>
                           )}
                         </div>
                       </div>
@@ -246,7 +246,7 @@ export function SheetList({ sheets, isAdmin }: Props) {
                             type="button"
                             onClick={e => { e.preventDefault(); setEditing(sheet); }}
                             aria-label={`${sheet.name} 수정`}
-                            className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-700"
+                            className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-muted text-gray-400 dark:text-muted-foreground hover:text-gray-700 dark:hover:text-foreground"
                           >
                             <Pencil size={14} />
                           </button>
@@ -256,12 +256,12 @@ export function SheetList({ sheets, isAdmin }: Props) {
                             type="button"
                             onClick={e => { e.preventDefault(); void handleDelete(sheet.id); }}
                             aria-label={`${sheet.name} 삭제`}
-                            className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500"
+                            className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-500/10 text-gray-400 dark:text-muted-foreground hover:text-red-500 dark:hover:text-red-400"
                           >
                             <Trash2 size={14} />
                           </button>
                         )}
-                        <ExternalLink size={14} className="text-violet-400 ml-1" />
+                        <ExternalLink size={14} className="text-violet-400 dark:text-violet-300 ml-1" />
                       </div>
                     </div>
                   </a>

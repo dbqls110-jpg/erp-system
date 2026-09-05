@@ -238,7 +238,38 @@ export function PartnerPaymentsDialog({
                 등록 단가와 지급 이력이 없습니다.
               </p>
             ) : (
-              <div className="overflow-x-auto rounded-lg border border-border">
+              <>
+                <div className="space-y-2 md:hidden">
+                  {stats.map((stat) => (
+                    <article key={`${stat.item}-${stat.unit}`} className="rounded-xl border border-border p-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <h3 className="truncate font-medium" title={stat.item}>{stat.item}</h3>
+                          <p className="mt-1 text-xs text-muted-foreground">{stat.unit}</p>
+                        </div>
+                      </div>
+                      <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 text-xs text-muted-foreground">
+                        <div>
+                          <dt>등록 단가</dt>
+                          <dd className="mt-0.5 tabular-nums text-foreground">{formatAmount(stat.rate)}</dd>
+                        </div>
+                        <div>
+                          <dt>실제 평균</dt>
+                          <dd className={`mt-0.5 tabular-nums ${averageClassName(stat.ratio)}`}>{formatAmount(stat.average)}</dd>
+                        </div>
+                        <div>
+                          <dt>건수</dt>
+                          <dd className="mt-0.5 tabular-nums text-foreground">{stat.count}건</dd>
+                        </div>
+                        <div>
+                          <dt>최소~최대</dt>
+                          <dd className="mt-0.5 tabular-nums text-foreground">{formatRange(stat.min, stat.max)}</dd>
+                        </div>
+                      </dl>
+                    </article>
+                  ))}
+                </div>
+                <div className="hidden overflow-x-auto rounded-lg border border-border md:block">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -266,13 +297,115 @@ export function PartnerPaymentsDialog({
                     ))}
                   </TableBody>
                 </Table>
-              </div>
+                </div>
+              </>
             )}
           </div>
 
           <div>
             <p className="mb-2 text-sm font-medium">지급 이력</p>
-            <div className="overflow-x-auto">
+            <div className="space-y-2 md:hidden">
+              {payments.length === 0 ? (
+                <p className="rounded-lg border border-dashed p-4 text-center text-sm text-muted-foreground">
+                  등록된 지급 이력이 없습니다.
+                </p>
+              ) : (
+                payments.map((payment, index) => {
+                  const original = initialPayments[index];
+                  const canSave = payment.item.trim() && Number(payment.amount) > 0 && Number(payment.quantity) >= 1;
+                  return (
+                    <article key={original.id} className="rounded-xl border border-border p-3">
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="col-span-2">
+                          <Label htmlFor={`payment-mobile-item-${original.id}`}>작업 이름</Label>
+                          <Input
+                            id={`payment-mobile-item-${original.id}`}
+                            value={payment.item}
+                            onChange={(e) => setPayment(String(index), "item", e.target.value)}
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor={`payment-mobile-amount-${original.id}`}>금액</Label>
+                          <Input
+                            id={`payment-mobile-amount-${original.id}`}
+                            inputMode="numeric"
+                            value={payment.amount}
+                            onChange={(e) => setPayment(String(index), "amount", e.target.value.replace(/[^0-9]/g, ""))}
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor={`payment-mobile-unit-${original.id}`}>단위</Label>
+                          <select
+                            id={`payment-mobile-unit-${original.id}`}
+                            className={`${SELECT_CLASS} w-full`}
+                            value={payment.unit}
+                            onChange={(e) => setPayment(String(index), "unit", e.target.value)}
+                          >
+                            {PAYMENT_UNITS.map((unit) => <option key={unit} value={unit}>{unit}</option>)}
+                          </select>
+                        </div>
+                        <div>
+                          <Label htmlFor={`payment-mobile-quantity-${original.id}`}>수량</Label>
+                          <Input
+                            id={`payment-mobile-quantity-${original.id}`}
+                            inputMode="numeric"
+                            value={payment.quantity}
+                            onChange={(e) => setPayment(String(index), "quantity", e.target.value.replace(/[^0-9]/g, ""))}
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor={`payment-mobile-project-${original.id}`}>프로젝트</Label>
+                          <ProjectSelect
+                            id={`payment-mobile-project-${original.id}`}
+                            value={payment.projectId}
+                            projects={projects}
+                            onChange={(value) => setPayment(String(index), "projectId", value)}
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor={`payment-mobile-paid-on-${original.id}`}>지급일</Label>
+                          <Input
+                            id={`payment-mobile-paid-on-${original.id}`}
+                            type="date"
+                            value={payment.paidOn}
+                            onChange={(e) => setPayment(String(index), "paidOn", e.target.value)}
+                          />
+                        </div>
+                        <div className="col-span-2">
+                          <Label htmlFor={`payment-mobile-memo-${original.id}`}>비고</Label>
+                          <Input
+                            id={`payment-mobile-memo-${original.id}`}
+                            value={payment.memo}
+                            onChange={(e) => setPayment(String(index), "memo", e.target.value)}
+                          />
+                        </div>
+                      </div>
+                      <div className="mt-3 flex justify-end gap-2 border-t border-border pt-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handlePaymentSave(index, payment)}
+                          disabled={savingId !== null || !canSave}
+                        >
+                          저장
+                        </Button>
+                        <button
+                          type="button"
+                          onClick={() => handlePaymentDelete(index)}
+                          disabled={savingId !== null}
+                          className="flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-destructive disabled:opacity-50"
+                          aria-label={`${payment.item || "지급 이력"} 삭제`}
+                          title="삭제"
+                        >
+                          <Trash2 className="size-3.5" />
+                        </button>
+                      </div>
+                    </article>
+                  );
+                })
+              )}
+            </div>
+            <div className="hidden overflow-x-auto md:block">
               <div className="sm:min-w-[58rem]">
                 <div className="hidden grid-cols-[minmax(0,1fr)_7rem_6rem_4.5rem_minmax(0,1fr)_8.5rem_minmax(0,1fr)_3rem_2rem] gap-2 px-1 text-xs text-muted-foreground sm:grid">
                   <span className="whitespace-nowrap">작업 이름</span>

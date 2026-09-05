@@ -418,7 +418,15 @@ function VenueDetailContent({ detail }: { detail: VenueDetailResponse }) {
               <details key={`${group.title}-${index}`} open={index === 0} className="rounded-lg border border-border">
                 <summary className="cursor-pointer px-3 py-2 text-sm font-medium">{group.title}</summary>
                 {group.hint && <p className="border-t border-border px-3 py-2 text-xs text-muted-foreground">{group.hint}</p>}
-                <div className="overflow-x-auto border-t border-border">
+                <div className="space-y-2 border-t border-border p-3 md:hidden">
+                  {group.rows.map((row, rowIndex) => (
+                    <article key={`${row.label}-${rowIndex}`} className="rounded-lg border border-border p-3">
+                      <p className="text-xs text-muted-foreground">{row.label}</p>
+                      <p className="mt-1 break-words text-sm">{row.value}</p>
+                    </article>
+                  ))}
+                </div>
+                <div className="hidden overflow-x-auto border-t border-border md:block">
                   <Table className="min-w-[36rem]">
                     <TableHeader>
                       <TableRow>
