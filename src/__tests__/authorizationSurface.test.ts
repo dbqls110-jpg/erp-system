@@ -74,6 +74,15 @@ describe("공유 자료를 바꾸는 서버 액션 권한", () => {
     }
   });
 
+  it("문의에서 프로젝트를 만들 때 세 메뉴의 수정 권한을 모두 확인한다", () => {
+    const source = read("src/app/actions/inquiries.ts");
+    const start = source.indexOf("export async function createProjectFromInquiry");
+    const body = source.slice(start);
+    expect(body).toContain('requireEditAccess("inquiries")');
+    expect(body).toContain('requireEditAccess("customers")');
+    expect(body).toContain('requireEditAccess("projects")');
+  });
+
   it("캘린더 수정 가드도 메뉴 수정 권한을 확인한다", () => {
     const source = read("src/app/actions/calendar.ts");
     const start = source.indexOf("async function requireCalendarEditor");
