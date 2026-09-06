@@ -26,6 +26,8 @@ const STAGE_TIME_COLUMNS: Partial<Record<InquiryStage, string>> = {
   성사: "P",
 };
 const CLOSED_ROW_BACKGROUND = { red: 0.9, green: 0.9, blue: 0.9 };
+/** 손대지 않은 행의 배경. 회색을 지울 때 이 값으로 되돌린다. */
+const DEFAULT_ROW_BACKGROUND = { red: 1, green: 1, blue: 1 };
 const PROJECT_HEADERS = [
   "문의 접수일시",
   "프로젝트명",
@@ -130,8 +132,12 @@ export async function saveInquiryStage(
         range: rowRange(sheetId, match.rowNumber, 0, 16),
         cell: {
           userEnteredFormat: {
-            // 종료 행만 회색으로 남기고 진행 단계로 돌아가면 색을 명시적으로 비운다.
-            backgroundColor: nextStage === "종료" ? CLOSED_ROW_BACKGROUND : {},
+            // 종료 행만 회색으로 남기고 진행 단계로 돌아가면 흰색으로 되돌린다.
+            //
+            // 빈 객체({})를 넣으면 안 된다. 시트 API 는 빠진 색 성분을 0 으로 채우므로
+            // {} 는 "색 없음" 이 아니라 검정이다. 실제로 종료에서 되돌린 행이 검게
+            // 칠해졌다. 손대지 않은 행의 값이 흰색(1,1,1)이라 그 값으로 되돌린다.
+            backgroundColor: nextStage === "종료" ? CLOSED_ROW_BACKGROUND : DEFAULT_ROW_BACKGROUND,
           },
         },
         fields: "userEnteredFormat.backgroundColor",
