@@ -64,10 +64,11 @@ describe("문의 칸반 순수 로직", () => {
     expect(getFollowupAge({ ...record, status: "성사", wonAt: "2026-09-03 14:20" }, NOW)).toEqual({ overdue: false, dayLabel: null });
   });
 
-  it("종료 72시간 초과만 숨기고 종료가 아닌 카드는 남긴다", () => {
-    const closed = { status: "종료" as const, closedAt: "2026-09-02 14:20" };
+  it("종료 48시간 초과만 숨기고 종료가 아닌 카드는 남긴다", () => {
+    const closed = { status: "종료" as const, closedAt: "2026-09-03 14:20" };
     expect(shouldHideInquiry(closed, NOW)).toBe(true);
-    expect(shouldHideInquiry({ ...closed, closedAt: "2026-09-02 14:21" }, NOW)).toBe(false);
+    // 정확히 48시간이면 아직 남는다. 경계에서 하루 일찍 사라지면 사람이 놓친다.
+    expect(shouldHideInquiry({ ...closed, closedAt: "2026-09-03 14:21" }, NOW)).toBe(false);
     expect(shouldHideInquiry({ status: "문의" as const, closedAt: closed.closedAt }, NOW)).toBe(false);
     expect(shouldHideInquiry({ status: "성사" as const, closedAt: closed.closedAt }, NOW)).toBe(false);
   });

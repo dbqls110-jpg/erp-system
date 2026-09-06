@@ -233,7 +233,7 @@ export function InquiriesKanban({ initialInquiries, canEdit }: Props) {
               <p className="mt-0.5 text-xs">
                 {inquiries.length === 0
                   ? "홈페이지 문의가 ‘문의 접수’ 시트에 들어오면 이곳에 카드로 표시됩니다."
-                  : "종료 후 3일이 지난 문의는 시트에 남아 있으며 칸반에서만 숨겨집니다."}
+                  : "종료 후 2일이 지난 문의는 시트에 남아 있으며 칸반에서만 숨겨집니다."}
               </p>
             </div>
           </div>

@@ -46,7 +46,7 @@ export interface InquiryRowMatch {
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const FOLLOWUP_HIGHLIGHT_MS = 48 * 60 * 60 * 1000;
-const CLOSED_HIDE_MS = 72 * 60 * 60 * 1000;
+const CLOSED_HIDE_MS = 48 * 60 * 60 * 1000;
 
 const KST_FORMATTER = new Intl.DateTimeFormat("en-US", {
   timeZone: "Asia/Seoul",
