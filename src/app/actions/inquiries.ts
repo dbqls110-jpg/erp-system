@@ -11,6 +11,11 @@ import {
   saveInquiryStage,
 } from "@/lib/inquirySheet";
 import { parseSheetDateTime, type InquiryIdentity, type InquiryRecord, type InquiryStage } from "@/lib/inquiries";
+import {
+  saveSpaceRegistrationMemo,
+  saveSpaceRegistrationStage,
+} from "@/lib/spaceRegistrationSheet";
+import type { SpaceRegistrationIdentity, SpaceRegistrationStage } from "@/lib/spaceRegistrations";
 
 export interface CreateInquiryProjectResult {
   projectId: string;
@@ -131,6 +136,23 @@ export async function updateInquiryStage(identity: InquiryIdentity, nextStage: I
 export async function updateInquiryMemo(identity: InquiryIdentity, memo: string) {
   await requireEditAccess("inquiries");
   const result = await saveInquiryMemo(identity, memo);
+  revalidatePath("/inquiries");
+  return result;
+}
+
+export async function updateSpaceRegistrationStage(
+  identity: SpaceRegistrationIdentity,
+  nextStage: SpaceRegistrationStage,
+) {
+  await requireEditAccess("inquiries");
+  const result = await saveSpaceRegistrationStage(identity, nextStage);
+  revalidatePath("/inquiries");
+  return result;
+}
+
+export async function updateSpaceRegistrationMemo(identity: SpaceRegistrationIdentity, memo: string) {
+  await requireEditAccess("inquiries");
+  const result = await saveSpaceRegistrationMemo(identity, memo);
   revalidatePath("/inquiries");
   return result;
 }

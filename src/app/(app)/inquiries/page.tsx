@@ -4,15 +4,17 @@ import { authOptions } from "@/lib/auth";
 import { canEditMenu, requireMenuAccess } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import { getInquiries } from "@/lib/inquirySheet";
-import { InquiriesKanban } from "./InquiriesKanban";
+import { getSpaceRegistrations } from "@/lib/spaceRegistrationSheet";
+import { InquiriesWorkspace } from "./InquiriesWorkspace";
 
 export default async function InquiriesPage() {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) redirect("/login");
   await requireMenuAccess(session.user.id, "inquiries", session.user.role);
 
-  const [inquiries, canEdit] = await Promise.all([
+  const [inquiries, spaceRegistrations, canEdit] = await Promise.all([
     getInquiries(),
+    getSpaceRegistrations(),
     canEditMenu(session.user.id, "inquiries", session.user.role),
   ]);
   const projectNames = [...new Set(inquiries.map((inquiry) => inquiry.projectName).filter(Boolean))];
@@ -41,7 +43,11 @@ export default async function InquiriesPage() {
           홈페이지로 들어온 문의를 연락 단계별로 관리합니다. 카드를 더블클릭하면 상세 내용을 볼 수 있습니다.
         </p>
       </div>
-      <InquiriesKanban initialInquiries={inquiriesWithProjectIds} canEdit={canEdit} />
+      <InquiriesWorkspace
+        initialInquiries={inquiriesWithProjectIds}
+        initialSpaceRegistrations={spaceRegistrations}
+        canEdit={canEdit}
+      />
     </div>
   );
 }
