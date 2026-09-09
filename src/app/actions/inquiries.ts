@@ -121,7 +121,7 @@ function creationFailureMessage(
   return new Error(
     `프로젝트 생성이 끝까지 저장되지 않았습니다: ${reason}\n` +
     `현재 상태 — 거래처: ${state.customer}; ERP 프로젝트: ${state.project}; ` +
-    `프로젝트 시트: ${state.projectSheet}; 문의 시트 O열: ${state.inquirySheet}. ` +
+    `프로젝트 시트: ${state.projectSheet}; 문의 시트 N열: ${state.inquirySheet}. ` +
     "이미 생성된 거래처·프로젝트는 재시도 때 식별자로 재사용합니다.",
   );
 }
@@ -170,7 +170,7 @@ export async function createProjectFromInquiry(
   if (inquiry.projectName) {
     const existing = await findInquiryProject(inquiry, inquiry.projectName);
     if (!existing) {
-      throw new Error(`문의 시트 O열에 ‘${inquiry.projectName}’이 있지만 ERP 프로젝트를 찾지 못했습니다.`);
+      throw new Error(`문의 시트 N열에 ‘${inquiry.projectName}’이 있지만 ERP 프로젝트를 찾지 못했습니다.`);
     }
     return {
       projectId: existing.id,
@@ -227,7 +227,7 @@ export async function createProjectFromInquiry(
     state.projectSheet = projectSheetResult.alreadyExists ? "기존 행 확인" : "행 추가 완료";
 
     const inquirySheetResult = await saveInquiryProject(identity, project.name, projectUrl(project.id));
-    state.inquirySheet = inquirySheetResult.alreadyLinked ? "기존 연결 확인" : "O열 기록 완료";
+    state.inquirySheet = inquirySheetResult.alreadyLinked ? "기존 연결 확인" : "N열 기록 완료";
 
     revalidatePath("/inquiries");
     revalidatePath("/customers");
