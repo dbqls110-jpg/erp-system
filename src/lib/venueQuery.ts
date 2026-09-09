@@ -29,35 +29,41 @@ const SEOUL_DISTRICTS = [
 ] as const;
 
 const CITY_ALIASES = [
-  { aliases: ["분당구", "분당"], districts: ["성남시"] },
-  { aliases: ["성남시", "성남"], districts: ["성남시"] },
-  { aliases: ["고양시", "고양"], districts: ["고양시"] },
-  { aliases: ["수원시", "수원"], districts: ["수원시"] },
-  { aliases: ["인천광역시", "인천시", "인천"], districts: ["인천시", "인천광역시"] },
-  { aliases: ["용인시", "용인"], districts: ["용인시"] },
-  { aliases: ["부천시", "부천"], districts: ["부천시"] },
-  { aliases: ["안양시", "안양"], districts: ["안양시"] },
-  { aliases: ["안산시", "안산"], districts: ["안산시"] },
-  { aliases: ["화성시", "화성"], districts: ["화성시"] },
-  { aliases: ["광명시", "광명"], districts: ["광명시"] },
-  { aliases: ["과천시", "과천"], districts: ["과천시"] },
-  { aliases: ["김포시", "김포"], districts: ["김포시"] },
-  { aliases: ["하남시", "하남"], districts: ["하남시"] },
-  { aliases: ["구리시", "구리"], districts: ["구리시"] },
-  { aliases: ["남양주시", "남양주"], districts: ["남양주시"] },
-  { aliases: ["의정부시", "의정부"], districts: ["의정부시"] },
-  { aliases: ["의왕시", "의왕"], districts: ["의왕시"] },
-  { aliases: ["시흥시", "시흥"], districts: ["시흥시"] },
-  { aliases: ["파주시", "파주"], districts: ["파주시"] },
-  { aliases: ["오산시", "오산"], districts: ["오산시"] },
-  { aliases: ["군포시", "군포"], districts: ["군포시"] },
-  { aliases: ["포천시", "포천"], districts: ["포천시"] },
-  { aliases: ["평택시", "평택"], districts: ["평택시"] },
-  { aliases: ["이천시", "이천"], districts: ["이천시"] },
-  { aliases: ["양주시", "양주"], districts: ["양주시"] },
-  { aliases: ["양평군", "양평"], districts: ["양평군"] },
-  { aliases: ["광주시", "광주"], districts: ["광주시"] },
+  { aliases: ["분당구", "분당"], districts: ["경기 성남시 분당구"] },
+  { aliases: ["성남시", "성남"], districts: ["경기 성남시"] },
+  { aliases: ["고양시", "고양"], districts: ["경기 고양시"] },
+  { aliases: ["수원시", "수원"], districts: ["경기 수원시"] },
+  { aliases: ["인천광역시", "인천시", "인천"], districts: ["인천"] },
+  { aliases: ["용인시", "용인"], districts: ["경기 용인시"] },
+  { aliases: ["부천시", "부천"], districts: ["경기 부천시"] },
+  { aliases: ["안양시", "안양"], districts: ["경기 안양시"] },
+  { aliases: ["안산시", "안산"], districts: ["경기 안산시"] },
+  { aliases: ["화성시", "화성"], districts: ["경기 화성시"] },
+  { aliases: ["광명시", "광명"], districts: ["경기 광명시"] },
+  { aliases: ["과천시", "과천"], districts: ["경기 과천시"] },
+  { aliases: ["김포시", "김포"], districts: ["경기 김포시"] },
+  { aliases: ["하남시", "하남"], districts: ["경기 하남시"] },
+  { aliases: ["구리시", "구리"], districts: ["경기 구리시"] },
+  { aliases: ["남양주시", "남양주"], districts: ["경기 남양주시"] },
+  { aliases: ["의정부시", "의정부"], districts: ["경기 의정부시"] },
+  { aliases: ["의왕시", "의왕"], districts: ["경기 의왕시"] },
+  { aliases: ["시흥시", "시흥"], districts: ["경기 시흥시"] },
+  { aliases: ["파주시", "파주"], districts: ["경기 파주시"] },
+  { aliases: ["오산시", "오산"], districts: ["경기 오산시"] },
+  { aliases: ["군포시", "군포"], districts: ["경기 군포시"] },
+  { aliases: ["포천시", "포천"], districts: ["경기 포천시"] },
+  { aliases: ["평택시", "평택"], districts: ["경기 평택시"] },
+  { aliases: ["이천시", "이천"], districts: ["경기 이천시"] },
+  { aliases: ["양주시", "양주"], districts: ["경기 양주시"] },
+  { aliases: ["양평군", "양평"], districts: ["경기 양평군"] },
+  { aliases: ["광주시", "광주"], districts: ["경기 광주시"] },
 ] as const;
+
+export const SEOUL_DISTRICT_NAMES = new Set<string>(SEOUL_DISTRICTS);
+
+export function isSeoulDistrictName(value: string) {
+  return SEOUL_DISTRICT_NAMES.has(value);
+}
 
 const NUMBER = String.raw`\d[\d,]*`;
 const RANGE_SEPARATOR = String.raw`[-~∼〜–—]`;

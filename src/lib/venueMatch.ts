@@ -18,6 +18,7 @@ import {
   trustPenalty,
   type ResolvedPrice,
 } from "@/lib/venuePrice";
+import { districtMatches } from "@/lib/venueDistrict.mjs";
 
 export const THRESHOLDS = {
   /** 이보다 정원이 모자라면 후보에서 뺀다. 0.85 = 15% 미달까지 허용. */
@@ -97,16 +98,17 @@ function dayField(venue: VenueLike, day: MatchQuery["dayOfWeek"]) {
 }
 
 /** Y/N 칸을 본다. 빈 값은 "없음"이 아니라 "언급 없음"이므로 경고로 다룬다. */
-function checkFacility(
+export function checkFacility(
   value: string | null,
   label: string,
   warnings: string[],
 ): boolean {
-  if (!value) {
+  const normalized = value?.trim();
+  if (!normalized || normalized === "미확인" || normalized === "__EMPTY__") {
     warnings.push(`${label} 정보 없음 — 전화 확인 필요`);
     return true;
   }
-  if (/^N$|불가|없음/.test(value)) return false;
+  if (/^N$|불가|없음/.test(normalized)) return false;
   return true;
 }
 
@@ -190,20 +192,22 @@ export function matchVenue(venue: VenueLike, query: MatchQuery): MatchResult {
   if (query.needs?.sound) checkFacility(venue.sound, "음향", warnings);
 
   // ── 신뢰도 ──────────────────────────────────────────────
-  // 요금을 어디서 얻었는지가 답의 신뢰도를 좌우한다. 전화로 확인한 곳을 크게 우대한다.
+  // 1,080곳 실측 정확도: 상업요율 68%, 공시가 64%, AG발굴 38%.
+  // 공시가는 상업요율과 4%p 차이뿐인데 기존 감점이 3배였으므로 0.2로 낮추고,
+  // 정확도가 가장 낮은 AG발굴은 0.7을 유지한다.
   let trustScore =
     venue.priceSource === "전화확인" ? 0 :
     venue.priceSource === "상업요율" ? 0.15 :
-    venue.priceSource?.startsWith("공시가") ? 0.5 : 0.7;
+    venue.priceSource?.startsWith("공시가") ? 0.2 :
+    venue.priceSource === "AG발굴" ? 0.7 : 0.7;
 
   if (venue.capacityMin === null) trustScore += 0.25;
   if (!venue.phone) trustScore += 0.2;
   if (venue.calledAt) trustScore = Math.max(0, trustScore - 0.4);
 
   // ── 거리 ────────────────────────────────────────────────
-  // 원래 규칙은 자치구 인접표를 썼는데 5개 구만 채워져 있었다. 같은 구인지만 본다.
-  // 좌표가 있으므로 나중에 실제 거리로 바꿀 수 있다.
-  const distanceScore = !query.district ? 0 : venue.district === query.district ? 0 : 1;
+  // 서울 구는 완전일치하고, 인천·경기는 도시 prefix로 하위 구까지 포함한다.
+  const distanceScore = !query.district || districtMatches(venue.district, query.district) ? 0 : 1;
 
   const w = THRESHOLDS.weights;
   const score =

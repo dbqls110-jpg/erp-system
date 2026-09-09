@@ -59,6 +59,8 @@ export interface ResolvedPrice {
 
 /** 원본이 "근거가 어긋난다"고 표시한 값들. 숫자는 있지만 그대로 믿으면 안 된다. */
 const UNRELIABLE_CONFIDENCE = [
+  "미검증",
+  "낮음",
   "근거없음",
   "근거불일치",
   "근거모순",
@@ -66,11 +68,22 @@ const UNRELIABLE_CONFIDENCE = [
   "무료(근거없음)",
 ];
 
-/** 원본이 확인했다고 표시한 값들. */
+/**
+ * 원본이 확인했다고 표시한 값들. 부분일치로 본다.
+ *
+ * 여기에 "확인" 을 넣으면 안 된다. has() 가 includes() 라서 "미확인" 까지 걸린다.
+ * 새 어휘의 "확인" 은 아래 CONFIRMED_EXACT 로 완전일치만 본다.
+ */
 const CONFIRMED_CONFIDENCE = ["근거일치", "무료(확인)", "무료(근거)", "근거로 교정", "검증교정"];
+
+/** 완전일치로만 확정으로 보는 값. 새 어휘(2026-09-09)는 한 단어라 부분일치가 위험하다. */
+const CONFIRMED_EXACT = ["확인"];
 
 const has = (value: string | null, list: string[]) =>
   value !== null && list.some((item) => value.includes(item));
+
+const isConfirmed = (value: string | null) =>
+  (value !== null && CONFIRMED_EXACT.includes(value)) || has(value, CONFIRMED_CONFIDENCE);
 
 /**
  * 요금 칸의 숫자가 ㎡당 단가인지.
@@ -103,6 +116,12 @@ export function resolvePrice(venue: PricedVenue): ResolvedPrice {
     return { amount: 0, trust: "confirmed", free: true, label: "무료", warnings: [] };
   }
 
+  // 새 표기에서는 무료 여부를 요금_신뢰도와 대관료_최소의 조합으로 표현한다.
+  // 공공시설은 기업·영리 행사에 상업요율이 따로 붙을 수 있어 안내 문구를 남긴다.
+  if (confidence === "확인" && venue.priceMin === 0) {
+    return { amount: 0, trust: "confirmed", free: true, label: "무료 — 기업행사는 별도 확인", warnings: [] };
+  }
+
   // ── 4시간 환산액 ──────────────────────────────────────
   // 원본이 기준시간을 맞춰 둔 값이라 공간끼리 비교할 수 있는 유일한 숫자다.
   //
@@ -124,7 +143,7 @@ export function resolvePrice(venue: PricedVenue): ResolvedPrice {
         ? "confirmed"
         : unreliable
           ? "unreliable"
-          : has(confidence, CONFIRMED_CONFIDENCE)
+          : isConfirmed(confidence)
             ? "confirmed"
             : "estimated",
       free: false,

@@ -60,7 +60,7 @@ describe("에이전트 공간 문의 조건 추출", () => {
       people: 1_000,
       budget: 5_000_000,
       hours: 4,
-      locationDistricts: ["성남시", "고양시"],
+      locationDistricts: ["경기 성남시 분당구", "경기 고양시"],
     });
   });
 

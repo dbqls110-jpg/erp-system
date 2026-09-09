@@ -37,6 +37,7 @@ import {
   listSubfolders,
   makeDriveClient,
 } from "./lib/drive.mjs";
+import { districtFromAddress } from "../src/lib/venueDistrict.mjs";
 
 const SOURCE_NAME = "서울경기_대관공간_DB.csv";
 const COORDS_NAME = "venue_coordinates.csv";
@@ -150,11 +151,13 @@ function toVenue(row, coord) {
     if (original && /[^0-9,.\s]/.test(original)) raw[`${c}_원문`] = original;
   }
 
+  const address = str(row["위치"]);
+
   return {
     sourceKey: sourceKey(row),
     name: str(row["이름"]) ?? "(이름 없음)",
-    district: str(row["자치구"]),
-    address: str(row["위치"]),
+    district: districtFromAddress(address) ?? str(row["자치구"]),
+    address,
     type: str(row["유형"]),
 
     capacityMin: int(row["수용_적용min"]),

@@ -1,6 +1,11 @@
 import { prisma } from "@/lib/prisma";
 import { rankVenues, type VenueLike } from "@/lib/venueMatch";
-import { extractVenueQuery, type ExtractedVenueQuery, type VenueSpacePreference } from "@/lib/venueQuery";
+import {
+  extractVenueQuery,
+  isSeoulDistrictName,
+  type ExtractedVenueQuery,
+  type VenueSpacePreference,
+} from "@/lib/venueQuery";
 
 export { extractVenueQuery, extractVenueMatchQuery } from "@/lib/venueQuery";
 
@@ -142,6 +147,15 @@ function venueNote(extra: string[] = []) {
   ].join(" ");
 }
 
+function venueDistrictWhere(districts: string[]) {
+  const clauses = districts.flatMap((district) =>
+    isSeoulDistrictName(district)
+      ? [{ district }]
+      : [{ district }, { district: { startsWith: `${district} ` } }],
+  );
+  return { OR: clauses };
+}
+
 export async function buildAgentContext(question: string): Promise<AgentContext> {
   const topics = detectTopics(question);
   const data: Record<string, unknown> = {};
@@ -188,7 +202,7 @@ export async function buildAgentContext(question: string): Promise<AgentContext>
           const query = extractVenueQuery(question);
           const rows = await prisma.venue.findMany({
             ...(query.locationDistricts
-              ? { where: { district: { in: query.locationDistricts } } }
+              ? { where: venueDistrictWhere(query.locationDistricts) }
               : {}),
             select: VENUE_SELECT,
           });
