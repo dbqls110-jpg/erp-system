@@ -29,6 +29,7 @@ interface Props {
   /** 선택 가능한 전체 목록 */
   allCustomers: Option[];
   allPartners: Option[];
+  canEdit: boolean;
 }
 
 interface SectionProps {
@@ -42,6 +43,7 @@ interface SectionProps {
   setAdding: (next: LinkKind | null) => void;
   busy: boolean;
   run: (fn: () => Promise<void>, ok: string) => Promise<void>;
+  canEdit: boolean;
 }
 
 function Section({
@@ -55,13 +57,14 @@ function Section({
   setAdding,
   busy,
   run,
+  canEdit,
 }: SectionProps) {
   const isCustomer = kind === "customer";
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
         <p className="text-sm font-medium text-foreground">{title}</p>
-        {options.length > 0 && (
+        {canEdit && options.length > 0 && (
           <Button
             variant="ghost"
             size="sm"
@@ -74,7 +77,7 @@ function Section({
         )}
       </div>
 
-      {adding === kind && (
+      {canEdit && adding === kind && (
         <select
           className="h-8 w-full rounded-2xl border border-transparent bg-input/50 px-3 text-sm text-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/30"
           defaultValue=""
@@ -111,22 +114,24 @@ function Section({
               className={`${toneBadgeClass(tone)} gap-1 pr-1`}
             >
               {it.name}
-              <button
-                onClick={() =>
-                  void run(
-                    () =>
-                      isCustomer
-                        ? unlinkProjectCustomer(projectId, it.id)
-                        : unlinkProjectPartner(projectId, it.id),
-                    "연결을 해제했습니다",
-                  )
-                }
-                disabled={busy}
-                aria-label={`${it.name} 연결 해제`}
-                className="rounded-full p-0.5 hover:bg-foreground/10"
-              >
-                <X className="size-3" />
-              </button>
+              {canEdit && (
+                <button
+                  onClick={() =>
+                    void run(
+                      () =>
+                        isCustomer
+                          ? unlinkProjectCustomer(projectId, it.id)
+                          : unlinkProjectPartner(projectId, it.id),
+                      "연결을 해제했습니다",
+                    )
+                  }
+                  disabled={busy}
+                  aria-label={`${it.name} 연결 해제`}
+                  className="rounded-full p-0.5 hover:bg-foreground/10"
+                >
+                  <X className="size-3" />
+                </button>
+              )}
             </Badge>
           ))}
         </div>
@@ -141,6 +146,7 @@ export function ProjectLinksPanel({
   partners,
   allCustomers,
   allPartners,
+  canEdit,
 }: Props) {
   const [busy, setBusy] = useState(false);
   const [adding, setAdding] = useState<LinkKind | null>(null);
@@ -177,6 +183,7 @@ export function ProjectLinksPanel({
         setAdding={setAdding}
         busy={busy}
         run={run}
+        canEdit={canEdit}
       />
       <Section
         title="파트너"
@@ -189,6 +196,7 @@ export function ProjectLinksPanel({
         setAdding={setAdding}
         busy={busy}
         run={run}
+        canEdit={canEdit}
       />
     </div>
   );

@@ -3,6 +3,17 @@ import { verifyAgentApiKey } from "@/lib/agentAuth";
 import { auditLog } from "@/lib/agentAudit";
 import { prisma } from "@/lib/prisma";
 import { normalizeCompany } from "@/lib/companyFinance";
+import { setDefaultProjectAmount } from "@/lib/projectAmounts";
+
+function parseAmount(value: unknown, field: string): number | null | undefined {
+  if (value === undefined) return undefined;
+  if (value === null || value === "") return null;
+  const amount = typeof value === "number" ? value : Number(String(value).replace(/,/g, "").trim());
+  if (!Number.isFinite(amount) || !Number.isInteger(amount) || amount < 0) {
+    throw new Error(`${field}은(는) 원 단위 정수로 0 이상 입력해 주세요.`);
+  }
+  return amount;
+}
 
 export async function GET(req: NextRequest) {
   if (!verifyAgentApiKey(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -53,6 +64,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "company는 인포피아, 노바웨이, 클로원 중 하나여야 합니다." }, { status: 400 });
   }
 
+  let revenueAmount: number | null | undefined;
+  let costAmount: number | null | undefined;
+  try {
+    revenueAmount = parseAmount(revenue, "revenue");
+    costAmount = parseAmount(cost, "cost");
+  } catch (error) {
+    return NextResponse.json({ error: error instanceof Error ? error.message : "금액이 올바르지 않습니다." }, { status: 400 });
+  }
+
   const data = {
     name,
     client: client ?? null,
@@ -63,17 +83,25 @@ export async function POST(req: NextRequest) {
     progress: progress ?? 0,
     assignee: assignee ?? null,
     memo: memo ?? null,
-    revenue: revenue ?? null,
-    cost: cost ?? null,
+  };
+
+  const amountPreview = {
+    ...(revenueAmount !== undefined ? { revenue: revenueAmount } : {}),
+    ...(costAmount !== undefined ? { cost: costAmount } : {}),
   };
 
   if (dryRun === true) {
-    await auditLog({ method: "POST", endpoint: "/api/agent/projects", action: "create_project", dryRun: true, payload: data });
-    return NextResponse.json({ dryRun: true, preview: data, message: "dryRun=true: 실제 저장되지 않았습니다." });
+    await auditLog({ method: "POST", endpoint: "/api/agent/projects", action: "create_project", dryRun: true, payload: { ...data, ...amountPreview } });
+    return NextResponse.json({ dryRun: true, preview: { ...data, ...amountPreview }, message: "dryRun=true: 실제 저장되지 않았습니다." });
   }
 
-  const project = await prisma.project.create({ data });
-  await auditLog({ method: "POST", endpoint: "/api/agent/projects", action: "create_project", dryRun: false, payload: data, result: { id: project.id } });
+  const project = await prisma.$transaction(async (tx) => {
+    const created = await tx.project.create({ data });
+    if (revenueAmount !== undefined) await setDefaultProjectAmount(created.id, "revenue", revenueAmount, tx);
+    if (costAmount !== undefined) await setDefaultProjectAmount(created.id, "cost", costAmount, tx);
+    return tx.project.findUniqueOrThrow({ where: { id: created.id } });
+  });
+  await auditLog({ method: "POST", endpoint: "/api/agent/projects", action: "create_project", dryRun: false, payload: { ...data, ...amountPreview }, result: { id: project.id } });
 
   return NextResponse.json({ project }, { status: 201 });
 }

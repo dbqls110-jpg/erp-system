@@ -6,6 +6,7 @@ import { uploadFileToDrive, deleteFileFromDrive } from "@/lib/googleDrive";
 import { revalidatePath } from "next/cache";
 import { analyzeQuoteFile, type QuoteAnalysis } from "@/lib/quoteParser";
 import { isInternalQuoteFileName } from "@/lib/quotePolicy";
+import { upsertQuoteAmounts } from "@/lib/projectAmounts";
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
 
@@ -95,13 +96,7 @@ export async function uploadProjectFiles(projectId: string, formData: FormData):
   }
 
   if (quoteAnalysis && (quoteAnalysis.revenue !== null || quoteAnalysis.cost !== null)) {
-    await prisma.project.update({
-      where: { id: projectId },
-      data: {
-        ...(quoteAnalysis.revenue !== null ? { revenue: quoteAnalysis.revenue } : {}),
-        ...(quoteAnalysis.cost !== null ? { cost: quoteAnalysis.cost } : {}),
-      },
-    });
+    await upsertQuoteAmounts(projectId, internalQuoteFile!.name, quoteAnalysis);
   }
 
   revalidatePath(`/projects/${projectId}`);

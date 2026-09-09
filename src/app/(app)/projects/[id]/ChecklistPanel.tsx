@@ -22,7 +22,7 @@ function formatCompletedDate(value: Date | string) {
   return `${Number(month)}/${Number(day)}`;
 }
 
-export function ChecklistPanel({ projectId, items }: { projectId: string; items: ChecklistItem[] }) {
+export function ChecklistPanel({ projectId, items, canEdit }: { projectId: string; items: ChecklistItem[]; canEdit: boolean }) {
   const router = useRouter();
   const [checklistItems, setChecklistItems] = useState(items);
   const [newItem, setNewItem] = useState("");
@@ -33,6 +33,7 @@ export function ChecklistPanel({ projectId, items }: { projectId: string; items:
   const [error, setError] = useState<string | null>(null);
 
   const handleAdd = async () => {
+    if (!canEdit) return;
     const content = newItem.trim();
     if (!content || loading) return;
     setLoading(true);
@@ -53,7 +54,7 @@ export function ChecklistPanel({ projectId, items }: { projectId: string; items:
   };
 
   const handleStartEdit = (item: ChecklistItem) => {
-    if (pendingId) return;
+    if (!canEdit || pendingId) return;
     setError(null);
     setEditingId(item.id);
     setEditingContent(item.content);
@@ -67,7 +68,7 @@ export function ChecklistPanel({ projectId, items }: { projectId: string; items:
   };
 
   const handleSaveEdit = async (itemId: string) => {
-    if (pendingId) return;
+    if (!canEdit || pendingId) return;
     const content = editingContent.trim();
     if (!content) {
       const message = "체크리스트 항목 내용을 입력해 주세요.";
@@ -104,7 +105,7 @@ export function ChecklistPanel({ projectId, items }: { projectId: string; items:
   };
 
   const handleToggle = async (itemId: string, checked?: boolean) => {
-    if (pendingId) return;
+    if (!canEdit || pendingId) return;
     const currentItem = checklistItems.find((item) => item.id === itemId);
     if (!currentItem) return;
 
@@ -137,7 +138,7 @@ export function ChecklistPanel({ projectId, items }: { projectId: string; items:
   };
 
   const handleDelete = async (itemId: string) => {
-    if (pendingId) return;
+    if (!canEdit || pendingId) return;
     const previous = checklistItems;
     setPendingId(itemId);
     setError(null);
@@ -168,7 +169,7 @@ export function ChecklistPanel({ projectId, items }: { projectId: string; items:
             type="checkbox"
             checked={item.isDone}
             onChange={(event) => void handleToggle(item.id, event.target.checked)}
-            disabled={pendingId !== null}
+            disabled={!canEdit || pendingId !== null}
             aria-label={`${item.content} ${item.isDone ? "완료 해제" : "완료 처리"}`}
             className="h-4 w-4 shrink-0 cursor-pointer accent-primary disabled:cursor-not-allowed disabled:opacity-60"
           />
@@ -218,7 +219,7 @@ export function ChecklistPanel({ projectId, items }: { projectId: string; items:
               {formatCompletedDate(item.completedAt)}
             </span>
           )}
-          {editingId !== item.id && (
+          {canEdit && editingId !== item.id && (
             <button
               type="button"
               onClick={() => handleStartEdit(item)}
@@ -230,20 +231,22 @@ export function ChecklistPanel({ projectId, items }: { projectId: string; items:
               <Pencil size={14} aria-hidden="true" />
             </button>
           )}
-          <button
-            type="button"
-            onClick={() => void handleDelete(item.id)}
-            disabled={pendingId !== null || editingId === item.id}
-            aria-label={`${item.content} 삭제`}
-            title="항목 삭제"
-            className="inline-flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-destructive disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            <Trash2 size={14} aria-hidden="true" />
-          </button>
+          {canEdit && (
+            <button
+              type="button"
+              onClick={() => void handleDelete(item.id)}
+              disabled={pendingId !== null || editingId === item.id}
+              aria-label={`${item.content} 삭제`}
+              title="항목 삭제"
+              className="inline-flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-destructive disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              <Trash2 size={14} aria-hidden="true" />
+            </button>
+          )}
         </div>
       ))}
 
-      <div className="flex gap-2 pt-2">
+      {canEdit && <div className="flex gap-2 pt-2">
         <Input
           value={newItem}
           onChange={(e) => setNewItem(e.target.value)}
@@ -255,7 +258,7 @@ export function ChecklistPanel({ projectId, items }: { projectId: string; items:
         <Button type="button" onClick={() => void handleAdd()} disabled={loading || !newItem.trim()} size="sm" variant="outline" className="gap-1 shrink-0">
           <Plus size={14} /> 추가
         </Button>
-      </div>
+      </div>}
     </div>
   );
 }

@@ -7,7 +7,7 @@ import { updateProjectMemo } from "@/app/actions/project";
 import { toast } from "sonner";
 import { Pencil, Check, X } from "lucide-react";
 
-export function MemoEditor({ projectId, memo }: { projectId: string; memo: string | null }) {
+export function MemoEditor({ projectId, memo, canEdit }: { projectId: string; memo: string | null; canEdit: boolean }) {
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(memo ?? "");
   const [loading, setLoading] = useState(false);
@@ -32,7 +32,11 @@ export function MemoEditor({ projectId, memo }: { projectId: string; memo: strin
 
   return (
     <div className="space-y-2">
-      {editing ? (
+      {!canEdit ? (
+        <p className="whitespace-pre-wrap text-sm text-foreground">
+          {value || <span className="text-muted-foreground">메모 없음</span>}
+        </p>
+      ) : editing ? (
         <>
           <Textarea
             value={value}

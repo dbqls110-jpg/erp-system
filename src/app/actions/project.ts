@@ -9,6 +9,7 @@ import { uploadProjectFiles } from "@/app/actions/projectFile";
 import { analyzeQuoteFile, type QuoteAnalysis } from "@/lib/quoteParser";
 import { isInternalQuoteFileName } from "@/lib/quotePolicy";
 import { normalizeCompany } from "@/lib/companyFinance";
+import { upsertQuoteAmounts } from "@/lib/projectAmounts";
 
 export interface CreateProjectResult {
   projectId: string;
@@ -20,15 +21,6 @@ export interface CreateProjectResult {
   uploadedFileNames: string[];
   failedFileNames: string[];
   materialOnlyFileNames: string[];
-}
-
-function parseOptionalAmount(rawValue: FormDataEntryValue | null, fieldName: string): number | null {
-  if (typeof rawValue !== "string" || !rawValue.trim()) return null;
-  const value = Number(rawValue.replace(/,/g, "").trim());
-  if (!Number.isFinite(value) || value < 0) {
-    throw new Error(`${fieldName}은(는) 0 이상의 숫자로 입력해 주세요.`);
-  }
-  return value;
 }
 
 function parseOptionalCompany(rawValue: FormDataEntryValue | null): string | null {
@@ -61,23 +53,26 @@ export async function createProject(formData: FormData): Promise<CreateProjectRe
     }
   }
 
-  const revenue = parseOptionalAmount(formData.get("revenue"), "매출") ?? quoteAnalysis?.revenue ?? null;
-  const cost = parseOptionalAmount(formData.get("cost"), "매입") ?? quoteAnalysis?.cost ?? null;
   const company = parseOptionalCompany(formData.get("company"));
 
-  const project = await prisma.project.create({
-    data: {
-      name: formData.get("name") as string,
-      client: (formData.get("client") as string) || null,
-      company,
-      announceDate: (formData.get("announceDate") as string) || null,
-      deadline: (formData.get("deadline") as string) || null,
-      assignee: (formData.get("assignee") as string) || null,
-      memo: (formData.get("memo") as string) || null,
-      revenue,
-      cost,
-      status: "active",
-    },
+  const project = await prisma.$transaction(async (tx) => {
+    const created = await tx.project.create({
+      data: {
+        name: formData.get("name") as string,
+        client: (formData.get("client") as string) || null,
+        company,
+        announceDate: (formData.get("announceDate") as string) || null,
+        deadline: (formData.get("deadline") as string) || null,
+        assignee: (formData.get("assignee") as string) || null,
+        memo: (formData.get("memo") as string) || null,
+        status: "active",
+      },
+    });
+
+    if (internalQuoteFile && quoteAnalysis) {
+      await upsertQuoteAmounts(created.id, internalQuoteFile.name, quoteAnalysis, tx);
+    }
+    return created;
   });
 
   let fileUploaded = false;
@@ -127,8 +122,6 @@ export async function createProject(formData: FormData): Promise<CreateProjectRe
 export async function updateProject(id: string, formData: FormData) {
   await requireEditAccess("projects");
 
-  const revenue = parseOptionalAmount(formData.get("revenue"), "매출");
-  const cost = parseOptionalAmount(formData.get("cost"), "매입");
   const company = parseOptionalCompany(formData.get("company"));
 
   await prisma.project.update({
@@ -142,8 +135,6 @@ export async function updateProject(id: string, formData: FormData) {
       assignee: (formData.get("assignee") as string) || null,
       memo: (formData.get("memo") as string) || null,
       status: formData.get("status") as string,
-      revenue,
-      cost,
     },
   });
   revalidatePath(`/projects/${id}`);

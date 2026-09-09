@@ -1,6 +1,6 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { requireMenuAccess } from "@/lib/permissions";
+import { canEditMenu, requireMenuAccess } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import { notFound } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
@@ -12,6 +12,7 @@ import { ProjectEditButton } from "./ProjectEditButton";
 import { ProjectDeleteButton } from "../ProjectDeleteButton";
 import { MemoEditor } from "./MemoEditor";
 import { ProjectFilesPanel } from "./ProjectFilesPanel";
+import { ProjectAmountsPanel } from "./ProjectAmountsPanel";
 import { Calendar, User, Building, ChevronRight, TrendingUp, TrendingDown } from "lucide-react";
 import Link from "next/link";
 import { calculateNetIncome, calculateOperatingProfit } from "@/lib/financeMetrics";
@@ -26,6 +27,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
   const { id } = await params;
   const session = await getServerSession(authOptions);
   await requireMenuAccess(session!.user.id, "projects", session!.user.role);
+  const canEdit = await canEditMenu(session!.user.id, "projects", session!.user.role);
   const isAdmin = session?.user?.role === "admin";
   const hasDriveAccess = !!session?.accessToken;
 
@@ -34,6 +36,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
     include: {
       checklistItems: { orderBy: { order: "asc" } },
       files: { orderBy: { createdAt: "desc" } },
+      amounts: { orderBy: [{ kind: "asc" }, { createdAt: "asc" }] },
       customers: { include: { customer: { select: { id: true, name: true } } } },
       partners: { include: { partner: { select: { id: true, name: true } } } },
     },
@@ -96,7 +99,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          <ProjectEditButton project={project} />
+          {canEdit && <ProjectEditButton project={project} />}
           {isAdmin && <ProjectDeleteButton id={project.id} name={project.name} />}
         </div>
       </div>
@@ -109,6 +112,18 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
             <span className="font-bold text-primary">{project.progress}%</span>
           </div>
           <Progress value={project.progress} className="h-2" />
+        </CardContent>
+      </Card>
+
+      {/* 매출 · 매입 건별 관리 */}
+      <Card className="shadow-xs">
+        <CardHeader>
+          <CardTitle className="text-base font-semibold text-foreground" style={{ fontFamily: "var(--font-plus-jakarta-sans)" }}>
+            매출 · 매입
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ProjectAmountsPanel projectId={project.id} amounts={project.amounts} canEdit={canEdit} />
         </CardContent>
       </Card>
 
@@ -126,6 +141,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
             partners={project.partners.map((pp) => pp.partner)}
             allCustomers={allCustomers}
             allPartners={allPartners}
+            canEdit={canEdit}
           />
         </CardContent>
       </Card>
@@ -138,7 +154,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <ChecklistPanel projectId={project.id} items={project.checklistItems} />
+          <ChecklistPanel projectId={project.id} items={project.checklistItems} canEdit={canEdit} />
         </CardContent>
       </Card>
 
@@ -150,7 +166,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <ProjectFilesPanel projectId={project.id} files={project.files} hasDriveAccess={hasDriveAccess} />
+          <ProjectFilesPanel projectId={project.id} files={project.files} hasDriveAccess={hasDriveAccess} canEdit={canEdit} />
         </CardContent>
       </Card>
 
@@ -160,7 +176,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
           <CardTitle className="text-base font-semibold text-foreground" style={{ fontFamily: "var(--font-plus-jakarta-sans)" }}>메모</CardTitle>
         </CardHeader>
         <CardContent>
-          <MemoEditor projectId={project.id} memo={project.memo} />
+          <MemoEditor projectId={project.id} memo={project.memo} canEdit={canEdit} />
         </CardContent>
       </Card>
     </div>

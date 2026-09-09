@@ -1,5 +1,5 @@
 import { getServerSession } from "next-auth";
-import { requireMenuAccess } from "@/lib/permissions";
+import { canEditMenu, requireMenuAccess } from "@/lib/permissions";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -28,6 +28,7 @@ export default async function ProjectsPage({
 
   const session = await getServerSession(authOptions);
   const isAdmin = session?.user?.role === "admin";
+  const canEdit = await canEditMenu(session!.user.id, "projects", session!.user.role);
 
   const whereStatus = currentFilter === "all" ? {} : { status: currentFilter };
   // 권한 검사가 실패하면 JSX를 반환하지 않으므로 프로젝트 목록을 함께 조회해도 응답에 포함되지 않는다.
@@ -51,7 +52,7 @@ export default async function ProjectsPage({
           <Link href="/projects/stats" className="flex h-9 items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-primary transition-colors border border-border rounded-lg px-3 py-2">
             <BarChart2 className="size-3.5" /> 통계
           </Link>
-          <ProjectCreateButton />
+          {canEdit && <ProjectCreateButton />}
         </div>
       </div>
 

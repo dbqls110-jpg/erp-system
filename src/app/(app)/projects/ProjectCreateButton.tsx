@@ -18,8 +18,6 @@ export function ProjectCreateButton() {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
-  const [revenue, setRevenue] = useState("");
-  const [cost, setCost] = useState("");
   const [quoteAnalysis, setQuoteAnalysis] = useState<QuoteAnalysis | null>(null);
   const [quoteFileNames, setQuoteFileNames] = useState<string[]>([]);
   const [internalQuoteFileCount, setInternalQuoteFileCount] = useState(0);
@@ -28,8 +26,6 @@ export function ProjectCreateButton() {
 
   const resetDraft = () => {
     formRef.current?.reset();
-    setRevenue("");
-    setCost("");
     setQuoteAnalysis(null);
     setQuoteFileNames([]);
     setInternalQuoteFileCount(0);
@@ -59,8 +55,6 @@ export function ProjectCreateButton() {
       formData.set("file", internalFiles[0]);
       const analysis = await analyzeQuote(formData);
       setQuoteAnalysis(analysis);
-      if (analysis.revenue !== null) setRevenue(String(analysis.revenue));
-      if (analysis.cost !== null) setCost(String(analysis.cost));
       if (analysis.source === "unsupported" || analysis.confidence === "none") {
         toast.info("파일은 첨부되지만 금액을 자동으로 읽지 못했습니다.");
       } else {
@@ -128,27 +122,13 @@ export function ProjectCreateButton() {
                 {COMPANY_NAMES.map((company) => <option key={company} value={company}>{company}</option>)}
               </select>
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-              </div>
-              <div className="space-y-1">
-                <Label>마감일</Label>
-                <Input type="date" name="deadline" />
-              </div>
+            <div className="space-y-1">
+              <Label>마감일</Label>
+              <Input type="date" name="deadline" />
             </div>
             <div className="space-y-1">
               <Label>담당자</Label>
               <Input name="assignee" placeholder="담당자 이름" />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <Label>매출 (원)</Label>
-                <Input type="number" name="revenue" value={revenue} onChange={(e) => setRevenue(e.target.value)} placeholder="0" min="0" step="1" />
-              </div>
-              <div className="space-y-1">
-                <Label>매입 (원)</Label>
-                <Input type="number" name="cost" value={cost} onChange={(e) => setCost(e.target.value)} placeholder="0" min="0" step="1" />
-              </div>
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="quoteFile">견적서 첨부</Label>
@@ -163,7 +143,7 @@ export function ProjectCreateButton() {
                 disabled={loading || analyzing}
                 className="cursor-pointer"
               />
-              <p className="text-xs text-muted-foreground">여러 파일을 선택할 수 있습니다. 파일명에 내부용이 있는 첫 번째 견적서만 금액을 분석하고, 나머지는 자료용으로 저장합니다. HWP/HWPX는 원본만 저장합니다.</p>
+              <p className="text-xs text-muted-foreground">여러 파일을 선택할 수 있습니다. 파일명에 내부용이 있는 첫 번째 견적서만 금액을 분석해 매출·매입 목록에 추가하고, 나머지는 자료용으로 저장합니다. HWP/HWPX는 원본만 저장합니다.</p>
               {quoteFileNames.length > 0 && (
                 <p className="text-xs text-muted-foreground break-all">선택 파일: {quoteFileNames.join(", ")}</p>
               )}
