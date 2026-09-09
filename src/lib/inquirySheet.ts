@@ -16,7 +16,7 @@ export const INQUIRIES_TAB_NAME = "문의 접수";
 export const PROJECTS_SPREADSHEET_ID = "1d0c5IUz7du-gqwKaoOj7YmFERzoOc-P1bbqXLI9ndDw";
 export const PROJECTS_TAB_NAME = "프로젝트";
 
-const INQUIRIES_RANGE = `'${INQUIRIES_TAB_NAME}'!A1:O`;
+const INQUIRIES_RANGE = `'${INQUIRIES_TAB_NAME}'!A1:AA`;
 const MEMO_COLUMN = "J";
 const STAGE_TIME_COLUMNS: Partial<Record<InquiryStage, string>> = {
   "1차 연락": "K",

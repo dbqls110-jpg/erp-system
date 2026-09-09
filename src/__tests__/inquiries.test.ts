@@ -4,6 +4,7 @@ import {
   getInquiryClosePoint,
   getCurrentInquiryMonth,
   getFollowupAge,
+  hasSelectedSpace,
   parseInquiryRows,
   parseSheetDateTime,
   shouldHideInquiry,
@@ -77,6 +78,74 @@ describe("문의 칸반 순수 로직", () => {
     expect(getInquiryClosePoint({ contact1At: "", contact2At: "" })).toBe("연락 전");
     expect(getInquiryClosePoint({ contact1At: "2026-09-01 10:00", contact2At: "" })).toBe("1차");
     expect(getInquiryClosePoint({ contact1At: "2026-09-01 10:00", contact2At: "2026-09-02 10:00" })).toBe("2차");
+  });
+
+  it("27열 문의 행의 홈페이지 폼 필드를 읽는다", () => {
+    const values = Array.from({ length: 27 }, () => "");
+    values[0] = "2026-09-05 10:00";
+    values[1] = "홍길동";
+    values[2] = "hong@example.com";
+    values[3] = "010-1234-5678";
+    values[15] = "2026-10-01";
+    values[16] = "2026-10-02";
+    values[17] = "아니오";
+    values[18] = "120";
+    values[19] = "500";
+    values[20] = "아니오";
+    values[21] = "space-123";
+    values[22] = "코너 아카이브";
+    values[23] = "연남·서울";
+    values[24] = "120";
+    values[25] = "290";
+    values[26] = "120명, 연남, 500만원";
+
+    const record = parseInquiryRows([Array.from({ length: 27 }, () => "헤더"), values])[0];
+
+    expect(record).toMatchObject({
+      rentalStartDate: "2026-10-01",
+      rentalEndDate: "2026-10-02",
+      scheduleUndecided: "아니오",
+      expectedMaxAttendees: "120",
+      totalRentalBudget: "500",
+      budgetAfterConsultation: "아니오",
+      selectedSpaceId: "space-123",
+      selectedSpaceName: "코너 아카이브",
+      selectedSpaceArea: "연남·서울",
+      selectedSpaceCapacity: "120",
+      selectedSpaceDailyRate: "290",
+      searchCondition: "120명, 연남, 500만원",
+    });
+  });
+
+  it("15열까지만 있는 옛 문의 행은 새 필드를 빈 값으로 채운다", () => {
+    const values = Array.from({ length: 15 }, () => "");
+    values[0] = "2026-09-05 10:00";
+    values[1] = "홍길동";
+    values[2] = "hong@example.com";
+    values[3] = "010-1234-5678";
+
+    const record = parseInquiryRows([Array.from({ length: 15 }, () => "헤더"), values])[0];
+
+    expect(record).toBeDefined();
+    expect(record).toMatchObject({
+      rentalStartDate: "",
+      rentalEndDate: "",
+      scheduleUndecided: "",
+      expectedMaxAttendees: "",
+      totalRentalBudget: "",
+      budgetAfterConsultation: "",
+      selectedSpaceId: "",
+      selectedSpaceName: "",
+      selectedSpaceArea: "",
+      selectedSpaceCapacity: "",
+      selectedSpaceDailyRate: "",
+      searchCondition: "",
+    });
+  });
+
+  it("선택 공간명이 없으면 선택 공간 묶음을 숨긴다", () => {
+    expect(hasSelectedSpace({ selectedSpaceName: "" })).toBe(false);
+    expect(hasSelectedSpace({ selectedSpaceName: "코너 아카이브" })).toBe(true);
   });
 
   it("접수일시가 선택한 월과 같은 문의만 연락 퍼널과 이탈을 집계한다", () => {

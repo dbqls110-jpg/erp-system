@@ -34,6 +34,18 @@ export interface InquiryRecord {
   closedAt: string;
   projectName: string;
   wonAt: string;
+  rentalStartDate: string;
+  rentalEndDate: string;
+  scheduleUndecided: string;
+  expectedMaxAttendees: string;
+  totalRentalBudget: string;
+  budgetAfterConsultation: string;
+  selectedSpaceId: string;
+  selectedSpaceName: string;
+  selectedSpaceArea: string;
+  selectedSpaceCapacity: string;
+  selectedSpaceDailyRate: string;
+  searchCondition: string;
   projectId?: string;
 }
 
@@ -87,6 +99,10 @@ export function getInquiryClosePoint(
   if (!hasCellValue(record.contact1At)) return "연락 전";
   if (!hasCellValue(record.contact2At)) return "1차";
   return "2차";
+}
+
+export function hasSelectedSpace(record: Pick<InquiryRecord, "selectedSpaceName">): boolean {
+  return hasCellValue(record.selectedSpaceName);
 }
 
 export interface InquirySummary {
@@ -280,7 +296,7 @@ export function stageTimestampFor(
 
 export function parseInquiryRows(rows: readonly (readonly unknown[])[]): InquiryRecord[] {
   return rows.slice(1).flatMap((values, index) => {
-    const normalized = Array.from({ length: 15 }, (_, columnIndex) => column(values, columnIndex));
+    const normalized = Array.from({ length: 27 }, (_, columnIndex) => column(values, columnIndex));
     if (!normalized.some(Boolean)) return [];
 
     const identity = identityFromValues(normalized);
@@ -306,6 +322,18 @@ export function parseInquiryRows(rows: readonly (readonly unknown[])[]): Inquiry
       closedAt: normalized[12],
       projectName: normalized[13],
       wonAt: normalized[14],
+      rentalStartDate: normalized[15],
+      rentalEndDate: normalized[16],
+      scheduleUndecided: normalized[17],
+      expectedMaxAttendees: normalized[18],
+      totalRentalBudget: normalized[19],
+      budgetAfterConsultation: normalized[20],
+      selectedSpaceId: normalized[21],
+      selectedSpaceName: normalized[22],
+      selectedSpaceArea: normalized[23],
+      selectedSpaceCapacity: normalized[24],
+      selectedSpaceDailyRate: normalized[25],
+      searchCondition: normalized[26],
     }];
   });
 }

@@ -25,6 +25,7 @@ import {
   getCurrentInquiryMonth,
   getFollowupAge,
   getInquiryClosePoint,
+  hasSelectedSpace,
   INQUIRY_STAGES,
   shouldHideInquiry,
   shiftInquiryMonth,
@@ -74,6 +75,12 @@ function displayDate(value: string): string {
 
 function displayValue(value: string): string {
   return value || "-";
+}
+
+function displayNumber(value: string, unit: string): string {
+  if (!value) return displayValue(value);
+  const number = Number(value.replace(/,/g, ""));
+  return Number.isFinite(number) ? `${number.toLocaleString("ko-KR")}${unit}` : displayValue(value);
 }
 
 function suggestedProjectName(inquiry: InquiryRecord): string {
@@ -411,6 +418,31 @@ export function InquiriesKanban({ initialInquiries, canEdit }: Props) {
                 <DetailField label="2차 연락일시" value={displayDate(selected.contact2At)} />
                 <DetailField label="성사일시" value={displayDate(selected.wonAt)} />
                 <DetailField label="종료일시" value={displayDate(selected.closedAt)} />
+                {selected.scheduleUndecided === "예" ? (
+                  <DetailField label="대관 일정" value="일정 미정" />
+                ) : (
+                  <>
+                    <DetailField label="대관 시작일" value={displayDate(selected.rentalStartDate)} />
+                    <DetailField label="대관 종료일" value={displayDate(selected.rentalEndDate)} />
+                  </>
+                )}
+                <DetailField label="예상 최대 참석 인원" value={displayNumber(selected.expectedMaxAttendees, "명")} />
+                <DetailField
+                  label="총 대관 예산"
+                  value={selected.budgetAfterConsultation === "예" ? "상담 후 결정" : displayNumber(selected.totalRentalBudget, "만원")}
+                />
+                {hasSelectedSpace(selected) && (
+                  <div className="space-y-3 rounded-xl border border-primary/30 bg-primary/5 p-3 ring-1 ring-primary/10 dark:bg-primary/10 sm:col-span-2">
+                    <p className="text-sm font-semibold text-primary">선택 공간</p>
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      <DetailField label="선택 공간 ID" value={displayValue(selected.selectedSpaceId)} />
+                      <DetailField label="선택 공간명" value={displayValue(selected.selectedSpaceName)} />
+                      <DetailField label="선택 공간 지역" value={displayValue(selected.selectedSpaceArea)} />
+                      <DetailField label="공간 최대 수용 인원" value={displayNumber(selected.selectedSpaceCapacity, "명")} />
+                      <DetailField label="공간 기준 1일 요금" value={displayNumber(selected.selectedSpaceDailyRate, "만원")} />
+                    </div>
+                  </div>
+                )}
                 {selected.projectName && (
                   <div className="sm:col-span-2">
                     {selected.projectId ? (
@@ -424,6 +456,9 @@ export function InquiriesKanban({ initialInquiries, canEdit }: Props) {
                 )}
                 <div className="sm:col-span-2">
                   <DetailField label="문의 내용" value={displayValue(selected.content)} multiline />
+                </div>
+                <div className="sm:col-span-2">
+                  <DetailField label="검색 조건" value={displayValue(selected.searchCondition)} multiline />
                 </div>
                 <div className="space-y-1.5 sm:col-span-2">
                   <label htmlFor="inquiry-memo" className="text-xs font-medium text-muted-foreground">메모</label>
@@ -500,7 +535,7 @@ function DetailField({
   return (
     <div className={cn("space-y-1.5", multiline && "rounded-lg border border-border bg-muted/30 p-3")}>
       <p className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">{icon}{label}</p>
-      <p className={cn("text-sm text-foreground", multiline ? "whitespace-pre-wrap leading-6" : "truncate")}>{value}</p>
+      <p className={cn("text-sm text-foreground", multiline ? "whitespace-pre-wrap break-words leading-6" : "truncate")}>{value}</p>
     </div>
   );
 }
