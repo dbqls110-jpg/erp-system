@@ -241,13 +241,29 @@ function sameSheetDate(left: unknown, right: string): boolean {
   return normalizeSheetText(left) === normalizeSheetText(right);
 }
 
-function isSameProjectSheetRow(values: readonly unknown[], inquiry: InquiryRecord, projectName: string, customerName: string) {
+export interface ProjectSheetRowInput {
+  submittedAt: string;
+  projectName: string;
+  customerName: string;
+  phone: string;
+  email: string;
+  rentalType: string;
+  desiredArea: string;
+  eventDate: string;
+  venue: string;
+  rentalFee: string;
+  brokerageFee: string;
+  assignee: string;
+  memo: string;
+}
+
+function isSameProjectSheetRow(values: readonly unknown[], input: ProjectSheetRowInput) {
   return (
-    sameSheetDate(values[0], inquiry.submittedAt) &&
-    normalizeSheetText(values[1]) === normalizeSheetText(projectName) &&
-    normalizeSheetText(values[2]) === normalizeSheetText(customerName) &&
-    normalizeSheetText(values[3]) === normalizeSheetText(inquiry.phone) &&
-    normalizeSheetText(values[4]) === normalizeSheetText(inquiry.email)
+    sameSheetDate(values[0], input.submittedAt) &&
+    normalizeSheetText(values[1]) === normalizeSheetText(input.projectName) &&
+    normalizeSheetText(values[2]) === normalizeSheetText(input.customerName) &&
+    normalizeSheetText(values[3]) === normalizeSheetText(input.phone) &&
+    normalizeSheetText(values[4]) === normalizeSheetText(input.email)
   );
 }
 
@@ -271,11 +287,7 @@ async function ensureProjectSheetTab(sheets: SheetsClient): Promise<void> {
   });
 }
 
-export async function appendInquiryProjectRow(
-  inquiry: InquiryRecord,
-  projectName: string,
-  customerName: string,
-): Promise<{ alreadyExists: boolean }> {
+export async function appendProjectSheetRow(input: ProjectSheetRowInput): Promise<{ alreadyExists: boolean }> {
   const sheets = await makeSheetsClientAsOwner();
   await ensureProjectSheetTab(sheets);
 
@@ -301,7 +313,7 @@ export async function appendInquiryProjectRow(
     valueRenderOption: "FORMATTED_VALUE",
   });
   const rows = (rowsResponse.data.values ?? []) as SheetRows;
-  if (rows.slice(1).some((values) => isSameProjectSheetRow(values, inquiry, projectName, customerName))) {
+  if (rows.slice(1).some((values) => isSameProjectSheetRow(values, input))) {
     return { alreadyExists: true };
   }
 
@@ -312,23 +324,45 @@ export async function appendInquiryProjectRow(
     insertDataOption: "INSERT_ROWS",
     requestBody: {
       values: [[
-        safeSheetValue(inquiry.submittedAt),
-        safeSheetValue(projectName),
-        safeSheetValue(customerName),
-        safeSheetValue(inquiry.phone),
-        safeSheetValue(inquiry.email),
-        safeSheetValue(inquiry.rentalType),
-        safeSheetValue(inquiry.desiredArea),
-        "",
-        "",
-        "",
-        "",
+        safeSheetValue(input.submittedAt),
+        safeSheetValue(input.projectName),
+        safeSheetValue(input.customerName),
+        safeSheetValue(input.phone),
+        safeSheetValue(input.email),
+        safeSheetValue(input.rentalType),
+        safeSheetValue(input.desiredArea),
+        safeSheetValue(input.eventDate),
+        safeSheetValue(input.venue),
+        safeSheetValue(input.rentalFee),
+        safeSheetValue(input.brokerageFee),
         "진행 중",
-        safeSheetValue(inquiry.assignee),
+        safeSheetValue(input.assignee),
         safeSheetValue(formatCurrentDateTime()),
-        safeSheetValue(inquiry.content),
+        safeSheetValue(input.memo),
       ]],
     },
   });
   return { alreadyExists: false };
+}
+
+export async function appendInquiryProjectRow(
+  inquiry: InquiryRecord,
+  projectName: string,
+  customerName: string,
+): Promise<{ alreadyExists: boolean }> {
+  return appendProjectSheetRow({
+    submittedAt: inquiry.submittedAt,
+    projectName,
+    customerName,
+    phone: inquiry.phone,
+    email: inquiry.email,
+    rentalType: inquiry.rentalType,
+    desiredArea: inquiry.desiredArea,
+    eventDate: "",
+    venue: "",
+    rentalFee: "",
+    brokerageFee: "",
+    assignee: inquiry.assignee,
+    memo: inquiry.content,
+  });
 }

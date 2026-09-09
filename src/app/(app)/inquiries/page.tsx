@@ -5,6 +5,7 @@ import { canEditMenu, requireMenuAccess } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import { getInquiries } from "@/lib/inquirySheet";
 import { getSpaceRegistrations } from "@/lib/spaceRegistrationSheet";
+import { getSpaceRentals } from "@/lib/spaceRentalSheet";
 import { InquiriesWorkspace } from "./InquiriesWorkspace";
 
 export default async function InquiriesPage() {
@@ -12,12 +13,16 @@ export default async function InquiriesPage() {
   if (!session?.user?.id) redirect("/login");
   await requireMenuAccess(session.user.id, "inquiries", session.user.role);
 
-  const [inquiries, spaceRegistrations, canEdit] = await Promise.all([
+  const [inquiries, spaceRegistrations, spaceRentals, canEdit] = await Promise.all([
     getInquiries(),
     getSpaceRegistrations(),
+    getSpaceRentals(),
     canEditMenu(session.user.id, "inquiries", session.user.role),
   ]);
-  const projectNames = [...new Set(inquiries.map((inquiry) => inquiry.projectName).filter(Boolean))];
+  const projectNames = [...new Set([
+    ...inquiries.map((inquiry) => inquiry.projectName),
+    ...spaceRentals.map((rental) => rental.projectName),
+  ].filter(Boolean))];
   const projects = projectNames.length === 0
     ? []
     : await prisma.project.findMany({
@@ -34,6 +39,10 @@ export default async function InquiriesPage() {
     ...inquiry,
     projectId: inquiry.projectName ? projectIdsByName.get(inquiry.projectName) : undefined,
   }));
+  const spaceRentalsWithProjectIds = spaceRentals.map((rental) => ({
+    ...rental,
+    projectId: rental.projectName ? projectIdsByName.get(rental.projectName) : undefined,
+  }));
 
   return (
     <div className="space-y-5">
@@ -46,6 +55,7 @@ export default async function InquiriesPage() {
       <InquiriesWorkspace
         initialInquiries={inquiriesWithProjectIds}
         initialSpaceRegistrations={spaceRegistrations}
+        initialSpaceRentals={spaceRentalsWithProjectIds}
         canEdit={canEdit}
       />
     </div>
