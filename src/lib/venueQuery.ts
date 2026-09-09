@@ -59,12 +59,6 @@ const CITY_ALIASES = [
   { aliases: ["광주시", "광주"], districts: ["경기 광주시"] },
 ] as const;
 
-export const SEOUL_DISTRICT_NAMES = new Set<string>(SEOUL_DISTRICTS);
-
-export function isSeoulDistrictName(value: string) {
-  return SEOUL_DISTRICT_NAMES.has(value);
-}
-
 const NUMBER = String.raw`\d[\d,]*`;
 const RANGE_SEPARATOR = String.raw`[-~∼〜–—]`;
 
@@ -157,11 +151,11 @@ function extractHours(question: string): number | undefined {
 
 function extractDistricts(question: string): string[] | null {
   const districts = new Set<string>();
-  if (question.includes("서울")) {
-    SEOUL_DISTRICTS.forEach((district) => districts.add(district));
-  }
+  // 자치구 표기가 "시도 + 시군구" 라 질의도 같은 형식으로 만든다.
+  // "서울" 만 물었으면 시도만 넘긴다. 25개를 나열하지 않아도 앞부분 매칭으로 다 걸린다.
+  if (question.includes("서울")) districts.add("서울");
   SEOUL_DISTRICTS.forEach((district) => {
-    if (question.includes(district)) districts.add(district);
+    if (question.includes(district)) districts.add(`서울 ${district}`);
   });
   for (const city of CITY_ALIASES) {
     if (city.aliases.some((alias) => question.includes(alias))) {

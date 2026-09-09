@@ -3,6 +3,7 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { analyzeQuoteFile, type QuoteAnalysis } from "@/lib/quoteParser";
+import { isInternalQuoteFileName } from "@/lib/quotePolicy";
 
 /** 프로젝트 등록 전에 견적서 금액을 미리 보여 주기 위한 서버 분석 action. */
 export async function analyzeQuote(formData: FormData): Promise<QuoteAnalysis> {
@@ -11,6 +12,16 @@ export async function analyzeQuote(formData: FormData): Promise<QuoteAnalysis> {
 
   const file = formData.get("file");
   if (!(file instanceof File)) throw new Error("견적서 파일을 선택해 주세요.");
+  if (!isInternalQuoteFileName(file.name)) {
+    return {
+      revenue: null,
+      cost: null,
+      confidence: "none",
+      source: "unsupported",
+      note: "자료용으로 저장했습니다 (금액 미반영). 파일명에 내부용이 있는 견적서만 금액을 분석합니다.",
+      matchedLabels: [],
+    };
+  }
 
   return analyzeQuoteFile(file);
 }

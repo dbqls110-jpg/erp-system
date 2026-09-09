@@ -7,7 +7,7 @@ vi.mock("@/lib/prisma", () => ({
 }));
 
 import { buildAgentContext } from "@/lib/agentContext";
-import { districtFromAddress, districtMatches } from "@/lib/venueDistrict.mjs";
+import { districtFromAddress, districtMatches, normalizeDistrictValue } from "@/lib/venueDistrict.mjs";
 import { checkFacility, matchVenue, type VenueLike } from "@/lib/venueMatch";
 import { resolvePrice } from "@/lib/venuePrice";
 import { extractVenueQuery } from "@/lib/venueQuery";
@@ -56,7 +56,7 @@ function contextVenue(over: Partial<VenueLike> = {}) {
 
 describe("주소 → 자치구 표준화", () => {
   it.each([
-    ["서울특별시   강남구 테헤란로 1", "강남구"],
+    ["서울특별시   강남구 테헤란로 1", "서울 강남구"],
     ["인천광역시   연수구 센트럴로 1", "인천 연수구"],
     ["경기도 성남시 분당구 판교로 1", "경기 성남시 분당구"],
     ["경기   시흥시 정왕동 1", "경기 시흥시"],
@@ -66,6 +66,28 @@ describe("주소 → 자치구 표준화", () => {
 
   it("판단할 수 없는 주소는 null을 반환한다", () => {
     expect(districtFromAddress("부산광역시 해운대구 센텀로 1")).toBeNull();
+  });
+});
+
+describe("자치구 맞춤 규칙", () => {
+  // 표기가 "시도 + 시군구" 한 형식이라 규칙도 하나다. 같거나, 질의로 시작하거나.
+  it.each([
+    ["서울 강남구", "서울 강남구", true],
+    ["서울 강남구", "서울", true],
+    ["경기 성남시 분당구", "경기 성남시", true],
+    ["경기 성남시 분당구", "경기", true],
+    ["인천 연수구", "인천", true],
+    ["서울 강남구", "서울 서초구", false],
+    ["경기 성남시흥구", "경기 성남시", false],
+  ])("%s 에 %s 질의 → %s", (actual, requested, expected) => {
+    expect(districtMatches(actual, requested)).toBe(expected);
+  });
+
+  it("접두어 없이 들어온 값을 표준형으로 올린다", () => {
+    expect(normalizeDistrictValue("강남구")).toBe("서울 강남구");
+    expect(normalizeDistrictValue("부천시")).toBe("경기 부천시");
+    expect(normalizeDistrictValue("성남시 분당구")).toBe("경기 성남시 분당구");
+    expect(normalizeDistrictValue("서울 강남구")).toBe("서울 강남구");
   });
 });
 

@@ -115,9 +115,15 @@ const int = (v) => {
   return Math.abs(rounded) > INT_MAX ? null : rounded;
 };
 
-/** 원본에 행 id 가 없어 이 세 값으로 행을 구분한다. */
+/**
+ * 원본에 행 id 가 없어 이름과 위치로 행을 구분한다.
+ *
+ * 예전에는 자치구도 넣었는데, 공간 DB 쪽이 표기를 "종로구" 에서 "서울 종로구" 로
+ * 바꾸자 4,150행이 통째로 다른 행이 되어 갱신 대신 복제가 될 뻔했다. 자치구는
+ * 주소에서 다시 뽑으므로 열쇠에 넣을 이유가 없다(scripts/rekey-venues.mjs).
+ */
 function sourceKey(row) {
-  const parts = [row["이름"], row["자치구"], row["위치"]].map((v) => (v ?? "").trim());
+  const parts = [row["이름"], row["위치"]].map((v) => (v ?? "").trim());
   return crypto.createHash("sha1").update(parts.join("|")).digest("hex").slice(0, 24);
 }
 
@@ -286,7 +292,7 @@ async function main() {
   if (coordCsv) {
     for (const c of parseCsv(coordCsv)) {
       if (!c["위도"]) continue;
-      coords.set(sourceKey({ 이름: c["이름"], 자치구: c["자치구"], 위치: c["위치"] }), {
+      coords.set(sourceKey({ 이름: c["이름"], 위치: c["위치"] }), {
         lat: Number(c["위도"]),
         lng: Number(c["경도"]),
         source: c["좌표출처"],

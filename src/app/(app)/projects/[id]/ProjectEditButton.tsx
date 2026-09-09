@@ -104,11 +104,11 @@ export function ProjectEditButton({ project }: { project: Project }) {
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
                 <Label>매출 (원)</Label>
-                <Input type="number" name="revenue" placeholder="0" min="0" step="10000" defaultValue={project.revenue ?? ""} />
+                <Input type="number" name="revenue" placeholder="0" min="0" step="1" defaultValue={project.revenue ?? ""} />
               </div>
               <div className="space-y-1">
                 <Label>매입 (원)</Label>
-                <Input type="number" name="cost" placeholder="0" min="0" step="10000" defaultValue={project.cost ?? ""} />
+                <Input type="number" name="cost" placeholder="0" min="0" step="1" defaultValue={project.cost ?? ""} />
               </div>
             </div>
             <div className="space-y-1">

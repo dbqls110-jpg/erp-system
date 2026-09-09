@@ -5,8 +5,9 @@ import { authOptions } from "@/lib/auth";
 import { requireEditAccess } from "@/lib/actionGuards";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
-import { uploadProjectFile } from "@/app/actions/projectFile";
+import { uploadProjectFiles } from "@/app/actions/projectFile";
 import { analyzeQuoteFile, type QuoteAnalysis } from "@/lib/quoteParser";
+import { isInternalQuoteFileName } from "@/lib/quotePolicy";
 import { normalizeCompany } from "@/lib/companyFinance";
 
 export interface CreateProjectResult {
@@ -14,6 +15,11 @@ export interface CreateProjectResult {
   quoteAnalysis: QuoteAnalysis | null;
   fileUploaded: boolean;
   warning: string | null;
+  internalQuoteFileName: string | null;
+  internalQuoteFileCount: number;
+  uploadedFileNames: string[];
+  failedFileNames: string[];
+  materialOnlyFileNames: string[];
 }
 
 function parseOptionalAmount(rawValue: FormDataEntryValue | null, fieldName: string): number | null {
@@ -34,12 +40,13 @@ function parseOptionalCompany(rawValue: FormDataEntryValue | null): string | nul
 export async function createProject(formData: FormData): Promise<CreateProjectResult> {
   const session = await requireEditAccess("projects");
 
-  const quoteFileEntry = formData.get("quoteFile");
-  const quoteFile = quoteFileEntry instanceof File && quoteFileEntry.size > 0 ? quoteFileEntry : null;
+  const quoteFiles = formData.getAll("quoteFile").filter((entry): entry is File => entry instanceof File);
+  const internalQuoteFiles = quoteFiles.filter((file) => isInternalQuoteFileName(file.name));
+  const internalQuoteFile = internalQuoteFiles[0] ?? null;
   let quoteAnalysis: QuoteAnalysis | null = null;
-  if (quoteFile) {
+  if (internalQuoteFile) {
     try {
-      quoteAnalysis = await analyzeQuoteFile(quoteFile);
+      quoteAnalysis = await analyzeQuoteFile(internalQuoteFile);
     } catch {
       // 금액 분석 실패가 프로젝트 생성 자체를 막지는 않는다. 원본 파일은 별도로
       // 보관하고, 화면에는 업로드 경고를 돌려 사용자가 직접 금액을 입력하게 한다.
@@ -75,16 +82,27 @@ export async function createProject(formData: FormData): Promise<CreateProjectRe
 
   let fileUploaded = false;
   let warning: string | null = null;
-  if (quoteFile) {
+  let uploadedFileNames: string[] = [];
+  let failedFileNames: string[] = [];
+  let materialOnlyFileNames: string[] = [];
+  if (quoteFiles.length > 0) {
     if (!session.accessToken) {
-      warning = "견적서 금액은 반영했지만 Google Drive 권한이 없어 원본 파일은 저장되지 않았습니다. 재로그인 후 다시 첨부해 주세요.";
+      failedFileNames = quoteFiles.map((file) => file.name);
+      warning = "금액은 반영했지만 Google Drive 권한이 없어 원본 파일은 저장되지 않았습니다. 재로그인 후 다시 첨부해 주세요.";
     } else {
       try {
         const uploadForm = new FormData();
-        uploadForm.set("file", quoteFile);
-        await uploadProjectFile(project.id, uploadForm);
-        fileUploaded = true;
+        quoteFiles.forEach((file) => uploadForm.append("file", file));
+        const uploadResult = await uploadProjectFiles(project.id, uploadForm);
+        uploadedFileNames = uploadResult.uploadedFileNames;
+        failedFileNames = uploadResult.failedFiles.map((file) => file.name);
+        materialOnlyFileNames = uploadResult.materialOnlyFileNames;
+        fileUploaded = uploadedFileNames.length > 0;
+        if (failedFileNames.length > 0) {
+          warning = `다음 파일 저장에 실패했습니다: ${uploadResult.failedFiles.map(({ name, reason }) => `${name} (${reason})`).join(", ")}`;
+        }
       } catch {
+        failedFileNames = quoteFiles.map((file) => file.name);
         warning = "프로젝트는 생성됐지만 견적서 원본 파일 저장에 실패했습니다. 프로젝트 상세에서 다시 첨부해 주세요.";
       }
     }
@@ -93,7 +111,17 @@ export async function createProject(formData: FormData): Promise<CreateProjectRe
   revalidatePath("/projects");
   revalidatePath(`/projects/${project.id}`);
 
-  return { projectId: project.id, quoteAnalysis, fileUploaded, warning };
+  return {
+    projectId: project.id,
+    quoteAnalysis,
+    fileUploaded,
+    warning,
+    internalQuoteFileName: internalQuoteFile?.name ?? null,
+    internalQuoteFileCount: internalQuoteFiles.length,
+    uploadedFileNames,
+    failedFileNames,
+    materialOnlyFileNames,
+  };
 }
 
 export async function updateProject(id: string, formData: FormData) {

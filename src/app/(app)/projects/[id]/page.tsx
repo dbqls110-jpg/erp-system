@@ -14,6 +14,7 @@ import { MemoEditor } from "./MemoEditor";
 import { ProjectFilesPanel } from "./ProjectFilesPanel";
 import { Calendar, User, Building, ChevronRight, TrendingUp, TrendingDown } from "lucide-react";
 import Link from "next/link";
+import { calculateNetIncome, calculateOperatingProfit } from "@/lib/financeMetrics";
 
 const statusConfig: Record<string, { label: string; class: string }> = {
   active: { label: "진행 중", class: "bg-primary/10 text-primary border-primary/20" },
@@ -47,6 +48,8 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
   ]);
 
   const s = statusConfig[project.status] ?? statusConfig.active;
+  const operatingProfit = calculateOperatingProfit(project.revenue, project.cost);
+  const netIncome = calculateNetIncome(project.revenue, project.cost);
 
   return (
     <div className="space-y-4 max-w-3xl">
@@ -80,9 +83,14 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
                 <TrendingDown size={13} />매입 {project.cost.toLocaleString()}원
               </span>
             )}
-            {project.revenue != null && project.cost != null && (
-              <span className={`flex items-center gap-1 font-medium ${project.revenue - project.cost >= 0 ? "text-primary" : "text-destructive"}`}>
-                순이익 {(project.revenue - project.cost).toLocaleString()}원
+            {operatingProfit !== null && (
+              <span className={`flex items-center gap-1 font-medium ${operatingProfit >= 0 ? "text-primary" : "text-destructive"}`}>
+                영업이익 {operatingProfit.toLocaleString()}원
+              </span>
+            )}
+            {netIncome !== null && (
+              <span className={`flex items-center gap-1 font-medium ${netIncome >= 0 ? "text-primary" : "text-destructive"}`}>
+                당기순이익 {netIncome.toLocaleString()}원
               </span>
             )}
           </div>

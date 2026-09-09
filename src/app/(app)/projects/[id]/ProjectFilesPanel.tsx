@@ -1,7 +1,8 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
-import { uploadProjectFile, deleteProjectFile } from "@/app/actions/projectFile";
+import { useRouter } from "next/navigation";
+import { uploadProjectFiles, deleteProjectFile } from "@/app/actions/projectFile";
 import { Button } from "@/components/ui/button";
 import { Upload, Trash2, ExternalLink, FileText, Loader2, AlertCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -33,20 +34,38 @@ function formatBytes(bytes: number | null) {
 
 export function ProjectFilesPanel({ projectId, files, hasDriveAccess }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const selectedFiles = Array.from(e.target.files ?? []);
+    if (selectedFiles.length === 0) return;
 
     const formData = new FormData();
-    formData.append("file", file);
+    selectedFiles.forEach((file) => formData.append("file", file));
 
     startTransition(async () => {
       try {
-        await uploadProjectFile(projectId, formData);
-        toast.success(`"${file.name}" 업로드 완료`);
+        const result = await uploadProjectFiles(projectId, formData);
+        if (result.uploadedFileNames.length > 0) {
+          toast.success(`업로드 완료: ${result.uploadedFileNames.join(", ")}`);
+        }
+        if (result.materialOnlyFileNames.length > 0) {
+          toast.info(`자료용으로 저장했습니다 (금액 미반영): ${result.materialOnlyFileNames.join(", ")}`);
+        }
+        if (result.internalQuoteFileCount > 1) {
+          toast.info(`내부용 견적서 ${result.internalQuoteFileCount}개 중 첫 번째 파일로 금액을 반영했습니다.`);
+        }
+        if (result.quoteAnalysis?.source === "unsupported" || result.quoteAnalysis?.confidence === "none") {
+          toast.info(result.quoteAnalysis.note);
+        } else if (result.quoteAnalysis && (result.quoteAnalysis.revenue !== null || result.quoteAnalysis.cost !== null)) {
+          toast.success("내부용 견적서 금액을 프로젝트에 반영했습니다.");
+        }
+        if (result.failedFiles.length > 0) {
+          toast.error(`업로드 실패: ${result.failedFiles.map(({ name, reason }) => `${name} (${reason})`).join(", ")}`);
+        }
+        router.refresh();
       } catch (err) {
         toast.error(err instanceof Error ? err.message : "업로드 실패");
       } finally {
@@ -74,6 +93,8 @@ export function ProjectFilesPanel({ projectId, files, hasDriveAccess }: Props) {
       <input
         ref={inputRef}
         type="file"
+        multiple
+        accept=".pdf,.txt,.csv,.json,.doc,.docx,.xls,.xlsx,.hwp,.hwpx,image/*,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         className="hidden"
         onChange={handleUpload}
       />

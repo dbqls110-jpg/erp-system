@@ -15,6 +15,8 @@ import { ExpenseDeleteButton } from "./ExpenseDeleteButton";
 import { FinanceMonthNav } from "./FinanceMonthNav";
 import { FixedExpensePanel } from "./FixedExpensePanel";
 import { calculateBudgetMetrics } from "@/lib/financeMetrics";
+import { FinanceTabs } from "./FinanceTabs";
+import { NetIncomeTable } from "./NetIncomeTable";
 
 const categoryLabel: Record<string, string> = {
   rent: "임차료", salary: "인건비", telecom: "통신비",
@@ -60,13 +62,17 @@ export default async function FinancePage({
   const daysInMonth = new Date(year, month, 0).getDate();
   const monthEnd = `${year}-${monthStr}-${String(daysInMonth).padStart(2, "0")}`;
 
-  const [budget, expenses, fixedExpenses] = await Promise.all([
+  const [budget, expenses, fixedExpenses, projects] = await Promise.all([
     prisma.budget.findUnique({ where: { year_month: { year, month } } }),
     prisma.expense.findMany({
       where: { date: { gte: `${year}-${monthStr}-01`, lte: monthEnd } },
       orderBy: { date: "desc" },
     }),
     prisma.fixedExpense.findMany({ orderBy: { order: "asc" } }),
+    prisma.project.findMany({
+      select: { id: true, name: true, revenue: true, cost: true },
+      orderBy: { createdAt: "desc" },
+    }),
   ]);
 
   // 이번 달 납부 완료된 고정비 ID 목록
@@ -125,6 +131,9 @@ export default async function FinancePage({
         </div>
       </div>
 
+      <FinanceTabs
+        budget={
+          <div className="space-y-4">
       {/* 요약 카드 */}
       <div className="grid grid-cols-1 gap-4 @xl/main:grid-cols-2 @5xl/main:grid-cols-4">
         <Card className="@container/card h-full shadow-xs">
@@ -226,6 +235,10 @@ export default async function FinancePage({
           )}
         </CardContent>
       </Card>
+          </div>
+        }
+        netIncome={<NetIncomeTable projects={projects} />}
+      />
     </div>
   );
 }

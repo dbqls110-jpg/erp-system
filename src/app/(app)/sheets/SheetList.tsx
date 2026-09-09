@@ -29,8 +29,72 @@ const CATEGORY_TONES: Record<string, Parameters<typeof toneBadgeClass>[0]> = {
   기타: "gray",
 };
 
-function getCategoryColor(cat: string | null) {
-  return toneBadgeClass(cat ? CATEGORY_TONES[cat] ?? "gray" : "gray");
+/**
+ * 분류에 돌려 쓸 색. gray 와 red 는 뺐다.
+ * gray 는 분류가 없는 것, red 는 위험을 뜻해서 분류 이름에 붙으면 뜻이 섞인다.
+ */
+const CATEGORY_TONE_POOL: Array<Parameters<typeof toneBadgeClass>[0]> = [
+  "blue",
+  "violet",
+  "green",
+  "amber",
+  "yellow",
+  "purple",
+];
+
+/** 이름이 같으면 늘 같은 자리에서 시작하도록. FNV-1a. */
+function toneSeed(category: string) {
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < category.length; index += 1) {
+    hash ^= category.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return hash >>> 0;
+}
+
+/**
+ * 분류마다 서로 다른 색을 준다.
+ *
+ * 이름만 해시하면 색이 겹친다 — 실제로 "입찰"과 "재무"가 둘 다 파랑이 됐다.
+ * 색을 나눠 놓은 이유가 분류를 구분하기 위해서인데 그러면 의미가 없다.
+ * 그래서 자기 자리가 이미 찼으면 빈 자리를 찾을 때까지 한 칸씩 밀어 본다.
+ * 분류 목록이 같으면 결과도 같다.
+ */
+function buildCategoryTones(categories: string[]) {
+  const assigned = new Map<string, string>();
+  const used = new Set<Parameters<typeof toneBadgeClass>[0]>();
+
+  // 고정 색을 가진 분류부터 자리를 잡는다. 사람이 정한 뜻이 밀리면 안 된다.
+  const ordered = [...categories].sort((a, b) => {
+    const fixed = Number(Boolean(CATEGORY_TONES[b])) - Number(Boolean(CATEGORY_TONES[a]));
+    return fixed !== 0 ? fixed : a.localeCompare(b);
+  });
+
+  for (const category of ordered) {
+    const preferred = CATEGORY_TONES[category];
+    if (preferred && !used.has(preferred)) {
+      used.add(preferred);
+      assigned.set(category, toneBadgeClass(preferred));
+      continue;
+    }
+    const seed = toneSeed(category);
+    let tone = CATEGORY_TONE_POOL[seed % CATEGORY_TONE_POOL.length];
+    for (let step = 1; used.has(tone) && step <= CATEGORY_TONE_POOL.length; step += 1) {
+      tone = CATEGORY_TONE_POOL[(seed + step) % CATEGORY_TONE_POOL.length];
+    }
+    // 분류가 색보다 많으면 결국 겹친다. 그때는 겹치는 대로 둔다.
+    used.add(tone);
+    assigned.set(category, toneBadgeClass(tone));
+  }
+  return assigned;
+}
+
+function getCardDescription(sheet: SheetLink) {
+  if (!sheet.description) return null;
+
+  const pathParts = sheet.description.split("/").map((part) => part.trim()).filter(Boolean);
+  const isRedundantDrivePath = pathParts.length > 1 && pathParts[pathParts.length - 1] === sheet.category;
+  return isRedundantDrivePath ? null : sheet.description;
 }
 
 function Modal({
@@ -168,6 +232,7 @@ export function SheetList({ sheets, isAdmin }: Props) {
   }, {});
 
   const categories = Object.keys(grouped).sort();
+  const categoryTones = buildCategoryTones(categories);
 
   async function handleDelete(id: string) {
     if (!confirm("삭제하시겠습니까?")) return;
@@ -198,74 +263,77 @@ export function SheetList({ sheets, isAdmin }: Props) {
           <p className="text-sm">등록된 시트가 없습니다</p>
         </div>
       ) : (
-        <div className="space-y-8">
+        <div className="space-y-6">
           {categories.map(cat => (
             <div key={cat}>
               <div className="flex items-center gap-2 mb-3">
-                <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${getCategoryColor(cat)}`}>
+                <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${categoryTones.get(cat) ?? toneBadgeClass("gray")}`}>
                   {cat}
                 </span>
                 <span className="text-xs text-gray-400 dark:text-muted-foreground">{grouped[cat].length}개</span>
               </div>
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-                {grouped[cat].map(sheet => (
-                  <a
-                    key={sheet.id}
-                    href={sheet.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="group bg-white dark:bg-card border border-gray-100 dark:border-border rounded-xl p-3.5 hover:shadow-md hover:border-violet-200 dark:hover:border-violet-500/50 transition-all block"
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className="w-10 h-10 rounded-lg bg-green-50 dark:bg-green-500/15 flex items-center justify-center shrink-0">
-                          <Sheet size={20} className="text-green-600 dark:text-green-400" />
-                        </div>
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-1.5">
-                            <p className="truncate text-base font-semibold text-gray-900 dark:text-foreground">{sheet.name}</p>
-                            {sheet.externalOwner && (
-                              // 옮길 수 없는 시트라는 뜻이다. 그냥 두면 "왜 이것만
-                              // 정리가 안 됐지"를 계속 다시 묻게 된다.
-                              <span
-                                title={`${sheet.externalOwner} 님 소유입니다. 공유받은 시트라 우리 드라이브로 옮길 수 없습니다.`}
-                                className="shrink-0 rounded-full border border-amber-500/30 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-medium text-amber-600 dark:text-amber-500"
-                              >
-                                외부 소유
-                              </span>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                {grouped[cat].map(sheet => {
+                  const description = getCardDescription(sheet);
+                  return (
+                    <a
+                      key={sheet.id}
+                      href={sheet.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="group bg-white dark:bg-card border border-gray-100 dark:border-border rounded-xl p-3.5 hover:shadow-md hover:border-violet-200 dark:hover:border-violet-500/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/50 dark:focus-visible:ring-violet-400/50 transition-all block"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="w-10 h-10 rounded-lg bg-green-50 dark:bg-green-500/15 flex items-center justify-center shrink-0">
+                            <Sheet size={20} className="text-green-600 dark:text-green-400" />
+                          </div>
+                          <div className="min-w-0">
+                            <div className="flex items-start gap-1.5">
+                              <p className="line-clamp-2 text-base font-semibold text-gray-900 dark:text-foreground">{sheet.name}</p>
+                              {sheet.externalOwner && (
+                                // 옮길 수 없는 시트라는 뜻이다. 그냥 두면 "왜 이것만
+                                // 정리가 안 됐지"를 계속 다시 묻게 된다.
+                                <span
+                                  title={`${sheet.externalOwner} 님 소유입니다. 공유받은 시트라 우리 드라이브로 옮길 수 없습니다.`}
+                                  className="shrink-0 rounded-full border border-amber-500/30 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-medium text-amber-600 dark:text-amber-500"
+                                >
+                                  외부 소유
+                                </span>
+                              )}
+                            </div>
+                            {description && (
+                              <p className="mt-0.5 truncate text-sm text-gray-500 dark:text-muted-foreground">{description}</p>
                             )}
                           </div>
-                          {sheet.description && (
-                            <p className="mt-0.5 truncate text-sm text-gray-500 dark:text-muted-foreground">{sheet.description}</p>
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 transition-opacity">
+                          {isAdmin && (
+                            <button
+                              type="button"
+                              onClick={e => { e.preventDefault(); setEditing(sheet); }}
+                              aria-label={`${sheet.name} 수정`}
+                              className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-muted text-gray-400 dark:text-muted-foreground hover:text-gray-700 dark:hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/50 dark:focus-visible:ring-violet-400/50"
+                            >
+                              <Pencil size={14} />
+                            </button>
                           )}
+                          {isAdmin && (
+                            <button
+                              type="button"
+                              onClick={e => { e.preventDefault(); void handleDelete(sheet.id); }}
+                              aria-label={`${sheet.name} 삭제`}
+                              className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-500/10 text-gray-400 dark:text-muted-foreground hover:text-red-500 dark:hover:text-red-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/50 dark:focus-visible:ring-red-400/50"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          )}
+                          <ExternalLink size={14} className="text-violet-400 dark:text-violet-300 ml-1" />
                         </div>
                       </div>
-                      <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                        {isAdmin && (
-                          <button
-                            type="button"
-                            onClick={e => { e.preventDefault(); setEditing(sheet); }}
-                            aria-label={`${sheet.name} 수정`}
-                            className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-muted text-gray-400 dark:text-muted-foreground hover:text-gray-700 dark:hover:text-foreground"
-                          >
-                            <Pencil size={14} />
-                          </button>
-                        )}
-                        {isAdmin && (
-                          <button
-                            type="button"
-                            onClick={e => { e.preventDefault(); void handleDelete(sheet.id); }}
-                            aria-label={`${sheet.name} 삭제`}
-                            className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-500/10 text-gray-400 dark:text-muted-foreground hover:text-red-500 dark:hover:text-red-400"
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                        )}
-                        <ExternalLink size={14} className="text-violet-400 dark:text-violet-300 ml-1" />
-                      </div>
-                    </div>
-                  </a>
-                ))}
+                    </a>
+                  );
+                })}
               </div>
             </div>
           ))}

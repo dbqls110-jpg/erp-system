@@ -249,22 +249,174 @@ function isSpreadsheetFile(file: File): boolean {
     || file.type === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 }
 
-async function spreadsheetText(file: File): Promise<string> {
-  const workbook = XLSX.read(new Uint8Array(await file.arrayBuffer()), { type: "array" });
-  return workbook.SheetNames
-    .map((sheetName) => {
-      const sheet = workbook.Sheets[sheetName];
-      const rows = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, raw: false });
-      const columnCount = rows.reduce((max, row) => Math.max(max, row.length), 0);
-      const columns = Array.from({ length: columnCount }, (_, columnIndex) =>
-        rows
-          .map((row) => String(row[columnIndex] ?? "").trim())
-          .filter(Boolean)
-          .join("\n"),
-      );
-      return `${sheetName}\n${columns.filter(Boolean).join("\n")}`;
-    })
-    .join("\n");
+const SPREADSHEET_PRIORITY_LABELS = {
+  revenue: "널위문 분배 후 잔액",
+  cost: "실사용금액",
+} as const;
+
+type SpreadsheetPriorityValues = {
+  revenue: number | null;
+  cost: number | null;
+  matchedLabels: string[];
+  found: boolean;
+};
+
+function spreadsheetCellText(cell: XLSX.CellObject | undefined): string {
+  if (!cell) return "";
+  const value = cell.w ?? cell.v;
+  return value === null || value === undefined ? "" : String(value).trim();
+}
+
+function normalizeSpreadsheetLabel(value: string): string {
+  return value.normalize("NFKC").replace(/\s+/gu, "");
+}
+
+function parseSpreadsheetAmount(cell: XLSX.CellObject | undefined): number | null {
+  if (!cell) return null;
+
+  if (typeof cell.v === "number") {
+    return Number.isFinite(cell.v) && cell.v >= 0 ? Math.round(cell.v) : null;
+  }
+
+  const normalized = spreadsheetCellText(cell)
+    .normalize("NFKC")
+    .replace(/[₩￦$]/gu, "")
+    .replace(/,/gu, "")
+    .replace(/\s+/gu, "")
+    .replace(/원$/u, "");
+  if (!/^\d+(?:\.\d+)?$/u.test(normalized)) return null;
+
+  const value = Number(normalized);
+  return Number.isFinite(value) && value >= 0 ? Math.round(value) : null;
+}
+
+function sheetRows(sheet: XLSX.WorkSheet): XLSX.CellObject[][] {
+  const ref = sheet["!ref"];
+  if (!ref) return [];
+  const range = XLSX.utils.decode_range(ref);
+  return Array.from({ length: range.e.r - range.s.r + 1 }, (_, rowOffset) =>
+    Array.from({ length: range.e.c - range.s.c + 1 }, (_, columnOffset) =>
+      sheet[XLSX.utils.encode_cell({ r: range.s.r + rowOffset, c: range.s.c + columnOffset })],
+    ),
+  );
+}
+
+function firstAmountToRight(row: XLSX.CellObject[], labelIndex: number): number | null {
+  for (let index = labelIndex + 1; index < row.length; index += 1) {
+    const amount = parseSpreadsheetAmount(row[index]);
+    if (amount !== null) return amount;
+  }
+  return null;
+}
+
+function findPriorityValuesInSheet(sheet: XLSX.WorkSheet): SpreadsheetPriorityValues {
+  const values: SpreadsheetPriorityValues = {
+    revenue: null,
+    cost: null,
+    matchedLabels: [],
+    found: false,
+  };
+  const normalizedLabels = new Map<string, keyof typeof SPREADSHEET_PRIORITY_LABELS>([
+    [normalizeSpreadsheetLabel(SPREADSHEET_PRIORITY_LABELS.revenue), "revenue"],
+    [normalizeSpreadsheetLabel(SPREADSHEET_PRIORITY_LABELS.cost), "cost"],
+  ]);
+
+  for (const row of sheetRows(sheet)) {
+    for (let index = 0; index < row.length; index += 1) {
+      const cell = row[index];
+      const kind = normalizedLabels.get(normalizeSpreadsheetLabel(spreadsheetCellText(cell)));
+      if (!kind) continue;
+
+      values.found = true;
+      values.matchedLabels.push(spreadsheetCellText(cell));
+      if (values[kind] === null) values[kind] = firstAmountToRight(row, index);
+    }
+  }
+
+  return values;
+}
+
+function firstAmountForLegacyCell(rows: XLSX.CellObject[][], rowIndex: number, columnIndex: number): number | null {
+  const rowAmount = firstAmountToRight(rows[rowIndex], columnIndex);
+  if (rowAmount !== null) return rowAmount;
+
+  // 기존에 지원하던 간단한 2행 표(첫 행 라벨, 다음 행 같은 열 금액)는
+  // 우선순위 라벨이 없는 오래된 파일에서만 보존한다.
+  for (let nextRow = rowIndex + 1; nextRow < rows.length; nextRow += 1) {
+    const amount = parseSpreadsheetAmount(rows[nextRow][columnIndex]);
+    if (amount !== null) return amount;
+  }
+  return null;
+}
+
+function extractSpreadsheetCandidates(
+  workbook: XLSX.WorkBook,
+  labelExpressions: string[],
+): MoneyCandidate[] {
+  const candidates: MoneyCandidate[] = [];
+  for (const sheetName of workbook.SheetNames) {
+    const rows = sheetRows(workbook.Sheets[sheetName]);
+    for (let rowIndex = 0; rowIndex < rows.length; rowIndex += 1) {
+      const row = rows[rowIndex];
+      for (let columnIndex = 0; columnIndex < row.length; columnIndex += 1) {
+        const label = spreadsheetCellText(row[columnIndex]);
+        if (!label) continue;
+        const matchedExpression = labelExpressions.find((expression) => new RegExp(expression, "iu").test(label));
+        if (!matchedExpression) continue;
+        const value = firstAmountForLegacyCell(rows, rowIndex, columnIndex);
+        if (value !== null) candidates.push({ value, label, distance: columnIndex });
+      }
+    }
+  }
+  return candidates;
+}
+
+function parseSpreadsheetWorkbook(workbook: XLSX.WorkBook): QuoteAnalysis {
+  // 특수 라벨은 라벨을 발견한 첫 시트만 사용한다. 이후 시트의 총계가
+  // 먼저 걸려 매출을 덮어쓰는 일을 막는다.
+  for (const sheetName of workbook.SheetNames) {
+    const priority = findPriorityValuesInSheet(workbook.Sheets[sheetName]);
+    if (!priority.found) continue;
+
+    const hasBoth = priority.revenue !== null && priority.cost !== null;
+    return {
+      revenue: priority.revenue,
+      cost: priority.cost,
+      confidence: hasBoth ? "high" : "medium",
+      source: "spreadsheet",
+      note: hasBoth
+        ? `특수 라벨에서 매출 ${formatMoney(priority.revenue)}, 매입 ${formatMoney(priority.cost)}을 확인했습니다.`
+        : "특수 라벨 중 일부 금액을 찾지 못했습니다. 저장 전 금액을 확인해 주세요.",
+      matchedLabels: [...new Set(priority.matchedLabels)],
+    };
+  }
+
+  const revenueCandidates = extractSpreadsheetCandidates(workbook, REVENUE_LABELS);
+  const costCandidates = extractSpreadsheetCandidates(workbook, COST_LABELS);
+  const genericCandidates = extractSpreadsheetCandidates(workbook, GENERIC_TOTAL_LABELS);
+  const revenueCandidate = revenueCandidates[0] ?? genericCandidates[0];
+  const costCandidate = costCandidates[0];
+  const usedGenericTotal = revenueCandidates.length === 0 && genericCandidates.length > 0;
+  const confidence: QuoteConfidence = costCandidate && revenueCandidates.length > 0
+    ? "high"
+    : usedGenericTotal
+      ? "low"
+      : "medium";
+
+  return {
+    revenue: revenueCandidate?.value ?? null,
+    cost: costCandidate?.value ?? null,
+    confidence: revenueCandidate || costCandidate ? confidence : "none",
+    source: "spreadsheet",
+    note: revenueCandidate || costCandidate
+      ? [
+          `매출 ${formatMoney(revenueCandidate?.value ?? null)}`,
+          `매입 ${formatMoney(costCandidate?.value ?? null)}`,
+          usedGenericTotal ? "총액·합계만 확인되어 매출로 임시 입력했습니다." : "저장 전 금액을 확인해 주세요.",
+        ].join(" / ")
+      : "견적서에서 매출·매입으로 볼 수 있는 금액을 찾지 못했습니다. 금액을 직접 입력해 주세요.",
+    matchedLabels: uniqueLabels([...revenueCandidates, ...costCandidates, ...(revenueCandidates.length ? [] : genericCandidates)]),
+  };
 }
 
 /** 업로드된 견적서에서 텍스트를 읽어 금액을 분석한다. 원본 파일은 이 함수에서 저장하지 않는다. */
@@ -301,7 +453,8 @@ export async function analyzeQuoteFile(file: File): Promise<QuoteAnalysis> {
 
   if (isSpreadsheetFile(file)) {
     try {
-      return parseQuoteText(await spreadsheetText(file), "spreadsheet");
+      const workbook = XLSX.read(new Uint8Array(await file.arrayBuffer()), { type: "array" });
+      return parseSpreadsheetWorkbook(workbook);
     } catch {
       return {
         revenue: null,

@@ -12,6 +12,7 @@ import type { QuoteAnalysis } from "@/lib/quoteParser";
 import { toast } from "sonner";
 import { AlertCircle, CheckCircle2, Loader2, Plus } from "lucide-react";
 import { COMPANY_NAMES } from "@/lib/companyFinance";
+import { isInternalQuoteFileName } from "@/lib/quotePolicy";
 
 export function ProjectCreateButton() {
   const [open, setOpen] = useState(false);
@@ -20,7 +21,8 @@ export function ProjectCreateButton() {
   const [revenue, setRevenue] = useState("");
   const [cost, setCost] = useState("");
   const [quoteAnalysis, setQuoteAnalysis] = useState<QuoteAnalysis | null>(null);
-  const [quoteFileName, setQuoteFileName] = useState("");
+  const [quoteFileNames, setQuoteFileNames] = useState<string[]>([]);
+  const [internalQuoteFileCount, setInternalQuoteFileCount] = useState(0);
   const formRef = useRef<HTMLFormElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -29,20 +31,32 @@ export function ProjectCreateButton() {
     setRevenue("");
     setCost("");
     setQuoteAnalysis(null);
-    setQuoteFileName("");
+    setQuoteFileNames([]);
+    setInternalQuoteFileCount(0);
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
   const handleQuoteFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+    const files = Array.from(e.target.files ?? []);
+    const internalFiles = files.filter((file) => isInternalQuoteFileName(file.name));
     setQuoteAnalysis(null);
-    setQuoteFileName(file?.name ?? "");
-    if (!file) return;
+    setQuoteFileNames(files.map((file) => file.name));
+    setInternalQuoteFileCount(internalFiles.length);
+    if (files.length === 0) return;
+
+    if (internalFiles.length === 0) {
+      toast.info("자료용으로 저장합니다 (금액 미반영).");
+      return;
+    }
+
+    if (internalFiles.length > 1) {
+      toast.info(`내부용 견적서 ${internalFiles.length}개가 선택되어 첫 번째 파일로 금액을 계산합니다.`);
+    }
 
     setAnalyzing(true);
     try {
       const formData = new FormData();
-      formData.set("file", file);
+      formData.set("file", internalFiles[0]);
       const analysis = await analyzeQuote(formData);
       setQuoteAnalysis(analysis);
       if (analysis.revenue !== null) setRevenue(String(analysis.revenue));
@@ -66,6 +80,12 @@ export function ProjectCreateButton() {
       const result = await createProject(new FormData(e.currentTarget));
       const amountWasExtracted = Boolean(result.quoteAnalysis && (result.quoteAnalysis.revenue !== null || result.quoteAnalysis.cost !== null));
       toast.success(amountWasExtracted ? "견적서 금액을 반영해 프로젝트가 생성됐습니다." : result.fileUploaded ? "프로젝트와 견적서가 생성됐습니다." : "프로젝트가 생성됐습니다.");
+      if (result.materialOnlyFileNames.length > 0) {
+        toast.info(`자료용으로 저장했습니다 (금액 미반영): ${result.materialOnlyFileNames.join(", ")}`);
+      }
+      if (result.internalQuoteFileCount > 1) {
+        toast.info(`내부용 견적서 ${result.internalQuoteFileCount}개 중 첫 번째 파일로 금액을 반영했습니다.`);
+      }
       if (result.warning) toast.warning(result.warning);
       setOpen(false);
       resetDraft();
@@ -123,11 +143,11 @@ export function ProjectCreateButton() {
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
                 <Label>매출 (원)</Label>
-                <Input type="number" name="revenue" value={revenue} onChange={(e) => setRevenue(e.target.value)} placeholder="0" min="0" step="10000" />
+                <Input type="number" name="revenue" value={revenue} onChange={(e) => setRevenue(e.target.value)} placeholder="0" min="0" step="1" />
               </div>
               <div className="space-y-1">
                 <Label>매입 (원)</Label>
-                <Input type="number" name="cost" value={cost} onChange={(e) => setCost(e.target.value)} placeholder="0" min="0" step="10000" />
+                <Input type="number" name="cost" value={cost} onChange={(e) => setCost(e.target.value)} placeholder="0" min="0" step="1" />
               </div>
             </div>
             <div className="space-y-1.5">
@@ -137,15 +157,25 @@ export function ProjectCreateButton() {
                 ref={fileInputRef}
                 type="file"
                 name="quoteFile"
-                accept=".pdf,.txt,.csv,.json,.doc,.docx,.xls,.xlsx,image/*,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                multiple
+                accept=".pdf,.txt,.csv,.json,.doc,.docx,.xls,.xlsx,.hwp,.hwpx,image/*,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 onChange={handleQuoteFileChange}
                 disabled={loading || analyzing}
                 className="cursor-pointer"
               />
-              <p className="text-xs text-muted-foreground">PDF(텍스트형), CSV, TXT, Excel은 금액을 자동 추출합니다. 스캔 이미지·워드 파일은 원본을 보관하고 금액은 직접 입력해 주세요.</p>
+              <p className="text-xs text-muted-foreground">여러 파일을 선택할 수 있습니다. 파일명에 내부용이 있는 첫 번째 견적서만 금액을 분석하고, 나머지는 자료용으로 저장합니다. HWP/HWPX는 원본만 저장합니다.</p>
+              {quoteFileNames.length > 0 && (
+                <p className="text-xs text-muted-foreground break-all">선택 파일: {quoteFileNames.join(", ")}</p>
+              )}
+              {quoteFileNames.length > 0 && internalQuoteFileCount === 0 && (
+                <p className="text-xs text-amber-700">자료용으로 저장합니다 (금액 미반영).</p>
+              )}
+              {internalQuoteFileCount > 1 && (
+                <p className="text-xs text-amber-700">내부용 견적서 {internalQuoteFileCount}개 중 첫 번째 파일만 금액 분석에 사용합니다.</p>
+              )}
               {analyzing && (
                 <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                  <Loader2 size={13} className="animate-spin" /> {quoteFileName || "견적서"} 분석 중...
+                  <Loader2 size={13} className="animate-spin" /> {quoteFileNames[0] || "견적서"} 분석 중...
                 </div>
               )}
               {!analyzing && quoteAnalysis && (
@@ -153,7 +183,7 @@ export function ProjectCreateButton() {
                   <div className="flex items-start gap-1.5">
                     {quoteAnalysis.confidence === "none" ? <AlertCircle size={14} className="mt-0.5 shrink-0 text-amber-600" /> : <CheckCircle2 size={14} className="mt-0.5 shrink-0 text-emerald-600" />}
                     <div className="space-y-1">
-                      <p className="font-medium">{quoteFileName || "견적서"} 분석 결과</p>
+                      <p className="font-medium">{quoteFileNames.find(isInternalQuoteFileName) || "견적서"} 분석 결과</p>
                       <p className="text-muted-foreground">{quoteAnalysis.note}</p>
                     </div>
                   </div>

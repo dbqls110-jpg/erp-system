@@ -9,7 +9,7 @@ export function districtFromAddress(address) {
   if (!a) return null;
 
   let match = /(서울특별시|서울시|서울)\s+(\S+?구)/.exec(a);
-  if (match) return match[2];
+  if (match) return `서울 ${match[2]}`;
 
   match = /(인천광역시|인천시|인천)\s+(\S+?[구군])/.exec(a);
   if (match) return `인천 ${match[2]}`;
@@ -23,16 +23,19 @@ export function districtFromAddress(address) {
   return null;
 }
 
-/** 자치구 질의가 해당 venue 표기와 일치하는지 판단한다. */
+/**
+ * 자치구 질의가 해당 venue 표기와 맞는지 본다.
+ *
+ * 표기가 "시도 + 시군구" 한 형식이라 규칙도 하나면 된다 — 같거나, 질의로 시작하거나.
+ *   "서울 강남구" == "서울 강남구"        완전일치
+ *   "서울"       ⊂  "서울 강남구"        시도만 물었을 때
+ *   "경기 성남시" ⊂  "경기 성남시 분당구"   시까지만 물었을 때
+ * 앞에 공백을 붙여 비교하는 것은 "경기 성남시" 가 "경기 성남시흥구" 같은 이름에
+ * 걸리지 않게 하기 위해서다.
+ */
 export function districtMatches(actual, requested) {
   if (!requested || !actual) return !requested;
-  if (actual === requested) return true;
-
-  // 인천·경기는 시/구가 한 칸에 들어간다. 도시 prefix 질의는 하위 구도 포함한다.
-  return (
-    (requested === "인천" || requested.startsWith("경기 ")) &&
-    actual.startsWith(`${requested} `)
-  );
+  return actual === requested || actual.startsWith(`${requested} `);
 }
 
 /**
@@ -49,10 +52,19 @@ const GYEONGGI_CITIES = new Set([
   "하남시", "여주시", "동두천시", "과천시", "양평군", "가평군", "연천군",
 ]);
 
+/** 서울 25개 자치구. 접두어 없이 들어온 값을 올릴 때 쓴다. */
+const SEOUL_GU = new Set([
+  "종로구", "중구", "용산구", "성동구", "광진구", "동대문구", "중랑구", "성북구",
+  "강북구", "도봉구", "노원구", "은평구", "서대문구", "마포구", "양천구", "강서구",
+  "구로구", "금천구", "영등포구", "동작구", "관악구", "서초구", "강남구", "송파구",
+  "강동구",
+]);
+
 export function normalizeDistrictValue(district) {
   const d = (district ?? "").replace(/\s+/g, " ").trim();
   if (!d) return null;
-  if (d.startsWith("경기 ") || d.startsWith("인천 ")) return d;
+  if (d.startsWith("서울 ") || d.startsWith("경기 ") || d.startsWith("인천 ")) return d;
+  if (SEOUL_GU.has(d)) return `서울 ${d}`;
   if (GYEONGGI_CITIES.has(d)) return `경기 ${d}`;
   // "성남시 분당구" 처럼 시+구인데 접두어만 없는 경우
   const pair = /^(\S+[시군])\s+(\S+구)$/.exec(d);

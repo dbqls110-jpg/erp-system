@@ -2,7 +2,6 @@ import { prisma } from "@/lib/prisma";
 import { rankVenues, type VenueLike } from "@/lib/venueMatch";
 import {
   extractVenueQuery,
-  isSeoulDistrictName,
   type ExtractedVenueQuery,
   type VenueSpacePreference,
 } from "@/lib/venueQuery";
@@ -147,12 +146,15 @@ function venueNote(extra: string[] = []) {
   ].join(" ");
 }
 
+/**
+ * 자치구 조건. venueDistrict 의 districtMatches 와 같은 규칙을 SQL 로 옮긴 것이다.
+ * 같거나, 질의로 시작하거나. 서울만 따로 두지 않는다 — 표기가 한 형식이라 규칙도 하나다.
+ */
 function venueDistrictWhere(districts: string[]) {
-  const clauses = districts.flatMap((district) =>
-    isSeoulDistrictName(district)
-      ? [{ district }]
-      : [{ district }, { district: { startsWith: `${district} ` } }],
-  );
+  const clauses = districts.flatMap((district) => [
+    { district },
+    { district: { startsWith: `${district} ` } },
+  ]);
   return { OR: clauses };
 }
 

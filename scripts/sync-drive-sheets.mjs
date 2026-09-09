@@ -20,7 +20,12 @@ import { PrismaPg } from "@prisma/adapter-pg";
 import { getRefreshToken } from "./lib/drive.mjs";
 
 const DRY_RUN = process.argv.includes("--dry-run");
-const ROOT_NAME = "천우영 시스템";
+/**
+ * 대상은 "천우영 시스템 > 시트" 폴더 안쪽뿐이다.
+ * 사장님 지시(2026-09-09): 시트 폴더에 있는 것만 화면에 올린다. 자료 폴더의
+ * 조사용 시트까지 올리면 목록이 길어져 정작 매일 쓰는 문서가 묻힌다.
+ */
+const SHEETS_FOLDER_ID = "1sINhEgqROuCDybbvD5PbnpWaVH8V0mi_";
 const FOLDER = "application/vnd.google-apps.folder";
 const SHEET = "application/vnd.google-apps.spreadsheet";
 
@@ -39,10 +44,9 @@ async function main() {
     oauth2.setCredentials({ refresh_token: await getRefreshToken() });
     const drive = google.drive({ version: "v3", auth: oauth2 });
 
-    const rootQuery = `name='${ROOT_NAME}' and mimeType='${FOLDER}' and trashed=false`;
-    const rootRes = await drive.files.list({ q: rootQuery, fields: "files(id,name)", pageSize: 10 });
-    const root = rootRes.data.files?.[0];
-    if (!root) throw new Error(`드라이브에서 '${ROOT_NAME}' 폴더를 찾지 못했습니다.`);
+    const rootRes = await drive.files.get({ fileId: SHEETS_FOLDER_ID, fields: "id,name,mimeType" });
+    const root = rootRes.data;
+    if (root.mimeType !== FOLDER) throw new Error("시트 폴더 ID 가 폴더가 아닙니다.");
 
     /** 폴더를 훑어 시트를 모은다. 분류는 바로 위 폴더 이름이다. */
     const found = [];
