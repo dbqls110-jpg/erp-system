@@ -60,19 +60,20 @@ async function main() {
     fs.writeFileSync(BACKUP_PATH, `${JSON.stringify(changes, null, 2)}\n`, "utf8");
     console.log(`변경 전 백업: ${BACKUP_PATH}`);
 
-    let done = 0;
-    for (const change of changes) {
-      await prisma.venue.update({
-        where: { id: change.id },
-        data: { district: change.newDistrict },
-      });
-      done += 1;
-      if (done % 200 === 0 || done === changes.length) {
-        process.stdout.write(`\r  ${done}/${changes.length}`);
-      }
+    /** 한 줄씩 갱신하면 수천 행에 수십 분이 걸린다. DB 가 미국에 있어 왕복이 비싸다. */
+    const CHUNK = 1000;
+    for (let i = 0; i < changes.length; i += CHUNK) {
+      const slice = changes.slice(i, i + CHUNK);
+      const values = slice.map((_, n) => `($${n * 2 + 1}, $${n * 2 + 2})`).join(",");
+      const params = slice.flatMap((c) => [c.id, c.newDistrict]);
+      await prisma.$executeRawUnsafe(
+        `UPDATE venues SET "district" = v.d FROM (VALUES ${values}) AS v(id, d) WHERE venues.id = v.id`,
+        ...params,
+      );
+      process.stdout.write(`  ${Math.min(i + CHUNK, changes.length)}/${changes.length}`);
     }
-    if (changes.length > 0) process.stdout.write("\n");
-    console.log(`자치구 변경 완료: ${changes.length}건`);
+    console.log(`
+자치구 변경 완료: ${changes.length}건`);
   } finally {
     await prisma.$disconnect();
   }

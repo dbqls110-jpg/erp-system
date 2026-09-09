@@ -2,7 +2,6 @@ export const INQUIRY_STAGES = [
   "문의",
   "1차 연락",
   "2차 연락",
-  "3차 연락",
   "성사",
   "종료",
 ] as const;
@@ -32,7 +31,6 @@ export interface InquiryRecord {
   memo: string;
   contact1At: string;
   contact2At: string;
-  contact3At: string;
   closedAt: string;
   projectName: string;
   wonAt: string;
@@ -76,7 +74,7 @@ function identityFromValues(values: readonly unknown[]): InquiryIdentity {
   };
 }
 
-export type InquiryClosePoint = "연락 전" | "1차" | "2차" | "3차";
+export type InquiryClosePoint = "연락 전" | "1차" | "2차";
 
 function hasCellValue(value: string): boolean {
   return value.trim().length > 0;
@@ -84,12 +82,11 @@ function hasCellValue(value: string): boolean {
 
 /** 종료 카드를 어느 연락 단계에서 잃었는지 시트의 사실 기록으로만 판정한다. */
 export function getInquiryClosePoint(
-  record: Pick<InquiryRecord, "contact1At" | "contact2At" | "contact3At">,
+  record: Pick<InquiryRecord, "contact1At" | "contact2At">,
 ): InquiryClosePoint {
   if (!hasCellValue(record.contact1At)) return "연락 전";
   if (!hasCellValue(record.contact2At)) return "1차";
-  if (!hasCellValue(record.contact3At)) return "2차";
-  return "3차";
+  return "2차";
 }
 
 export interface InquirySummary {
@@ -97,7 +94,6 @@ export interface InquirySummary {
   inquiryCount: number;
   contact1Count: number;
   contact2Count: number;
-  contact3Count: number;
   wonCount: number;
   dropOff: Record<InquiryClosePoint, number>;
 }
@@ -123,9 +119,8 @@ export function summarizeInquiries(
     inquiryCount: 0,
     contact1Count: 0,
     contact2Count: 0,
-    contact3Count: 0,
     wonCount: 0,
-    dropOff: { "연락 전": 0, "1차": 0, "2차": 0, "3차": 0 },
+    dropOff: { "연락 전": 0, "1차": 0, "2차": 0 },
   };
   if (!isMonthKey(monthKey)) return summary;
 
@@ -134,8 +129,7 @@ export function summarizeInquiries(
     summary.inquiryCount += 1;
     if (hasCellValue(record.contact1At)) summary.contact1Count += 1;
     if (hasCellValue(record.contact2At)) summary.contact2Count += 1;
-    if (hasCellValue(record.contact3At)) summary.contact3Count += 1;
-    // 성사 시각은 P열에 남기므로 나중에 종료로 옮겨도 성사 건수는 유지하고, 예전 수기 데이터도 놓치지 않는다.
+    // 성사 시각은 O열에 남기므로 나중에 종료로 옮겨도 성사 건수는 유지하고, 예전 수기 데이터도 놓치지 않는다.
     if (hasCellValue(record.wonAt) || record.status === "성사") summary.wonCount += 1;
     if (record.status === "종료") summary.dropOff[getInquiryClosePoint(record)] += 1;
   }
@@ -273,13 +267,12 @@ export function isInquiryStage(value: unknown): value is InquiryStage {
 }
 
 export function stageTimestampFor(
-  record: Pick<InquiryRecord, "contact1At" | "contact2At" | "contact3At" | "closedAt"> &
+  record: Pick<InquiryRecord, "contact1At" | "contact2At" | "closedAt"> &
     Partial<Pick<InquiryRecord, "wonAt">>,
   stage: InquiryStage,
 ): string {
   if (stage === "1차 연락") return record.contact1At;
   if (stage === "2차 연락") return record.contact2At;
-  if (stage === "3차 연락") return record.contact3At;
   if (stage === "성사") return record.wonAt ?? "";
   if (stage === "종료") return record.closedAt;
   return "";
@@ -287,7 +280,7 @@ export function stageTimestampFor(
 
 export function parseInquiryRows(rows: readonly (readonly unknown[])[]): InquiryRecord[] {
   return rows.slice(1).flatMap((values, index) => {
-    const normalized = Array.from({ length: 16 }, (_, columnIndex) => column(values, columnIndex));
+    const normalized = Array.from({ length: 15 }, (_, columnIndex) => column(values, columnIndex));
     if (!normalized.some(Boolean)) return [];
 
     const identity = identityFromValues(normalized);
@@ -310,10 +303,9 @@ export function parseInquiryRows(rows: readonly (readonly unknown[])[]): Inquiry
       memo: normalized[9],
       contact1At: normalized[10],
       contact2At: normalized[11],
-      contact3At: normalized[12],
-      closedAt: normalized[13],
-      projectName: normalized[14],
-      wonAt: normalized[15],
+      closedAt: normalized[12],
+      projectName: normalized[13],
+      wonAt: normalized[14],
     }];
   });
 }
@@ -342,7 +334,7 @@ export function findInquiryRows(
   return rows.slice(1).flatMap((values, index) => {
     const candidate = identityFromValues(values);
     return sameIdentity(candidate, identity)
-      ? [{ rowNumber: index + 2, values: Array.from({ length: 16 }, (_, columnIndex) => column(values, columnIndex)) }]
+      ? [{ rowNumber: index + 2, values: Array.from({ length: 15 }, (_, columnIndex) => column(values, columnIndex)) }]
       : [];
   });
 }
@@ -354,7 +346,7 @@ export function inquiryIdentityKey(identity: InquiryIdentity): string {
 }
 
 export function getFollowupAge(
-  record: Pick<InquiryRecord, "status" | "contact1At" | "contact2At" | "contact3At" | "closedAt"> &
+  record: Pick<InquiryRecord, "status" | "contact1At" | "contact2At" | "closedAt"> &
     Partial<Pick<InquiryRecord, "wonAt">>,
   now = new Date(),
 ): { overdue: boolean; dayLabel: string | null } {

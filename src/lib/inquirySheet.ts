@@ -16,14 +16,13 @@ export const INQUIRIES_TAB_NAME = "문의 접수";
 export const PROJECTS_SPREADSHEET_ID = "1d0c5IUz7du-gqwKaoOj7YmFERzoOc-P1bbqXLI9ndDw";
 export const PROJECTS_TAB_NAME = "프로젝트";
 
-const INQUIRIES_RANGE = `'${INQUIRIES_TAB_NAME}'!A1:P`;
+const INQUIRIES_RANGE = `'${INQUIRIES_TAB_NAME}'!A1:O`;
 const MEMO_COLUMN = "J";
 const STAGE_TIME_COLUMNS: Partial<Record<InquiryStage, string>> = {
   "1차 연락": "K",
   "2차 연락": "L",
-  "3차 연락": "M",
-  "종료": "N",
-  성사: "P",
+  "종료": "M",
+  성사: "O",
 };
 const CLOSED_ROW_BACKGROUND = { red: 0.9, green: 0.9, blue: 0.9 };
 /** 손대지 않은 행의 배경. 회색을 지울 때 이 값으로 되돌린다. */
@@ -129,7 +128,7 @@ export async function saveInquiryStage(
     },
     {
       repeatCell: {
-        range: rowRange(sheetId, match.rowNumber, 0, 16),
+        range: rowRange(sheetId, match.rowNumber, 0, 15),
         cell: {
           userEnteredFormat: {
             // 종료 행만 회색으로 남기고 진행 단계로 돌아가면 흰색으로 되돌린다.
@@ -195,7 +194,7 @@ export async function saveInquiryProject(
 
   const { sheets, rows } = await readInquirySheet();
   const match = locateUniqueRow(rows, identity);
-  const existingProjectName = match.values[14] ?? "";
+  const existingProjectName = match.values[13] ?? "";
   if (existingProjectName) {
     // 재시도나 중복 클릭 때 이미 기록된 프로젝트를 덮어쓰지 않아 중복 생성을 막는다.
     return { projectName: existingProjectName, alreadyLinked: true };
@@ -208,14 +207,14 @@ export async function saveInquiryProject(
       requests: [
         {
           updateCells: {
-            range: rowRange(sheetId, match.rowNumber, 14, 15),
+            range: rowRange(sheetId, match.rowNumber, 13, 14),
             rows: [{ values: [{ userEnteredValue: { stringValue: value } }] }],
             fields: "userEnteredValue",
           },
         },
         {
           repeatCell: {
-            range: rowRange(sheetId, match.rowNumber, 14, 15),
+            range: rowRange(sheetId, match.rowNumber, 13, 14),
             cell: { userEnteredFormat: { textFormat: { link: { uri: projectUrl } } } },
             fields: "userEnteredFormat.textFormat.link",
           },

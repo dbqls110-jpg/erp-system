@@ -35,13 +35,32 @@ import {
 import { cn } from "@/lib/utils";
 import { useVisiblePolling } from "@/lib/useVisiblePolling";
 
-const STAGE_STYLES: Record<InquiryStage, { dot: string; badge: string }> = {
-  문의: { dot: "bg-slate-400", badge: "border-slate-200 bg-slate-50 text-slate-700" },
-  "1차 연락": { dot: "bg-sky-500", badge: "border-sky-200 bg-sky-50 text-sky-700" },
-  "2차 연락": { dot: "bg-amber-500", badge: "border-amber-200 bg-amber-50 text-amber-700" },
-  "3차 연락": { dot: "bg-orange-500", badge: "border-orange-200 bg-orange-50 text-orange-700" },
-  성사: { dot: "bg-violet-500", badge: "border-violet-200 bg-violet-50 text-violet-700" },
-  종료: { dot: "bg-emerald-500", badge: "border-emerald-200 bg-emerald-50 text-emerald-700" },
+const STAGE_STYLES: Record<InquiryStage, { dot: string; badge: string; header: string }> = {
+  문의: {
+    dot: "bg-slate-400 dark:bg-slate-500",
+    badge: "border-slate-200 bg-slate-50 text-slate-700 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-300",
+    header: "bg-slate-50/70 dark:bg-slate-950/30",
+  },
+  "1차 연락": {
+    dot: "bg-sky-500 dark:bg-sky-400",
+    badge: "border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-800 dark:bg-sky-950/50 dark:text-sky-300",
+    header: "bg-sky-50/70 dark:bg-sky-950/20",
+  },
+  "2차 연락": {
+    dot: "bg-amber-500 dark:bg-amber-400",
+    badge: "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300",
+    header: "bg-amber-50/70 dark:bg-amber-950/20",
+  },
+  성사: {
+    dot: "bg-violet-500 dark:bg-violet-400",
+    badge: "border-violet-200 bg-violet-50 text-violet-700 dark:border-violet-800 dark:bg-violet-950/40 dark:text-violet-300",
+    header: "bg-violet-50/70 dark:bg-violet-950/20",
+  },
+  종료: {
+    dot: "bg-emerald-500 dark:bg-emerald-400",
+    badge: "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300",
+    header: "bg-emerald-50/70 dark:bg-emerald-950/20",
+  },
 };
 
 interface Props {
@@ -128,7 +147,6 @@ export function InquiriesKanban({ initialInquiries, canEdit }: Props) {
       status: nextStage,
       ...(nextStage === "1차 연락" ? { contact1At: optimisticTimestamp } : {}),
       ...(nextStage === "2차 연락" ? { contact2At: optimisticTimestamp } : {}),
-      ...(nextStage === "3차 연락" ? { contact3At: optimisticTimestamp } : {}),
       ...(nextStage === "종료" ? { closedAt: optimisticTimestamp } : {}),
       ...(nextStage === "성사" ? { wonAt: optimisticTimestamp } : {}),
     };
@@ -143,7 +161,6 @@ export function InquiriesKanban({ initialInquiries, canEdit }: Props) {
           ...item,
           ...(nextStage === "1차 연락" ? { contact1At: result.timestamp } : {}),
           ...(nextStage === "2차 연락" ? { contact2At: result.timestamp } : {}),
-          ...(nextStage === "3차 연락" ? { contact3At: result.timestamp } : {}),
           ...(nextStage === "종료" ? { closedAt: result.timestamp } : {}),
           ...(nextStage === "성사" ? { wonAt: result.timestamp } : {}),
         };
@@ -207,10 +224,10 @@ export function InquiriesKanban({ initialInquiries, canEdit }: Props) {
           </div>
           <div className="mt-2 space-y-1 text-xs text-muted-foreground sm:text-sm">
             <p>
-              {summaryTitle} 문의 <span className="font-semibold text-foreground">{summary.inquiryCount}</span>건 · 1차 <span className="font-semibold text-foreground">{summary.contact1Count}</span> · 2차 <span className="font-semibold text-foreground">{summary.contact2Count}</span> · 3차 <span className="font-semibold text-foreground">{summary.contact3Count}</span> · 성사 <span className="font-semibold text-foreground">{summary.wonCount}</span>
+              {summaryTitle} 문의 <span className="font-semibold text-foreground">{summary.inquiryCount}</span>건 · 1차 <span className="font-semibold text-foreground">{summary.contact1Count}</span> · 2차 <span className="font-semibold text-foreground">{summary.contact2Count}</span> · 성사 <span className="font-semibold text-foreground">{summary.wonCount}</span>
             </p>
             <p>
-              이탈&nbsp; 문의 <span className="font-semibold text-foreground">{summary.dropOff["연락 전"]}</span> · 1차 <span className="font-semibold text-foreground">{summary.dropOff["1차"]}</span> · 2차 <span className="font-semibold text-foreground">{summary.dropOff["2차"]}</span> · 3차 <span className="font-semibold text-foreground">{summary.dropOff["3차"]}</span>
+              이탈&nbsp; 문의 <span className="font-semibold text-foreground">{summary.dropOff["연락 전"]}</span> · 1차 <span className="font-semibold text-foreground">{summary.dropOff["1차"]}</span> · 2차 <span className="font-semibold text-foreground">{summary.dropOff["2차"]}</span>
             </p>
           </div>
         </div>
@@ -219,7 +236,7 @@ export function InquiriesKanban({ initialInquiries, canEdit }: Props) {
             전체 <span className="font-semibold text-foreground">{visibleInquiries.length}</span>건
           </div>
           <div className="text-xs text-muted-foreground">
-            {canEdit ? "카드를 끌어 단계에 놓으세요" : "상세 내용을 보려면 카드를 더블클릭하세요"}
+            {canEdit ? "카드를 끌거나 카드의 단계 변경에서 선택하세요" : "상세 내용을 보려면 카드를 더블클릭하세요"}
           </div>
         </div>
 
@@ -239,15 +256,15 @@ export function InquiriesKanban({ initialInquiries, canEdit }: Props) {
           </div>
         )}
 
-        <div className="overflow-x-auto pb-2">
-          <div className="grid min-w-[1420px] grid-cols-6 gap-3">
+        <div className="pb-2">
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
             {INQUIRY_STAGES.map((stage) => {
               const items = visibleInquiries.filter((inquiry) => inquiry.status === stage);
               const style = STAGE_STYLES[stage];
               return (
                 <section
                   key={stage}
-                  className="flex min-h-[28rem] min-w-0 flex-col rounded-xl border border-border bg-background/80"
+                  className="flex min-h-56 min-w-0 flex-col rounded-xl border border-border bg-background/80 xl:min-h-[28rem]"
                   onDragOver={(event) => event.preventDefault()}
                   onDrop={(event) => {
                     event.preventDefault();
@@ -255,7 +272,7 @@ export function InquiriesKanban({ initialInquiries, canEdit }: Props) {
                     if (inquiry) void moveInquiry(inquiry, stage);
                   }}
                 >
-                  <div className="flex items-center justify-between border-b border-border px-3 py-3">
+                  <div className={cn("flex items-center justify-between border-b border-border px-3 py-3", style.header)}>
                     <div className="flex items-center gap-2">
                       <span className={cn("size-2 rounded-full", style.dot)} />
                       <h2 className="text-sm font-semibold">{stage}</h2>
@@ -264,8 +281,10 @@ export function InquiriesKanban({ initialInquiries, canEdit }: Props) {
                   </div>
                   <div className="flex flex-1 flex-col gap-2 p-2">
                     {items.length === 0 ? (
-                      <div className="flex flex-1 items-center justify-center rounded-lg border border-dashed border-border/70 px-3 text-center text-xs text-muted-foreground">
-                        이 단계의 문의가 없습니다.
+                      <div className="flex min-h-32 flex-1 flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border/70 bg-muted/10 px-3 py-6 text-center text-xs text-muted-foreground dark:bg-muted/5">
+                        <Inbox className="size-5 text-muted-foreground/70" />
+                        <span>이 단계의 문의가 없습니다.</span>
+                        <span className="text-[11px]">카드를 이곳에 놓거나 단계 변경에서 선택하세요.</span>
                       </div>
                     ) : items.map((inquiry) => {
                       const age = getFollowupAge(inquiry, now);
@@ -282,7 +301,7 @@ export function InquiriesKanban({ initialInquiries, canEdit }: Props) {
                           onDragEnd={() => setDraggedId(null)}
                           onDoubleClick={() => openDetail(inquiry)}
                           className={cn(
-                            "cursor-grab rounded-xl border bg-card p-3 shadow-xs transition hover:-translate-y-0.5 hover:shadow-sm active:cursor-grabbing",
+                            "touch-pan-y cursor-grab rounded-xl border bg-card p-3 shadow-xs transition hover:-translate-y-0.5 hover:shadow-sm active:cursor-grabbing",
                             age.overdue
                               ? "border-rose-400 bg-rose-50/80 ring-2 ring-rose-200/70 dark:bg-rose-950/20"
                               : "border-border",
@@ -293,7 +312,7 @@ export function InquiriesKanban({ initialInquiries, canEdit }: Props) {
                         >
                           <div className="flex items-start justify-between gap-2">
                             <div className="min-w-0">
-                              <p className="truncate text-sm font-semibold text-foreground">{displayValue(inquiry.name)}</p>
+                              <p className="truncate text-base font-semibold text-foreground">{displayValue(inquiry.name)}</p>
                               <p className="mt-0.5 text-[11px] text-muted-foreground">접수 {displayDate(inquiry.submittedAt)}</p>
                             </div>
                             {age.overdue && (
@@ -302,7 +321,7 @@ export function InquiriesKanban({ initialInquiries, canEdit }: Props) {
                               </span>
                             )}
                           </div>
-                          <p className="mt-3 line-clamp-3 whitespace-pre-wrap text-xs leading-5 text-foreground/85">
+                          <p className="mt-2 line-clamp-3 whitespace-pre-wrap text-sm leading-6 text-foreground/90">
                             {displayValue(inquiry.content)}
                           </p>
                           {inquiry.status === "종료" && (
@@ -310,10 +329,28 @@ export function InquiriesKanban({ initialInquiries, canEdit }: Props) {
                               {getInquiryClosePoint(inquiry)}에서 종료
                             </p>
                           )}
-                          <div className="mt-3 space-y-1 border-t border-border/70 pt-2 text-[11px] text-muted-foreground">
+                          <div className="mt-3 space-y-1 border-t border-border/70 pt-2 text-xs text-muted-foreground">
                             <p className="flex items-center gap-1.5 truncate"><Phone className="size-3 shrink-0" />{displayValue(inquiry.phone)}</p>
                             <p className="flex items-center gap-1.5 truncate"><Mail className="size-3 shrink-0" />{displayValue(inquiry.email)}</p>
                           </div>
+                          {canEdit && (
+                            <label
+                              className="mt-3 flex items-center gap-2 border-t border-border/70 pt-2 text-[11px] text-muted-foreground"
+                              onClick={(event) => event.stopPropagation()}
+                              onDoubleClick={(event) => event.stopPropagation()}
+                            >
+                              <span className="shrink-0">단계 변경</span>
+                              <select
+                                value={inquiry.status}
+                                aria-label={`${displayValue(inquiry.name)} 단계 변경`}
+                                disabled={saving}
+                                onChange={(event) => void moveInquiry(inquiry, event.target.value as InquiryStage)}
+                                className="min-w-0 flex-1 rounded-md border border-input bg-background px-2 py-1.5 text-xs font-medium text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring dark:bg-background"
+                              >
+                                {INQUIRY_STAGES.map((option) => <option key={option} value={option}>{option}</option>)}
+                              </select>
+                            </label>
+                          )}
                           {inquiry.status === "성사" && (
                             <div className="mt-3 border-t border-border/70 pt-2">
                               {inquiry.projectName ? (
@@ -372,7 +409,6 @@ export function InquiriesKanban({ initialInquiries, canEdit }: Props) {
                 <DetailField label="담당자" value={displayValue(selected.assignee)} />
                 <DetailField label="1차 연락일시" value={displayDate(selected.contact1At)} />
                 <DetailField label="2차 연락일시" value={displayDate(selected.contact2At)} />
-                <DetailField label="3차 연락일시" value={displayDate(selected.contact3At)} />
                 <DetailField label="성사일시" value={displayDate(selected.wonAt)} />
                 <DetailField label="종료일시" value={displayDate(selected.closedAt)} />
                 {selected.projectName && (

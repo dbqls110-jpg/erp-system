@@ -73,16 +73,15 @@ describe("문의 칸반 순수 로직", () => {
     expect(shouldHideInquiry({ status: "성사" as const, closedAt: closed.closedAt }, NOW)).toBe(false);
   });
 
-  it("종료 카드를 연락 전·1차·2차·3차 이탈로 구분한다", () => {
-    expect(getInquiryClosePoint({ contact1At: "", contact2At: "", contact3At: "" })).toBe("연락 전");
-    expect(getInquiryClosePoint({ contact1At: "2026-09-01 10:00", contact2At: "", contact3At: "" })).toBe("1차");
-    expect(getInquiryClosePoint({ contact1At: "2026-09-01 10:00", contact2At: "2026-09-02 10:00", contact3At: "" })).toBe("2차");
-    expect(getInquiryClosePoint({ contact1At: "2026-09-01 10:00", contact2At: "2026-09-02 10:00", contact3At: "2026-09-03 10:00" })).toBe("3차");
+  it("종료 카드를 연락 전·1차·2차 이탈로 구분한다", () => {
+    expect(getInquiryClosePoint({ contact1At: "", contact2At: "" })).toBe("연락 전");
+    expect(getInquiryClosePoint({ contact1At: "2026-09-01 10:00", contact2At: "" })).toBe("1차");
+    expect(getInquiryClosePoint({ contact1At: "2026-09-01 10:00", contact2At: "2026-09-02 10:00" })).toBe("2차");
   });
 
   it("접수일시가 선택한 월과 같은 문의만 연락 퍼널과 이탈을 집계한다", () => {
-    const row = (date: string, status: string, contact1At = "", contact2At = "", contact3At = "", wonAt = "") => {
-      const values = Array.from({ length: 16 }, () => "");
+    const row = (date: string, status: string, contact1At = "", contact2At = "", wonAt = "") => {
+      const values = Array.from({ length: 15 }, () => "");
       values[0] = date;
       values[1] = "홍길동";
       values[2] = `${date}@example.com`;
@@ -90,17 +89,16 @@ describe("문의 칸반 순수 로직", () => {
       values[7] = status;
       values[10] = contact1At;
       values[11] = contact2At;
-      values[12] = contact3At;
-      values[15] = wonAt;
+      values[14] = wonAt;
       return values;
     };
     const records = parseInquiryRows([
-      Array.from({ length: 16 }, () => "헤더"),
-      row("2026-09-01 10:00", "성사", "2026-09-01 11:00", "2026-09-02 11:00", "2026-09-03 11:00", "2026-09-04 11:00"),
+      Array.from({ length: 15 }, () => "헤더"),
+      row("2026-09-01 10:00", "성사", "2026-09-01 11:00", "2026-09-02 11:00", "2026-09-04 11:00"),
       row("2026-09-02 10:00", "종료", "2026-09-02 11:00"),
       row("2026-09-03 10:00", "종료"),
       row("2026-09-04 10:00", "종료", "2026-09-04 11:00", "2026-09-05 11:00"),
-      row("2026-08-31 10:00", "성사", "2026-08-31 11:00", "", "", "2026-08-31 12:00"),
+      row("2026-08-31 10:00", "성사", "2026-08-31 11:00", "", "2026-08-31 12:00"),
     ]);
 
     expect(summarizeInquiries(records, "2026-09")).toEqual({
@@ -108,9 +106,8 @@ describe("문의 칸반 순수 로직", () => {
       inquiryCount: 4,
       contact1Count: 3,
       contact2Count: 2,
-      contact3Count: 1,
       wonCount: 1,
-      dropOff: { "연락 전": 1, "1차": 1, "2차": 1, "3차": 0 },
+      dropOff: { "연락 전": 1, "1차": 1, "2차": 1 },
     });
     expect(getCurrentInquiryMonth(new Date("2026-08-31T14:59:00Z"))).toBe("2026-08");
     expect(getCurrentInquiryMonth(new Date("2026-08-31T15:00:00Z"))).toBe("2026-09");

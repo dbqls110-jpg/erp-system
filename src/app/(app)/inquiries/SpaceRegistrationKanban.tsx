@@ -180,15 +180,15 @@ export function SpaceRegistrationKanban({ initialRegistrations, canEdit }: Props
           </div>
         )}
 
-        <div className="overflow-x-auto pb-2">
-          <div className="grid min-w-[1180px] grid-cols-5 gap-3">
+        <div className="pb-2">
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
             {SPACE_REGISTRATION_STAGES.map((stage) => {
               const items = registrations.filter((registration) => registration.status === stage);
               const style = STAGE_STYLES[stage];
               return (
                 <section
                   key={stage}
-                  className="flex min-h-[28rem] min-w-0 flex-col rounded-xl border border-border bg-background/80"
+                  className="flex min-h-56 min-w-0 flex-col rounded-xl border border-border bg-background/80 xl:min-h-[28rem]"
                   onDragOver={(event) => event.preventDefault()}
                   onDrop={(event) => {
                     event.preventDefault();
