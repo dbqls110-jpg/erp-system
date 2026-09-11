@@ -3,11 +3,13 @@ import { getServerSession } from "next-auth";
 import { revalidatePath } from "next/cache";
 
 import { authOptions } from "@/lib/auth";
+import { addChecklistItem } from "@/app/actions/project";
 import { prisma } from "@/lib/prisma";
 import { canEditMenu } from "@/lib/permissions";
 import {
   parseProposals,
   validateProposal,
+  type ProjectChecklistContent,
   type SheetCreateContent,
   type ProposalTarget,
 } from "@/lib/assistantProposal";
@@ -33,12 +35,19 @@ const MENU_FOR: Record<ProposalTarget, string> = {
   project: "projects",
   drive_file: "messenger",
   sheet_create: "sheets",
+  project_checklist: "projects",
 };
 
 interface ExistingSheetApply {
   title: string;
   url: string;
   folderPath?: string;
+}
+
+interface ExistingProjectChecklistApply {
+  name: string;
+  addedCount: number;
+  alreadyExistingCount: number;
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -64,6 +73,39 @@ async function findExistingSheetApply(jobId: string, index: number): Promise<Exi
     url: result.url,
     folderPath: typeof result.folderPath === "string" ? result.folderPath : undefined,
   };
+}
+
+async function findExistingProjectChecklistApply(
+  jobId: string,
+  index: number,
+): Promise<ExistingProjectChecklistApply | null> {
+  // 감사 로그에 같은 job과 제안 위치가 있으면 체크리스트를 다시 만들지 않는다.
+  const logs = await prisma.agentAuditLog.findMany({
+    where: { action: "assistant_apply_project_checklist" },
+    orderBy: { createdAt: "desc" },
+    select: { payload: true, result: true },
+  });
+  const match = logs.find((log) => {
+    const payload = asRecord(log.payload);
+    return payload?.jobId === jobId && payload?.index === index;
+  });
+  const result = asRecord(match?.result);
+  if (
+    typeof result?.name !== "string" ||
+    typeof result.addedCount !== "number" ||
+    typeof result.alreadyExistingCount !== "number"
+  ) {
+    return null;
+  }
+  return {
+    name: result.name,
+    addedCount: result.addedCount,
+    alreadyExistingCount: result.alreadyExistingCount,
+  };
+}
+
+function checklistComparisonKey(value: string): string {
+  return value.replace(/\s+/g, "").toLocaleLowerCase();
 }
 
 export async function POST(req: NextRequest) {
@@ -181,6 +223,72 @@ export async function POST(req: NextRequest) {
         url: created.url,
         folderPath: created.folderPath,
       }, { status: 201 });
+    }
+
+    if (proposal.target === "project_checklist") {
+      const content = accepted as unknown as ProjectChecklistContent;
+      const existingApply = await findExistingProjectChecklistApply(jobId, index);
+      if (existingApply) {
+        return NextResponse.json({
+          ok: true,
+          name: existingApply.name,
+          addedCount: existingApply.addedCount,
+          alreadyExistingCount: existingApply.alreadyExistingCount,
+          reused: true,
+        });
+      }
+
+      const project = await prisma.project.findUnique({
+        where: { id: proposal.id },
+        select: {
+          name: true,
+          checklistItems: { select: { content: true } },
+        },
+      });
+      if (!project) {
+        return NextResponse.json({ error: "지정한 프로젝트를 찾을 수 없습니다." }, { status: 404 });
+      }
+
+      const existingItems = new Set(project.checklistItems.map((item) => checklistComparisonKey(item.content)));
+      let addedCount = 0;
+      let alreadyExistingCount = 0;
+      for (const item of content.items) {
+        const key = checklistComparisonKey(item);
+        if (existingItems.has(key)) {
+          alreadyExistingCount += 1;
+          continue;
+        }
+        await addChecklistItem(proposal.id, item);
+        existingItems.add(key);
+        addedCount += 1;
+      }
+
+      await prisma.agentAuditLog.create({
+        data: {
+          method: "POST",
+          endpoint: "/api/assistant/apply",
+          action: "assistant_apply_project_checklist",
+          payload: {
+            jobId,
+            index,
+            id: proposal.id,
+            changes: JSON.parse(JSON.stringify(proposal.changes)),
+          },
+          result: {
+            name: project.name,
+            addedCount,
+            alreadyExistingCount,
+            by: session.user.id,
+          },
+        },
+      });
+
+      return NextResponse.json({
+        ok: true,
+        name: project.name,
+        addedCount,
+        alreadyExistingCount,
+      });
     }
 
     const legacyAccepted = accepted as Record<string, string | number | Date | null>;

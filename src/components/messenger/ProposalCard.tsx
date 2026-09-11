@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import {
   fieldLabel,
   validateProposal,
+  type ProjectChecklistContent,
   type SheetCreateContent,
   type Proposal,
 } from "@/lib/assistantProposal";
@@ -92,7 +93,12 @@ export function ProposalCard({
 
   const { accepted, rejected } = validateProposal(proposal);
   const isSheetCreate = proposal.target === "sheet_create";
+  const isProjectChecklist = proposal.target === "project_checklist";
   const sheet = isSheetCreate ? (accepted as unknown as Partial<SheetCreateContent>) : null;
+  const checklist = isProjectChecklist
+    ? (accepted as unknown as Partial<ProjectChecklistContent>)
+    : null;
+  const checklistItems = checklist && Array.isArray(checklist.items) ? checklist.items : [];
   const sheetTabs = sheet && Array.isArray(sheet.tabs) ? sheet.tabs : [];
   const sheetData = sheet && sheet.data && typeof sheet.data === "object" ? sheet.data : {};
   const sheetRowCount = Object.values(sheetData).reduce(
@@ -109,20 +115,33 @@ export function ProposalCard({
   );
   const nothingToApply = isSheetCreate
     ? rejected.length > 0 || typeof sheet?.title !== "string"
-    : Object.keys(accepted).length === 0;
+    : isProjectChecklist
+      ? checklistItems.length === 0
+      : Object.keys(accepted).length === 0;
   const [sheetUrl, setSheetUrl] = useState<string | null>(null);
+  const [checklistResult, setChecklistResult] = useState<{
+    addedCount: number;
+    alreadyExistingCount: number;
+  } | null>(null);
 
   async function apply() {
     setState("saving");
     setError(null);
     setSheetUrl(null);
+    setChecklistResult(null);
     try {
       const res = await fetch("/api/assistant/apply", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ jobId, index }),
       });
-      const data = (await res.json()) as { error?: string; name?: string; url?: string };
+      const data = (await res.json()) as {
+        error?: string;
+        name?: string;
+        url?: string;
+        addedCount?: number;
+        alreadyExistingCount?: number;
+      };
       if (!res.ok) {
         setError(data.error ?? "저장하지 못했습니다.");
         setState("idle");
@@ -130,7 +149,14 @@ export function ProposalCard({
       }
       setState("done");
       setSheetUrl(data.url ?? null);
-      toast.success(isSheetCreate ? "구글 시트를 만들었습니다." : `${data.name ?? "자료"}에 반영했습니다.`);
+      if (isProjectChecklist) {
+        const addedCount = data.addedCount ?? 0;
+        const alreadyExistingCount = data.alreadyExistingCount ?? 0;
+        setChecklistResult({ addedCount, alreadyExistingCount });
+        toast.success(`업무 ${addedCount}개를 추가했습니다.`);
+      } else {
+        toast.success(isSheetCreate ? "구글 시트를 만들었습니다." : `${data.name ?? "자료"}에 반영했습니다.`);
+      }
       onApplied?.();
     } catch {
       setError("저장하지 못했습니다.");
@@ -151,14 +177,22 @@ export function ProposalCard({
                 ? "프로젝트"
                 : proposal.target === "drive_file"
                   ? "Drive 파일"
-                  : "구글 시트"}
+                  : proposal.target === "project_checklist"
+                    ? "프로젝트 업무"
+                    : "구글 시트"}
         </span>
       </p>
       {proposal.reason && (
         <p className="mt-0.5 text-[11px] text-muted-foreground">{proposal.reason}</p>
       )}
 
-      {isSheetCreate ? (
+      {isProjectChecklist ? (
+        <ul className="mt-2 list-disc space-y-1 pl-5 text-xs text-foreground">
+          {checklistItems.map((item, itemIndex) => (
+            <li key={`${item}-${itemIndex}`}>{item}</li>
+          ))}
+        </ul>
+      ) : isSheetCreate ? (
         <>
           <dl className="mt-2 space-y-1 text-xs">
             <div className="flex gap-2">
@@ -209,7 +243,12 @@ export function ProposalCard({
       {state === "done" ? (
         <div className="mt-2 text-[11px] text-muted-foreground">
           <p className="flex items-center gap-1">
-            <Check className="size-3" /> {isSheetCreate ? "시트를 만들었습니다" : "반영했습니다"}
+            <Check className="size-3" />
+            {isProjectChecklist
+              ? `추가 ${checklistResult?.addedCount ?? 0}개 · 이미 있음 ${checklistResult?.alreadyExistingCount ?? 0}개`
+              : isSheetCreate
+                ? "시트를 만들었습니다"
+                : "반영했습니다"}
           </p>
           {sheetUrl && (
             <a
@@ -233,7 +272,17 @@ export function ProposalCard({
             disabled={state === "saving" || nothingToApply}
             title={nothingToApply ? "적용할 수 있는 항목이 없습니다" : undefined}
           >
-            {state === "saving" ? (isSheetCreate ? "시트 만드는 중…" : "저장 중…") : isSheetCreate ? "시트 만들기" : "저장"}
+            {state === "saving"
+              ? isProjectChecklist
+                ? "업무 추가 중…"
+                : isSheetCreate
+                  ? "시트 만드는 중…"
+                  : "저장 중…"
+              : isProjectChecklist
+                ? `업무 ${checklistItems.length}개 추가`
+                : isSheetCreate
+                  ? "시트 만들기"
+                  : "저장"}
           </Button>
           <Button
             size="sm"

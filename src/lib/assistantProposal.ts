@@ -50,6 +50,9 @@ export const EDITABLE_FIELDS = {
     tabs: "탭 이름",
     data: "시트 데이터",
   },
+  project_checklist: {
+    items: "업무",
+  },
 } as const;
 
 export type ProposalTarget = keyof typeof EDITABLE_FIELDS;
@@ -59,6 +62,10 @@ export interface SheetCreateContent {
   folderName?: string;
   tabs: string[];
   data: Record<string, string[][]>;
+}
+
+export interface ProjectChecklistContent {
+  items: string[];
 }
 
 export interface Proposal {
@@ -109,14 +116,14 @@ export function parseProposals(answer: string): Proposal[] {
       const isSheetCreate = p.target === "sheet_create";
       if (!isSheetCreate && (typeof p.id !== "string" || !p.id)) continue;
 
-      const topLevelSheetFields = isSheetCreate
+      const topLevelStructuredFields = isSheetCreate || p.target === "project_checklist"
         ? Object.fromEntries(
-            ["title", "folderName", "tabs", "data"]
+            (isSheetCreate ? ["title", "folderName", "tabs", "data"] : ["items"])
               .filter((field) => field in p)
               .map((field) => [field, p[field]]),
           )
         : null;
-      const changes = asRecord(p.changes) ?? topLevelSheetFields;
+      const changes = asRecord(p.changes) ?? topLevelStructuredFields;
       if (!changes) continue;
 
       out.push({
@@ -142,6 +149,7 @@ const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
  */
 export function validateProposal(proposal: Proposal): ValidatedProposal {
   if (proposal.target === "sheet_create") return validateSheetCreateProposal(proposal);
+  if (proposal.target === "project_checklist") return validateProjectChecklistProposal(proposal);
 
   const allowed = EDITABLE_FIELDS[proposal.target] as Record<string, string>;
   const accepted: Record<string, unknown> = {};
@@ -235,6 +243,59 @@ export function validateProposal(proposal: Proposal): ValidatedProposal {
     }
   }
 
+  return { proposal, accepted, rejected };
+}
+
+const CHECKLIST_NUMBER_PREFIX = /^\s*(?:\d+\s*[.)．。]|[①-⑳㉑-㉛])\s*/u;
+
+function normalizeChecklistItem(value: string): string {
+  return value.replace(CHECKLIST_NUMBER_PREFIX, "").trim();
+}
+
+function checklistComparisonKey(value: string): string {
+  return value.replace(/\s+/g, "").toLocaleLowerCase();
+}
+
+function validateProjectChecklistProposal(proposal: Proposal): ValidatedProposal {
+  const accepted: Record<string, unknown> = {};
+  const rejected: ProposalIssue[] = [];
+  const rawItems = proposal.changes.items;
+
+  if (!Array.isArray(rawItems)) {
+    rejected.push({ field: "items", reason: "업무 목록은 문자열 배열이어야 합니다." });
+    return { proposal, accepted, rejected };
+  }
+
+  const items: string[] = [];
+  const seen = new Set<string>();
+  for (const [index, rawItem] of rawItems.entries()) {
+    if (typeof rawItem !== "string") {
+      rejected.push({ field: `items[${index}]`, reason: "업무 이름은 글자여야 합니다." });
+      continue;
+    }
+
+    const item = normalizeChecklistItem(rawItem);
+    if (!item) continue;
+    if (item.length > 100) {
+      rejected.push({ field: `items[${index}]`, reason: "업무 이름은 100자 이내여야 합니다." });
+      continue;
+    }
+
+    const key = checklistComparisonKey(item);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    items.push(item);
+  }
+
+  if (items.length > 30) {
+    rejected.push({ field: "items", reason: "업무는 한 번에 최대 30개까지 추가할 수 있습니다." });
+  } else if (items.length === 0) {
+    rejected.push({ field: "items", reason: "추가할 업무가 하나 이상 필요합니다." });
+  } else {
+    accepted.items = items;
+  }
+
+  if (items.length > 30) delete accepted.items;
   return { proposal, accepted, rejected };
 }
 
@@ -362,6 +423,7 @@ function validateSheetCreateProposal(proposal: Proposal): ValidatedProposal {
 /** 사람이 읽을 칸 이름. 화면에서 "calledPrice" 대신 "확인 요금" 을 보여준다. */
 export function fieldLabel(target: ProposalTarget, field: string): string {
   const allowed = EDITABLE_FIELDS[target] as Record<string, string>;
+  if (target === "project_checklist" && /^items\[\d+\]$/.test(field)) return allowed.items;
   return allowed[field] ?? field;
 }
 
