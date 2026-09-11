@@ -184,16 +184,23 @@ export async function updateChecklistItem(itemId: string, projectId: string, con
 
 export async function toggleChecklistItem(itemId: string, projectId: string) {
   await requireEditAccess("projects");
+  const item = await prisma.checklistItem.findUnique({ where: { id: itemId } });
+  if (!item || item.projectId !== projectId) return;
+  return setChecklistDone(itemId, projectId, !item.isDone);
+}
+
+export async function setChecklistDone(itemId: string, projectId: string, done: boolean) {
+  await requireEditAccess("projects");
 
   const item = await prisma.checklistItem.findUnique({ where: { id: itemId } });
-  if (!item) return;
+  if (!item || item.projectId !== projectId) throw new Error("체크리스트 항목을 찾을 수 없습니다.");
 
   const updated = await prisma.checklistItem.update({
     where: { id: itemId },
     data: {
-      isDone: !item.isDone,
+      isDone: done,
       // 체크한 시점을 남긴다. 해제하면 지워서 "언제 완료했는지"가 항상 현재 상태와 맞게 유지된다.
-      completedAt: !item.isDone ? new Date() : null,
+      completedAt: done ? new Date() : null,
     },
     select: { id: true, content: true, isDone: true, completedAt: true },
   });

@@ -23,9 +23,12 @@ function parseKind(value: unknown): ProjectAmountKind {
 }
 
 function parseAmount(value: unknown): number {
-  const amount = typeof value === "number" ? value : Number(String(value ?? "").replace(/,/g, "").trim());
-  if (!Number.isFinite(amount) || !Number.isInteger(amount) || amount < 0) {
-    throw new Error("금액은 원 단위 정수로 0 이상 입력해 주세요.");
+  if (typeof value !== "number") {
+    throw new Error("금액은 숫자로 보내야 합니다.");
+  }
+  const amount = value;
+  if (!Number.isSafeInteger(amount) || amount <= 0) {
+    throw new Error("금액은 0보다 큰 원 단위 정수로 입력해 주세요.");
   }
   return amount;
 }

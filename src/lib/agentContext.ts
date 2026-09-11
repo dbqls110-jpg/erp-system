@@ -23,7 +23,7 @@ const TOPIC_PATTERNS: Record<ContextTopic, RegExp> = {
   venues: /공간|장소|대관|행사장|체육관|공연장|강당|회의실|세미나|컨벤션|부스|바자회|운동회|잔디|야외|실내/,
   customers: /거래처|고객사|협력사|공급사/,
   partners: /파트너|협력업체|계약/,
-  projects: /프로젝트|과업|진행\s*중인\s*일/,
+  projects: /프로젝트|과업|진행\s*중인\s*일|체크리스트|할\s*일|업무|완료|끝났|해제|매출|매입|수입|지출|비용|금액/,
 };
 
 export function detectTopics(question: string): ContextTopic[] {
@@ -193,6 +193,11 @@ export async function buildAgentContext(question: string): Promise<AgentContext>
             select: {
               id: true, name: true, client: true, company: true, deadline: true,
               progress: true, assignee: true, revenue: true, cost: true,
+              checklistItems: {
+                orderBy: { order: "asc" },
+                take: 30,
+                select: { content: true, isDone: true },
+              },
             },
             orderBy: { updatedAt: "desc" },
             take: 100,

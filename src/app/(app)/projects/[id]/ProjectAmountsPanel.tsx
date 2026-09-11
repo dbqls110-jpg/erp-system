@@ -200,7 +200,7 @@ export function ProjectAmountsPanel({ projectId, amounts, canEdit }: Props) {
                 id="project-amount-value"
                 type="number"
                 inputMode="numeric"
-                min="0"
+                min="1"
                 step="1"
                 value={draft.amount}
                 onChange={(event) => setDraft((current) => ({ ...current, amount: event.target.value }))}

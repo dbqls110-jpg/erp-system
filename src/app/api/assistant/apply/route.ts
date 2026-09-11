@@ -3,12 +3,17 @@ import { getServerSession } from "next-auth";
 import { revalidatePath } from "next/cache";
 
 import { authOptions } from "@/lib/auth";
-import { addChecklistItem } from "@/app/actions/project";
+import { addChecklistItem, createProject, setChecklistDone } from "@/app/actions/project";
+import { createProjectAmount, type ProjectAmountInput } from "@/app/actions/projectAmount";
 import { prisma } from "@/lib/prisma";
 import { canEditMenu } from "@/lib/permissions";
+import { calculateNetIncome } from "@/lib/financeMetrics";
 import {
   parseProposals,
   validateProposal,
+  type ChecklistDoneContent,
+  type ProjectAmountContent,
+  type ProjectCreateFields,
   type ProjectChecklistContent,
   type SheetCreateContent,
   type ProposalTarget,
@@ -36,6 +41,9 @@ const MENU_FOR: Record<ProposalTarget, string> = {
   drive_file: "messenger",
   sheet_create: "sheets",
   project_checklist: "projects",
+  project_create: "projects",
+  checklist_done: "projects",
+  project_amount: "projects",
 };
 
 interface ExistingSheetApply {
@@ -48,6 +56,26 @@ interface ExistingProjectChecklistApply {
   name: string;
   addedCount: number;
   alreadyExistingCount: number;
+}
+
+interface ExistingProjectCreateApply {
+  projectId: string;
+  name: string;
+}
+
+interface ExistingChecklistDoneApply {
+  name: string;
+  foundCount: number;
+  notFoundCount: number;
+  done: boolean;
+}
+
+interface ExistingProjectAmountApply {
+  name: string;
+  revenue: number | null;
+  cost: number | null;
+  netIncome: number | null;
+  entryCount: number;
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -104,6 +132,82 @@ async function findExistingProjectChecklistApply(
   };
 }
 
+async function findExistingProjectCreateApply(
+  jobId: string,
+  index: number,
+): Promise<ExistingProjectCreateApply | null> {
+  const logs = await prisma.agentAuditLog.findMany({
+    where: { action: "assistant_apply_project_create" },
+    orderBy: { createdAt: "desc" },
+    select: { payload: true, result: true },
+  });
+  const match = logs.find((log) => {
+    const payload = asRecord(log.payload);
+    return payload?.jobId === jobId && payload?.index === index;
+  });
+  const result = asRecord(match?.result);
+  if (typeof result?.projectId !== "string" || typeof result.name !== "string") return null;
+  return { projectId: result.projectId, name: result.name };
+}
+
+async function findExistingChecklistDoneApply(
+  jobId: string,
+  index: number,
+): Promise<ExistingChecklistDoneApply | null> {
+  const logs = await prisma.agentAuditLog.findMany({
+    where: { action: "assistant_apply_checklist_done" },
+    orderBy: { createdAt: "desc" },
+    select: { payload: true, result: true },
+  });
+  const match = logs.find((log) => {
+    const payload = asRecord(log.payload);
+    return payload?.jobId === jobId && payload?.index === index;
+  });
+  const result = asRecord(match?.result);
+  if (
+    typeof result?.name !== "string" ||
+    typeof result.foundCount !== "number" ||
+    typeof result.notFoundCount !== "number" ||
+    typeof result.done !== "boolean"
+  ) return null;
+  return {
+    name: result.name,
+    foundCount: result.foundCount,
+    notFoundCount: result.notFoundCount,
+    done: result.done,
+  };
+}
+
+async function findExistingProjectAmountApply(
+  jobId: string,
+  index: number,
+): Promise<ExistingProjectAmountApply | null> {
+  const logs = await prisma.agentAuditLog.findMany({
+    where: { action: "assistant_apply_project_amount" },
+    orderBy: { createdAt: "desc" },
+    select: { payload: true, result: true },
+  });
+  const match = logs.find((log) => {
+    const payload = asRecord(log.payload);
+    return payload?.jobId === jobId && payload?.index === index;
+  });
+  const result = asRecord(match?.result);
+  if (
+    typeof result?.name !== "string" ||
+    (typeof result.revenue !== "number" && result.revenue !== null) ||
+    (typeof result.cost !== "number" && result.cost !== null) ||
+    (typeof result.netIncome !== "number" && result.netIncome !== null) ||
+    typeof result.entryCount !== "number"
+  ) return null;
+  return {
+    name: result.name,
+    revenue: result.revenue,
+    cost: result.cost,
+    netIncome: result.netIncome,
+    entryCount: result.entryCount,
+  };
+}
+
 function checklistComparisonKey(value: string): string {
   return value.replace(/\s+/g, "").toLocaleLowerCase();
 }
@@ -152,6 +256,12 @@ export async function POST(req: NextRequest) {
   if (proposal.target === "sheet_create" && rejected.length > 0) {
     return NextResponse.json(
       { error: "시트 제안에 고칠 항목이 있습니다.", rejected },
+      { status: 400 },
+    );
+  }
+  if (proposal.target === "project_create" && rejected.length > 0) {
+    return NextResponse.json(
+      { error: "프로젝트 만들기 제안에 고칠 항목이 있습니다.", rejected },
       { status: 400 },
     );
   }
@@ -288,6 +398,187 @@ export async function POST(req: NextRequest) {
         name: project.name,
         addedCount,
         alreadyExistingCount,
+      });
+    }
+
+    if (proposal.target === "project_create") {
+      const fields = accepted as unknown as ProjectCreateFields;
+      const existingApply = await findExistingProjectCreateApply(jobId, index);
+      if (existingApply) {
+        return NextResponse.json({
+          ok: true,
+          name: existingApply.name,
+          projectId: existingApply.projectId,
+          url: `/projects/${existingApply.projectId}`,
+          reused: true,
+        });
+      }
+
+      const existing = await prisma.project.findFirst({
+        where: { name: fields.name },
+        select: { id: true, name: true },
+      });
+      if (existing) {
+        return NextResponse.json({
+          ok: true,
+          name: existing.name,
+          projectId: existing.id,
+          url: `/projects/${existing.id}`,
+          alreadyExists: true,
+        });
+      }
+
+      const formData = new FormData();
+      for (const [field, value] of Object.entries(fields)) {
+        if (typeof value === "string") formData.set(field, value);
+      }
+      const created = await createProject(formData);
+      await prisma.agentAuditLog.create({
+        data: {
+          method: "POST",
+          endpoint: "/api/assistant/apply",
+          action: "assistant_apply_project_create",
+          payload: { jobId, index, changes: JSON.parse(JSON.stringify(proposal.changes)) },
+          result: {
+            name: fields.name,
+            projectId: created.projectId,
+            by: session.user.id,
+          },
+        },
+      });
+
+      return NextResponse.json({
+        ok: true,
+        name: fields.name,
+        projectId: created.projectId,
+        url: `/projects/${created.projectId}`,
+      }, { status: 201 });
+    }
+
+    if (proposal.target === "checklist_done") {
+      const content = accepted as unknown as ChecklistDoneContent;
+      const existingApply = await findExistingChecklistDoneApply(jobId, index);
+      if (existingApply) {
+        return NextResponse.json({ ok: true, ...existingApply, reused: true });
+      }
+
+      const project = await prisma.project.findUnique({
+        where: { id: proposal.id },
+        select: {
+          name: true,
+          checklistItems: {
+            orderBy: { order: "asc" },
+            take: 30,
+            select: { id: true, content: true },
+          },
+        },
+      });
+      if (!project) {
+        return NextResponse.json({ error: "지정한 프로젝트를 찾을 수 없습니다." }, { status: 404 });
+      }
+
+      const itemsByKey = new Map(
+        project.checklistItems.map((item) => [checklistComparisonKey(item.content), item]),
+      );
+      let foundCount = 0;
+      let notFoundCount = 0;
+      for (const itemText of content.items) {
+        const item = itemsByKey.get(checklistComparisonKey(itemText));
+        if (!item) {
+          notFoundCount += 1;
+          continue;
+        }
+        await setChecklistDone(item.id, proposal.id, content.done);
+        foundCount += 1;
+      }
+
+      await prisma.agentAuditLog.create({
+        data: {
+          method: "POST",
+          endpoint: "/api/assistant/apply",
+          action: "assistant_apply_checklist_done",
+          payload: {
+            jobId,
+            index,
+            id: proposal.id,
+            changes: JSON.parse(JSON.stringify(proposal.changes)),
+          },
+          result: {
+            name: project.name,
+            foundCount,
+            notFoundCount,
+            done: content.done,
+            by: session.user.id,
+          },
+        },
+      });
+
+      return NextResponse.json({
+        ok: true,
+        name: project.name,
+        foundCount,
+        notFoundCount,
+        done: content.done,
+      });
+    }
+
+    if (proposal.target === "project_amount") {
+      const content = accepted as unknown as ProjectAmountContent;
+      const existingApply = await findExistingProjectAmountApply(jobId, index);
+      if (existingApply) {
+        return NextResponse.json({ ok: true, ...existingApply, reused: true });
+      }
+
+      const before = await prisma.project.findUnique({
+        where: { id: proposal.id },
+        select: { name: true },
+      });
+      if (!before) {
+        return NextResponse.json({ error: "지정한 프로젝트를 찾을 수 없습니다." }, { status: 404 });
+      }
+
+      for (const entry of content.entries) {
+        await createProjectAmount(proposal.id, entry as ProjectAmountInput);
+      }
+
+      const project = await prisma.project.findUnique({
+        where: { id: proposal.id },
+        select: { name: true, revenue: true, cost: true },
+      });
+      if (!project) {
+        return NextResponse.json({ error: "적용 뒤 프로젝트를 찾을 수 없습니다." }, { status: 404 });
+      }
+      const netIncome = calculateNetIncome(project.revenue, project.cost);
+
+      await prisma.agentAuditLog.create({
+        data: {
+          method: "POST",
+          endpoint: "/api/assistant/apply",
+          action: "assistant_apply_project_amount",
+          payload: {
+            jobId,
+            index,
+            id: proposal.id,
+            changes: JSON.parse(JSON.stringify(proposal.changes)),
+          },
+          result: {
+            name: project.name,
+            revenue: project.revenue,
+            cost: project.cost,
+            netIncome,
+            entryCount: content.entries.length,
+            by: session.user.id,
+          },
+        },
+      });
+
+      return NextResponse.json({
+        ok: true,
+        name: project.name,
+        revenue: project.revenue,
+        cost: project.cost,
+        netIncome,
+        entryCount: content.entries.length,
       });
     }
 
