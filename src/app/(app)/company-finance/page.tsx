@@ -176,9 +176,11 @@ export default async function CompanyFinancePage({
                   );
                 })}
               </div>
-              <div className="mt-3 flex items-center justify-between border-t border-border pt-3 text-sm font-semibold">
-                <span>연간 합계</span>
-                <span className={metricClass(summary.profit)}>{formatWon(summary.profit)}</span>
+              {/* 위 분기 행과 같은 좌우 여백(px-2)을 줘야 왼쪽 글자와 오른쪽 숫자 열이 맞는다.
+                  글자 크기도 분기 행(12px)에 맞추고 금액만 굵게 — 줄 하나만 커지면 떠 보인다. */}
+              <div className="mt-2 flex items-baseline justify-between border-t border-border px-2 pt-2.5 text-xs">
+                <span className="font-medium text-muted-foreground">연간 합계</span>
+                <span className={`text-sm font-bold tabular-nums ${metricClass(summary.profit)}`} style={{ fontFamily: "var(--font-plus-jakarta-sans)" }}>{formatWon(summary.profit)}</span>
               </div>
             </CardContent>
           </Card>
@@ -196,8 +198,10 @@ export default async function CompanyFinancePage({
               </div>
             </CardHeader>
             <CardContent className="px-4 py-3">
-              <div className={`text-sm font-semibold ${metricClass(unassigned.profit)}`}>
-                이익 {formatWon(unassigned.profit)}
+              {/* 회사 카드의 "연간 합계" 줄과 같은 모양. 카드마다 합계 줄이 다르게 생기면 눈이 헤맨다. */}
+              <div className="flex items-baseline justify-between text-xs">
+                <span className="font-medium text-muted-foreground">이익</span>
+                <span className={`text-sm font-bold tabular-nums ${metricClass(unassigned.profit)}`} style={{ fontFamily: "var(--font-plus-jakarta-sans)" }}>{formatWon(unassigned.profit)}</span>
               </div>
             </CardContent>
           </Card>
