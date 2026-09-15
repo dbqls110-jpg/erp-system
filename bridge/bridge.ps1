@@ -111,7 +111,7 @@ function Send-Heartbeat {
     }
 }
 
-function Invoke-Codex {
+function Invoke-CodexOnce {
     param([string]$Prompt)
     # 프롬프트는 stdin 으로 넘긴다.
     # 인자로 주면 Start-Process 가 공백에서 쪼개 "unexpected argument '은?'" 같은
@@ -138,11 +138,7 @@ function Invoke-Codex {
         #
         # Get-Content 가 돌려주는 값은 순수 문자열이 아니라 PSPath, PSDrive 같은
         # 속성이 붙은 객체다. .GetType() 은 System.String 이라고 하지만
-        # ConvertTo-Json 은 그 속성까지 통째로 직렬화한다. 그래서 서버에는
-        # output 이 문자열이 아니라 객체로 도착했고, 답이 통째로 버려졌다.
-        # 두 글자짜리 답에 JSON 이 849자였다.
-        #
-        # 덤으로 빈 파일에서 $null 이 나오는 문제도 사라진다.
+        # ConvertTo-Json 이 그 속성들을 같이 직렬화해 서버가 파싱에 실패한다.
         $stdout = ""
         if (Test-Path -LiteralPath $outFile) {
             $stdout = [IO.File]::ReadAllText($outFile, [Text.Encoding]::UTF8)
@@ -151,19 +147,61 @@ function Invoke-Codex {
         if (Test-Path -LiteralPath $errFile) {
             $stderr = [IO.File]::ReadAllText($errFile, [Text.Encoding]::UTF8)
         }
-
-        if ($p.ExitCode -ne 0) {
-            throw "codex exec 종료코드 $($p.ExitCode): $stderr"
-        }
-        # 종료코드가 0인데 출력이 비어 있으면 성공이 아니다. 빈 답을 완료로 보고하면
-        # 사용자에게는 "답이 없는데 성공"으로 보여 원인을 쫓을 실마리가 사라진다.
-        if ([string]::IsNullOrWhiteSpace($stdout)) {
-            throw "codex 가 종료코드 0으로 끝났지만 출력이 비었습니다. stderr: $stderr"
-        }
-        return $stdout
+        return @{ ExitCode = $p.ExitCode; Stdout = $stdout; Stderr = $stderr }
     } finally {
         Remove-Item -LiteralPath $inFile, $outFile, $errFile -ErrorAction SilentlyContinue
     }
+}
+
+# Codex 가 업그레이드된 뒤 옛 모델 캐시를 못 읽어 죽는 일이 있다.
+#   ERROR codex_models_manager::cache: failed to load models cache: missing field `base_instructions`
+# 캐시는 지우면 다시 만들어지는 파일이라 지우고 한 번 더 돌리면 된다. 사람이 회사 PC 에
+# 가서 지울 때까지 메신저가 죽어 있으면 안 된다.
+function Repair-CodexModelsCache {
+    param([string]$Stderr)
+    if ($Stderr -notmatch "failed to load models cache") { return $false }
+    $cache = Join-Path $env:USERPROFILE ".codex\models_cache.json"
+    if (-not (Test-Path -LiteralPath $cache)) { return $false }
+    Remove-Item -LiteralPath $cache -Force -ErrorAction SilentlyContinue
+    Write-Log "Codex 모델 캐시가 깨져 있어 지우고 다시 시도합니다: $cache" "WARN"
+    return $true
+}
+
+# stderr 에서 사람이 볼 한 줄만 고른다. 전체를 사용자에게 돌려주면 프롬프트 전문과
+# 배너가 메신저에 그대로 찍힌다(실제로 그랬다). 전체는 로그에 남긴다.
+function Get-CodexErrorHint {
+    param([string]$Stderr)
+    $lines = $Stderr -split "`n" | ForEach-Object { $_.Trim() } | Where-Object { $_ }
+    $err = $lines | Where-Object { $_ -match "ERROR|error:|Error:" } | Select-Object -First 1
+    if ($err) {
+        $err = $err -replace "^\S+Z\s+ERROR\s+\S+:\s*", ""   # 시각·모듈 접두어 제거
+        if ($err.Length -gt 160) { $err = $err.Substring(0, 160) + "…" }
+        return $err
+    }
+    return ""
+}
+
+function Invoke-Codex {
+    param([string]$Prompt)
+    $r = Invoke-CodexOnce -Prompt $Prompt
+    if ($r.ExitCode -ne 0 -and (Repair-CodexModelsCache -Stderr $r.Stderr)) {
+        $r = Invoke-CodexOnce -Prompt $Prompt
+    }
+    if ($r.ExitCode -ne 0) {
+        Write-Log "codex exec 종료코드 $($r.ExitCode). stderr 전문:`n$($r.Stderr)" "ERROR"
+        $hint = Get-CodexErrorHint -Stderr $r.Stderr
+        $msg = "AI 비서가 답을 만들지 못했습니다 (Codex 종료코드 $($r.ExitCode))."
+        if ($hint) { $msg += " 원인: $hint" }
+        $msg += " 자세한 내용은 회사 PC 의 브리지 로그에 있습니다."
+        throw $msg
+    }
+    # 종료코드가 0인데 출력이 비어 있으면 성공이 아니다. 빈 답을 완료로 보고하면
+    # 사용자에게는 "답이 없는데 성공"으로 보여 원인을 쫓을 실마리가 사라진다.
+    if ([string]::IsNullOrWhiteSpace($r.Stdout)) {
+        Write-Log "codex 종료코드 0 인데 출력이 비었습니다. stderr 전문:`n$($r.Stderr)" "ERROR"
+        throw "AI 비서가 빈 답을 돌려줬습니다. 자세한 내용은 회사 PC 의 브리지 로그에 있습니다."
+    }
+    return $r.Stdout
 }
 
 
