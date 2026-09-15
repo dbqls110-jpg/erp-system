@@ -1,16 +1,30 @@
 import { google } from "googleapis";
 import { Readable } from "stream";
 import { categorizeFileName } from "@/lib/fileCategory";
-import { makeDriveClientAsOwner } from "@/lib/googleClient";
+import { isInvalidGrantError, makeDriveClientAsOwner } from "@/lib/googleClient";
 
 const ROOT_FOLDER_NAME = "천우영 시스템";
 export const MESSENGER_FOLDER_NAME = "메신저";
 export const MAX_MESSENGER_FILE_SIZE = 50 * 1024 * 1024;
 
-function getDriveClient(accessToken: string) {
-  const auth = new google.auth.OAuth2();
-  auth.setCredentials({ access_token: accessToken });
-  return google.drive({ version: "v3", auth });
+const OWNER_DRIVE_REAUTH_MESSAGE =
+  "Google Drive 소유자 인증이 만료됐습니다. 관리자에게 /api/admin/drive-setup 에서 재인증해 주세요.";
+
+function normalizeOwnerDriveError(error: unknown): Error {
+  if (isInvalidGrantError(error)) return new Error(OWNER_DRIVE_REAUTH_MESSAGE);
+  if (error instanceof Error) return error;
+  return new Error("Google Drive 작업에 실패했습니다.");
+}
+
+async function withOwnerDrive<T>(
+  operation: (drive: ReturnType<typeof google.drive>) => Promise<T>,
+): Promise<T> {
+  try {
+    const drive = await makeDriveClientAsOwner();
+    return await operation(drive);
+  } catch (error) {
+    throw normalizeOwnerDriveError(error);
+  }
 }
 
 async function findOrCreateFolder(
@@ -55,48 +69,45 @@ function formatMonthFolder(date: Date): string {
 }
 
 export async function uploadFileToDrive(
-  accessToken: string,
   file: { buffer: Buffer; name: string; mimeType: string; size: number },
   project: { id: string; name: string; createdAt: Date }
 ): Promise<{ driveFileId: string; driveUrl: string; category: string | null }> {
-  const drive = getDriveClient(accessToken);
+  return withOwnerDrive(async (drive) => {
+    const rootId = await findOrCreateFolder(drive, ROOT_FOLDER_NAME);
+    const monthFolder = formatMonthFolder(project.createdAt);
+    const monthId = await findOrCreateFolder(drive, monthFolder, rootId);
+    const projectFolderId = await findOrCreateFolder(drive, project.name, monthId);
 
-  const rootId = await findOrCreateFolder(drive, ROOT_FOLDER_NAME);
-  const monthFolder = formatMonthFolder(project.createdAt);
-  const monthId = await findOrCreateFolder(drive, monthFolder, rootId);
-  const projectFolderId = await findOrCreateFolder(drive, project.name, monthId);
+    // 2차 분류: 파일명으로 종류를 알면 그 하위 폴더에, 모르면 프로젝트 폴더에 그대로 둔다.
+    const category = categorizeFileName(file.name);
+    const targetFolderId = category
+      ? await findOrCreateFolder(drive, category, projectFolderId)
+      : projectFolderId;
 
-  // 2차 분류: 파일명으로 종류를 알면 그 하위 폴더에, 모르면 프로젝트 폴더에 그대로 둔다.
-  const category = categorizeFileName(file.name);
-  const targetFolderId = category
-    ? await findOrCreateFolder(drive, category, projectFolderId)
-    : projectFolderId;
+    const res = await drive.files.create({
+      requestBody: {
+        name: file.name,
+        parents: [targetFolderId],
+      },
+      media: {
+        mimeType: file.mimeType,
+        body: Readable.from(file.buffer),
+      },
+      fields: "id, webViewLink",
+    });
 
-  const res = await drive.files.create({
-    requestBody: {
-      name: file.name,
-      parents: [targetFolderId],
-    },
-    media: {
-      mimeType: file.mimeType,
-      body: Readable.from(file.buffer),
-    },
-    fields: "id, webViewLink",
+    return {
+      driveFileId: res.data.id!,
+      driveUrl: res.data.webViewLink!,
+      category,
+    };
   });
-
-  return {
-    driveFileId: res.data.id!,
-    driveUrl: res.data.webViewLink!,
-    category,
-  };
 }
 
 export async function deleteFileFromDrive(
-  accessToken: string,
   driveFileId: string
 ): Promise<void> {
-  const drive = getDriveClient(accessToken);
-  await drive.files.delete({ fileId: driveFileId });
+  await withOwnerDrive((drive) => drive.files.delete({ fileId: driveFileId }).then(() => undefined));
 }
 
 type DriveUploadFile = {
@@ -145,39 +156,39 @@ async function moveDriveFileToFolder(
 
 /** 메신저 첨부파일을 회사 소유 Drive의 천우영 시스템/메신저에 저장한다. */
 export async function uploadMessengerFile(file: DriveUploadFile): Promise<MessengerDriveFile> {
-  const drive = await makeDriveClientAsOwner();
-  const rootId = await findOrCreateFolder(drive, ROOT_FOLDER_NAME);
-  const messengerId = await findOrCreateFolder(drive, MESSENGER_FOLDER_NAME, rootId);
+  return withOwnerDrive(async (drive) => {
+    const rootId = await findOrCreateFolder(drive, ROOT_FOLDER_NAME);
+    const messengerId = await findOrCreateFolder(drive, MESSENGER_FOLDER_NAME, rootId);
 
-  const created = await drive.files.create({
-    requestBody: {
-      name: file.name,
-      parents: [messengerId],
-    },
-    media: {
-      mimeType: file.mimeType,
-      body: Readable.from(file.buffer),
-    },
-    fields: "id,name,mimeType,size,webViewLink",
+    const created = await drive.files.create({
+      requestBody: {
+        name: file.name,
+        parents: [messengerId],
+      },
+      media: {
+        mimeType: file.mimeType,
+        body: Readable.from(file.buffer),
+      },
+      fields: "id,name,mimeType,size,webViewLink",
+    });
+
+    if (!created.data.id || !created.data.webViewLink) {
+      throw new Error("Drive에 파일을 저장했지만 파일 링크를 확인하지 못했습니다.");
+    }
+
+    return {
+      driveFileId: created.data.id,
+      driveUrl: created.data.webViewLink,
+      name: created.data.name ?? file.name,
+      mimeType: created.data.mimeType ?? file.mimeType,
+      size: file.size,
+    };
   });
-
-  if (!created.data.id || !created.data.webViewLink) {
-    throw new Error("Drive에 파일을 저장했지만 파일 링크를 확인하지 못했습니다.");
-  }
-
-  return {
-    driveFileId: created.data.id,
-    driveUrl: created.data.webViewLink,
-    name: created.data.name ?? file.name,
-    mimeType: created.data.mimeType ?? file.mimeType,
-    size: file.size,
-  };
 }
 
 /** 메신저 업로드가 DB 저장 전에 실패했을 때 남은 Drive 파일을 정리한다. */
 export async function deleteDriveFileAsOwner(driveFileId: string): Promise<void> {
-  const drive = await makeDriveClientAsOwner();
-  await drive.files.delete({ fileId: driveFileId });
+  await withOwnerDrive((drive) => drive.files.delete({ fileId: driveFileId }).then(() => undefined));
 }
 
 /** 첨부파일을 프로젝트의 기존 Drive 폴더 규칙으로 이동한다. */
@@ -186,20 +197,21 @@ export async function moveMessengerFileToProject(
   project: { name: string; createdAt: Date },
   category?: string,
 ): Promise<{ name: string; driveUrl: string; folderPath: string }> {
-  const drive = await makeDriveClientAsOwner();
-  const rootId = await findOrCreateFolder(drive, ROOT_FOLDER_NAME);
-  const monthFolder = formatMonthFolder(project.createdAt);
-  const monthId = await findOrCreateFolder(drive, monthFolder, rootId);
-  const projectFolderId = await findOrCreateFolder(drive, project.name, monthId);
-  const targetFolderId = category
-    ? await findOrCreateFolder(drive, category, projectFolderId)
-    : projectFolderId;
-  const moved = await moveDriveFileToFolder(drive, driveFileId, targetFolderId);
+  return withOwnerDrive(async (drive) => {
+    const rootId = await findOrCreateFolder(drive, ROOT_FOLDER_NAME);
+    const monthFolder = formatMonthFolder(project.createdAt);
+    const monthId = await findOrCreateFolder(drive, monthFolder, rootId);
+    const projectFolderId = await findOrCreateFolder(drive, project.name, monthId);
+    const targetFolderId = category
+      ? await findOrCreateFolder(drive, category, projectFolderId)
+      : projectFolderId;
+    const moved = await moveDriveFileToFolder(drive, driveFileId, targetFolderId);
 
-  return {
-    ...moved,
-    folderPath: `${ROOT_FOLDER_NAME}/${monthFolder}/${project.name}${category ? `/${category}` : ""}`,
-  };
+    return {
+      ...moved,
+      folderPath: `${ROOT_FOLDER_NAME}/${monthFolder}/${project.name}${category ? `/${category}` : ""}`,
+    };
+  });
 }
 
 /** 프로젝트를 지정하지 않고 메신저 안의 분류 폴더(예: 견적서)로 이동한다. */
@@ -207,11 +219,12 @@ export async function moveMessengerFileToCategory(
   driveFileId: string,
   category: string,
 ): Promise<{ name: string; driveUrl: string; folderPath: string }> {
-  const drive = await makeDriveClientAsOwner();
-  const rootId = await findOrCreateFolder(drive, ROOT_FOLDER_NAME);
-  const messengerId = await findOrCreateFolder(drive, MESSENGER_FOLDER_NAME, rootId);
-  const categoryId = await findOrCreateFolder(drive, category, messengerId);
-  const moved = await moveDriveFileToFolder(drive, driveFileId, categoryId);
+  return withOwnerDrive(async (drive) => {
+    const rootId = await findOrCreateFolder(drive, ROOT_FOLDER_NAME);
+    const messengerId = await findOrCreateFolder(drive, MESSENGER_FOLDER_NAME, rootId);
+    const categoryId = await findOrCreateFolder(drive, category, messengerId);
+    const moved = await moveDriveFileToFolder(drive, driveFileId, categoryId);
 
-  return { ...moved, folderPath: `${ROOT_FOLDER_NAME}/${MESSENGER_FOLDER_NAME}/${category}` };
+    return { ...moved, folderPath: `${ROOT_FOLDER_NAME}/${MESSENGER_FOLDER_NAME}/${category}` };
+  });
 }

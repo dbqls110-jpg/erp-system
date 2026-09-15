@@ -79,6 +79,15 @@ function suggestedProjectName(rental: SpaceRentalRecord): string {
   return rental.eventName || [rental.client || rental.reserverName, rental.eventType].filter(Boolean).join(" ") || "새 프로젝트";
 }
 
+function RentalName({ rental }: { rental: Pick<SpaceRentalRecord, "category" | "reserverName"> }) {
+  return (
+    <>
+      {rental.category && <span className="mr-2 font-mono text-sm font-normal tabular-nums text-muted-foreground">{rental.category}</span>}
+      <span>{displayValue(rental.reserverName)}</span>
+    </>
+  );
+}
+
 export function SpaceRentalKanban({ initialRentals, canEdit }: Props) {
   const [rentals, setRentals] = useState(initialRentals);
   const [now, setNow] = useState(() => new Date());
@@ -235,7 +244,7 @@ export function SpaceRentalKanban({ initialRentals, canEdit }: Props) {
                         >
                           <div className="flex items-start justify-between gap-2">
                             <div className="min-w-0">
-                              <p className="truncate text-base font-semibold text-foreground">{displayValue(rental.reserverName)}</p>
+                              <p className="truncate text-base font-semibold text-foreground"><RentalName rental={rental} /></p>
                               <p className="truncate text-xs text-foreground/80">원청 {displayValue(rental.client)}</p>
                               <p className="truncate text-xs text-foreground/80">{displayValue(rental.eventName)} · {displayValue(rental.eventType)}</p>
                               <p className="mt-0.5 text-[11px] text-muted-foreground">접수 {displayDate(rental.receivedAt)}</p>
@@ -279,7 +288,7 @@ export function SpaceRentalKanban({ initialRentals, canEdit }: Props) {
           {selected && (
             <>
               <DialogHeader>
-                <DialogTitle>{displayValue(selected.reserverName)} 공간대관 상세</DialogTitle>
+                <DialogTitle><RentalName rental={selected} /> 공간대관 상세</DialogTitle>
                 <DialogDescription>‘진행 고객’ 탭의 원본 값을 글자 그대로 표시합니다.</DialogDescription>
               </DialogHeader>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">

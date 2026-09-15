@@ -30,7 +30,7 @@ function parseOptionalCompany(rawValue: FormDataEntryValue | null): string | nul
 }
 
 export async function createProject(formData: FormData): Promise<CreateProjectResult> {
-  const session = await requireEditAccess("projects");
+  await requireEditAccess("projects");
 
   const quoteFiles = formData.getAll("quoteFile").filter((entry): entry is File => entry instanceof File);
   const internalQuoteFiles = quoteFiles.filter((file) => isInternalQuoteFileName(file.name));
@@ -81,25 +81,20 @@ export async function createProject(formData: FormData): Promise<CreateProjectRe
   let failedFileNames: string[] = [];
   let materialOnlyFileNames: string[] = [];
   if (quoteFiles.length > 0) {
-    if (!session.accessToken) {
-      failedFileNames = quoteFiles.map((file) => file.name);
-      warning = "금액은 반영했지만 Google Drive 권한이 없어 원본 파일은 저장되지 않았습니다. 재로그인 후 다시 첨부해 주세요.";
-    } else {
-      try {
-        const uploadForm = new FormData();
-        quoteFiles.forEach((file) => uploadForm.append("file", file));
-        const uploadResult = await uploadProjectFiles(project.id, uploadForm);
-        uploadedFileNames = uploadResult.uploadedFileNames;
-        failedFileNames = uploadResult.failedFiles.map((file) => file.name);
-        materialOnlyFileNames = uploadResult.materialOnlyFileNames;
-        fileUploaded = uploadedFileNames.length > 0;
-        if (failedFileNames.length > 0) {
-          warning = `다음 파일 저장에 실패했습니다: ${uploadResult.failedFiles.map(({ name, reason }) => `${name} (${reason})`).join(", ")}`;
-        }
-      } catch {
-        failedFileNames = quoteFiles.map((file) => file.name);
-        warning = "프로젝트는 생성됐지만 견적서 원본 파일 저장에 실패했습니다. 프로젝트 상세에서 다시 첨부해 주세요.";
+    try {
+      const uploadForm = new FormData();
+      quoteFiles.forEach((file) => uploadForm.append("file", file));
+      const uploadResult = await uploadProjectFiles(project.id, uploadForm);
+      uploadedFileNames = uploadResult.uploadedFileNames;
+      failedFileNames = uploadResult.failedFiles.map((file) => file.name);
+      materialOnlyFileNames = uploadResult.materialOnlyFileNames;
+      fileUploaded = uploadedFileNames.length > 0;
+      if (failedFileNames.length > 0) {
+        warning = `다음 파일 저장에 실패했습니다: ${uploadResult.failedFiles.map(({ name, reason }) => `${name} (${reason})`).join(", ")}`;
       }
+    } catch {
+      failedFileNames = quoteFiles.map((file) => file.name);
+      warning = "프로젝트는 생성됐지만 견적서 원본 파일 저장에 실패했습니다. 프로젝트 상세에서 다시 첨부해 주세요.";
     }
   }
 

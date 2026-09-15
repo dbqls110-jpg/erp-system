@@ -40,8 +40,7 @@ function formatUploadFailure(failedFiles: Array<{ name: string; reason: string }
 
 /** 여러 파일을 독립적으로 처리해 한 파일의 실패가 나머지 업로드를 막지 않게 한다. */
 export async function uploadProjectFiles(projectId: string, formData: FormData): Promise<ProjectFileUploadResult> {
-  const session = await requireEditAccess("projects");
-  if (!session.accessToken) throw new Error("Google Drive 권한이 없습니다. 재로그인 해주세요.");
+  await requireEditAccess("projects");
 
   const files = filesFromFormData(formData);
   if (files.length === 0) throw new Error("파일을 선택해주세요.");
@@ -70,7 +69,6 @@ export async function uploadProjectFiles(projectId: string, formData: FormData):
 
       const buffer = Buffer.from(await file.arrayBuffer());
       const { driveFileId, driveUrl, category } = await uploadFileToDrive(
-        session.accessToken,
         { buffer, name: file.name, mimeType: file.type || "application/octet-stream", size: file.size },
         { id: project.id, name: project.name, createdAt: project.createdAt }
       );
@@ -121,13 +119,12 @@ export async function uploadProjectFile(projectId: string, formData: FormData) {
 }
 
 export async function deleteProjectFile(fileId: string, projectId: string) {
-  const session = await requireEditAccess("projects");
-  if (!session.accessToken) throw new Error("Google Drive 권한이 없습니다. 재로그인 해주세요.");
+  await requireEditAccess("projects");
 
   const file = await prisma.projectFile.findUnique({ where: { id: fileId } });
   if (!file) throw new Error("파일을 찾을 수 없습니다.");
 
-  await deleteFileFromDrive(session.accessToken, file.driveFileId);
+  await deleteFileFromDrive(file.driveFileId);
   await prisma.projectFile.delete({ where: { id: fileId } });
 
   revalidatePath(`/projects/${projectId}`);

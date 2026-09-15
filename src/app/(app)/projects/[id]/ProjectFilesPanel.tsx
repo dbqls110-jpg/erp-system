@@ -22,7 +22,6 @@ interface ProjectFile {
 interface Props {
   projectId: string;
   files: ProjectFile[];
-  hasDriveAccess: boolean;
   canEdit: boolean;
 }
 
@@ -33,15 +32,17 @@ function formatBytes(bytes: number | null) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-export function ProjectFilesPanel({ projectId, files, hasDriveAccess, canEdit }: Props) {
+export function ProjectFilesPanel({ projectId, files, canEdit }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [failedFiles, setFailedFiles] = useState<Array<{ name: string; reason: string }>>([]);
 
   function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const selectedFiles = Array.from(e.target.files ?? []);
     if (selectedFiles.length === 0) return;
+    setFailedFiles([]);
 
     const formData = new FormData();
     selectedFiles.forEach((file) => formData.append("file", file));
@@ -64,11 +65,14 @@ export function ProjectFilesPanel({ projectId, files, hasDriveAccess, canEdit }:
           toast.success("내부용 견적서 금액을 프로젝트에 반영했습니다.");
         }
         if (result.failedFiles.length > 0) {
+          setFailedFiles(result.failedFiles);
           toast.error(`업로드 실패: ${result.failedFiles.map(({ name, reason }) => `${name} (${reason})`).join(", ")}`);
         }
         router.refresh();
       } catch (err) {
-        toast.error(err instanceof Error ? err.message : "업로드 실패");
+        const reason = err instanceof Error ? err.message : "업로드 실패";
+        setFailedFiles(selectedFiles.map((file) => ({ name: file.name, reason })));
+        toast.error(reason);
       } finally {
         if (inputRef.current) inputRef.current.value = "";
       }
@@ -144,15 +148,21 @@ export function ProjectFilesPanel({ projectId, files, hasDriveAccess, canEdit }:
         </ul>
       )}
 
-      {canEdit && (!hasDriveAccess ? (
-        <div className="flex items-start gap-2 p-3 rounded-lg bg-yellow-50 border border-yellow-200 text-sm">
-          <AlertCircle size={15} className="text-yellow-600 shrink-0 mt-0.5" />
-          <div>
-            <p className="font-medium text-yellow-800">Google Drive 연결 필요</p>
-            <p className="text-yellow-700 text-xs mt-0.5">파일 업로드를 사용하려면 로그아웃 후 재로그인 시 Drive 권한을 허용해 주세요.</p>
+      {failedFiles.length > 0 && (
+        <div role="alert" className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm">
+          <AlertCircle size={15} className="mt-0.5 shrink-0 text-destructive" />
+          <div className="min-w-0">
+            <p className="font-medium text-destructive">저장하지 못한 파일</p>
+            <ul className="mt-1 space-y-0.5 text-xs text-muted-foreground">
+              {failedFiles.map(({ name, reason }) => (
+                <li key={`${name}-${reason}`} className="break-words"><span className="font-medium text-foreground">{name}</span>: {reason}</li>
+              ))}
+            </ul>
           </div>
         </div>
-      ) : (
+      )}
+
+      {canEdit && (
         <Button
           variant="outline"
           size="sm"
@@ -167,7 +177,7 @@ export function ProjectFilesPanel({ projectId, files, hasDriveAccess, canEdit }:
           )}
           파일 업로드
         </Button>
-      ))}
+      )}
     </div>
   );
 }

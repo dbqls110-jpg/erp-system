@@ -29,7 +29,6 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
   await requireMenuAccess(session!.user.id, "projects", session!.user.role);
   const canEdit = await canEditMenu(session!.user.id, "projects", session!.user.role);
   const isAdmin = session?.user?.role === "admin";
-  const hasDriveAccess = !!session?.accessToken;
 
   const project = await prisma.project.findUnique({
     where: { id },
@@ -166,7 +165,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <ProjectFilesPanel projectId={project.id} files={project.files} hasDriveAccess={hasDriveAccess} canEdit={canEdit} />
+          <ProjectFilesPanel projectId={project.id} files={project.files} canEdit={canEdit} />
         </CardContent>
       </Card>
 
