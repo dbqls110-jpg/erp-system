@@ -249,6 +249,16 @@ model ChecklistItem {
 }
 
 // ─── 고정비 ───────────────────────────────────────────────
+/**
+ * 고정비 한 건. 행 하나가 모든 달에 같이 적용되던 것을 기간으로 바꿨다.
+ *
+ * 9월 화면에서 임대료를 고치면 7·8월 화면까지 같이 바뀌었다. 달 정보가 없어서 행
+ * 자체를 고쳤기 때문이다. 지난달 장부가 뒤늦게 바뀌면 월별 비교가 깨진다.
+ *
+ * 그래서 startMonth 부터 endMonth 까지만 적용된다. 어느 달 화면에서 금액을 고치면
+ * 그 달부터 새 행이 생기고 옛 행은 전달에서 끝난다. 지우는 것도 마찬가지다 —
+ * 그 달부터 안 보일 뿐 지난달에는 남는다.
+ */
 model FixedExpense {
   id         String   @id @default(cuid())
   name       String
@@ -256,9 +266,16 @@ model FixedExpense {
   dayOfMonth Int // 매달 몇일
   category   String // "rent" | "salary" | "telecom" | "supplies" | "food" | "other"
   order      Int      @default(0)
+
+  /// "YYYY-MM". 이 달부터 적용. 처음 넣은 달이다 — 기존 행은 createdAt 의 달로 옮겼다.
+  startMonth String
+  /// "YYYY-MM". 이 달까지 적용. 비어 있으면 계속.
+  endMonth   String?
+
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
+  @@index([startMonth, endMonth])
   @@map("fixed_expenses")
 }
 

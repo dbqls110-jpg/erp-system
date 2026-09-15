@@ -17,6 +17,7 @@ import { FixedExpensePanel } from "./FixedExpensePanel";
 import { calculateBudgetMetrics } from "@/lib/financeMetrics";
 import { FinanceTabs } from "./FinanceTabs";
 import { NetIncomeTable } from "./NetIncomeTable";
+import { fixedExpenseMonthWhere, monthKey } from "@/lib/fixedExpenseMonths";
 
 const categoryLabel: Record<string, string> = {
   rent: "임차료", salary: "인건비", telecom: "통신비",
@@ -58,6 +59,7 @@ export default async function FinancePage({
   const year = params.year ? parseInt(params.year) : now.getFullYear();
   const month = params.month ? parseInt(params.month) : now.getMonth() + 1;
   const monthStr = String(month).padStart(2, "0");
+  const viewMonth = monthKey(year, month);
 
   const daysInMonth = new Date(year, month, 0).getDate();
   const monthEnd = `${year}-${monthStr}-${String(daysInMonth).padStart(2, "0")}`;
@@ -68,7 +70,10 @@ export default async function FinancePage({
       where: { date: { gte: `${year}-${monthStr}-01`, lte: monthEnd } },
       orderBy: { date: "desc" },
     }),
-    prisma.fixedExpense.findMany({ orderBy: { order: "asc" } }),
+    prisma.fixedExpense.findMany({
+      where: fixedExpenseMonthWhere(viewMonth),
+      orderBy: { order: "asc" },
+    }),
     prisma.project.findMany({
       select: { id: true, name: true, revenue: true, cost: true },
       orderBy: { createdAt: "desc" },

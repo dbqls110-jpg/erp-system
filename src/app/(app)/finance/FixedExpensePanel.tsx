@@ -16,6 +16,7 @@ import {
   checkFixedExpense,
   uncheckFixedExpense,
 } from "@/app/actions/fixedExpense";
+import { monthKey } from "@/lib/fixedExpenseMonths";
 
 const CATEGORY_LABELS: Record<string, string> = {
   rent: "임차료", salary: "인건비", telecom: "통신비",
@@ -29,6 +30,8 @@ interface FixedExpenseItem {
   amount: number;
   dayOfMonth: number;
   category: string;
+  startMonth: string;
+  endMonth: string | null;
 }
 
 interface Props {
@@ -40,6 +43,7 @@ interface Props {
 }
 
 export function FixedExpensePanel({ items, checkedIds, year, month, isAdmin }: Props) {
+  const viewMonth = monthKey(year, month);
   const [open, setOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -91,7 +95,7 @@ export function FixedExpensePanel({ items, checkedIds, year, month, isAdmin }: P
     setPendingId(item.id);
     startTransition(async () => {
       try {
-        await deleteFixedExpense(item.id);
+        await deleteFixedExpense(item.id, year, month);
         toast.success(`"${item.name}" 삭제됐습니다.`);
       } catch (err) {
         toast.error(err instanceof Error ? err.message : "삭제 실패");
@@ -107,10 +111,10 @@ export function FixedExpensePanel({ items, checkedIds, year, month, isAdmin }: P
     try {
       const data = { name: name.trim(), amount: parseFloat(amount), dayOfMonth: parseInt(dayOfMonth), category };
       if (editingId) {
-        await updateFixedExpense(editingId, data);
+        await updateFixedExpense(editingId, data, year, month);
         toast.success("수정됐습니다.");
       } else {
-        await createFixedExpense(data);
+        await createFixedExpense(data, year, month);
         toast.success("고정비 항목이 추가됐습니다.");
       }
       setOpen(false);
@@ -157,6 +161,12 @@ export function FixedExpensePanel({ items, checkedIds, year, month, isAdmin }: P
                       {item.name}
                     </span>
                     <Badge variant="outline" className="text-xs">{CATEGORY_LABELS[item.category]}</Badge>
+                    {item.startMonth === viewMonth && (
+                      <span className="text-xs text-primary">{month}월부터</span>
+                    )}
+                    {item.endMonth === viewMonth && (
+                      <span className="text-xs text-muted-foreground">{month}월까지</span>
+                    )}
                     <span className="text-muted-foreground text-xs">매달 {item.dayOfMonth}일</span>
                   </div>
                   <div className="flex items-center gap-2">
@@ -168,7 +178,13 @@ export function FixedExpensePanel({ items, checkedIds, year, month, isAdmin }: P
                         <button onClick={() => openEdit(item)} disabled={pending} className="text-muted-foreground hover:text-primary transition-colors disabled:opacity-50">
                           <Pencil className="size-3.5" />
                         </button>
-                        <button onClick={() => handleDelete(item)} disabled={pending} className="text-muted-foreground hover:text-destructive transition-colors disabled:opacity-50">
+                        <button
+                          onClick={() => handleDelete(item)}
+                          disabled={pending}
+                          title={item.startMonth < viewMonth ? "이번 달부터 없앱니다. 지난달 기록은 남습니다." : "이번 달에 추가한 고정비를 삭제합니다."}
+                          aria-label={item.startMonth < viewMonth ? "이번 달부터 없앱니다. 지난달 기록은 남습니다." : "이번 달에 추가한 고정비를 삭제합니다."}
+                          className="text-muted-foreground hover:text-destructive transition-colors disabled:opacity-50"
+                        >
                           <Trash2 className="size-3.5" />
                         </button>
                       </>

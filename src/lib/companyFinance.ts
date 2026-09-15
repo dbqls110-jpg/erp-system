@@ -1,6 +1,9 @@
+import { koreanDateKey } from "@/lib/dateFormat";
+
 export const COMPANY_NAMES = ["인포피아", "노바웨이", "클로원"] as const;
 
 export type CompanyName = (typeof COMPANY_NAMES)[number];
+export type CompanyFinanceEntryType = "revenue" | "cost";
 
 export interface CompanyFinanceProject {
   company: string | null;
@@ -9,10 +12,15 @@ export interface CompanyFinanceProject {
   createdAt: Date | string;
 }
 
-export type CompanyFinanceEntryType = "revenue" | "cost";
-
 export interface CompanyFinanceEntryRecord {
   company: string;
+  type: CompanyFinanceEntryType;
+  amount: number;
+  date: Date | string;
+}
+
+export interface CompanyFinanceRecord {
+  company: string | null;
   type: CompanyFinanceEntryType;
   amount: number;
   date: Date | string;
@@ -43,17 +51,19 @@ export interface UnassignedFinanceSummary {
 
 const QUARTERS = [1, 2, 3, 4] as const;
 
+interface FinanceAggregateItem {
+  company: string | null;
+  date: Date | string;
+  revenue: number | null;
+  cost: number | null;
+}
+
 function emptyQuarter(): QuarterFinance {
   return { revenue: 0, cost: 0, profit: 0, projectCount: 0 };
 }
 
 function emptyQuarters(): Record<1 | 2 | 3 | 4, QuarterFinance> {
-  return {
-    1: emptyQuarter(),
-    2: emptyQuarter(),
-    3: emptyQuarter(),
-    4: emptyQuarter(),
-  };
+  return { 1: emptyQuarter(), 2: emptyQuarter(), 3: emptyQuarter(), 4: emptyQuarter() };
 }
 
 function isCompanyName(value: string | null): value is CompanyName {
@@ -83,20 +93,16 @@ function createSummaries() {
   };
 }
 
-function getYearQuarter(value: Date | string) {
-  if (typeof value === "string") {
-    const match = /^(\d{4})-(\d{2})/.exec(value);
-    if (match) {
-      const month = Number(match[2]);
-      if (month >= 1 && month <= 12) {
-        return { year: Number(match[1]), quarter: Math.ceil(month / 3) as 1 | 2 | 3 | 4 };
-      }
-    }
-  }
+export function getYearQuarter(value: Date | string) {
+  const key = typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)
+    ? value
+    : koreanDateKey(value);
+  const match = /^(\d{4})-(\d{2})-\d{2}$/.exec(key);
+  if (!match) return null;
 
-  const date = value instanceof Date ? value : new Date(value);
-  if (Number.isNaN(date.getTime())) return null;
-  return { year: date.getFullYear(), quarter: Math.ceil((date.getMonth() + 1) / 3) as 1 | 2 | 3 | 4 };
+  const month = Number(match[2]);
+  if (month < 1 || month > 12) return null;
+  return { year: Number(match[1]), quarter: Math.ceil(month / 3) as 1 | 2 | 3 | 4 };
 }
 
 function addToSummary(
@@ -112,56 +118,69 @@ function addToSummary(
   summary.projectCount += 1;
 }
 
-/**
- * 프로젝트에 저장된 매출·매입을 회사와 생성일 기준 분기로 집계한다.
- * 회사가 지정되지 않았거나 목록에 없는 프로젝트는 unassigned 로 분리한다.
- */
-export function summarizeCompanyFinance(projects: CompanyFinanceProject[], year: number) {
+function addToUnassigned(
+  unassigned: UnassignedFinanceSummary,
+  revenue: number | null,
+  cost: number | null,
+) {
+  unassigned.revenue += revenue ?? 0;
+  unassigned.cost += cost ?? 0;
+  unassigned.profit = unassigned.revenue - unassigned.cost;
+  unassigned.projectCount += 1;
+}
+
+function summarizeItems(items: FinanceAggregateItem[], year: number) {
   const { summaries, summaryByCompany, unassigned } = createSummaries();
 
-  for (const project of projects) {
-    const date = getYearQuarter(project.createdAt);
+  for (const item of items) {
+    const date = getYearQuarter(item.date);
     if (!date || date.year !== year) continue;
 
-    const summary = isCompanyName(project.company) ? summaryByCompany.get(project.company) : undefined;
+    const summary = isCompanyName(item.company) ? summaryByCompany.get(item.company) : undefined;
     if (summary) {
-      addToSummary(summary, date.quarter, project.revenue, project.cost);
+      addToSummary(summary, date.quarter, item.revenue, item.cost);
     } else {
-      unassigned.revenue += project.revenue ?? 0;
-      unassigned.cost += project.cost ?? 0;
-      unassigned.profit = unassigned.revenue - unassigned.cost;
-      unassigned.projectCount += 1;
+      addToUnassigned(unassigned, item.revenue, item.cost);
     }
   }
 
   return { summaries, unassigned };
 }
 
-/**
- * 프로젝트와 분리해 직접 등록한 회사 매출·매입만 집계한다.
- * 프로젝트의 revenue/cost 값은 이 함수에 전달하지 않으므로 회사 장부에 섞이지 않는다.
- */
+export function summarizeCompanyFinance(projects: CompanyFinanceProject[], year: number) {
+  return summarizeItems(
+    projects.map((project) => ({
+      company: project.company,
+      date: project.createdAt,
+      revenue: project.revenue,
+      cost: project.cost,
+    })),
+    year,
+  );
+}
+
 export function summarizeCompanyFinanceEntries(entries: CompanyFinanceEntryRecord[], year: number) {
-  const { summaries, summaryByCompany, unassigned } = createSummaries();
+  return summarizeItems(
+    entries.map((entry) => ({
+      company: entry.company,
+      date: entry.date,
+      revenue: entry.type === "revenue" ? entry.amount : null,
+      cost: entry.type === "cost" ? entry.amount : null,
+    })),
+    year,
+  );
+}
 
-  for (const entry of entries) {
-    const date = getYearQuarter(entry.date);
-    if (!date || date.year !== year) continue;
-
-    const revenue = entry.type === "revenue" ? entry.amount : null;
-    const cost = entry.type === "cost" ? entry.amount : null;
-    const summary = isCompanyName(entry.company) ? summaryByCompany.get(entry.company) : undefined;
-    if (summary) {
-      addToSummary(summary, date.quarter, revenue, cost);
-    } else {
-      unassigned.revenue += revenue ?? 0;
-      unassigned.cost += cost ?? 0;
-      unassigned.profit = unassigned.revenue - unassigned.cost;
-      unassigned.projectCount += 1;
-    }
-  }
-
-  return { summaries, unassigned };
+export function summarizeCompanyFinanceRecords(records: CompanyFinanceRecord[], year: number) {
+  return summarizeItems(
+    records.map((record) => ({
+      company: record.company,
+      date: record.date,
+      revenue: record.type === "revenue" ? record.amount : null,
+      cost: record.type === "cost" ? record.amount : null,
+    })),
+    year,
+  );
 }
 
 export function normalizeCompany(value: unknown): CompanyName | null {
