@@ -19,6 +19,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { toneBadgeClass } from "@/lib/badge-tone";
 
 type PriceTrust = "confirmed" | "estimated" | "unreliable" | "unknown";
 
@@ -105,8 +106,14 @@ function priceTrustClass(trust: PriceTrust) {
   return trust === "unreliable"
     ? "text-destructive"
     : trust === "confirmed"
-      ? "text-foreground"
+      ? "text-[#15803d] dark:text-emerald-400"
       : "text-muted-foreground";
+}
+
+function priceTone(trust: PriceTrust) {
+  if (trust === "confirmed") return "green" as const;
+  if (trust === "estimated" || trust === "unreliable") return "amber" as const;
+  return "gray" as const;
 }
 
 const FACILITIES: Array<{ key: keyof Venue; label: string }> = [
@@ -280,7 +287,7 @@ export function VenueDetailDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) handleClose(); }}>
-      <DialogContent className="max-h-[85vh] sm:max-w-3xl overflow-y-auto">
+      <DialogContent className="max-h-[85vh] overflow-y-auto rounded-[12px] sm:max-w-3xl">
         {isLoading && (
           <div className="space-y-2 py-8 text-center text-sm text-muted-foreground" role="status">
             <p>공간 정보를 불러오는 중입니다.</p>
@@ -320,9 +327,9 @@ function VenueDetailContent({ detail }: { detail: VenueDetailResponse }) {
   });
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-[14px]">
       <DialogHeader>
-        <DialogTitle className="text-base">{venue.name}</DialogTitle>
+        <DialogTitle className="text-[16px]">{venue.name}</DialogTitle>
         <DialogDescription>
           {[venue.district, venue.type, venue.address].filter(hasValue).join(" · ")}
         </DialogDescription>
@@ -334,18 +341,18 @@ function VenueDetailContent({ detail }: { detail: VenueDetailResponse }) {
         )}
       </DialogHeader>
 
-      <section className="space-y-2 rounded-lg border border-border p-3">
+      <section className="space-y-2 rounded-[10px] border border-border p-3.5">
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div className="space-y-1">
             {venue.calledPrice !== null && (
               <p className="text-sm font-medium text-primary">전화 확인: {formatWon(venue.calledPrice)}</p>
             )}
             <h3 className="text-sm font-semibold">요금</h3>
-            <p className={`text-2xl font-semibold tracking-tight ${priceTrustClass(price.trust)}`}>{price.label}</p>
+            <p className={`text-[26px] font-bold tracking-[-0.01em] ${priceTrustClass(price.trust)}`} style={{ fontFamily: "var(--font-plus-jakarta-sans)" }}>{price.label}</p>
           </div>
           <Badge
-            variant={price.trust === "unreliable" ? "destructive" : price.trust === "confirmed" ? "default" : "outline"}
-            className={price.trust === "unknown" ? "text-muted-foreground" : undefined}
+            variant="outline"
+            className={toneBadgeClass(priceTone(price.trust))}
           >
             {TRUST_LABEL[price.trust]}
           </Badge>
@@ -362,7 +369,7 @@ function VenueDetailContent({ detail }: { detail: VenueDetailResponse }) {
           ]}
         />
         {(venue.calledAt || venue.calledNote) && (
-          <div className="rounded-md bg-muted/50 p-2 text-sm text-muted-foreground">
+          <div className="rounded-[9px] bg-muted/50 p-2 text-[12px] text-muted-foreground">
             {venue.calledAt && <p>통화일: {venue.calledAt}</p>}
             {venue.calledNote && <p>전화 메모: {venue.calledNote}</p>}
           </div>

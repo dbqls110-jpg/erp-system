@@ -12,9 +12,9 @@ export function FinanceTabs({
 }) {
   return (
     <Tabs defaultValue="budget" className="space-y-4">
-      <TabsList>
-        <TabsTrigger value="budget">예산·지출</TabsTrigger>
-        <TabsTrigger value="net-income">당기순이익</TabsTrigger>
+      <TabsList className="h-9 rounded-[10px] bg-muted/50 p-1">
+        <TabsTrigger value="budget" className="rounded-[8px] px-3 text-[13px]">예산·지출</TabsTrigger>
+        <TabsTrigger value="net-income" className="rounded-[8px] px-3 text-[13px]">당기순이익</TabsTrigger>
       </TabsList>
       <TabsContent value="budget">{budget}</TabsContent>
       <TabsContent value="net-income">{netIncome}</TabsContent>

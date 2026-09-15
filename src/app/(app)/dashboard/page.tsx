@@ -163,20 +163,20 @@ export default async function DashboardPage() {
   return (
     <div className="space-y-4">
       <div>
-        <p className="mt-1 text-sm text-muted-foreground">{format(now, "yyyy년 M월 d일 (eee)", { locale: ko })}</p>
+        <p className="mt-1 text-[13px] text-muted-foreground">{format(now, "yyyy년 M월 d일 (eee)", { locale: ko })}</p>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 @xl/main:grid-cols-3">
+      <div className="grid grid-cols-1 gap-[14px] @md/main:grid-cols-2 @xl/main:grid-cols-4">
         {visibleWidgets.map((w) => (
           <Link key={w.href + w.title} href={w.href}>
-            <Card className="@container/card h-full shadow-xs transition-all hover:border-primary/20 hover:shadow-sm cursor-pointer">
-              <CardHeader>
-                <CardDescription>{w.title}</CardDescription>
-                <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">{w.value}</CardTitle>
+            <Card className="@container/card h-full rounded-[12px] border border-border py-0 shadow-none transition-all hover:border-[#d8d4fb] hover:shadow-sm dark:bg-card">
+              <CardHeader className="gap-[6px] px-[18px] py-4">
+                <CardDescription className="text-[12px] text-muted-foreground">{w.title}</CardDescription>
+                <CardTitle className="text-[26px] font-bold leading-tight tracking-[-0.01em] tabular-nums" style={{ fontFamily: "var(--font-plus-jakarta-sans)" }}>{w.value}</CardTitle>
                 <CardAction>{w.icon}</CardAction>
               </CardHeader>
-              <CardContent>
-                <p className="mt-1 text-xs text-muted-foreground">{w.sub}</p>
+              <CardContent className="px-[18px] pb-4 pt-0">
+                <p className="text-[12px] leading-4 text-muted-foreground">{w.sub}</p>
               </CardContent>
             </Card>
           </Link>
@@ -184,20 +184,20 @@ export default async function DashboardPage() {
       </div>
 
       {upcomingEvents.length > 0 && (
-        <Card className="shadow-xs">
-          <CardHeader>
-            <CardTitle className="text-base font-semibold text-foreground" style={{ fontFamily: "var(--font-plus-jakarta-sans)" }}>
+        <Card className="rounded-[12px] border border-border py-0 shadow-none dark:bg-card">
+          <CardHeader className="border-b border-[#f0f0f0] px-4 py-3.5 dark:border-border">
+            <CardTitle className="text-[14px] font-semibold text-foreground">
               이번 주 마감 일정
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <ul className="space-y-2">
+          <CardContent className="px-4 py-0">
+            <ul className="divide-y divide-[#f0f0f0] dark:divide-border">
               {upcomingEvents.map((p) => (
-                <li key={p.id} className="flex items-center justify-between text-sm">
+                <li key={p.id} className="flex items-center justify-between gap-4 py-3 text-[12px] leading-4">
                   <Link href={`/projects/${p.id}`} className="font-medium text-foreground transition-colors hover:text-primary">
                     {p.name}
                   </Link>
-                  <span className="text-xs text-muted-foreground">{p.deadline} 마감</span>
+                  <span className="shrink-0 text-[12px] text-muted-foreground">{p.deadline} 마감</span>
                 </li>
               ))}
             </ul>
@@ -223,54 +223,54 @@ function ExternalDashboard({
   return (
     <div className="space-y-4">
       <Link href="/messenger" className="block">
-        <Card className="shadow-xs transition-all hover:border-primary/20 hover:shadow-sm cursor-pointer">
-          <CardHeader>
-            <CardDescription>안 읽은 메시지</CardDescription>
-            <CardTitle className="text-2xl font-semibold tabular-nums">{unreadCount}건</CardTitle>
+        <Card className="rounded-[12px] border border-border py-0 shadow-none transition-all hover:border-[#d8d4fb] hover:shadow-sm dark:bg-card">
+          <CardHeader className="gap-[6px] px-[18px] py-4">
+            <CardDescription className="text-[12px] text-muted-foreground">안 읽은 메시지</CardDescription>
+            <CardTitle className="text-[26px] font-bold leading-tight tracking-[-0.01em] tabular-nums" style={{ fontFamily: "var(--font-plus-jakarta-sans)" }}>{unreadCount}건</CardTitle>
             <CardAction><MessageCircle size={16} className="text-primary" /></CardAction>
           </CardHeader>
-          <CardContent>
-            <p className="mt-1 text-xs text-muted-foreground">메신저에서 확인하세요</p>
+          <CardContent className="px-[18px] pb-4 pt-0">
+            <p className="text-[12px] leading-4 text-muted-foreground">메신저에서 확인하세요</p>
           </CardContent>
         </Card>
       </Link>
 
-      <div className="grid grid-cols-1 gap-4 @xl/main:grid-cols-2">
-        <Card className="shadow-xs">
-          <CardHeader>
-            <CardTitle className="text-base font-semibold text-foreground">참여 중인 프로젝트</CardTitle>
+      <div className="grid grid-cols-1 gap-[14px] @xl/main:grid-cols-2">
+        <Card className="rounded-[12px] border border-border py-0 shadow-none dark:bg-card">
+          <CardHeader className="border-b border-[#f0f0f0] px-4 py-3.5 dark:border-border">
+            <CardTitle className="text-[14px] font-semibold text-foreground">참여 중인 프로젝트</CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="px-4 py-0">
             {participatingProjects.length > 0 ? (
-              <ul className="space-y-2">
+              <ul className="divide-y divide-[#f0f0f0] dark:divide-border">
                 {participatingProjects.map((project) => (
-                  <li key={project.id} className="flex items-center justify-between gap-4 text-sm">
-                    <span className="font-medium text-foreground truncate">
+                  <li key={project.id} className="flex items-center justify-between gap-4 py-3 text-[12px] leading-4">
+                    <span className="min-w-0 truncate font-medium text-foreground">
                       {project.name}
                     </span>
-                    <span className="shrink-0 text-xs text-muted-foreground">
+                    <span className="shrink-0 text-[12px] text-muted-foreground">
                       {project.deadline ? `${project.deadline} 마감` : "마감일 미정"}
                     </span>
                   </li>
                 ))}
               </ul>
             ) : (
-              <p className="text-sm text-muted-foreground">참여 중인 프로젝트가 없습니다.</p>
+              <p className="py-3 text-[12px] leading-4 text-muted-foreground">참여 중인 프로젝트가 없습니다.</p>
             )}
           </CardContent>
         </Card>
 
-        <Card className="shadow-xs">
-          <CardHeader>
-            <CardTitle className="text-base font-semibold text-foreground">다가오는 일정</CardTitle>
+        <Card className="rounded-[12px] border border-border py-0 shadow-none dark:bg-card">
+          <CardHeader className="border-b border-[#f0f0f0] px-4 py-3.5 dark:border-border">
+            <CardTitle className="text-[14px] font-semibold text-foreground">다가오는 일정</CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="px-4 py-0">
             {upcomingSchedules.length > 0 ? (
-              <ul className="space-y-2">
+              <ul className="divide-y divide-[#f0f0f0] dark:divide-border">
                 {upcomingSchedules.map((schedule) => (
-                  <li key={schedule.id} className="flex items-center justify-between gap-4 text-sm">
-                    <span className="truncate text-foreground">{schedule.title}</span>
-                    <span className="shrink-0 text-xs text-muted-foreground">
+                  <li key={schedule.id} className="flex items-center justify-between gap-4 py-3 text-[12px] leading-4">
+                    <span className="min-w-0 truncate text-foreground">{schedule.title}</span>
+                    <span className="shrink-0 text-[12px] text-muted-foreground">
                       {schedule.endDate && schedule.endDate > schedule.date
                         ? `${schedule.date} ~ ${schedule.endDate}`
                         : schedule.date}
@@ -279,7 +279,7 @@ function ExternalDashboard({
                 ))}
               </ul>
             ) : (
-              <p className="text-sm text-muted-foreground">다가오는 일정이 없습니다.</p>
+              <p className="py-3 text-[12px] leading-4 text-muted-foreground">다가오는 일정이 없습니다.</p>
             )}
           </CardContent>
         </Card>

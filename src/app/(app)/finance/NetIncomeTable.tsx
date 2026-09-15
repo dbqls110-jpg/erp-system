@@ -27,19 +27,19 @@ export function NetIncomeTable({ projects }: { projects: FinanceProject[] }) {
   const formatTotal = (value: number) => completeProjects.length === 0 ? "미입력" : formatAmount(value);
 
   return (
-    <Card className="shadow-xs">
-      <CardHeader>
-        <CardTitle className="text-base font-semibold">프로젝트별 당기순이익</CardTitle>
-        <CardDescription>매출과 매입이 모두 입력된 프로젝트만 영업이익과 당기순이익을 계산합니다.</CardDescription>
+    <Card className="rounded-[12px] border border-border py-0 shadow-none">
+      <CardHeader className="border-b border-[#f0f0f0] px-4 py-3.5 dark:border-border">
+        <CardTitle className="text-[14px] font-semibold">프로젝트별 당기순이익</CardTitle>
+        <CardDescription className="text-[12px]">매출과 매입이 모두 입력된 프로젝트만 영업이익과 당기순이익을 계산합니다.</CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent className="px-4 py-4">
         {projects.length === 0 ? (
           <p className="py-8 text-center text-sm text-muted-foreground">등록된 프로젝트가 없습니다.</p>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[720px] text-sm">
+            <table className="w-full min-w-[720px] text-[12px]">
               <thead>
-                <tr className="border-b text-left text-xs text-muted-foreground">
+                <tr className="border-b border-[#f0f0f0] text-left text-[11.5px] text-muted-foreground dark:border-border">
                   <th className="px-3 py-2 font-medium">프로젝트</th>
                   <th className="px-3 py-2 text-right font-medium">매출</th>
                   <th className="px-3 py-2 text-right font-medium">매입</th>
@@ -52,7 +52,7 @@ export function NetIncomeTable({ projects }: { projects: FinanceProject[] }) {
                   const operatingProfit = calculateOperatingProfit(project.revenue, project.cost);
                   const netIncome = calculateNetIncome(project.revenue, project.cost);
                   return (
-                    <tr key={project.id} className="border-b last:border-0">
+                    <tr key={project.id} className="border-b border-[#f0f0f0] last:border-0 dark:border-border">
                       <td className="px-3 py-2.5 font-medium">{project.name}</td>
                       <td className="px-3 py-2.5 text-right tabular-nums">{formatAmount(project.revenue)}</td>
                       <td className="px-3 py-2.5 text-right tabular-nums">{formatAmount(project.cost)}</td>

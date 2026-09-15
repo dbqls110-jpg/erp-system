@@ -17,6 +17,7 @@ import {
   uncheckFixedExpense,
 } from "@/app/actions/fixedExpense";
 import { monthKey } from "@/lib/fixedExpenseMonths";
+import { toneBadgeClass } from "@/lib/badge-tone";
 
 const CATEGORY_LABELS: Record<string, string> = {
   rent: "임차료", salary: "인건비", telecom: "통신비",
@@ -144,7 +145,7 @@ export function FixedExpensePanel({ items, checkedIds, year, month, isAdmin }: P
               return (
                 <div
                   key={item.id}
-                  className="flex items-center justify-between py-2 border-b border-border last:border-0 text-sm"
+                  className="flex flex-wrap items-center justify-between gap-3 border-b border-[#f0f0f0] py-3 text-[12px] last:border-0 dark:border-border"
                 >
                   <div className="flex items-center gap-3">
                     <button
@@ -160,7 +161,7 @@ export function FixedExpensePanel({ items, checkedIds, year, month, isAdmin }: P
                     <span className={`font-medium ${checked ? "line-through text-muted-foreground" : "text-foreground"}`}>
                       {item.name}
                     </span>
-                    <Badge variant="outline" className="text-xs">{CATEGORY_LABELS[item.category]}</Badge>
+                    <Badge variant="outline" className={`h-[22px] text-[11.5px] ${toneBadgeClass("gray")}`}>{CATEGORY_LABELS[item.category]}</Badge>
                     {item.startMonth === viewMonth && (
                       <span className="text-xs text-primary">{month}월부터</span>
                     )}
@@ -170,7 +171,7 @@ export function FixedExpensePanel({ items, checkedIds, year, month, isAdmin }: P
                     <span className="text-muted-foreground text-xs">매달 {item.dayOfMonth}일</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className={`font-medium ${checked ? "text-muted-foreground line-through" : ""}`}>
+                    <span className={`font-semibold tabular-nums ${checked ? "text-muted-foreground line-through" : ""}`} style={{ fontFamily: "var(--font-plus-jakarta-sans)" }}>
                       {item.amount.toLocaleString()}원
                     </span>
                     {isAdmin && (

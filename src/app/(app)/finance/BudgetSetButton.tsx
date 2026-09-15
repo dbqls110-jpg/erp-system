@@ -29,7 +29,7 @@ export function BudgetSetButton({ year, month, currentAmount }: { year: number; 
 
   return (
     <>
-      <Button variant="outline" onClick={() => setOpen(true)} className="gap-2" style={{ borderRadius: "9px" }}>
+      <Button variant="outline" onClick={() => setOpen(true)} className="h-9 gap-2 rounded-[10px] px-3.5 text-[13px] font-semibold">
         <Settings size={15} /> 예산 설정
       </Button>
       <Dialog open={open} onOpenChange={setOpen}>
@@ -44,7 +44,7 @@ export function BudgetSetButton({ year, month, currentAmount }: { year: number; 
             </div>
             <div className="flex gap-2 justify-end">
               <Button type="button" variant="outline" onClick={() => setOpen(false)}>취소</Button>
-              <Button type="submit" disabled={loading} className="bg-dark-onyx text-white" style={{ borderRadius: "9px" }}>
+              <Button type="submit" disabled={loading} className="rounded-[10px] bg-[#202023] text-white hover:bg-[#343438]">
                 {loading ? "저장 중..." : "저장"}
               </Button>
             </div>

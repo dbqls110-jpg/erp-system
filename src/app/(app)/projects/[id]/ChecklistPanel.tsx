@@ -162,8 +162,9 @@ export function ChecklistPanel({ projectId, items, canEdit }: { projectId: strin
     <div className="space-y-2">
       {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
       {checklistItems.length === 0 && <p className="text-sm text-muted-foreground">체크리스트 항목이 없습니다.</p>}
+      <div className="grid grid-cols-1 gap-x-6 sm:grid-cols-2">
       {checklistItems.map((item) => (
-        <div key={item.id} className="group flex items-center gap-2 rounded-md px-1 py-1 -mx-1 hover:bg-muted/40">
+        <div key={item.id} className="group grid min-h-8 grid-cols-[16px_minmax(0,1fr)_auto_auto_auto] items-center gap-2 border-b border-[#f0f0f0] px-1 py-0 dark:border-border hover:bg-muted/40">
           <input
             id={`checklist-${item.id}`}
             type="checkbox"
@@ -171,7 +172,7 @@ export function ChecklistPanel({ projectId, items, canEdit }: { projectId: strin
             onChange={(event) => void handleToggle(item.id, event.target.checked)}
             disabled={!canEdit || pendingId !== null}
             aria-label={`${item.content} ${item.isDone ? "완료 해제" : "완료 처리"}`}
-            className="h-4 w-4 shrink-0 cursor-pointer accent-primary disabled:cursor-not-allowed disabled:opacity-60"
+            className="h-4 w-4 shrink-0 cursor-pointer accent-[#7b68ee] disabled:cursor-not-allowed disabled:opacity-60"
           />
           {editingId === item.id ? (
             <div className="flex min-w-0 flex-1 items-center gap-1.5">
@@ -209,7 +210,7 @@ export function ChecklistPanel({ projectId, items, canEdit }: { projectId: strin
           ) : (
             <label
               htmlFor={`checklist-${item.id}`}
-              className={cn("min-w-0 flex-1 cursor-pointer text-sm", item.isDone ? "line-through text-muted-foreground" : "text-foreground")}
+              className={cn("min-w-0 cursor-pointer text-[12px] leading-4", item.isDone ? "text-muted-foreground opacity-60 line-through" : "text-foreground")}
             >
               {item.content}
             </label>
@@ -245,6 +246,7 @@ export function ChecklistPanel({ projectId, items, canEdit }: { projectId: strin
           )}
         </div>
       ))}
+      </div>
 
       {canEdit && <div className="flex gap-2 pt-2">
         <Input

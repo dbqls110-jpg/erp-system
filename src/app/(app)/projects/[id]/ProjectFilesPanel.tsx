@@ -107,15 +107,15 @@ export function ProjectFilesPanel({ projectId, files, canEdit }: Props) {
       {files.length === 0 ? (
         <p className="text-sm text-muted-foreground py-2">첨부된 파일이 없습니다.</p>
       ) : (
-        <ul className="space-y-2">
+        <ul className="divide-y divide-[#f0f0f0] rounded-[10px] border border-border dark:divide-border">
           {files.map((file) => (
-            <li key={file.id} className="flex items-center gap-3 p-2.5 rounded-lg border border-border bg-background hover:bg-muted/40 transition-colors">
-              <FileText size={16} className="text-muted-foreground shrink-0" />
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-foreground truncate">{file.name}</p>
-                <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <li key={file.id} className="flex items-center gap-2.5 px-4 py-[11px] transition-colors hover:bg-muted/40">
+              <FileText size={18} className="shrink-0 text-[#9ca3af]" />
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-[13px] font-medium text-foreground">{file.name}</p>
+                <p className="flex items-center gap-1.5 text-[11.5px] text-muted-foreground">
                   {file.category && (
-                    <Badge variant="outline" className={toneBadgeClass("blue")}>{file.category}</Badge>
+                    <Badge variant="outline" className={file.category === "금액 반영됨" ? toneBadgeClass("green") : toneBadgeClass("blue")}>{file.category}</Badge>
                   )}
                   {formatBytes(file.size)}
                 </p>
@@ -124,7 +124,7 @@ export function ProjectFilesPanel({ projectId, files, canEdit }: Props) {
                 href={file.driveUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-muted-foreground hover:text-primary transition-colors shrink-0"
+                className="shrink-0 text-muted-foreground transition-colors hover:text-primary"
                 title="Google Drive에서 열기"
               >
                 <ExternalLink size={15} />
@@ -133,7 +133,7 @@ export function ProjectFilesPanel({ projectId, files, canEdit }: Props) {
                 <button
                   onClick={() => handleDelete(file)}
                   disabled={isPending && deletingId === file.id}
-                  className="text-muted-foreground hover:text-destructive transition-colors shrink-0 disabled:opacity-50"
+                  className="shrink-0 text-muted-foreground transition-colors hover:text-destructive disabled:opacity-50"
                   title="삭제"
                 >
                   {isPending && deletingId === file.id ? (
@@ -168,7 +168,7 @@ export function ProjectFilesPanel({ projectId, files, canEdit }: Props) {
           size="sm"
           onClick={() => inputRef.current?.click()}
           disabled={isPending}
-          className="gap-2"
+          className="flex h-auto w-full flex-col gap-2 rounded-[10px] border-dashed border-[#d1d5db] py-3 text-[12px] text-muted-foreground hover:bg-muted/30 hover:text-foreground"
         >
           {isPending && !deletingId ? (
             <Loader2 size={14} className="animate-spin" />

@@ -33,7 +33,7 @@ export function MemoEditor({ projectId, memo, canEdit }: { projectId: string; me
   return (
     <div className="space-y-2">
       {!canEdit ? (
-        <p className="whitespace-pre-wrap text-sm text-foreground">
+        <p className="whitespace-pre-wrap text-[13px] leading-[1.6] text-foreground">
           {value || <span className="text-muted-foreground">메모 없음</span>}
         </p>
       ) : editing ? (
@@ -57,7 +57,7 @@ export function MemoEditor({ projectId, memo, canEdit }: { projectId: string; me
         </>
       ) : (
         <div className="flex items-start justify-between gap-2">
-          <p className="text-sm text-foreground whitespace-pre-wrap flex-1">
+          <p className="flex-1 whitespace-pre-wrap text-[13px] leading-[1.6] text-foreground">
             {value || <span className="text-muted-foreground">메모 없음</span>}
           </p>
           <Button size="sm" variant="ghost" onClick={() => setEditing(true)} className="gap-1 shrink-0 h-7 px-2">

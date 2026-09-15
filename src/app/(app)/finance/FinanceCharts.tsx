@@ -14,14 +14,14 @@ interface Props {
 export function FinanceCharts({ categoryData, dailyData, budget, plannedExpense, usagePercent }: Props) {
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <div className="grid grid-cols-1 gap-[14px] md:grid-cols-2">
       {/* 도넛 차트 */}
       {categoryData.length > 0 && (
-        <Card className="shadow-xs">
-          <CardHeader>
-            <CardTitle className="text-sm font-medium text-muted-foreground">카테고리별 지출</CardTitle>
+        <Card className="rounded-[12px] border border-border py-0 shadow-none">
+          <CardHeader className="border-b border-[#f0f0f0] px-4 py-3.5 dark:border-border">
+            <CardTitle className="text-[14px] font-semibold text-foreground">카테고리별 지출</CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="px-4 py-4">
             <div className="flex items-center gap-4">
               <ResponsiveContainer width={140} height={140}>
                 <PieChart>
@@ -60,11 +60,11 @@ export function FinanceCharts({ categoryData, dailyData, budget, plannedExpense,
 
       {/* 라인 차트 */}
       {dailyData.length > 0 && (
-        <Card className="shadow-xs">
-          <CardHeader>
-            <CardTitle className="text-sm font-medium text-muted-foreground">일별 지출 추이</CardTitle>
+        <Card className="rounded-[12px] border border-border py-0 shadow-none">
+          <CardHeader className="border-b border-[#f0f0f0] px-4 py-3.5 dark:border-border">
+            <CardTitle className="text-[14px] font-semibold text-foreground">일별 지출 추이</CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="px-4 py-4">
             <ResponsiveContainer width="100%" height={160}>
               <LineChart data={dailyData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e8e8e8" />

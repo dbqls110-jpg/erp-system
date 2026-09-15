@@ -49,7 +49,7 @@ export default async function ProjectsPage({
         </div>
         <div className="flex items-center gap-3 flex-wrap">
           <ProjectFilter current={currentFilter} />
-          <Link href="/projects/stats" className="flex h-9 items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-primary transition-colors border border-border rounded-lg px-3 py-2">
+          <Link href="/projects/stats" className="flex h-9 items-center gap-1.5 rounded-[10px] border border-border px-3.5 text-[13px] font-semibold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
             <BarChart2 className="size-3.5" /> 통계
           </Link>
           {canEdit && <ProjectCreateButton />}
@@ -57,8 +57,8 @@ export default async function ProjectsPage({
       </div>
 
       {projects.length === 0 ? (
-        <Card>
-          <CardContent>
+          <Card className="rounded-[12px] border border-border py-0 shadow-none">
+          <CardContent className="px-4">
             <div className="flex flex-col items-center gap-3 py-12 text-center">
               <FolderOpen className="size-6 text-muted-foreground" />
               <p className="text-sm text-muted-foreground">
@@ -69,15 +69,15 @@ export default async function ProjectsPage({
           </CardContent>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 gap-[14px] md:grid-cols-2 xl:grid-cols-3">
           {projects.map((p) => {
             const s = statusConfig[p.status] ?? statusConfig.active;
             return (
               <Link key={p.id} href={`/projects/${p.id}`}>
-                <Card className="shadow-xs hover:shadow-sm transition-shadow cursor-pointer h-full">
-                  <CardHeader className="pb-3">
+                <Card className="h-full rounded-[12px] border border-border py-0 shadow-none transition-all hover:border-[#d8d4fb] hover:shadow-sm">
+                  <CardHeader className="gap-[6px] px-[18px] pb-3 pt-4">
                     <div className="flex items-start justify-between gap-2">
-                      <CardTitle className="text-base font-semibold text-foreground line-clamp-1" style={{ fontFamily: "var(--font-plus-jakarta-sans)" }}>
+                      <CardTitle className="line-clamp-1 text-[14px] font-semibold text-foreground">
                         {p.name}
                       </CardTitle>
                       <div className="flex items-center gap-1 shrink-0">
@@ -85,18 +85,18 @@ export default async function ProjectsPage({
                         {isAdmin && <ProjectDeleteButton id={p.id} name={p.name} />}
                       </div>
                     </div>
-                    {p.client && <p className="text-sm text-muted-foreground">{p.client}</p>}
-                    {p.company && <p className="text-xs text-primary">귀속 회사 · {p.company}</p>}
+                    {p.client && <p className="text-[12px] text-muted-foreground">{p.client}</p>}
+                    {p.company && <p className="text-[11.5px] text-primary">귀속 회사 · {p.company}</p>}
                   </CardHeader>
-                  <CardContent className="space-y-3">
+                  <CardContent className="space-y-3 px-[18px] pb-4">
                     <div>
-                      <div className="flex justify-between text-xs text-muted-foreground mb-1">
+                      <div className="mb-1 flex justify-between text-[12px] text-muted-foreground">
                         <span>진행률</span>
                         <span>{p.progress}%</span>
                       </div>
                       <Progress value={p.progress} className="h-1.5" />
                     </div>
-                    <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                    <div className="flex items-center gap-4 text-[11.5px] text-muted-foreground">
                       {p.deadline && (
                         <span className="flex items-center gap-1">
                           <Calendar size={11} /> 마감 {p.deadline}

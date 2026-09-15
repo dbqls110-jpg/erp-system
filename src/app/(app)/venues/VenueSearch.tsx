@@ -1,20 +1,15 @@
 "use client";
 
-import { Fragment, useRef, useState } from "react";
+import { useRef, useState } from "react";
 
 import { VenueMap } from "@/components/map/VenueMap";
 import { VenueDetailDialog } from "./VenueDetailDialog";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { toneBadgeClass } from "@/lib/badge-tone";
+import { X } from "lucide-react";
 import type { MatchQuery } from "@/lib/venueMatch";
 
 type DayOfWeek = NonNullable<MatchQuery["dayOfWeek"]>;
@@ -126,14 +121,6 @@ const TRUST_LABEL: Record<ResolvedPriceView["trust"], string> = {
   unknown: "요금 미상",
 };
 
-function trustClass(trust: ResolvedPriceView["trust"]) {
-  return trust === "unreliable"
-    ? "text-destructive"
-    : trust === "confirmed"
-      ? "text-foreground"
-      : "text-muted-foreground";
-}
-
 /**
  * 신청 방법.
  *
@@ -180,6 +167,56 @@ function ReserveCell({ venue }: { venue: CandidateVenue }) {
     return <span className="text-muted-foreground">{method}</span>;
   }
   return <span className="text-muted-foreground">확인 필요</span>;
+}
+
+function trustTone(trust: ResolvedPriceView["trust"]) {
+  if (trust === "confirmed") return "green" as const;
+  if (trust === "estimated" || trust === "unreliable") return "amber" as const;
+  return "gray" as const;
+}
+
+function VenueResultCard({
+  venue,
+  warnings,
+  price,
+  selected,
+  onSelect,
+}: {
+  venue: CandidateVenue;
+  warnings: string[];
+  price: ResolvedPriceView;
+  selected: boolean;
+  onSelect: () => void;
+}) {
+  return (
+    <article className={`rounded-[12px] border bg-card px-4 py-3.5 transition-colors ${selected ? "border-[#7b68ee] shadow-[0_0_0_3px_#ede9fe] dark:shadow-[0_0_0_3px_rgba(123,104,238,0.25)]" : "border-border hover:border-[#d8d4fb]"}`}>
+      <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0 flex-1 space-y-1.5">
+          <div className="flex min-w-0 items-center gap-2">
+            <button type="button" onClick={onSelect} className="truncate text-left text-[14px] font-semibold text-foreground hover:text-primary hover:underline">
+              {displayValue(venue.name)}
+            </button>
+            <Badge variant="outline" className={`h-[22px] rounded-full px-2 text-[11.5px] font-semibold ${toneBadgeClass(trustTone(price.trust))}`}>
+              {TRUST_LABEL[price.trust]}
+            </Badge>
+          </div>
+          <p className="text-[12px] text-muted-foreground">{displayValue(venue.district)} · {displayValue(venue.type)}</p>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11.5px] text-muted-foreground">
+            <span>{venue.phone ? <a href={`tel:${venue.phone.replace(/[^\d+]/g, "")}`} className="hover:text-primary">{venue.phone}</a> : "연락처 미상"}</span>
+            <ReserveCell venue={venue} />
+          </div>
+          {warnings.length > 0 && <p className="text-[11.5px] text-muted-foreground">{warnings.join(" · ")}</p>}
+        </div>
+        <div className="flex shrink-0 flex-col items-start gap-1 sm:items-end">
+          <div className={`text-[15px] font-bold tabular-nums ${price.trust === "unknown" ? "text-[#9ca3af]" : "text-foreground"}`} style={{ fontFamily: "var(--font-plus-jakarta-sans)" }}>
+            {price.label}
+          </div>
+          <div className="text-[11.5px] text-[#9ca3af]">4시간 기준 · 정원 {displayCapacity(venue.capacityMin, venue.capacityMax)}</div>
+          {price.trust === "unknown" && <div className="text-[11px] text-[#b45309]">전화 확인 필요</div>}
+        </div>
+      </div>
+    </article>
+  );
 }
 
 export function VenueSearch({ districts, venueTypes }: VenueSearchProps) {
@@ -278,9 +315,9 @@ export function VenueSearch({ districts, venueTypes }: VenueSearchProps) {
         <p className="mt-1 text-sm text-muted-foreground">문의 조건에 맞는 대관 공간 후보를 찾아보세요</p>
       </div>
 
-      <Card className="shadow-xs">
-        <CardContent className="space-y-4 pt-(--card-spacing)">
-          <label className="block space-y-1.5 text-sm">
+      <Card className="rounded-[12px] border border-border py-0 shadow-none">
+        <CardContent className="space-y-4 px-[18px] py-4">
+          <label className="block space-y-1.5 text-[12px]">
             <span className="block text-muted-foreground">공간명</span>
             <Input
               value={form.name}
@@ -293,19 +330,19 @@ export function VenueSearch({ districts, venueTypes }: VenueSearchProps) {
           </label>
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            <label className="space-y-1.5 text-sm">
+            <label className="space-y-1.5 text-[12px]">
               <span className="block text-muted-foreground">인원</span>
               <Input type="number" min="1" value={form.people} onChange={(event) => setField("people", event.target.value)} placeholder="예: 100" />
             </label>
-            <label className="space-y-1.5 text-sm">
+            <label className="space-y-1.5 text-[12px]">
               <span className="block text-muted-foreground">예산(원)</span>
               <Input type="number" min="1" step="10000" value={form.budget} onChange={(event) => setField("budget", event.target.value)} placeholder="예: 1000000" />
             </label>
-            <label className="space-y-1.5 text-sm">
+            <label className="space-y-1.5 text-[12px]">
               <span className="block text-muted-foreground">필요 시간(시간)</span>
               <Input type="number" min="1" step="0.5" value={form.hours} onChange={(event) => setField("hours", event.target.value)} placeholder="예: 4" />
             </label>
-            <label className="space-y-1.5 text-sm">
+            <label className="space-y-1.5 text-[12px]">
               <span className="block text-muted-foreground">희망 요일</span>
               <select value={form.dayOfWeek} onChange={(event) => setField("dayOfWeek", event.target.value as FormState["dayOfWeek"])} className="h-9 w-full rounded-2xl border border-transparent bg-input/50 px-3 text-sm text-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/30">
                 <option value="">선택 안 함</option>
@@ -315,14 +352,14 @@ export function VenueSearch({ districts, venueTypes }: VenueSearchProps) {
                 <option value="공휴일">공휴일</option>
               </select>
             </label>
-            <label className="space-y-1.5 text-sm">
+            <label className="space-y-1.5 text-[12px]">
               <span className="block text-muted-foreground">지역(자치구)</span>
               <select value={form.district} onChange={(event) => setField("district", event.target.value)} className="h-9 w-full rounded-2xl border border-transparent bg-input/50 px-3 text-sm text-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/30">
                 <option value="전체">전체</option>
                 {districts.map((district) => <option key={district} value={district}>{district}</option>)}
               </select>
             </label>
-            <label className="space-y-1.5 text-sm">
+            <label className="space-y-1.5 text-[12px]">
               <span className="block text-muted-foreground">유형</span>
               <select value={form.type} onChange={(event) => setField("type", event.target.value)} className="h-9 w-full rounded-2xl border border-transparent bg-input/50 px-3 text-sm text-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/30">
                 <option value="전체">전체</option>
@@ -331,7 +368,7 @@ export function VenueSearch({ districts, venueTypes }: VenueSearchProps) {
             </label>
           </div>
 
-          <div className="flex flex-wrap gap-x-5 gap-y-2 text-sm">
+          <div className="flex flex-wrap gap-2">
             {([
               ["parking", "주차 필요"],
               ["hvac", "냉난방 필요"],
@@ -339,16 +376,17 @@ export function VenueSearch({ districts, venueTypes }: VenueSearchProps) {
               ["sound", "음향 필요"],
               ["commercial", "영리 목적 행사"],
             ] as const).map(([key, label]) => (
-              <label key={key} className="flex items-center gap-2">
-                <input type="checkbox" checked={form[key]} onChange={(event) => setField(key, event.target.checked)} className="size-4 rounded border-border accent-primary" />
-                {label}
+              <label key={key} className={`inline-flex h-[30px] items-center gap-1.5 rounded-full px-3 text-[12.5px] font-medium transition-colors ${form[key] ? "bg-[#7b68ee] text-white" : "border border-border text-[#4b5563] dark:text-muted-foreground"}`}>
+                <input type="checkbox" checked={form[key]} onChange={(event) => setField(key, event.target.checked)} className="sr-only" />
+                <span>{label}</span>
+                {form[key] && <X size={12} strokeWidth={2.5} aria-hidden="true" />}
               </label>
             ))}
           </div>
 
           <div className="flex flex-wrap justify-end gap-2">
-            <Button type="button" variant="outline" onClick={reset}>초기화</Button>
-            <Button type="button" onClick={() => void search(0)} disabled={isLoading}>
+            <Button type="button" variant="outline" onClick={reset} className="h-9 rounded-[10px] px-3.5 text-[13px] font-semibold">초기화</Button>
+            <Button type="button" onClick={() => void search(0)} disabled={isLoading} className="h-9 rounded-[10px] bg-[#202023] px-3.5 text-[13px] font-semibold text-white hover:bg-[#343438]">
               {isLoading ? "검색 중..." : "검색"}
             </Button>
           </div>
@@ -357,7 +395,7 @@ export function VenueSearch({ districts, venueTypes }: VenueSearchProps) {
       </Card>
 
       {result && (
-        <p className="text-sm">
+        <p className="text-[13px] text-muted-foreground">
           후보 <span className="font-semibold text-primary">{result.total.toLocaleString()}</span>곳 · 조건에 안 맞아 제외{" "}
           <span className="font-semibold">{result.blockedCount.toLocaleString()}</span>곳
           {result.total > 0 && (
@@ -371,87 +409,22 @@ export function VenueSearch({ districts, venueTypes }: VenueSearchProps) {
         </p>
       )}
 
-      <Card ref={tableRef} className="py-0 shadow-xs">
-        <CardContent className="p-0">
-          <div className="space-y-2 p-3 md:hidden">
-            {!result ? (
-              <p className="py-10 text-center text-sm text-muted-foreground">검색 조건을 입력하고 검색하세요.</p>
-            ) : result.candidates.length === 0 ? (
-              <p className="py-10 text-center text-sm text-muted-foreground">조건에 맞는 후보가 없습니다.</p>
-            ) : result.candidates.map(({ venue, warnings, price }) => (
-              <article key={venue.id} className="rounded-xl border border-border p-3">
-                <button type="button" onClick={() => setOpenVenueId(venue.id)} className="font-medium text-left hover:text-primary hover:underline">{displayValue(venue.name)}</button>
-                <p className="mt-1 text-xs text-muted-foreground">{displayValue(venue.district)} · {displayValue(venue.type)} · {displayCapacity(venue.capacityMin, venue.capacityMax)}</p>
-                <p className="mt-2 text-sm"><span className={trustClass(price.trust)}>{price.label}</span>{!price.free && <span className="ml-1 text-xs text-muted-foreground">({TRUST_LABEL[price.trust]})</span>}</p>
-                <div className="mt-2 text-xs text-muted-foreground">{venue.phone ? <a href={`tel:${venue.phone.replace(/[^\d+]/g, "")}`} className="hover:text-primary">{venue.phone}</a> : "연락처 미상"} · <ReserveCell venue={venue} /></div>
-                {warnings.length > 0 && <p className="mt-2 text-xs text-muted-foreground">{warnings.join(" · ")}</p>}
-              </article>
-            ))}
-          </div>
-          <div className="hidden overflow-x-auto md:block">
-            <p className="mb-2 text-xs text-muted-foreground md:hidden">표를 좌우로 밀어 더 많은 열을 볼 수 있습니다.</p>
-            <Table className="mx-auto w-auto table-auto [&_:is(th,td)]:px-4 [&_:is(th,td)]:py-3">
-              <TableHeader>
-                <TableRow>
-                  {/* 공간명은 긴 이름이 들어올 수 있어 남는 폭을 맡긴다. */}
-                  <TableHead className="w-full whitespace-nowrap">공간명</TableHead>
-                  <TableHead className="whitespace-nowrap">자치구</TableHead>
-                  <TableHead className="whitespace-nowrap">유형</TableHead>
-                  <TableHead className="whitespace-nowrap text-right">정원</TableHead>
-                  <TableHead className="whitespace-nowrap text-right">요금 (4시간 기준)</TableHead>
-                  <TableHead className="whitespace-nowrap">전화</TableHead>
-                  <TableHead className="whitespace-nowrap">신청 방법</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {!result ? (
-                  <TableRow>
-                    <TableCell colSpan={7} className="py-12 text-center text-sm text-muted-foreground">검색 조건을 입력하고 검색하세요.</TableCell>
-                  </TableRow>
-                ) : result.candidates.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={7} className="py-12 text-center text-sm text-muted-foreground">조건에 맞는 후보가 없습니다. 제외 사유를 확인하거나 조건을 완화해 보세요.</TableCell>
-                  </TableRow>
-                ) : (
-                  result.candidates.map(({ venue, warnings, price }) => (
-                    <Fragment key={venue.id}>
-                      <TableRow>
-                        <TableCell className="font-medium">
-                          <button
-                            type="button"
-                            onClick={() => setOpenVenueId(venue.id)}
-                            className="text-left hover:text-primary hover:underline"
-                          >
-                            {displayValue(venue.name)}
-                          </button>
-                        </TableCell>
-                        <TableCell>{displayValue(venue.district)}</TableCell>
-                        <TableCell>{displayValue(venue.type)}</TableCell>
-                        <TableCell className="whitespace-nowrap text-right tabular-nums">{displayCapacity(venue.capacityMin, venue.capacityMax)}</TableCell>
-                        <TableCell className="whitespace-nowrap text-right tabular-nums">
-                          <span className={trustClass(price.trust)}>{price.label}</span>
-                          {!price.free && (
-                            <span className="ml-1 text-xs text-muted-foreground">({TRUST_LABEL[price.trust]})</span>
-                          )}
-                        </TableCell>
-                        <TableCell className="whitespace-nowrap">
-                          {venue.phone ? <a href={`tel:${venue.phone.replace(/[^\d+]/g, "")}`} className="hover:text-primary">{venue.phone}</a> : "미상"}
-                        </TableCell>
-                        <TableCell className="whitespace-nowrap">
-                          <ReserveCell venue={venue} />
-                        </TableCell>
-                      </TableRow>
-                      {warnings.length > 0 && (
-                        <TableRow>
-                          <TableCell colSpan={7} className="border-0 py-1.5 text-xs text-muted-foreground">{warnings.join(" · ")}</TableCell>
-                        </TableRow>
-                      )}
-                    </Fragment>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
+      <Card ref={tableRef} className="rounded-[12px] border border-border py-0 shadow-none">
+        <CardContent className="space-y-2 p-3">
+          {!result ? (
+            <p className="py-10 text-center text-[12px] text-muted-foreground">검색 조건을 입력하고 검색하세요.</p>
+          ) : result.candidates.length === 0 ? (
+            <p className="py-10 text-center text-[12px] text-muted-foreground">조건에 맞는 후보가 없습니다. 제외 사유를 확인하거나 조건을 완화해 보세요.</p>
+          ) : result.candidates.map(({ venue, warnings, price }) => (
+            <VenueResultCard
+              key={venue.id}
+              venue={venue}
+              warnings={warnings}
+              price={price}
+              selected={openVenueId === venue.id}
+              onSelect={() => setOpenVenueId(venue.id)}
+            />
+          ))}
         </CardContent>
       </Card>
 

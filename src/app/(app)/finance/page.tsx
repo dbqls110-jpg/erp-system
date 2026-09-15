@@ -17,7 +17,7 @@ import { FixedExpensePanel } from "./FixedExpensePanel";
 import { calculateBudgetMetrics } from "@/lib/financeMetrics";
 import { FinanceTabs } from "./FinanceTabs";
 import { NetIncomeTable } from "./NetIncomeTable";
-import { fixedExpenseMonthWhere, monthKey } from "@/lib/fixedExpenseMonths";
+import { fixedExpenseMonthWhere, monthKey, previousMonthKey } from "@/lib/fixedExpenseMonths";
 
 const categoryLabel: Record<string, string> = {
   rent: "임차료", salary: "인건비", telecom: "통신비",
@@ -60,11 +60,17 @@ export default async function FinancePage({
   const month = params.month ? parseInt(params.month) : now.getMonth() + 1;
   const monthStr = String(month).padStart(2, "0");
   const viewMonth = monthKey(year, month);
+  const previousViewMonth = previousMonthKey(viewMonth);
+  const [previousYearText, previousMonthText] = previousViewMonth.split("-");
+  const previousYear = Number(previousYearText);
+  const previousMonth = Number(previousMonthText);
 
   const daysInMonth = new Date(year, month, 0).getDate();
   const monthEnd = `${year}-${monthStr}-${String(daysInMonth).padStart(2, "0")}`;
+  const previousDaysInMonth = new Date(previousYear, previousMonth, 0).getDate();
+  const previousMonthEnd = `${previousViewMonth}-${String(previousDaysInMonth).padStart(2, "0")}`;
 
-  const [budget, expenses, fixedExpenses, projects] = await Promise.all([
+  const [budget, expenses, fixedExpenses, projects, previousBudget, previousExpenses, previousFixedExpenses] = await Promise.all([
     prisma.budget.findUnique({ where: { year_month: { year, month } } }),
     prisma.expense.findMany({
       where: { date: { gte: `${year}-${monthStr}-01`, lte: monthEnd } },
@@ -77,6 +83,15 @@ export default async function FinancePage({
     prisma.project.findMany({
       select: { id: true, name: true, revenue: true, cost: true },
       orderBy: { createdAt: "desc" },
+    }),
+    prisma.budget.findUnique({ where: { year_month: { year: previousYear, month: previousMonth } }, select: { amount: true } }),
+    prisma.expense.findMany({
+      where: { date: { gte: `${previousViewMonth}-01`, lte: previousMonthEnd } },
+      select: { amount: true, fixedExpenseId: true },
+    }),
+    prisma.fixedExpense.findMany({
+      where: fixedExpenseMonthWhere(previousViewMonth),
+      select: { amount: true },
     }),
   ]);
 
@@ -97,6 +112,11 @@ export default async function FinancePage({
 
   // 카드·차트 공통 기준: 납부 여부와 관계없이 해당 월 고정비 전체 + 기타 지출.
   const budgetMetrics = calculateBudgetMetrics(budget?.amount ?? null, totalFixed, totalOther);
+  const previousFixedTotal = previousFixedExpenses.reduce((sum, expense) => sum + expense.amount, 0);
+  const previousOtherTotal = previousExpenses
+    .filter((expense) => expense.fixedExpenseId === null)
+    .reduce((sum, expense) => sum + expense.amount, 0);
+  const previousBudgetMetrics = calculateBudgetMetrics(previousBudget?.amount ?? null, previousFixedTotal, previousOtherTotal);
 
   // 카테고리별 집계 (실지출 + 미납부 고정비 포함)
   const byCategory = expenses.reduce((acc, e) => {
@@ -140,52 +160,57 @@ export default async function FinancePage({
         budget={
           <div className="space-y-4">
       {/* 요약 카드 */}
-      <div className="grid grid-cols-1 gap-4 @xl/main:grid-cols-2 @5xl/main:grid-cols-4">
-        <Card className="@container/card h-full shadow-xs">
-          <CardHeader>
-            <CardDescription>이번 달 예산</CardDescription>
-            <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">{budget ? `${budget.amount.toLocaleString()}원` : "미설정"}</CardTitle>
+      <div className="grid grid-cols-1 gap-[14px] @xl/main:grid-cols-2 @5xl/main:grid-cols-4">
+        <Card className="@container/card h-full rounded-[12px] border border-border py-0 shadow-none dark:bg-card">
+          <CardHeader className="gap-[6px] px-[18px] py-4">
+            <CardDescription className="text-[12px]">이번 달 예산</CardDescription>
+            <CardTitle className="text-[26px] font-bold leading-tight tracking-[-0.01em] tabular-nums" style={{ fontFamily: "var(--font-plus-jakarta-sans)" }}>{budget ? `${budget.amount.toLocaleString()}원` : "미설정"}</CardTitle>
           </CardHeader>
         </Card>
-        <Card className="@container/card h-full shadow-xs">
-          <CardHeader>
-            <CardDescription>고정비</CardDescription>
-            <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">{totalFixed.toLocaleString()}원</CardTitle>
+        <Card className="@container/card h-full rounded-[12px] border border-border py-0 shadow-none dark:bg-card">
+          <CardHeader className="gap-[6px] px-[18px] py-4">
+            <CardDescription className="text-[12px]">고정비</CardDescription>
+            <CardTitle className="text-[26px] font-bold leading-tight tracking-[-0.01em] tabular-nums" style={{ fontFamily: "var(--font-plus-jakarta-sans)" }}>{totalFixed.toLocaleString()}원</CardTitle>
           </CardHeader>
-          <CardContent>
-            <p className="text-xs text-muted-foreground mt-1">{paidFixedCount}/{fixedExpenses.length}건 납부</p>
+          <CardContent className="px-[18px] pb-4 pt-0">
+            <p className="text-[12px] leading-4 text-muted-foreground">{paidFixedCount}/{fixedExpenses.length}건 납부</p>
           </CardContent>
         </Card>
-        <Card className="@container/card h-full shadow-xs">
-          <CardHeader>
-            <CardDescription>기타 지출</CardDescription>
-            <CardTitle className={`text-2xl font-semibold tabular-nums @[250px]/card:text-3xl ${totalOther > 0 ? "text-destructive" : "text-foreground"}`}>{totalOther.toLocaleString()}원</CardTitle>
+        <Card className="@container/card h-full rounded-[12px] border border-border py-0 shadow-none dark:bg-card">
+          <CardHeader className="gap-[6px] px-[18px] py-4">
+            <CardDescription className="text-[12px]">기타 지출</CardDescription>
+            <CardTitle className={`text-[26px] font-bold leading-tight tracking-[-0.01em] tabular-nums ${totalOther > 0 ? "text-destructive" : "text-foreground"}`} style={{ fontFamily: "var(--font-plus-jakarta-sans)" }}>{totalOther.toLocaleString()}원</CardTitle>
           </CardHeader>
-          <CardContent>
-            {budget && <p className="text-xs text-muted-foreground mt-1">예산의 {budgetMetrics.usagePercent}% 소진 (고정비 포함)</p>}
+          <CardContent className="px-[18px] pb-4 pt-0">
+            {budget && <p className="text-[12px] leading-4 text-muted-foreground">예산의 {budgetMetrics.usagePercent}% 소진 (고정비 포함)</p>}
           </CardContent>
         </Card>
-        <Card className="@container/card h-full shadow-xs">
-          <CardHeader>
-            <CardDescription>잔여 예산</CardDescription>
-            <CardTitle className={`text-2xl font-semibold tabular-nums @[250px]/card:text-3xl ${budgetMetrics.remaining !== null && budgetMetrics.remaining < 0 ? "text-destructive" : "text-primary"}`}>
+        <Card className="@container/card h-full rounded-[12px] border border-border py-0 shadow-none dark:bg-card">
+          <CardHeader className="gap-[6px] px-[18px] py-4">
+            <CardDescription className="text-[12px]">잔여 예산</CardDescription>
+            <CardTitle className={`text-[26px] font-bold leading-tight tracking-[-0.01em] tabular-nums ${budgetMetrics.remaining !== null && budgetMetrics.remaining < 0 ? "text-destructive" : "text-primary"}`} style={{ fontFamily: "var(--font-plus-jakarta-sans)" }}>
               {budgetMetrics.remaining !== null ? `${budgetMetrics.remaining.toLocaleString()}원` : "미설정"}
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            {budgetMetrics.remaining !== null && <p className="text-xs text-muted-foreground mt-1">고정비 포함 차감</p>}
+          <CardContent className="px-[18px] pb-4 pt-0">
+            {budgetMetrics.remaining !== null && <p className="text-[12px] leading-4 text-muted-foreground">고정비 포함 차감</p>}
           </CardContent>
         </Card>
       </div>
 
+      <p className="text-[11.5px] text-muted-foreground">
+        <span className="mr-2 font-medium text-foreground">{previousMonth}월 마감</span>
+        예산 {previousBudget?.amount.toLocaleString() ?? "미설정"} · 고정비 {previousFixedTotal.toLocaleString()} · 지출 {previousOtherTotal.toLocaleString()} · 잔액 {previousBudgetMetrics.remaining?.toLocaleString() ?? "미설정"}
+      </p>
+
       {/* 고정비 */}
-      <Card className="shadow-xs">
-        <CardHeader>
-          <CardTitle className="text-base font-semibold text-foreground" style={{ fontFamily: "var(--font-plus-jakarta-sans)" }}>
+      <Card className="rounded-[12px] border border-border py-0 shadow-none">
+        <CardHeader className="border-b border-[#f0f0f0] px-4 py-3.5 dark:border-border">
+          <CardTitle className="text-[14px] font-semibold text-foreground">
             고정비 ({fixedExpenses.filter(f => checkedFixedIds.has(f.id)).length}/{fixedExpenses.length} 납부)
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-4 py-4">
           <FixedExpensePanel
             items={fixedExpenses}
             checkedIds={checkedFixedIds}
@@ -208,13 +233,13 @@ export default async function FinancePage({
       )}
 
       {/* 지출 내역 */}
-      <Card className="shadow-xs">
-        <CardHeader>
-          <CardTitle className="text-base font-semibold text-foreground" style={{ fontFamily: "var(--font-plus-jakarta-sans)" }}>
+      <Card className="rounded-[12px] border border-border py-0 shadow-none">
+        <CardHeader className="border-b border-[#f0f0f0] px-4 py-3.5 dark:border-border">
+          <CardTitle className="text-[14px] font-semibold text-foreground">
             지출 내역
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-4 py-4">
           {expenses.length === 0 ? (
             <div className="flex flex-col items-center gap-3 py-12 text-center">
               <ReceiptText className="size-6 text-muted-foreground" aria-hidden="true" />
@@ -223,12 +248,12 @@ export default async function FinancePage({
           ) : (
             <div className="space-y-1">
               {expenses.map((e) => (
-                <div key={e.id} className="flex items-center justify-between py-2 border-b border-border last:border-0 text-sm">
-                  <div className="flex items-center gap-3">
-                    <span className="text-muted-foreground w-16">{e.date.slice(5)}</span>
-                    <span className="font-medium text-foreground">{e.title}</span>
+                <div key={e.id} className="flex items-center justify-between gap-3 border-b border-[#f0f0f0] py-3 text-[12px] last:border-0 dark:border-border">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <span className="w-16 shrink-0 text-muted-foreground">{e.date.slice(5)}</span>
+                    <span className="truncate font-medium text-foreground">{e.title}</span>
                     <Badge variant="outline" className={toneBadgeClass("blue")}>{categoryLabel[e.category]}</Badge>
-                    {e.memo && <span className="text-muted-foreground text-xs truncate max-w-xs">{e.memo}</span>}
+                    {e.memo && <span className="max-w-xs truncate text-[11.5px] text-muted-foreground">{e.memo}</span>}
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="font-medium">{e.amount.toLocaleString()}원</span>

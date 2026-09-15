@@ -16,11 +16,12 @@ import { ProjectAmountsPanel } from "./ProjectAmountsPanel";
 import { Calendar, User, Building, ChevronRight, TrendingUp, TrendingDown } from "lucide-react";
 import Link from "next/link";
 import { calculateNetIncome, calculateOperatingProfit } from "@/lib/financeMetrics";
+import { toneBadgeClass } from "@/lib/badge-tone";
 
 const statusConfig: Record<string, { label: string; class: string }> = {
-  active: { label: "진행 중", class: "bg-primary/10 text-primary border-primary/20" },
-  completed: { label: "완료", class: "bg-green-50 text-green-700 border-green-200" },
-  on_hold: { label: "보류", class: "bg-yellow-50 text-yellow-700 border-yellow-200" },
+  active: { label: "진행 중", class: toneBadgeClass("blue") },
+  completed: { label: "완료", class: toneBadgeClass("green") },
+  on_hold: { label: "보류", class: toneBadgeClass("amber") },
 };
 
 export default async function ProjectDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -54,7 +55,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
   const netIncome = calculateNetIncome(project.revenue, project.cost);
 
   return (
-    <div className="space-y-4 max-w-3xl">
+    <div className="max-w-5xl space-y-4">
       {/* 브레드크럼 */}
       <nav className="flex items-center gap-1.5 text-sm text-muted-foreground">
         <Link href="/projects" className="hover:text-foreground transition-colors">프로젝트</Link>
@@ -68,15 +69,15 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
             <h1 className="text-xl font-semibold tracking-tight text-foreground">
               {project.name}
             </h1>
-            <Badge variant="outline" className={s.class}>{s.label}</Badge>
           </div>
-          <div className="flex items-center gap-4 text-sm text-muted-foreground flex-wrap">
+          <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-[12px] border border-border bg-card px-4 py-3 text-[12px] text-muted-foreground shadow-none">
+            <Badge variant="outline" className={s.class}>{s.label}</Badge>
             {project.client && <span className="flex items-center gap-1"><Building size={13} />{project.client}</span>}
             {project.company && <span className="flex items-center gap-1"><Building size={13} />귀속 회사 {project.company}</span>}
             {project.assignee && <span className="flex items-center gap-1"><User size={13} />{project.assignee}</span>}
             {project.deadline && <span className="flex items-center gap-1"><Calendar size={13} />마감 {project.deadline}</span>}
             {project.revenue != null && (
-              <span className="flex items-center gap-1 text-green-600">
+              <span className="flex items-center gap-1 text-[#15803d] dark:text-emerald-400">
                 <TrendingUp size={13} />매출 {project.revenue.toLocaleString()}원
               </span>
             )}
@@ -86,7 +87,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
               </span>
             )}
             {operatingProfit !== null && (
-              <span className={`flex items-center gap-1 font-medium ${operatingProfit >= 0 ? "text-primary" : "text-destructive"}`}>
+                <span className={`flex items-center gap-1 font-medium ${operatingProfit >= 0 ? "text-primary" : "text-destructive"}`}>
                 영업이익 {operatingProfit.toLocaleString()}원
               </span>
             )}
@@ -104,8 +105,8 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
       </div>
 
       {/* 진행률 */}
-      <Card className="shadow-xs">
-        <CardContent className="pt-4">
+      <Card className="rounded-[12px] border border-border py-0 shadow-none">
+        <CardContent className="px-4 py-3.5">
           <div className="flex justify-between text-sm mb-2">
             <span className="font-medium text-foreground">전체 진행률</span>
             <span className="font-bold text-primary">{project.progress}%</span>
@@ -115,25 +116,25 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
       </Card>
 
       {/* 매출 · 매입 건별 관리 */}
-      <Card className="shadow-xs">
-        <CardHeader>
-          <CardTitle className="text-base font-semibold text-foreground" style={{ fontFamily: "var(--font-plus-jakarta-sans)" }}>
+      <Card className="rounded-[12px] border border-border py-0 shadow-none">
+        <CardHeader className="border-b border-[#f0f0f0] px-4 py-3.5 dark:border-border">
+          <CardTitle className="text-[14px] font-semibold text-foreground">
             매출 · 매입
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-4 py-4">
           <ProjectAmountsPanel projectId={project.id} amounts={project.amounts} canEdit={canEdit} />
         </CardContent>
       </Card>
 
       {/* 거래처 · 파트너 연결 */}
-      <Card className="shadow-xs">
-        <CardHeader>
-          <CardTitle className="text-base font-semibold text-foreground" style={{ fontFamily: "var(--font-plus-jakarta-sans)" }}>
+      <Card className="rounded-[12px] border border-border py-0 shadow-none">
+        <CardHeader className="border-b border-[#f0f0f0] px-4 py-3.5 dark:border-border">
+          <CardTitle className="text-[14px] font-semibold text-foreground">
             거래처 · 파트너
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-4 py-4">
           <ProjectLinksPanel
             projectId={project.id}
             customers={project.customers.map((pc) => pc.customer)}
@@ -146,35 +147,38 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
       </Card>
 
       {/* 체크리스트 */}
-      <Card className="shadow-xs">
-        <CardHeader>
-          <CardTitle className="text-base font-semibold text-foreground" style={{ fontFamily: "var(--font-plus-jakarta-sans)" }}>
+      <Card className="rounded-[12px] border border-border py-0 shadow-none">
+        <CardHeader className="border-b border-[#f0f0f0] px-4 py-3.5 dark:border-border">
+          <div className="flex items-center justify-between gap-4">
+            <CardTitle className="text-[14px] font-semibold text-foreground">
             체크리스트 ({project.checklistItems.filter(i => i.isDone).length}/{project.checklistItems.length})
-          </CardTitle>
+            </CardTitle>
+            <Progress value={project.checklistItems.length === 0 ? 0 : (project.checklistItems.filter(i => i.isDone).length / project.checklistItems.length) * 100} className="w-36 shrink-0" />
+          </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-4 py-4">
           <ChecklistPanel projectId={project.id} items={project.checklistItems} canEdit={canEdit} />
         </CardContent>
       </Card>
 
       {/* 파일 */}
-      <Card className="shadow-xs">
-        <CardHeader>
-          <CardTitle className="text-base font-semibold text-foreground" style={{ fontFamily: "var(--font-plus-jakarta-sans)" }}>
+      <Card className="rounded-[12px] border border-border py-0 shadow-none">
+        <CardHeader className="border-b border-[#f0f0f0] px-4 py-3.5 dark:border-border">
+          <CardTitle className="text-[14px] font-semibold text-foreground">
             파일 ({project.files.length})
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-4 py-4">
           <ProjectFilesPanel projectId={project.id} files={project.files} canEdit={canEdit} />
         </CardContent>
       </Card>
 
       {/* 메모 */}
-      <Card className="shadow-xs">
-        <CardHeader>
-          <CardTitle className="text-base font-semibold text-foreground" style={{ fontFamily: "var(--font-plus-jakarta-sans)" }}>메모</CardTitle>
+      <Card className="rounded-[12px] border border-border py-0 shadow-none">
+        <CardHeader className="border-b border-[#f0f0f0] px-4 py-3.5 dark:border-border">
+          <CardTitle className="text-[14px] font-semibold text-foreground">메모</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-4 py-4">
           <MemoEditor projectId={project.id} memo={project.memo} canEdit={canEdit} />
         </CardContent>
       </Card>

@@ -38,7 +38,7 @@ export function CompanyFinanceEntryForm({ defaultDate }: { defaultDate: string }
 
   return (
     <>
-      <Button type="button" onClick={() => setOpen(true)} className="h-9 gap-1.5">
+      <Button type="button" onClick={() => setOpen(true)} className="h-9 gap-1.5 rounded-[10px] bg-[#202023] px-3.5 text-[13px] font-semibold text-white hover:bg-[#343438]">
         <Plus size={15} aria-hidden="true" />
         매출·매입 등록
       </Button>

@@ -15,6 +15,7 @@ import { CompanyFinanceYearNav } from "./CompanyFinanceYearNav";
 import { CompanyFinanceEntryForm } from "./CompanyFinanceEntryForm";
 import { CompanyFinanceEntryDeleteButton } from "./CompanyFinanceEntryDeleteButton";
 import { currentKoreanDateKey, koreanDateKey } from "@/lib/dateFormat";
+import { toneBadgeClass } from "@/lib/badge-tone";
 
 function formatWon(value: number) {
   return `${value.toLocaleString()}원`;
@@ -125,30 +126,30 @@ export default async function CompanyFinancePage({
       </div>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <Card className="shadow-xs">
-          <CardHeader className="pb-2">
-            <CardDescription>전체 매출</CardDescription>
-            <CardTitle className="text-2xl tabular-nums text-primary">{formatWon(totalRevenue)}</CardTitle>
+        <Card className="rounded-[12px] border border-border py-0 shadow-none">
+          <CardHeader className="gap-[6px] px-[18px] py-4">
+            <CardDescription className="text-[12px]">전체 매출</CardDescription>
+            <CardTitle className="text-[26px] font-bold leading-tight tracking-[-0.01em] tabular-nums text-primary" style={{ fontFamily: "var(--font-plus-jakarta-sans)" }}>{formatWon(totalRevenue)}</CardTitle>
           </CardHeader>
         </Card>
-        <Card className="shadow-xs">
-          <CardHeader className="pb-2">
-            <CardDescription>전체 매입</CardDescription>
-            <CardTitle className="text-2xl tabular-nums text-destructive">{formatWon(totalCost)}</CardTitle>
+        <Card className="rounded-[12px] border border-border py-0 shadow-none">
+          <CardHeader className="gap-[6px] px-[18px] py-4">
+            <CardDescription className="text-[12px]">전체 매입</CardDescription>
+            <CardTitle className="text-[26px] font-bold leading-tight tracking-[-0.01em] tabular-nums text-destructive" style={{ fontFamily: "var(--font-plus-jakarta-sans)" }}>{formatWon(totalCost)}</CardTitle>
           </CardHeader>
         </Card>
-        <Card className="shadow-xs">
-          <CardHeader className="pb-2">
-            <CardDescription>전체 순이익</CardDescription>
-            <CardTitle className={`text-2xl tabular-nums ${metricClass(totalProfit)}`}>{formatWon(totalProfit)}</CardTitle>
+        <Card className="rounded-[12px] border border-border py-0 shadow-none">
+          <CardHeader className="gap-[6px] px-[18px] py-4">
+            <CardDescription className="text-[12px]">전체 순이익</CardDescription>
+            <CardTitle className={`text-[26px] font-bold leading-tight tracking-[-0.01em] tabular-nums ${metricClass(totalProfit)}`} style={{ fontFamily: "var(--font-plus-jakarta-sans)" }}>{formatWon(totalProfit)}</CardTitle>
           </CardHeader>
         </Card>
       </div>
 
       <div className="grid grid-cols-1 gap-3 xl:grid-cols-3">
         {summaries.map((summary) => (
-          <Card key={summary.company} className="shadow-xs">
-            <CardHeader className="border-b border-border pb-3">
+          <Card key={summary.company} className="rounded-[12px] border border-border py-0 shadow-none">
+            <CardHeader className="border-b border-[#f0f0f0] px-4 py-3.5 dark:border-border">
               <div className="flex items-center justify-between gap-2">
                 <CardTitle className="flex items-center gap-2 text-base">
                   <Building2 className="size-4 text-primary" aria-hidden="true" />
@@ -194,7 +195,7 @@ export default async function CompanyFinancePage({
                 <span>매입 {formatWon(unassigned.cost)}</span>
               </div>
             </CardHeader>
-            <CardContent className="pt-3">
+            <CardContent className="px-4 py-3">
               <div className={`text-sm font-semibold ${metricClass(unassigned.profit)}`}>
                 이익 {formatWon(unassigned.profit)}
               </div>
@@ -203,8 +204,8 @@ export default async function CompanyFinancePage({
         )}
       </div>
 
-      <Card className="shadow-xs">
-        <CardHeader className="border-b border-border pb-3">
+          <Card className="rounded-[12px] border border-border py-0 shadow-none">
+            <CardHeader className="border-b border-[#f0f0f0] px-4 py-3.5 dark:border-border">
           <div className="flex items-center justify-between gap-2">
             <div>
               <CardTitle className="text-base">{year}년 등록 내역</CardTitle>
@@ -213,7 +214,7 @@ export default async function CompanyFinancePage({
             <Badge variant="outline">{displayItems.length}건</Badge>
           </div>
         </CardHeader>
-        <CardContent className="pt-3">
+            <CardContent className="px-4 py-3">
           {displayItems.length === 0 ? (
             <p className="py-8 text-center text-sm text-muted-foreground">등록된 회사 매출·매입 내역이 없습니다.</p>
           ) : (
@@ -224,7 +225,7 @@ export default async function CompanyFinancePage({
                   <div key={`${item.source}-${item.id}`} className="flex flex-wrap items-center justify-between gap-3 py-3 first:pt-0 last:pb-0">
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
-                        <Badge variant="outline" className={isRevenue ? "border-primary/30 text-primary" : "border-destructive/30 text-destructive"}>
+                        <Badge variant="outline" className={isRevenue ? toneBadgeClass("green") : toneBadgeClass("red")}>
                           {isRevenue ? "매출" : "매입"}
                         </Badge>
                         <span className="text-xs text-muted-foreground">{item.company ?? "미배정"}</span>

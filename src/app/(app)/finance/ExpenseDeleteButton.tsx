@@ -27,7 +27,7 @@ export function ExpenseDeleteButton({ id, title }: { id: string; title: string }
     <>
       <button
         onClick={() => setOpen(true)}
-        className="text-muted-foreground hover:text-destructive transition-colors"
+        className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-destructive"
       >
         <Trash2 size={14} />
       </button>
@@ -48,7 +48,7 @@ export function ExpenseDeleteButton({ id, title }: { id: string; title: string }
             </Button>
             <Button
               size="sm"
-              className="bg-red-500 hover:bg-red-600 text-white"
+              className="rounded-[10px] bg-[#202023] text-white hover:bg-[#343438]"
               onClick={handleDelete}
               disabled={pending}
             >

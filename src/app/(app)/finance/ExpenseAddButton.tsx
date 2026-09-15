@@ -34,7 +34,7 @@ export function ExpenseAddButton({ initialDate }: { initialDate: string }) {
 
   return (
     <>
-      <Button onClick={() => setOpen(true)} className="gap-2 bg-dark-onyx text-white hover:bg-muted" style={{ borderRadius: "9px" }}>
+      <Button onClick={() => setOpen(true)} className="h-9 gap-2 rounded-[10px] bg-[#202023] px-3.5 text-[13px] font-semibold text-white hover:bg-[#343438]">
         <Plus size={16} /> 지출 입력
       </Button>
       <Dialog open={open} onOpenChange={setOpen}>
@@ -75,7 +75,7 @@ export function ExpenseAddButton({ initialDate }: { initialDate: string }) {
             </div>
             <div className="flex gap-2 justify-end">
               <Button type="button" variant="outline" onClick={() => setOpen(false)}>취소</Button>
-              <Button type="submit" disabled={loading} className="bg-dark-onyx text-white" style={{ borderRadius: "9px" }}>
+              <Button type="submit" disabled={loading} className="rounded-[10px] bg-[#202023] text-white hover:bg-[#343438]">
                 {loading ? "등록 중..." : "등록"}
               </Button>
             </div>
