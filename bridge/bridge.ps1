@@ -65,6 +65,18 @@ if ($CodexExe -like "*.ps1") {
     if (Test-Path -LiteralPath $cmdWrapper) { $CodexExe = $cmdWrapper }
 }
 $CodexVersion = (& codex --version 2>&1 | Select-Object -First 1)
+# 로그인 상태를 시작할 때 한 번 적어 둔다. 토큰은 출력되지 않는다 — "Logged in using ChatGPT"
+# 또는 "Not logged in" 한 줄이다. 예약 작업 안에서 Codex 가 로그인이 풀린 채 도는 일이
+# 실제로 있었고(업그레이드 뒤), 그때 로그에는 OpenAI 401 만 남아 어느 구간인지 한참 헤맸다.
+try {
+    $loginStatus = (& codex login status 2>&1 | Select-Object -First 1)
+    Write-Log "codex 로그인 상태: $loginStatus"
+    if ("$loginStatus" -match "Not logged in|not logged") {
+        Write-Log "Codex 가 로그인돼 있지 않습니다. 이 PC 에서 'codex login' 을 실행하세요. 브라우저를 못 여는 자리면 'codex login --device-auth'." "ERROR"
+    }
+} catch {
+    Write-Log "codex 로그인 상태를 읽지 못했습니다: $($_.Exception.Message)" "WARN"
+}
 Write-Log "브릿지 시작 | agentType=$AgentType | $CodexVersion | model=$Model effort=$Effort"
 
 $Headers = @{ "Authorization" = "Bearer $ApiKey" }
@@ -172,6 +184,11 @@ function Repair-CodexModelsCache {
 function Get-CodexErrorHint {
     param([string]$Stderr)
     $lines = $Stderr -split "`n" | ForEach-Object { $_.Trim() } | Where-Object { $_ }
+    # OpenAI 가 돌려주는 401 문구. 우리 서버는 "Unauthorized" 라고만 하므로 이 문구가 보이면
+    # Codex → OpenAI 구간이고, 뜻은 하나다 — 이 PC 의 Codex 로그인이 풀렸다.
+    if ($Stderr -match "401|Missing bearer|basic authentication") {
+        return "Codex 로그인이 풀렸습니다. 회사 PC 에서 'codex login' (브라우저를 못 열면 'codex login --device-auth') 을 실행한 뒤 브리지를 다시 시작하세요."
+    }
     $err = $lines | Where-Object { $_ -match "ERROR|error:|Error:" } | Select-Object -First 1
     if ($err) {
         $err = $err -replace "^\S+Z\s+ERROR\s+\S+:\s*", ""   # 시각·모듈 접두어 제거
