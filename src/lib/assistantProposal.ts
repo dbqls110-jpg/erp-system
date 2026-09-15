@@ -1,6 +1,9 @@
 import { FILE_CATEGORIES } from "@/lib/fileCategory";
 import { LIMITS, sanitizeSheetTitle } from "@/lib/sheetLimits";
 import { COMPANY_NAMES, type CompanyName } from "@/lib/companyFinance";
+import { INQUIRY_STAGES, type InquiryStage } from "@/lib/inquiries";
+import { SPACE_REGISTRATION_STAGES, type SpaceRegistrationStage } from "@/lib/spaceRegistrations";
+import { SPACE_RENTAL_STAGES, type SpaceRentalStage } from "@/lib/spaceRentals";
 
 /**
  * AI 가 내놓은 변경 제안을 검사하고 실제로 적용한다.
@@ -69,6 +72,82 @@ export const EDITABLE_FIELDS = {
   project_amount: {
     entries: "매출·매입 건",
   },
+  inquiry_move: {
+    branch: "문의 갈래",
+    stage: "단계",
+  },
+  inquiry_memo: {
+    branch: "문의 갈래",
+    memo: "메모",
+  },
+  customer_create: {
+    name: "거래처명",
+    manager: "담당자",
+    phone: "연락처",
+    email: "이메일",
+    category: "분류",
+    industry: "업종",
+    status: "상태",
+    memo: "메모",
+  },
+  customer_update: {
+    name: "거래처명",
+    manager: "담당자",
+    phone: "연락처",
+    email: "이메일",
+    category: "분류",
+    industry: "업종",
+    status: "상태",
+    memo: "메모",
+  },
+  partner_create: {
+    name: "파트너 이름",
+    job: "직업",
+    phone: "연락처",
+    rate: "단가",
+    rateUnit: "단가 단위",
+    contractStatus: "계약상태",
+    settlementType: "정산방식",
+    memo: "비고",
+  },
+  partner_update: {
+    name: "파트너 이름",
+    job: "직업",
+    phone: "연락처",
+    rate: "단가",
+    rateUnit: "단가 단위",
+    contractStatus: "계약상태",
+    settlementType: "정산방식",
+    memo: "비고",
+  },
+  expense_create: {
+    month: "월",
+    category: "카테고리",
+    amount: "금액",
+    memo: "메모",
+  },
+  calendar_create: {
+    title: "일정 제목",
+    date: "날짜",
+    endDate: "종료 날짜",
+    projectId: "프로젝트",
+    color: "색상",
+    start: "시작 시각",
+    end: "종료 시각",
+    memo: "메모",
+  },
+  leave_request: {
+    type: "휴가 유형",
+    start: "시작일",
+    end: "종료일",
+    startTime: "시작 시각",
+    endTime: "종료 시각",
+    reason: "사유",
+  },
+  message_send: {
+    to: "받는 사람",
+    text: "본문",
+  },
 } as const;
 
 export type ProposalTarget = keyof typeof EDITABLE_FIELDS;
@@ -107,6 +186,72 @@ export interface ProjectAmountEntry {
 
 export interface ProjectAmountContent {
   entries: ProjectAmountEntry[];
+}
+
+export type InquiryBranch = "customer" | "space" | "rental";
+
+export interface InquiryMoveContent {
+  branch: InquiryBranch;
+  stage: InquiryStage | SpaceRegistrationStage | SpaceRentalStage;
+}
+
+export interface InquiryMemoContent {
+  branch: InquiryBranch;
+  memo: string;
+}
+
+export type CustomerCategory = "고객사" | "협력사" | "공급사";
+export type CustomerStatus = "거래중" | "보류" | "종료";
+
+export interface CustomerFields {
+  name?: string;
+  manager?: string;
+  phone?: string;
+  email?: string;
+  category?: CustomerCategory;
+  industry?: string;
+  status?: CustomerStatus;
+  memo?: string;
+}
+
+export interface PartnerFields {
+  name?: string;
+  job?: string;
+  phone?: string;
+  rate?: number | null;
+  rateUnit?: "건당" | "일당" | "시간당";
+  contractStatus?: "활성" | "보류" | "종료";
+  settlementType?: "월정산" | "건별";
+  memo?: string;
+}
+
+export interface ExpenseCreateContent {
+  month: string;
+  category: "rent" | "salary" | "telecom" | "supplies" | "food" | "other";
+  amount: number;
+  memo?: string;
+}
+
+export interface CalendarCreateContent {
+  title: string;
+  date: string;
+  endDate?: string;
+  projectId?: string;
+  color?: "gray" | "blue" | "green" | "red" | "yellow" | "purple";
+}
+
+export interface LeaveRequestContent {
+  type: "annual" | "half_am" | "half_pm" | "hourly";
+  start: string;
+  end: string;
+  startTime?: string;
+  endTime?: string;
+  reason?: string;
+}
+
+export interface MessageSendContent {
+  to: string;
+  text: string;
 }
 
 export interface Proposal {
@@ -158,9 +303,15 @@ export function parseProposals(answer: string): Proposal[] {
       const isProjectCreate = p.target === "project_create";
       const isChecklistDone = p.target === "checklist_done";
       const isProjectAmount = p.target === "project_amount";
-      if (!isSheetCreate && !isProjectCreate && (typeof p.id !== "string" || !p.id)) continue;
+      const isNoIdCreate = [
+        "sheet_create", "project_create", "customer_create", "partner_create",
+        "expense_create", "calendar_create", "leave_request", "message_send",
+      ].includes(p.target);
+      const isInquiryMove = p.target === "inquiry_move";
+      const isInquiryMemo = p.target === "inquiry_memo";
+      if (!isNoIdCreate && (typeof p.id !== "string" || !p.id)) continue;
 
-      const topLevelStructuredFields = isSheetCreate || isProjectCreate || isChecklistDone || isProjectAmount || p.target === "project_checklist"
+      const topLevelStructuredFields = isSheetCreate || isProjectCreate || isChecklistDone || isProjectAmount || isInquiryMove || isInquiryMemo || isNoIdCreate || p.target === "project_checklist"
         ? isProjectCreate
           ? asRecord(p.fields)
           : Object.fromEntries(
@@ -170,12 +321,18 @@ export function parseProposals(answer: string): Proposal[] {
                   ? ["entries"]
                   : isChecklistDone
                     ? ["items", "done"]
-                    : ["items"])
+                    : isInquiryMove
+                      ? ["branch", "stage"]
+                      : isInquiryMemo
+                        ? ["branch", "memo"]
+                        : p.target === "project_checklist"
+                          ? ["items"]
+                        : ["fields"])
                 .filter((field) => field in p)
                 .map((field) => [field, p[field]]),
             )
         : null;
-      const changes = asRecord(p.changes) ?? topLevelStructuredFields;
+      const changes = asRecord(p.changes) ?? asRecord(p.fields) ?? topLevelStructuredFields;
       if (!changes) continue;
 
       out.push({
@@ -205,6 +362,18 @@ export function validateProposal(proposal: Proposal): ValidatedProposal {
   if (proposal.target === "project_create") return validateProjectCreateProposal(proposal);
   if (proposal.target === "checklist_done") return validateChecklistDoneProposal(proposal);
   if (proposal.target === "project_amount") return validateProjectAmountProposal(proposal);
+  if (proposal.target === "inquiry_move") return validateInquiryMoveProposal(proposal);
+  if (proposal.target === "inquiry_memo") return validateInquiryMemoProposal(proposal);
+  if (proposal.target === "customer_create" || proposal.target === "customer_update") {
+    return validateCustomerProposal(proposal);
+  }
+  if (proposal.target === "partner_create" || proposal.target === "partner_update") {
+    return validatePartnerProposal(proposal);
+  }
+  if (proposal.target === "expense_create") return validateExpenseCreateProposal(proposal);
+  if (proposal.target === "calendar_create") return validateCalendarCreateProposal(proposal);
+  if (proposal.target === "leave_request") return validateLeaveRequestProposal(proposal);
+  if (proposal.target === "message_send") return validateMessageSendProposal(proposal);
 
   const allowed = EDITABLE_FIELDS[proposal.target] as Record<string, string>;
   const accepted: Record<string, unknown> = {};
@@ -517,6 +686,306 @@ function validateProjectAmountProposal(proposal: Proposal): ValidatedProposal {
     rejected.push({ field: "entries", reason: "추가할 매출·매입 건이 하나 이상 필요합니다." });
   }
   if (entries.length > 0) accepted.entries = entries;
+  return { proposal, accepted, rejected };
+}
+
+const INQUIRY_BRANCHES = ["customer", "space", "rental"] as const;
+const CUSTOMER_CATEGORIES = ["고객사", "협력사", "공급사"] as const;
+const CUSTOMER_STATUSES = ["거래중", "보류", "종료"] as const;
+const PARTNER_STATUSES = ["활성", "보류", "종료"] as const;
+const PARTNER_RATE_UNITS = ["건당", "일당", "시간당"] as const;
+const PARTNER_SETTLEMENT_TYPES = ["월정산", "건별"] as const;
+const EXPENSE_CATEGORIES = ["rent", "salary", "telecom", "supplies", "food", "other"] as const;
+const CALENDAR_COLORS = ["gray", "blue", "green", "red", "yellow", "purple"] as const;
+const LEAVE_TYPES = ["annual", "half_am", "half_pm", "hourly"] as const;
+const NEW_TEXT_LIMIT = 500;
+const MESSAGE_TEXT_LIMIT = 2000;
+const TIME_ONLY = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
+
+function validDateOnly(value: unknown): value is string {
+  if (typeof value !== "string" || !DATE_ONLY.test(value)) return false;
+  const [year, month, day] = value.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day;
+}
+
+function addTextField(
+  accepted: Record<string, unknown>,
+  rejected: ProposalIssue[],
+  fields: Record<string, unknown>,
+  field: string,
+  options: { required?: boolean; limit?: number } = {},
+) {
+  const value = fields[field];
+  if (value === undefined) {
+    if (options.required) rejected.push({ field, reason: "값이 필요합니다." });
+    return;
+  }
+  if (typeof value !== "string") {
+    rejected.push({ field, reason: "글자여야 합니다." });
+    return;
+  }
+  const text = value.trim();
+  const limit = options.limit ?? NEW_TEXT_LIMIT;
+  if (!text && options.required) {
+    rejected.push({ field, reason: "값이 필요합니다." });
+  } else if (text.length > limit) {
+    rejected.push({ field, reason: `${limit}자를 넘습니다.` });
+  } else if (text) {
+    accepted[field] = text;
+  }
+}
+
+function rejectUnknownFields(
+  fields: Record<string, unknown>,
+  allowed: ReadonlySet<string>,
+  rejected: ProposalIssue[],
+) {
+  for (const field of Object.keys(fields)) {
+    if (!allowed.has(field)) rejected.push({ field, reason: "이 제안에서 사용할 수 없는 항목입니다." });
+  }
+}
+
+function validateInquiryMoveProposal(proposal: Proposal): ValidatedProposal {
+  const accepted: Record<string, unknown> = {};
+  const rejected: ProposalIssue[] = [];
+  const branch = proposal.changes.branch;
+  if (!(INQUIRY_BRANCHES as readonly unknown[]).includes(branch)) {
+    rejected.push({ field: "branch", reason: "customer·space·rental 중 하나여야 합니다." });
+  }
+
+  const stage = proposal.changes.stage;
+  const validStages = branch === "customer"
+    ? INQUIRY_STAGES
+    : branch === "space"
+      ? SPACE_REGISTRATION_STAGES
+      : branch === "rental"
+        ? SPACE_RENTAL_STAGES
+        : [];
+  if (typeof stage !== "string" || !(validStages as readonly string[]).includes(stage)) {
+    rejected.push({ field: "stage", reason: "그 문의 갈래에서 사용할 수 없는 단계입니다." });
+  }
+  if (rejected.length === 0) {
+    accepted.branch = branch;
+    accepted.stage = stage;
+  }
+  return { proposal, accepted, rejected };
+}
+
+function validateInquiryMemoProposal(proposal: Proposal): ValidatedProposal {
+  const accepted: Record<string, unknown> = {};
+  const rejected: ProposalIssue[] = [];
+  const branch = proposal.changes.branch;
+  if (!(INQUIRY_BRANCHES as readonly unknown[]).includes(branch)) {
+    rejected.push({ field: "branch", reason: "customer·space·rental 중 하나여야 합니다." });
+  } else {
+    accepted.branch = branch;
+  }
+  if (branch === "rental") {
+    rejected.push({ field: "branch", reason: "공간대관에는 현재 메모 저장 함수가 없어 AI 메모를 적용할 수 없습니다." });
+  }
+  addTextField(accepted, rejected, proposal.changes, "memo", { required: true, limit: MESSAGE_TEXT_LIMIT });
+  return { proposal, accepted, rejected };
+}
+
+function validateCustomerProposal(proposal: Proposal): ValidatedProposal {
+  const accepted: Record<string, unknown> = {};
+  const rejected: ProposalIssue[] = [];
+  const fields = asRecord(proposal.changes.fields) ?? proposal.changes;
+  const allowed = new Set(["name", "manager", "phone", "email", "category", "industry", "status", "memo"]);
+  rejectUnknownFields(fields, allowed, rejected);
+  addTextField(accepted, rejected, fields, "name", { required: proposal.target === "customer_create" });
+  for (const field of ["manager", "phone", "email", "industry", "memo"]) {
+    addTextField(accepted, rejected, fields, field);
+  }
+
+  const category = fields.category;
+  if (category !== undefined) {
+    if (!(CUSTOMER_CATEGORIES as readonly unknown[]).includes(category)) {
+      rejected.push({ field: "category", reason: "고객사·협력사·공급사 중 하나여야 합니다." });
+    } else {
+      accepted.category = category;
+    }
+  }
+  const status = fields.status;
+  if (status !== undefined) {
+    if (!(CUSTOMER_STATUSES as readonly unknown[]).includes(status)) {
+      rejected.push({ field: "status", reason: "거래중·보류·종료 중 하나여야 합니다." });
+    } else {
+      accepted.status = status;
+    }
+  }
+  if (proposal.target === "customer_update" && Object.keys(accepted).length === 0) {
+    rejected.push({ field: "changes", reason: "고칠 항목이 하나 이상 필요합니다." });
+  }
+  return { proposal, accepted, rejected };
+}
+
+function validatePartnerProposal(proposal: Proposal): ValidatedProposal {
+  const accepted: Record<string, unknown> = {};
+  const rejected: ProposalIssue[] = [];
+  const fields = asRecord(proposal.changes.fields) ?? proposal.changes;
+  const allowed = new Set(["name", "job", "phone", "rate", "rateUnit", "contractStatus", "settlementType", "memo"]);
+  rejectUnknownFields(fields, allowed, rejected);
+  addTextField(accepted, rejected, fields, "name", { required: proposal.target === "partner_create" });
+  for (const field of ["job", "phone", "memo"]) addTextField(accepted, rejected, fields, field);
+
+  const rate = fields.rate;
+  if (rate !== undefined) {
+    if (rate !== null && (typeof rate !== "number" || !Number.isSafeInteger(rate) || rate < 0)) {
+      rejected.push({ field: "rate", reason: "단가는 0 이상의 원 단위 정수(숫자)여야 합니다." });
+    } else {
+      accepted.rate = rate;
+    }
+  }
+  const rateUnit = fields.rateUnit;
+  if (rateUnit !== undefined) {
+    if (!(PARTNER_RATE_UNITS as readonly unknown[]).includes(rateUnit)) {
+      rejected.push({ field: "rateUnit", reason: "건당·일당·시간당 중 하나여야 합니다." });
+    } else {
+      accepted.rateUnit = rateUnit;
+    }
+  }
+  const contractStatus = fields.contractStatus;
+  if (contractStatus !== undefined) {
+    if (!(PARTNER_STATUSES as readonly unknown[]).includes(contractStatus)) {
+      rejected.push({ field: "contractStatus", reason: "활성·보류·종료 중 하나여야 합니다." });
+    } else {
+      accepted.contractStatus = contractStatus;
+    }
+  }
+  const settlementType = fields.settlementType;
+  if (settlementType !== undefined) {
+    if (!(PARTNER_SETTLEMENT_TYPES as readonly unknown[]).includes(settlementType)) {
+      rejected.push({ field: "settlementType", reason: "월정산·건별 중 하나여야 합니다." });
+    } else {
+      accepted.settlementType = settlementType;
+    }
+  }
+  if (proposal.target === "partner_update" && Object.keys(accepted).length === 0) {
+    rejected.push({ field: "changes", reason: "고칠 항목이 하나 이상 필요합니다." });
+  }
+  return { proposal, accepted, rejected };
+}
+
+function validateExpenseCreateProposal(proposal: Proposal): ValidatedProposal {
+  const accepted: Record<string, unknown> = {};
+  const rejected: ProposalIssue[] = [];
+  const fields = asRecord(proposal.changes.fields) ?? proposal.changes;
+  rejectUnknownFields(fields, new Set(["month", "category", "amount", "memo"]), rejected);
+  const month = fields.month;
+  if (typeof month !== "string" || !/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) {
+    rejected.push({ field: "month", reason: "월은 YYYY-MM 형식이어야 합니다." });
+  } else {
+    accepted.month = month;
+  }
+  const category = fields.category;
+  if (!(EXPENSE_CATEGORIES as readonly unknown[]).includes(category)) {
+    rejected.push({ field: "category", reason: "지출 화면에 있는 카테고리만 사용할 수 있습니다." });
+  } else {
+    accepted.category = category;
+  }
+  const amount = fields.amount;
+  if (typeof amount !== "number" || !Number.isSafeInteger(amount) || amount <= 0) {
+    rejected.push({ field: "amount", reason: "금액은 0보다 큰 원 단위 정수(숫자)여야 합니다." });
+  } else {
+    accepted.amount = amount;
+  }
+  addTextField(accepted, rejected, fields, "memo");
+  if (typeof proposal.label !== "string" || !proposal.label.trim()) {
+    rejected.push({ field: "label", reason: "지출 항목명이 필요합니다." });
+  } else if (proposal.label.trim().length > NEW_TEXT_LIMIT) {
+    rejected.push({ field: "label", reason: `${NEW_TEXT_LIMIT}자를 넘습니다.` });
+  }
+  return { proposal, accepted, rejected };
+}
+
+function validateCalendarCreateProposal(proposal: Proposal): ValidatedProposal {
+  const accepted: Record<string, unknown> = {};
+  const rejected: ProposalIssue[] = [];
+  const fields = asRecord(proposal.changes.fields) ?? proposal.changes;
+  const allowed = new Set(["title", "date", "endDate", "projectId", "color"]);
+  rejectUnknownFields(fields, allowed, rejected);
+  addTextField(accepted, rejected, fields, "title", { required: true });
+  const date = fields.date;
+  if (!validDateOnly(date)) {
+    rejected.push({ field: "date", reason: "날짜는 유효한 YYYY-MM-DD 형식이어야 합니다." });
+  } else {
+    accepted.date = date;
+  }
+  const endDate = fields.endDate;
+  if (endDate !== undefined) {
+    if (!validDateOnly(endDate) || (typeof date === "string" && validDateOnly(date) && endDate < date)) {
+      rejected.push({ field: "endDate", reason: "종료 날짜는 유효하고 시작 날짜 이후여야 합니다." });
+    } else {
+      accepted.endDate = endDate;
+    }
+  }
+  const projectId = fields.projectId;
+  if (projectId !== undefined) {
+    if (typeof projectId !== "string" || !projectId.trim() || projectId.length > 100) {
+      rejected.push({ field: "projectId", reason: "유효한 프로젝트 id를 지정해야 합니다." });
+    } else {
+      accepted.projectId = projectId.trim();
+    }
+  }
+  const color = fields.color;
+  if (color !== undefined) {
+    if (!(CALENDAR_COLORS as readonly unknown[]).includes(color)) {
+      rejected.push({ field: "color", reason: "캘린더에서 사용하는 색상만 선택할 수 있습니다." });
+    } else {
+      accepted.color = color;
+    }
+  }
+  return { proposal, accepted, rejected };
+}
+
+function validateLeaveRequestProposal(proposal: Proposal): ValidatedProposal {
+  const accepted: Record<string, unknown> = {};
+  const rejected: ProposalIssue[] = [];
+  const fields = asRecord(proposal.changes.fields) ?? proposal.changes;
+  const allowed = new Set(["type", "start", "end", "startTime", "endTime", "reason"]);
+  rejectUnknownFields(fields, allowed, rejected);
+  const type = fields.type;
+  if (!(LEAVE_TYPES as readonly unknown[]).includes(type)) {
+    rejected.push({ field: "type", reason: "annual·half_am·half_pm·hourly 중 액션이 받는 값만 사용할 수 있습니다." });
+  } else {
+    accepted.type = type;
+  }
+  const start = fields.start;
+  const end = fields.end;
+  if (!validDateOnly(start)) rejected.push({ field: "start", reason: "시작일은 유효한 YYYY-MM-DD 형식이어야 합니다." });
+  else accepted.start = start;
+  if (!validDateOnly(end)) rejected.push({ field: "end", reason: "종료일은 유효한 YYYY-MM-DD 형식이어야 합니다." });
+  else accepted.end = end;
+  if (validDateOnly(start) && validDateOnly(end) && end < start) {
+    rejected.push({ field: "end", reason: "종료일은 시작일보다 빠를 수 없습니다." });
+  }
+  const startTime = fields.startTime;
+  const endTime = fields.endTime;
+  if (startTime !== undefined && (typeof startTime !== "string" || !TIME_ONLY.test(startTime))) {
+    rejected.push({ field: "startTime", reason: "시각은 HH:MM 형식이어야 합니다." });
+  } else if (startTime !== undefined) accepted.startTime = startTime;
+  if (endTime !== undefined && (typeof endTime !== "string" || !TIME_ONLY.test(endTime))) {
+    rejected.push({ field: "endTime", reason: "시각은 HH:MM 형식이어야 합니다." });
+  } else if (endTime !== undefined) accepted.endTime = endTime;
+  if (typeof startTime === "string" && typeof endTime === "string" && TIME_ONLY.test(startTime) && TIME_ONLY.test(endTime) && endTime <= startTime) {
+    rejected.push({ field: "endTime", reason: "종료 시각은 시작 시각보다 늦어야 합니다." });
+  }
+  if (type !== "hourly" && (startTime !== undefined || endTime !== undefined)) {
+    rejected.push({ field: "startTime", reason: "시각은 hourly(시간차)에서만 사용할 수 있습니다." });
+  }
+  addTextField(accepted, rejected, fields, "reason");
+  return { proposal, accepted, rejected };
+}
+
+function validateMessageSendProposal(proposal: Proposal): ValidatedProposal {
+  const accepted: Record<string, unknown> = {};
+  const rejected: ProposalIssue[] = [];
+  const fields = asRecord(proposal.changes.fields) ?? proposal.changes;
+  rejectUnknownFields(fields, new Set(["to", "text"]), rejected);
+  addTextField(accepted, rejected, fields, "to", { required: true, limit: 100 });
+  addTextField(accepted, rejected, fields, "text", { required: true, limit: MESSAGE_TEXT_LIMIT });
   return { proposal, accepted, rejected };
 }
 

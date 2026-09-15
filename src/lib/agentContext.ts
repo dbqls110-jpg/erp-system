@@ -5,6 +5,9 @@ import {
   type ExtractedVenueQuery,
   type VenueSpacePreference,
 } from "@/lib/venueQuery";
+import { getInquiries } from "@/lib/inquirySheet";
+import { getSpaceRegistrations } from "@/lib/spaceRegistrationSheet";
+import { getSpaceRentals } from "@/lib/spaceRentalSheet";
 
 export { extractVenueQuery, extractVenueMatchQuery } from "@/lib/venueQuery";
 
@@ -17,13 +20,15 @@ export { extractVenueQuery, extractVenueMatchQuery } from "@/lib/venueQuery";
  * 요청자는 항상 서버가 아는 값(AgentJob.userId)에서 오며, 질문 본문에서 뽑지 않는다.
  */
 
-export type ContextTopic = "venues" | "customers" | "partners" | "projects";
+export type ContextTopic = "venues" | "customers" | "partners" | "projects" | "inquiries" | "users";
 
 const TOPIC_PATTERNS: Record<ContextTopic, RegExp> = {
   venues: /공간|장소|대관|행사장|체육관|공연장|강당|회의실|세미나|컨벤션|부스|바자회|운동회|잔디|야외|실내/,
   customers: /거래처|고객사|협력사|공급사/,
   partners: /파트너|협력업체|계약/,
-  projects: /프로젝트|과업|진행\s*중인\s*일|체크리스트|할\s*일|업무|완료|끝났|해제|매출|매입|수입|지출|비용|금액/,
+  projects: /프로젝트|과업|진행\s*중인\s*일|체크리스트|할\s*일|업무|완료|끝났|해제|매출|매입|수입|지출|비용|금액|일정|미팅|회의|캘린더/,
+  inquiries: /고객\s*문의|문의\s*접수|공간\s*등록|공간\s*대관|접수\s*번호|1차\s*연락|2차\s*연락|성사|종료\s*문의/,
+  users: /메신저|메시지|동료|직원|누구에게|전해|보내(?:줘|주세요|라)?|알려(?:줘|주세요|라)?/,
 };
 
 export function detectTopics(question: string): ContextTopic[] {
@@ -203,6 +208,62 @@ export async function buildAgentContext(question: string): Promise<AgentContext>
             take: 100,
           });
           data.projects = { count: rows.length, items: rows };
+          break;
+        }
+        case "inquiries": {
+          const [customerRows, spaceRows, rentalRows] = await Promise.all([
+            getInquiries(),
+            getSpaceRegistrations(),
+            getSpaceRentals(),
+          ]);
+          data.inquiries = {
+            customer: {
+              count: customerRows.length,
+              items: customerRows.slice(-30).map((row) => ({
+                id: row.id,
+                name: row.name,
+                company: "",
+                event: row.rentalType,
+                stage: row.status,
+              })),
+            },
+            space: {
+              count: spaceRows.length,
+              items: spaceRows.slice(-30).map((row) => ({
+                id: row.id,
+                name: row.contactName,
+                company: row.relationship,
+                event: row.spaceName,
+                stage: row.status,
+              })),
+            },
+            rental: {
+              count: rentalRows.length,
+              items: rentalRows.slice(-30).map((row) => ({
+                id: row.id,
+                name: row.reserverName,
+                company: row.client || row.agency,
+                event: row.eventName || row.eventType,
+                stage: row.status,
+              })),
+            },
+          };
+          break;
+        }
+        case "users": {
+          const rows = await prisma.user.findMany({
+            where: {
+              active: true,
+              isAgent: false,
+              role: { not: "pending" },
+              partnerId: null,
+              customerId: null,
+            },
+            select: { id: true, name: true },
+            orderBy: { name: "asc" },
+            take: 100,
+          });
+          data.users = { count: rows.length, items: rows };
           break;
         }
         case "venues": {

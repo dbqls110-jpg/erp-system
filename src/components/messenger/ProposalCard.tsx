@@ -7,8 +7,16 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { calculateNetIncome } from "@/lib/financeMetrics";
 import {
+  type CalendarCreateContent,
   type ChecklistDoneContent,
+  type CustomerFields,
+  type ExpenseCreateContent,
   fieldLabel,
+  type InquiryMemoContent,
+  type InquiryMoveContent,
+  type LeaveRequestContent,
+  type MessageSendContent,
+  type PartnerFields,
   type ProjectAmountContent,
   type ProjectCreateFields,
   validateProposal,
@@ -105,6 +113,16 @@ export function ProposalCard({
   const isProjectCreate = proposal.target === "project_create";
   const isChecklistDone = proposal.target === "checklist_done";
   const isProjectAmount = proposal.target === "project_amount";
+  const isInquiryMove = proposal.target === "inquiry_move";
+  const isInquiryMemo = proposal.target === "inquiry_memo";
+  const isCustomerCreate = proposal.target === "customer_create";
+  const isCustomerUpdate = proposal.target === "customer_update";
+  const isPartnerCreate = proposal.target === "partner_create";
+  const isPartnerUpdate = proposal.target === "partner_update";
+  const isExpenseCreate = proposal.target === "expense_create";
+  const isCalendarCreate = proposal.target === "calendar_create";
+  const isLeaveRequest = proposal.target === "leave_request";
+  const isMessageSend = proposal.target === "message_send";
   const sheet = isSheetCreate ? (accepted as unknown as Partial<SheetCreateContent>) : null;
   const checklist = isProjectChecklist
     ? (accepted as unknown as Partial<ProjectChecklistContent>)
@@ -115,6 +133,14 @@ export function ProposalCard({
   const checklistDoneItems = checklistDone && Array.isArray(checklistDone.items) ? checklistDone.items : [];
   const projectAmount = isProjectAmount ? (accepted as unknown as Partial<ProjectAmountContent>) : null;
   const projectAmountEntries = projectAmount && Array.isArray(projectAmount.entries) ? projectAmount.entries : [];
+  const inquiryMove = isInquiryMove ? (accepted as unknown as Partial<InquiryMoveContent>) : null;
+  const inquiryMemo = isInquiryMemo ? (accepted as unknown as Partial<InquiryMemoContent>) : null;
+  const customer = isCustomerCreate || isCustomerUpdate ? (accepted as unknown as Partial<CustomerFields>) : null;
+  const partner = isPartnerCreate || isPartnerUpdate ? (accepted as unknown as Partial<PartnerFields>) : null;
+  const expense = isExpenseCreate ? (accepted as unknown as Partial<ExpenseCreateContent>) : null;
+  const calendar = isCalendarCreate ? (accepted as unknown as Partial<CalendarCreateContent>) : null;
+  const leave = isLeaveRequest ? (accepted as unknown as Partial<LeaveRequestContent>) : null;
+  const message = isMessageSend ? (accepted as unknown as Partial<MessageSendContent>) : null;
   const sheetTabs = sheet && Array.isArray(sheet.tabs) ? sheet.tabs : [];
   const sheetData = sheet && sheet.data && typeof sheet.data === "object" ? sheet.data : {};
   const sheetRowCount = Object.values(sheetData).reduce(
@@ -129,6 +155,7 @@ export function ProposalCard({
     (count, rows) => Math.max(count, ...(Array.isArray(rows) ? rows.map((row) => row.length) : [])),
     0,
   );
+  const isStrictNewProposal = isInquiryMove || isInquiryMemo || isCustomerCreate || isCustomerUpdate || isPartnerCreate || isPartnerUpdate || isExpenseCreate || isCalendarCreate || isLeaveRequest || isMessageSend;
   const nothingToApply = isSheetCreate
     ? rejected.length > 0 || typeof sheet?.title !== "string"
     : isProjectChecklist
@@ -139,6 +166,8 @@ export function ProposalCard({
           ? checklistDoneItems.length === 0 || typeof checklistDone?.done !== "boolean"
           : isProjectAmount
             ? projectAmountEntries.length === 0
+            : isStrictNewProposal
+              ? rejected.length > 0 || Object.keys(accepted).length === 0
             : Object.keys(accepted).length === 0;
   const [sheetUrl, setSheetUrl] = useState<string | null>(null);
   const [projectUrl, setProjectUrl] = useState<string | null>(null);
@@ -163,11 +192,43 @@ export function ProposalCard({
     ? "border-emerald-200 bg-emerald-50/50 dark:border-emerald-900/70 dark:bg-emerald-950/20"
     : isChecklistDone
       ? "border-slate-300 bg-slate-50/70 dark:border-slate-700 dark:bg-slate-900/40"
+      : isInquiryMove
+        ? "border-sky-200 bg-sky-50/60 dark:border-sky-900/70 dark:bg-sky-950/20"
+        : isInquiryMemo
+          ? "border-amber-200 bg-amber-50/60 dark:border-amber-900/70 dark:bg-amber-950/20"
+          : isCustomerCreate || isCustomerUpdate
+            ? "border-indigo-200 bg-indigo-50/60 dark:border-indigo-900/70 dark:bg-indigo-950/20"
+            : isPartnerCreate || isPartnerUpdate
+              ? "border-violet-200 bg-violet-50/60 dark:border-violet-900/70 dark:bg-violet-950/20"
+              : isExpenseCreate
+                ? "border-rose-200 bg-rose-50/60 dark:border-rose-900/70 dark:bg-rose-950/20"
+                : isCalendarCreate
+                  ? "border-cyan-200 bg-cyan-50/60 dark:border-cyan-900/70 dark:bg-cyan-950/20"
+                  : isLeaveRequest
+                    ? "border-orange-200 bg-orange-50/60 dark:border-orange-900/70 dark:bg-orange-950/20"
+                    : isMessageSend
+                      ? "border-teal-200 bg-teal-50/60 dark:border-teal-900/70 dark:bg-teal-950/20"
       : "bg-background";
   const actionTone = isProjectCreate
     ? "bg-emerald-600 text-white hover:bg-emerald-700 dark:bg-emerald-500 dark:hover:bg-emerald-600"
     : isChecklistDone
       ? "bg-slate-600 text-white hover:bg-slate-700 dark:bg-slate-500 dark:hover:bg-slate-600"
+      : isInquiryMove
+        ? "bg-sky-600 text-white hover:bg-sky-700 dark:bg-sky-500 dark:hover:bg-sky-600"
+        : isInquiryMemo
+          ? "bg-amber-600 text-white hover:bg-amber-700 dark:bg-amber-500 dark:hover:bg-amber-600"
+          : isCustomerCreate || isCustomerUpdate
+            ? "bg-indigo-600 text-white hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600"
+            : isPartnerCreate || isPartnerUpdate
+              ? "bg-violet-600 text-white hover:bg-violet-700 dark:bg-violet-500 dark:hover:bg-violet-600"
+              : isExpenseCreate
+                ? "bg-rose-600 text-white hover:bg-rose-700 dark:bg-rose-500 dark:hover:bg-rose-600"
+                : isCalendarCreate
+                  ? "bg-cyan-600 text-white hover:bg-cyan-700 dark:bg-cyan-500 dark:hover:bg-cyan-600"
+                  : isLeaveRequest
+                    ? "bg-orange-600 text-white hover:bg-orange-700 dark:bg-orange-500 dark:hover:bg-orange-600"
+                    : isMessageSend
+                      ? "bg-teal-600 text-white hover:bg-teal-700 dark:bg-teal-500 dark:hover:bg-teal-600"
       : "";
 
   async function apply() {
@@ -200,6 +261,15 @@ export function ProposalCard({
         revenue?: number | null;
         cost?: number | null;
         netIncome?: number | null;
+        customerId?: string;
+        partnerId?: string;
+        receiverId?: string;
+        text?: string;
+        stage?: string;
+        month?: string;
+        amount?: number;
+        date?: string;
+        endDate?: string | null;
       };
       if (!res.ok) {
         setError(data.error ?? "저장하지 못했습니다.");
@@ -230,6 +300,22 @@ export function ProposalCard({
         const netIncome = data.netIncome ?? calculateNetIncome(revenue, cost);
         setProjectAmountResult({ entryCount, revenue, cost, netIncome });
         toast.success(`매출·매입 ${entryCount}건을 반영했습니다.`);
+      } else if (isInquiryMove) {
+        toast.success(`문의 단계가 ‘${data.stage ?? inquiryMove?.stage ?? ""}’로 바뀌었습니다.`);
+      } else if (isInquiryMemo) {
+        toast.success("문의 메모에 덧붙였습니다.");
+      } else if (isCustomerCreate || isCustomerUpdate) {
+        toast.success(data.alreadyExists ? "같은 이름의 거래처가 이미 있습니다." : "거래처를 반영했습니다.");
+      } else if (isPartnerCreate || isPartnerUpdate) {
+        toast.success(data.alreadyExists ? "같은 이름의 파트너가 이미 있습니다." : "파트너를 반영했습니다.");
+      } else if (isExpenseCreate) {
+        toast.success("지출을 등록했습니다.");
+      } else if (isCalendarCreate) {
+        toast.success("캘린더 일정을 등록했습니다.");
+      } else if (isLeaveRequest) {
+        toast.success("본인의 휴가를 신청했습니다.");
+      } else if (isMessageSend) {
+        toast.success("메시지를 보냈습니다.");
       } else {
         toast.success(isSheetCreate ? "구글 시트를 만들었습니다." : `${data.name ?? "자료"}에 반영했습니다.`);
       }
@@ -254,8 +340,28 @@ export function ProposalCard({
               ? "프로젝트 만들기"
               : proposal.target === "checklist_done"
                 ? "업무 완료·해제"
-                : proposal.target === "project_amount"
+              : proposal.target === "project_amount"
                   ? "매출·매입"
+                  : proposal.target === "inquiry_move"
+                    ? "문의 단계 이동"
+                    : proposal.target === "inquiry_memo"
+                      ? "문의 메모"
+                      : proposal.target === "customer_create"
+                        ? "거래처 등록"
+                        : proposal.target === "customer_update"
+                          ? "거래처 수정"
+                          : proposal.target === "partner_create"
+                            ? "파트너 등록"
+                            : proposal.target === "partner_update"
+                              ? "파트너 수정"
+                              : proposal.target === "expense_create"
+                                ? "지출 등록"
+                                : proposal.target === "calendar_create"
+                                  ? "캘린더 일정"
+                                  : proposal.target === "leave_request"
+                                    ? "휴가 신청"
+                                    : proposal.target === "message_send"
+                                      ? "메시지 전송"
                   : "구글 시트";
   const savingLabel = isProjectCreate
     ? "프로젝트 만드는 중…"
@@ -263,6 +369,26 @@ export function ProposalCard({
       ? "업무 상태 적용 중…"
       : isProjectAmount
         ? "매출·매입 반영 중…"
+        : isInquiryMove
+          ? "문의 단계 적용 중…"
+          : isInquiryMemo
+            ? "문의 메모 저장 중…"
+            : isCustomerCreate
+              ? "거래처 등록 중…"
+              : isCustomerUpdate
+                ? "거래처 수정 중…"
+                : isPartnerCreate
+                  ? "파트너 등록 중…"
+                  : isPartnerUpdate
+                    ? "파트너 수정 중…"
+                    : isExpenseCreate
+                      ? "지출 등록 중…"
+                      : isCalendarCreate
+                        ? "일정 등록 중…"
+                        : isLeaveRequest
+                          ? "휴가 신청 중…"
+                          : isMessageSend
+                            ? "메시지 전송 중…"
         : isProjectChecklist
           ? "업무 추가 중…"
           : isSheetCreate
@@ -272,8 +398,28 @@ export function ProposalCard({
     ? "프로젝트 만들기"
     : isChecklistDone
       ? `업무 ${checklistDoneItems.length}건 적용`
-      : isProjectAmount
+    : isProjectAmount
         ? `매출·매입 ${projectAmountEntries.length}건 적용`
+        : isInquiryMove
+          ? `‘${inquiryMove?.stage ?? "단계"}’로 이동`
+          : isInquiryMemo
+            ? "메모 덧붙이기"
+            : isCustomerCreate
+              ? "거래처 등록"
+              : isCustomerUpdate
+                ? "거래처 수정"
+                : isPartnerCreate
+                  ? "파트너 등록"
+                  : isPartnerUpdate
+                    ? "파트너 수정"
+                    : isExpenseCreate
+                      ? "지출 등록"
+                      : isCalendarCreate
+                        ? "일정 등록"
+                        : isLeaveRequest
+                          ? "휴가 신청"
+                          : isMessageSend
+                            ? "메시지 보내기"
         : isProjectChecklist
           ? `업무 ${checklistItems.length}개 추가`
           : isSheetCreate
@@ -296,7 +442,57 @@ export function ProposalCard({
         <p className="mt-0.5 text-[11px] text-muted-foreground">{proposal.reason}</p>
       )}
 
-      {isProjectCreate ? (
+      {isInquiryMove ? (
+        <dl className="mt-2 space-y-1 text-xs">
+          <div className="flex gap-2"><dt className="w-20 shrink-0 text-muted-foreground">갈래</dt><dd>{inquiryMove?.branch}</dd></div>
+          <div className="flex gap-2"><dt className="w-20 shrink-0 text-muted-foreground">대상 단계</dt><dd className="font-medium">{inquiryMove?.stage}</dd></div>
+        </dl>
+      ) : isInquiryMemo ? (
+        <div className="mt-2 rounded-lg border border-amber-200/70 bg-background/60 p-2.5 text-xs dark:border-amber-800/60">
+          <p className="text-[11px] text-muted-foreground">{inquiryMemo?.branch} 문의에 덧붙일 메모</p>
+          <p className="mt-1 whitespace-pre-wrap break-words text-foreground">{inquiryMemo?.memo}</p>
+        </div>
+      ) : isCustomerCreate || isCustomerUpdate ? (
+        <dl className="mt-2 space-y-1 text-xs">
+          {Object.entries(customer ?? {}).map(([field, value]) => (
+            <div key={field} className="flex gap-2"><dt className="w-20 shrink-0 text-muted-foreground">{fieldLabel(proposal.target, field)}</dt><dd className="text-foreground">{displayValue(value)}</dd></div>
+          ))}
+        </dl>
+      ) : isPartnerCreate || isPartnerUpdate ? (
+        <dl className="mt-2 space-y-1 text-xs">
+          {Object.entries(partner ?? {}).map(([field, value]) => (
+            <div key={field} className="flex gap-2"><dt className="w-20 shrink-0 text-muted-foreground">{fieldLabel(proposal.target, field)}</dt><dd className="text-foreground">{displayValue(value)}</dd></div>
+          ))}
+        </dl>
+      ) : isExpenseCreate ? (
+        <dl className="mt-2 space-y-1 text-xs">
+          <div className="flex gap-2"><dt className="w-20 shrink-0 text-muted-foreground">월</dt><dd>{expense?.month}</dd></div>
+          <div className="flex gap-2"><dt className="w-20 shrink-0 text-muted-foreground">카테고리</dt><dd>{expense?.category}</dd></div>
+          <div className="flex gap-2"><dt className="w-20 shrink-0 text-muted-foreground">금액</dt><dd className="font-medium">{typeof expense?.amount === "number" ? `${expense.amount.toLocaleString("ko-KR")}원` : "-"}</dd></div>
+          {expense?.memo && <div className="flex gap-2"><dt className="w-20 shrink-0 text-muted-foreground">메모</dt><dd className="whitespace-pre-wrap break-words">{expense.memo}</dd></div>}
+        </dl>
+      ) : isCalendarCreate ? (
+        <dl className="mt-2 space-y-1 text-xs">
+          {Object.entries(calendar ?? {}).map(([field, value]) => (
+            <div key={field} className="flex gap-2"><dt className="w-20 shrink-0 text-muted-foreground">{fieldLabel(proposal.target, field)}</dt><dd className="text-foreground">{displayValue(value)}</dd></div>
+          ))}
+        </dl>
+      ) : isLeaveRequest ? (
+        <dl className="mt-2 space-y-1 text-xs">
+          <div className="flex gap-2"><dt className="w-20 shrink-0 text-muted-foreground">휴가 유형</dt><dd className="font-medium">{leave?.type === "annual" ? "연차" : leave?.type === "half_am" ? "반차(오전)" : leave?.type === "half_pm" ? "반차(오후)" : "시간차"}</dd></div>
+          <div className="flex gap-2"><dt className="w-20 shrink-0 text-muted-foreground">기간</dt><dd>{leave?.start} ~ {leave?.end}</dd></div>
+          {leave?.startTime && <div className="flex gap-2"><dt className="w-20 shrink-0 text-muted-foreground">시간</dt><dd>{leave.startTime} ~ {leave.endTime}</dd></div>}
+          {leave?.reason && <div className="flex gap-2"><dt className="w-20 shrink-0 text-muted-foreground">사유</dt><dd className="whitespace-pre-wrap break-words">{leave.reason}</dd></div>}
+        </dl>
+      ) : isMessageSend ? (
+        <div className="mt-2 space-y-2 text-xs">
+          <p><span className="text-muted-foreground">받는 사람</span> <span className="font-medium text-foreground">{proposal.label ?? message?.to}</span></p>
+          <div className="rounded-lg border border-teal-200/70 bg-background/60 p-2.5 dark:border-teal-800/60">
+            <p className="text-[11px] text-muted-foreground">보낼 본문</p>
+            <p className="mt-1 whitespace-pre-wrap break-words text-foreground">{message?.text}</p>
+          </div>
+        </div>
+      ) : isProjectCreate ? (
         <dl className="mt-2 space-y-1 text-xs">
           {Object.entries(projectCreate ?? {}).map(([field, value]) => (
             <div key={field} className="flex gap-2">
@@ -384,7 +580,27 @@ export function ProposalCard({
         <div className="mt-2 text-[11px] text-muted-foreground">
           <p className="flex items-center gap-1">
             <Check className="size-3" />
-            {isProjectCreate
+            {isInquiryMove
+              ? "문의 단계를 바꿨습니다"
+              : isInquiryMemo
+                ? "문의 메모에 덧붙였습니다"
+                : isCustomerCreate
+                  ? "거래처를 등록했습니다"
+                  : isCustomerUpdate
+                    ? "거래처를 수정했습니다"
+                    : isPartnerCreate
+                      ? "파트너를 등록했습니다"
+                      : isPartnerUpdate
+                        ? "파트너를 수정했습니다"
+                        : isExpenseCreate
+                          ? "지출을 등록했습니다"
+                          : isCalendarCreate
+                            ? "일정을 등록했습니다"
+                            : isLeaveRequest
+                              ? "휴가를 신청했습니다"
+                              : isMessageSend
+                                ? "메시지를 보냈습니다"
+                                : isProjectCreate
               ? projectAlreadyExists ? "이미 있는 프로젝트입니다" : "프로젝트를 만들었습니다"
               : isChecklistDone
                 ? `${checklistDoneResult?.done ? "완료" : "해제"} ${checklistDoneResult?.foundCount ?? 0}건 · 못 찾음 ${checklistDoneResult?.notFoundCount ?? 0}건`
