@@ -202,14 +202,14 @@ function Modal({
           <button
             type="button"
             onClick={onClose}
-            className="flex-1 py-2 rounded-lg border border-gray-200 dark:border-border text-sm text-gray-600 dark:text-muted-foreground hover:bg-gray-50 dark:hover:bg-muted"
+            className="h-9 flex-1 rounded-[10px] border border-border px-3.5 text-[13px] font-semibold text-[#6b7280] dark:text-muted-foreground hover:bg-muted"
           >
             취소
           </button>
           <button
             type="submit"
             disabled={loading}
-            className="flex-1 py-2 rounded-lg bg-violet-600 dark:bg-violet-500 text-white text-sm font-medium hover:bg-violet-700 dark:hover:bg-violet-400 disabled:opacity-50"
+            className="h-9 flex-1 rounded-[10px] bg-[#202023] px-3.5 text-[13px] font-semibold text-white hover:bg-[#343438] dark:bg-[#202023] dark:hover:bg-[#343438] disabled:opacity-50"
           >
             {loading ? "저장 중..." : "저장"}
           </button>
@@ -246,11 +246,11 @@ export function SheetList({ sheets, isAdmin }: Props) {
 
   return (
     <div>
-      <div className="flex justify-end mb-6">
+      <div className="mb-6 flex justify-end">
         {isAdmin && <button
           type="button"
           onClick={() => setShowAdd(true)}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-violet-600 dark:bg-violet-500 text-white text-sm font-medium hover:bg-violet-700 dark:hover:bg-violet-400"
+          className="flex h-9 items-center gap-2 rounded-[10px] bg-[#202023] px-3.5 text-[13px] font-semibold text-white hover:bg-[#343438] dark:bg-[#202023] dark:hover:bg-[#343438]"
         >
           <Plus size={16} />
           시트 추가
@@ -263,16 +263,16 @@ export function SheetList({ sheets, isAdmin }: Props) {
           <p className="text-sm">등록된 시트가 없습니다</p>
         </div>
       ) : (
-        <div className="space-y-6">
+        <div className="space-y-[22px]">
           {categories.map(cat => (
             <div key={cat}>
-              <div className="flex items-center gap-2 mb-3">
-                <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${categoryTones.get(cat) ?? toneBadgeClass("gray")}`}>
+              <div className="mb-[10px] flex items-center gap-2">
+                <span className={`inline-flex h-[22px] items-center rounded-full px-2 text-[11.5px] font-semibold whitespace-nowrap ${categoryTones.get(cat) ?? toneBadgeClass("gray")}`}>
                   {cat}
                 </span>
-                <span className="text-xs text-gray-400 dark:text-muted-foreground">{grouped[cat].length}개</span>
+                <span className="text-[12px] tabular-nums text-[#9ca3af] dark:text-muted-foreground">{grouped[cat].length}개</span>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 {grouped[cat].map(sheet => {
                   const description = getCardDescription(sheet);
                   return (
@@ -281,29 +281,29 @@ export function SheetList({ sheets, isAdmin }: Props) {
                       href={sheet.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="group bg-white dark:bg-card border border-gray-100 dark:border-border rounded-xl p-3.5 hover:shadow-md hover:border-violet-200 dark:hover:border-violet-500/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/50 dark:focus-visible:ring-violet-400/50 transition-all block"
+                      className="group flex items-center rounded-[12px] border border-border bg-white p-3.5 transition-all hover:border-[#d8d4fb] hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 dark:bg-card dark:hover:border-violet-500/50"
                     >
-                      <div className="flex items-start justify-between gap-3">
+                      <div className="flex min-w-0 flex-1 items-center justify-between gap-3">
                         <div className="flex items-center gap-3 min-w-0">
-                          <div className="w-10 h-10 rounded-lg bg-green-50 dark:bg-green-500/15 flex items-center justify-center shrink-0">
-                            <Sheet size={20} className="text-green-600 dark:text-green-400" />
+                          <div className="flex size-9 shrink-0 items-center justify-center rounded-[9px] bg-[#dcfce7] dark:bg-green-500/15">
+                            <Sheet size={18} className="text-[#15803d] dark:text-green-400" />
                           </div>
                           <div className="min-w-0">
                             <div className="flex items-start gap-1.5">
-                              <p className="line-clamp-2 text-base font-semibold text-gray-900 dark:text-foreground">{sheet.name}</p>
+                              <p className="truncate text-[13.5px] font-semibold text-foreground">{sheet.name}</p>
                               {sheet.externalOwner && (
                                 // 옮길 수 없는 시트라는 뜻이다. 그냥 두면 "왜 이것만
                                 // 정리가 안 됐지"를 계속 다시 묻게 된다.
                                 <span
                                   title={`${sheet.externalOwner} 님 소유입니다. 공유받은 시트라 우리 드라이브로 옮길 수 없습니다.`}
-                                  className="shrink-0 rounded-full border border-amber-500/30 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-medium text-amber-600 dark:text-amber-500"
+                                  className="shrink-0 rounded-[6px] border border-[#fcd34d] bg-[#fef3c7] px-1.5 py-0.5 text-[10px] font-medium text-[#b45309] dark:border-amber-800 dark:bg-amber-950/60 dark:text-amber-300"
                                 >
                                   외부 소유
                                 </span>
                               )}
                             </div>
                             {description && (
-                              <p className="mt-0.5 truncate text-sm text-gray-500 dark:text-muted-foreground">{description}</p>
+                              <p className="mt-[2px] truncate text-[11.5px] text-[#9ca3af] dark:text-muted-foreground">{description}</p>
                             )}
                           </div>
                         </div>
@@ -313,7 +313,7 @@ export function SheetList({ sheets, isAdmin }: Props) {
                               type="button"
                               onClick={e => { e.preventDefault(); setEditing(sheet); }}
                               aria-label={`${sheet.name} 수정`}
-                              className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-muted text-gray-400 dark:text-muted-foreground hover:text-gray-700 dark:hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/50 dark:focus-visible:ring-violet-400/50"
+                              className="rounded-lg p-1.5 text-[#9ca3af] hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 dark:text-muted-foreground"
                             >
                               <Pencil size={14} />
                             </button>
@@ -323,12 +323,12 @@ export function SheetList({ sheets, isAdmin }: Props) {
                               type="button"
                               onClick={e => { e.preventDefault(); void handleDelete(sheet.id); }}
                               aria-label={`${sheet.name} 삭제`}
-                              className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-500/10 text-gray-400 dark:text-muted-foreground hover:text-red-500 dark:hover:text-red-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/50 dark:focus-visible:ring-red-400/50"
+                              className="rounded-lg p-1.5 text-[#9ca3af] hover:bg-red-50 hover:text-red-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/50 dark:text-muted-foreground dark:hover:bg-red-500/10 dark:hover:text-red-400"
                             >
                               <Trash2 size={14} />
                             </button>
                           )}
-                          <ExternalLink size={14} className="text-violet-400 dark:text-violet-300 ml-1" />
+                          <ExternalLink size={14} className="ml-1 text-[#9ca3af] dark:text-muted-foreground" />
                         </div>
                       </div>
                     </a>

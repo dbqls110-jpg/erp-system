@@ -30,11 +30,11 @@ import { cn } from "@/lib/utils";
 import { useVisiblePolling } from "@/lib/useVisiblePolling";
 
 const STAGE_STYLES: Record<SpaceRegistrationStage, { dot: string; badge: string }> = {
-  접수: { dot: "bg-slate-400", badge: "border-slate-200 bg-slate-50 text-slate-700" },
-  "검토 중": { dot: "bg-sky-500", badge: "border-sky-200 bg-sky-50 text-sky-700" },
-  "확인 완료": { dot: "bg-amber-500", badge: "border-amber-200 bg-amber-50 text-amber-700" },
-  "등록 완료": { dot: "bg-emerald-500", badge: "border-emerald-200 bg-emerald-50 text-emerald-700" },
-  반려: { dot: "bg-rose-500", badge: "border-rose-200 bg-rose-50 text-rose-700" },
+  접수: { dot: "bg-[#9ca3af] dark:bg-muted-foreground", badge: "bg-[#e9ebf0] text-[#4b5563] dark:bg-muted/50 dark:text-muted-foreground" },
+  "검토 중": { dot: "bg-[#9ca3af] dark:bg-muted-foreground", badge: "bg-[#e9ebf0] text-[#4b5563] dark:bg-muted/50 dark:text-muted-foreground" },
+  "확인 완료": { dot: "bg-[#9ca3af] dark:bg-muted-foreground", badge: "bg-[#e9ebf0] text-[#4b5563] dark:bg-muted/50 dark:text-muted-foreground" },
+  "등록 완료": { dot: "bg-[#9ca3af] dark:bg-muted-foreground", badge: "bg-[#e9ebf0] text-[#4b5563] dark:bg-muted/50 dark:text-muted-foreground" },
+  반려: { dot: "bg-[#9ca3af] dark:bg-muted-foreground", badge: "bg-[#e9ebf0] text-[#4b5563] dark:bg-muted/50 dark:text-muted-foreground" },
 };
 
 interface Props {
@@ -124,10 +124,10 @@ export function SpaceRegistrationKanban({ initialRegistrations, canEdit }: Props
 
   return (
     <>
-      <div className="rounded-2xl border border-border bg-muted/20 p-3 sm:p-4">
-        <div className="mb-3 rounded-xl border border-border bg-background px-3 py-2.5 sm:px-4">
+      <div className="border-0 bg-transparent p-0">
+        <div className="mb-3 rounded-[10px] border border-border bg-card px-3 py-2.5 sm:px-4">
           <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+            <div className="flex items-center gap-2 text-[13px] font-medium text-foreground">
               <CalendarDays className="size-4 text-primary" />
               <span>{summaryTitle} 공간 등록 요약</span>
             </div>
@@ -154,24 +154,24 @@ export function SpaceRegistrationKanban({ initialRegistrations, canEdit }: Props
               </Button>
             </div>
           </div>
-          <p className="mt-2 text-xs text-muted-foreground sm:text-sm">
-            {summaryTitle} 공간 등록 <span className="font-semibold text-foreground">{summary.totalCount}</span>건 · {SPACE_REGISTRATION_STAGES.map((stage, index) => (
-              <span key={stage}>{index > 0 && " · "}{stage} <span className="font-semibold text-foreground">{summary.stageCounts[stage]}</span></span>
+          <p className="mt-2 text-[13px] text-[#6b7280] dark:text-muted-foreground">
+            {summaryTitle} 공간 등록 <span className="font-semibold tabular-nums text-foreground">{summary.totalCount}</span>건 · {SPACE_REGISTRATION_STAGES.map((stage, index) => (
+              <span key={stage}>{index > 0 && " · "}{stage} <span className="font-semibold tabular-nums text-foreground">{summary.stageCounts[stage]}</span></span>
             ))}
           </p>
         </div>
 
         <div className="mb-3 flex items-center justify-between gap-3 px-1">
-          <div className="text-sm text-muted-foreground">
-            전체 <span className="font-semibold text-foreground">{registrations.length}</span>건
+          <div className="text-[13px] text-[#6b7280] dark:text-muted-foreground">
+            전체 <span className="font-semibold tabular-nums text-foreground">{registrations.length}</span>건
           </div>
-          <div className="text-xs text-muted-foreground">
+          <div className="text-[12px] text-[#6b7280] dark:text-muted-foreground">
             {canEdit ? "카드를 끌어 단계에 놓으세요" : "상세 내용을 보려면 카드를 더블클릭하세요"}
           </div>
         </div>
 
         {registrations.length === 0 && (
-          <div className="mb-3 flex items-center gap-3 rounded-xl border border-dashed border-border bg-background px-4 py-3 text-sm text-muted-foreground">
+          <div className="mb-3 flex items-center gap-3 rounded-[10px] border border-dashed border-[#d1d5db] bg-transparent px-4 py-3 text-[13px] text-[#9ca3af] dark:border-muted dark:text-muted-foreground">
             <Inbox className="size-5 shrink-0 text-primary" />
             <div>
               <p className="font-medium text-foreground">아직 등록된 공간이 없습니다.</p>
@@ -181,14 +181,14 @@ export function SpaceRegistrationKanban({ initialRegistrations, canEdit }: Props
         )}
 
         <div className="pb-2">
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+          <div className="grid grid-cols-1 gap-[14px] md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
             {SPACE_REGISTRATION_STAGES.map((stage) => {
               const items = registrations.filter((registration) => registration.status === stage);
               const style = STAGE_STYLES[stage];
               return (
                 <section
                   key={stage}
-                  className="flex min-h-56 min-w-0 flex-col rounded-xl border border-border bg-background/80 xl:min-h-[28rem]"
+                  className="flex min-h-56 min-w-0 flex-col gap-[10px] rounded-[12px] bg-[#f5f6f8] p-3 dark:bg-[#202023] xl:min-h-[28rem]"
                   onDragOver={(event) => event.preventDefault()}
                   onDrop={(event) => {
                     event.preventDefault();
@@ -196,16 +196,16 @@ export function SpaceRegistrationKanban({ initialRegistrations, canEdit }: Props
                     if (registration) void moveRegistration(registration, stage);
                   }}
                 >
-                  <div className="flex items-center justify-between border-b border-border px-3 py-3">
+                  <div className="flex items-center justify-between px-1 py-0.5">
                     <div className="flex items-center gap-2">
                       <span className={cn("size-2 rounded-full", style.dot)} />
-                      <h2 className="text-sm font-semibold">{stage}</h2>
+                      <h2 className="text-[13px] font-semibold">{stage}</h2>
                     </div>
-                    <Badge variant="outline" className={cn("font-normal", style.badge)}>{items.length}</Badge>
+                    <Badge variant="outline" className={cn("h-[22px] rounded-full border-0 px-2 py-0 text-[11.5px] font-semibold tabular-nums", style.badge)}>{items.length}</Badge>
                   </div>
-                  <div className="flex flex-1 flex-col gap-2 p-2">
+                  <div className="flex flex-1 flex-col gap-2">
                     {items.length === 0 ? (
-                      <div className="flex flex-1 items-center justify-center rounded-lg border border-dashed border-border/70 px-3 text-center text-xs text-muted-foreground">
+                      <div className="flex min-h-[120px] flex-1 items-center justify-center rounded-[10px] border border-dashed border-[#d1d5db] bg-transparent px-3 text-center text-[12px] text-[#9ca3af] dark:border-muted dark:text-muted-foreground">
                         이 단계의 공간 등록이 없습니다.
                       </div>
                     ) : items.map((registration) => {
@@ -223,36 +223,34 @@ export function SpaceRegistrationKanban({ initialRegistrations, canEdit }: Props
                           onDragEnd={() => setDraggedId(null)}
                           onDoubleClick={() => openDetail(registration)}
                           className={cn(
-                            "cursor-grab rounded-xl border bg-card p-3 shadow-xs transition hover:-translate-y-0.5 hover:shadow-sm active:cursor-grabbing",
+                            "flex flex-col gap-2 cursor-grab rounded-[10px] border bg-card p-3 text-foreground shadow-xs transition hover:-translate-y-0.5 hover:shadow-sm active:cursor-grabbing",
                             age.overdue
-                              ? "border-rose-400 bg-rose-50/80 ring-2 ring-rose-200/70 dark:bg-rose-950/20"
+                              ? "border-[#fca5a5] dark:border-red-300/70"
                               : "border-border",
                             draggedId === registration.id && "opacity-50",
                             saving && "cursor-wait opacity-70",
                           )}
                           title="더블클릭하여 상세 보기"
                         >
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="min-w-0">
-                              <p className="truncate text-sm font-semibold text-foreground">{displayValue(registration.spaceName)}</p>
-                              <p className="mt-0.5 text-[11px] text-muted-foreground">접수 {displayDate(registration.receivedAt)}</p>
-                            </div>
-                            {age.overdue && (
-                              <span className="shrink-0 rounded-md bg-rose-600 px-1.5 py-1 text-[10px] font-semibold text-white">
-                                {age.dayLabel}
-                              </span>
-                            )}
+                          {age.overdue && (
+                            <span className="inline-flex w-fit items-center self-start rounded-[6px] bg-[#fee2e2] px-2 py-[3px] text-[11px] font-semibold text-[#dc2626] dark:bg-red-950/60 dark:text-red-300">
+                              {age.dayLabel}
+                            </span>
+                          )}
+                          <div className="flex items-baseline justify-between gap-2">
+                            <p className="min-w-0 truncate text-[14px] font-semibold text-foreground">{displayValue(registration.spaceName)}</p>
+                            <p className="shrink-0 text-[11px] text-[#9ca3af] dark:text-muted-foreground">접수 {displayDate(registration.receivedAt)}</p>
                           </div>
-                          <p className="mt-3 line-clamp-3 whitespace-pre-wrap text-xs leading-5 text-foreground/85">
+                          <p className="line-clamp-3 whitespace-pre-wrap text-[13px] leading-[1.5] text-foreground">
                             {displayValue(registration.description)}
                           </p>
-                          <div className="mt-3 space-y-1 border-t border-border/70 pt-2 text-[11px] text-muted-foreground">
+                          <div className="space-y-1 pt-1 text-[12px] text-[#6b7280] dark:text-muted-foreground">
                             <p className="truncate">{displayValue(registration.spaceType)} · {displayValue(registration.desiredRegion)}</p>
                             <p>{displayValue(registration.area)}㎡ · {displayValue(registration.capacity)}명 · {displayValue(registration.dailyRate)}만원/일</p>
                             <p className="flex items-center gap-1.5 truncate"><Phone className="size-3 shrink-0" />{displayValue(registration.phone)}</p>
                             <p className="flex items-center gap-1.5 truncate"><Mail className="size-3 shrink-0" />{displayValue(registration.email)}</p>
                           </div>
-                          <p className="mt-2 text-[11px] text-muted-foreground">사진 {displayValue(registration.photoCount)}장</p>
+                          <p className="text-[12px] text-[#6b7280] dark:text-muted-foreground">사진 {displayValue(registration.photoCount)}장</p>
                         </article>
                       );
                     })}

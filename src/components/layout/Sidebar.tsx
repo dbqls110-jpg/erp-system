@@ -109,14 +109,14 @@ export function Sidebar({ role, onClose, allowedMenus }: SidebarProps) {
         onClick={onClose}
         aria-current={active ? "page" : undefined}
         className={cn(
-          "flex h-9 w-full items-center gap-2.5 overflow-hidden rounded-xl px-3 text-left text-sm whitespace-nowrap transition-colors",
+          "flex h-9 w-full items-center gap-[10px] overflow-hidden rounded-[12px] px-3 text-left text-[14px] whitespace-nowrap transition-colors",
           "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
           active
-            ? "bg-sidebar-accent font-medium text-sidebar-accent-foreground"
-            : "text-sidebar-foreground/80"
+            ? "bg-[#7b68ee] font-medium text-white hover:bg-[#6656d9] dark:bg-[#7b68ee] dark:text-white dark:hover:bg-[#6656d9]"
+            : "text-[#292d34] dark:text-sidebar-foreground"
         )}
       >
-        <Icon className="size-[18px] shrink-0" />
+        <Icon className="size-5 shrink-0" />
         <span className="truncate">{item.label}</span>
       </Link>
     );
@@ -125,9 +125,9 @@ export function Sidebar({ role, onClose, allowedMenus }: SidebarProps) {
   const secondary = navSecondary.filter(visible);
 
   return (
-    <aside className="flex h-full w-60 shrink-0 flex-col border-r border-border bg-sidebar text-sidebar-foreground">
+    <aside className="box-border flex h-full w-60 shrink-0 flex-col gap-1 border-r border-border bg-sidebar p-5 px-3 text-sidebar-foreground">
       {/* 브랜드 */}
-      <div className="flex h-14 shrink-0 items-center justify-between border-b border-border px-3">
+      <div className="flex shrink-0 items-center justify-between px-2 pb-[18px] pt-1">
         <Link
           href="/dashboard"
           onClick={onClose}
@@ -149,7 +149,7 @@ export function Sidebar({ role, onClose, allowedMenus }: SidebarProps) {
       </div>
 
       {/* 내비게이션 */}
-      <nav className="flex flex-1 flex-col overflow-y-auto px-2 py-2">
+      <nav className="flex flex-1 flex-col overflow-y-auto">
         {/* 메뉴 행을 넉넉히 두면서도 관리자 화면에서 전체 항목이 한 화면에 들어오도록 간격을 제한한다. */}
         <div className="flex flex-col gap-1.5">
           {navGroups.map((group, gi) => {
@@ -158,7 +158,7 @@ export function Sidebar({ role, onClose, allowedMenus }: SidebarProps) {
             return (
               <div key={group.label ?? `g${gi}`} className="py-1">
                 {group.label && (
-                  <div className="flex h-7 shrink-0 items-center rounded-xl px-3 text-xs font-medium text-sidebar-foreground/70">
+                  <div className="flex h-7 shrink-0 items-center rounded-[12px] px-3 text-[11px] font-semibold tracking-[0.04em] text-[#b3b3b3] dark:text-[#b3b3b3]">
                     {group.label}
                   </div>
                 )}

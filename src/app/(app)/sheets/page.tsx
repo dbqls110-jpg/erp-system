@@ -19,10 +19,10 @@ export default async function SheetsPage() {
   ]);
 
   return (
-    <div className="space-y-4">
+    <div className="-m-4 min-h-full space-y-4 bg-[#fafafa] p-4 dark:bg-background sm:-m-7 sm:px-7 sm:py-5">
       <div>
-        <h1 className="text-xl font-semibold tracking-tight">구글 시트</h1>
-        <p className="mt-1 text-sm text-muted-foreground">구글 시트 링크를 확인하고 필요한 문서에 접근하세요.</p>
+        <h1 className="font-heading text-xl font-bold tracking-tight">구글 시트</h1>
+        <p className="mt-1 text-[13px] text-[#6b7280] dark:text-muted-foreground">구글 시트 링크를 확인하고 필요한 문서에 접근하세요.</p>
       </div>
       <SheetList sheets={sheets} isAdmin={canEdit} />
     </div>

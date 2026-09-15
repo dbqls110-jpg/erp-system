@@ -54,7 +54,7 @@ export function AppShell({ user, userId, children, allowedMenus }: AppShellProps
 
         <div className="flex flex-col flex-1 overflow-hidden min-w-0">
           <Header user={user} onMobileMenuOpen={() => setMobileOpen(true)} />
-          <main className="@container/main flex-1 overflow-y-auto p-4 sm:p-6">{children}</main>
+          <main className="@container/main flex-1 overflow-y-auto p-4 sm:p-7">{children}</main>
         </div>
       </div>
 

@@ -1,0 +1,171 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700&display=swap">
+  <style>
+    body { margin: 0; font-family: 'Noto Sans KR', 'Inter', system-ui, sans-serif; color: #292d34; }
+    a { color: #7b68ee; } a:hover { color: #6656d9; }
+  </style>
+</helmet>
+<div style="width: 1440px; height: 900px; display: flex; background: #ffffff; overflow: hidden;">
+
+  <aside style="width: 240px; display: flex; flex-direction: column; border-right: 1px solid #e8e8e8; background: #ffffff; padding: 20px 12px; gap: 4px; box-sizing: border-box;">
+    <div style="display: flex; align-items: center; gap: 10px; padding: 4px 8px 18px 8px;">
+      <div style="width: 28px; height: 28px; border-radius: 8px; background: #7b68ee;"></div>
+      <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 700; font-size: 16px;">천우영 ERP</div>
+    </div>
+    <div style="font-size: 11px; font-weight: 600; color: #b3b3b3; padding: 8px 12px 4px 12px; letter-spacing: 0.04em;">개요</div>
+    <div style="display: flex; align-items: center; gap: 10px; height: 36px; padding: 0 12px; border-radius: 12px; font-size: 14px;">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#292d34" stroke-width="1.8"><rect x="3" y="3" width="7" height="9" rx="1.5"></rect><rect x="14" y="3" width="7" height="5" rx="1.5"></rect><rect x="14" y="12" width="7" height="9" rx="1.5"></rect><rect x="3" y="16" width="7" height="5" rx="1.5"></rect></svg>
+      <span>대시보드</span>
+    </div>
+    <div style="font-size: 11px; font-weight: 600; color: #b3b3b3; padding: 12px 12px 4px 12px; letter-spacing: 0.04em;">업무</div>
+    <div style="display: flex; align-items: center; gap: 10px; height: 36px; padding: 0 12px; border-radius: 12px; font-size: 14px;">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#292d34" stroke-width="1.8"><path d="M4 6h16M4 12h16M4 18h10"></path></svg>
+      <span>프로젝트</span>
+    </div>
+    <div style="display: flex; align-items: center; gap: 10px; height: 36px; padding: 0 12px; border-radius: 12px; font-size: 14px; background: #7b68ee; color: #ffffff; font-weight: 500;">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="1.8"><path d="M4 5h16v11H8l-4 4V5z"></path></svg>
+      <span>문의</span>
+    </div>
+    <div style="display: flex; align-items: center; gap: 10px; height: 36px; padding: 0 12px; border-radius: 12px; font-size: 14px;">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#292d34" stroke-width="1.8"><rect x="3" y="5" width="18" height="16" rx="2"></rect><path d="M3 10h18M8 3v4M16 3v4"></path></svg>
+      <span>캘린더</span>
+    </div>
+    <div style="display: flex; align-items: center; gap: 10px; height: 36px; padding: 0 12px; border-radius: 12px; font-size: 14px;">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#292d34" stroke-width="1.8"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1.1-4.6A8 8 0 1 1 21 12z"></path></svg>
+      <span>메신저</span>
+    </div>
+    <div style="font-size: 11px; font-weight: 600; color: #b3b3b3; padding: 12px 12px 4px 12px; letter-spacing: 0.04em;">회사</div>
+    <div style="display: flex; align-items: center; gap: 10px; height: 36px; padding: 0 12px; border-radius: 12px; font-size: 14px;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#292d34" stroke-width="1.8"><path d="M3 21V7l9-4 9 4v14M9 21v-6h6v6"></path></svg><span>거래처</span></div>
+    <div style="display: flex; align-items: center; gap: 10px; height: 36px; padding: 0 12px; border-radius: 12px; font-size: 14px;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#292d34" stroke-width="1.8"><circle cx="9" cy="8" r="3.5"></circle><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4a3.5 3.5 0 0 1 0 7M21.5 20a6.5 6.5 0 0 0-5-6.3"></path></svg><span>파트너</span></div>
+    <div style="display: flex; align-items: center; gap: 10px; height: 36px; padding: 0 12px; border-radius: 12px; font-size: 14px;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#292d34" stroke-width="1.8"><path d="M12 21s7-6.2 7-11a7 7 0 0 0-14 0c0 4.8 7 11 7 11z"></path><circle cx="12" cy="10" r="2.5"></circle></svg><span>공간 DB</span></div>
+    <div style="display: flex; align-items: center; gap: 10px; height: 36px; padding: 0 12px; border-radius: 12px; font-size: 14px;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#292d34" stroke-width="1.8"><path d="M4 4h16v16H4zM4 10h16M10 4v16"></path></svg><span>시트</span></div>
+    <div style="display: flex; align-items: center; gap: 10px; height: 36px; padding: 0 12px; border-radius: 12px; font-size: 14px;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#292d34" stroke-width="1.8"><path d="M4 19V5M4 19h16M8 15v-4M12 15V8M16 15v-6"></path></svg><span>재무</span></div>
+  </aside>
+
+  <main style="flex: 1; display: flex; flex-direction: column; min-width: 0;">
+    <header style="display: flex; align-items: center; justify-content: space-between; height: 64px; padding: 0 28px; border-bottom: 1px solid #e8e8e8; box-sizing: border-box;">
+      <div style="display: flex; align-items: center; gap: 20px;">
+        <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 700; font-size: 20px;">문의</div>
+        <div style="display: flex; gap: 2px; padding: 3px; background: #e9ebf0; border-radius: 10px;">
+          <div style="padding: 6px 14px; border-radius: 8px; font-size: 13px; color: #6b7280;">고객 문의</div>
+          <div style="padding: 6px 14px; border-radius: 8px; font-size: 13px; color: #6b7280;">공간 등록</div>
+          <div style="padding: 6px 14px; border-radius: 8px; background: #ffffff; font-size: 13px; font-weight: 600; box-shadow: 0 1px 2px rgba(0,0,0,0.06);">공간대관</div>
+        </div>
+      </div>
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <div style="display: flex; align-items: center; gap: 8px; height: 36px; padding: 0 12px; border: 1px solid #e8e8e8; border-radius: 10px; font-size: 13px; color: #6b7280; width: 220px; box-sizing: border-box;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" stroke-width="2"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg>
+          <span>이름·회사·행사 검색</span>
+        </div>
+        <div style="height: 36px; padding: 0 14px; display: flex; align-items: center; border-radius: 10px; background: #202023; color: #ffffff; font-size: 13px; font-weight: 600;">문의 추가</div>
+      </div>
+    </header>
+
+    <div style="display: flex; align-items: center; gap: 16px; padding: 14px 28px 0 28px; font-size: 13px; color: #6b7280;">
+      <span>전체 <b style="color: #292d34;">5</b></span>
+      <span>·</span>
+      <span>2일 넘게 멈춤 <b style="color: #dc2626;">1</b></span>
+      <span>·</span>
+      <span>이번 주 성사 <b style="color: #292d34;">0</b></span>
+    </div>
+
+    <div style="flex: 1; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 14px; padding: 16px 28px 24px 28px; min-height: 0;">
+
+      <section style="display: flex; flex-direction: column; gap: 10px; background: #f5f6f8; border-radius: 12px; padding: 12px;">
+        <div style="display: flex; align-items: center; justify-content: space-between; padding: 2px 4px;">
+          <div style="font-size: 13px; font-weight: 600;">문의</div>
+          <div style="font-size: 12px; font-weight: 600; color: #7b68ee; background: #ede9fe; padding: 2px 8px; border-radius: 999px;">2</div>
+        </div>
+        <article style="display: flex; flex-direction: column; gap: 8px; background: #ffffff; border: 1px solid #e8e8e8; border-radius: 10px; padding: 12px;">
+          <div style="display: flex; justify-content: space-between; align-items: baseline;">
+            <div style="font-size: 14px; font-weight: 600;"><span style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 600; color: #9ca3af; margin-right: 7px;">1218</span>김민준</div>
+            <div style="font-size: 11px; color: #9ca3af;">9/15</div>
+          </div>
+          <div style="font-size: 12px; color: #6b7280;">(주)한빛 · 체육대회</div>
+          <div style="font-size: 13px; line-height: 1.5;">가을 체육대회 200명, 10월 셋째 주 토요일. 서울 동부권 희망.</div>
+          <div style="display: flex; gap: 12px; font-size: 12px; color: #6b7280; padding-top: 4px;"><span>010-••••-1234</span><span>minjun@hanbit.co.kr</span></div>
+        </article>
+        <article style="display: flex; flex-direction: column; gap: 8px; background: #ffffff; border: 1px solid #e8e8e8; border-radius: 10px; padding: 12px;">
+          <div style="display: flex; justify-content: space-between; align-items: baseline;">
+            <div style="font-size: 14px; font-weight: 600;"><span style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 600; color: #9ca3af; margin-right: 7px;">1217</span>이서연</div>
+            <div style="font-size: 11px; color: #9ca3af;">9/14</div>
+          </div>
+          <div style="font-size: 12px; color: #6b7280;">오름컴퍼니 · 팝업 스토어</div>
+          <div style="font-size: 13px; line-height: 1.5;">브랜드 연합 팝업, 11월 첫째 주 금–일. 성수·연남 쪽.</div>
+          <div style="display: flex; gap: 12px; font-size: 12px; color: #6b7280; padding-top: 4px;"><span>010-••••-5678</span><span>seoyeon@oreum.kr</span></div>
+        </article>
+      </section>
+
+      <section style="display: flex; flex-direction: column; gap: 10px; background: #f5f6f8; border-radius: 12px; padding: 12px;">
+        <div style="display: flex; align-items: center; justify-content: space-between; padding: 2px 4px;">
+          <div style="font-size: 13px; font-weight: 600;">1차 연락</div>
+          <div style="font-size: 12px; font-weight: 600; color: #6b7280; background: #e9ebf0; padding: 2px 8px; border-radius: 999px;">1</div>
+        </div>
+        <article style="display: flex; flex-direction: column; gap: 8px; background: #ffffff; border: 1px solid #fca5a5; border-radius: 10px; padding: 12px;">
+          <div style="display: inline-flex; align-self: flex-start; align-items: center; gap: 6px; font-size: 11px; font-weight: 600; color: #dc2626; background: #fee2e2; padding: 3px 8px; border-radius: 6px;">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2.5"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>
+            <span>3일째 멈춤</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; align-items: baseline;">
+            <div style="font-size: 14px; font-weight: 600;"><span style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 600; color: #9ca3af; margin-right: 7px;">1216</span>박지호</div>
+            <div style="font-size: 11px; color: #9ca3af;">9/9</div>
+          </div>
+          <div style="font-size: 12px; color: #6b7280;">블루문 · 공연/콘서트</div>
+          <div style="font-size: 13px; line-height: 1.5;">스탠드업 콘서트 350석, 10/30 금. 명지대 대강당 후보.</div>
+          <div style="display: flex; gap: 12px; font-size: 12px; color: #6b7280; padding-top: 4px;"><span>010-••••-9012</span><span>jiho@bluemoon.kr</span></div>
+        </article>
+      </section>
+
+      <section style="display: flex; flex-direction: column; gap: 10px; background: #f5f6f8; border-radius: 12px; padding: 12px;">
+        <div style="display: flex; align-items: center; justify-content: space-between; padding: 2px 4px;">
+          <div style="font-size: 13px; font-weight: 600;">2차 연락</div>
+          <div style="font-size: 12px; font-weight: 600; color: #6b7280; background: #e9ebf0; padding: 2px 8px; border-radius: 999px;">1</div>
+        </div>
+        <article style="display: flex; flex-direction: column; gap: 8px; background: #ffffff; border: 1px solid #e8e8e8; border-radius: 10px; padding: 12px;">
+          <div style="display: flex; justify-content: space-between; align-items: baseline;">
+            <div style="font-size: 14px; font-weight: 600;"><span style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 600; color: #9ca3af; margin-right: 7px;">1214</span>최유진</div>
+            <div style="font-size: 11px; color: #9ca3af;">9/12</div>
+          </div>
+          <div style="font-size: 12px; color: #6b7280;">그린웨이 · 강연/교육</div>
+          <div style="font-size: 13px; line-height: 1.5;">임직원 워크숍 120명, 11월 중. 강남권 세미나실.</div>
+          <div style="display: flex; gap: 12px; font-size: 12px; color: #6b7280; padding-top: 4px;"><span>010-••••-3456</span><span>yujin@greenway.co.kr</span></div>
+        </article>
+      </section>
+
+      <section style="display: flex; flex-direction: column; gap: 10px; background: #f5f6f8; border-radius: 12px; padding: 12px;">
+        <div style="display: flex; align-items: center; justify-content: space-between; padding: 2px 4px;">
+          <div style="font-size: 13px; font-weight: 600;">성사</div>
+          <div style="font-size: 12px; font-weight: 600; color: #6b7280; background: #e9ebf0; padding: 2px 8px; border-radius: 999px;">0</div>
+        </div>
+        <div style="flex: 1; display: flex; align-items: center; justify-content: center; border: 1px dashed #d1d5db; border-radius: 10px; font-size: 12px; color: #9ca3af; min-height: 120px;">성사되면 프로젝트가 만들어집니다</div>
+      </section>
+
+      <section style="display: flex; flex-direction: column; gap: 10px; background: #f5f6f8; border-radius: 12px; padding: 12px;">
+        <div style="display: flex; align-items: center; justify-content: space-between; padding: 2px 4px;">
+          <div style="font-size: 13px; font-weight: 600; color: #6b7280;">종료</div>
+          <div style="font-size: 12px; font-weight: 600; color: #6b7280; background: #e9ebf0; padding: 2px 8px; border-radius: 999px;">1</div>
+        </div>
+        <article style="display: flex; flex-direction: column; gap: 8px; background: #fafafa; border: 1px solid #ececec; border-radius: 10px; padding: 12px; color: #9ca3af;">
+          <div style="display: flex; justify-content: space-between; align-items: baseline;">
+            <div style="font-size: 14px; font-weight: 600;"><span style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 600; color: #9ca3af; margin-right: 7px;">1211</span>정하늘</div>
+            <div style="font-size: 11px;">9/8</div>
+          </div>
+          <div style="font-size: 12px;">노을기획 · 박람회</div>
+          <div style="font-size: 13px; line-height: 1.5;">일정 미확정으로 보류.</div>
+        </article>
+      </section>
+
+    </div>
+  </main>
+</div>
+</x-dc>
+</body>
+</html>

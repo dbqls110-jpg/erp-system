@@ -11,21 +11,21 @@ export type BadgeTone =
 export function toneBadgeClass(tone: BadgeTone): string {
   switch (tone) {
     case "blue":
-      return "border-blue-500/30 bg-blue-500/10 text-blue-600 dark:text-blue-400";
+      return "bg-[#dbeafe] text-[#1d4ed8] dark:bg-blue-950/60 dark:text-blue-300";
     case "green":
-      return "border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400";
+      return "bg-[#dcfce7] text-[#15803d] dark:bg-emerald-950/60 dark:text-emerald-300";
     case "amber":
     case "yellow":
-      return "border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-500";
+      return "bg-[#fef3c7] text-[#b45309] dark:bg-amber-950/60 dark:text-amber-300";
     case "purple":
-      return "border-purple-500/30 bg-purple-500/10 text-purple-600 dark:text-purple-400";
+      return "bg-[#ede9fe] text-[#6d28d9] dark:bg-violet-950/60 dark:text-violet-300";
     case "violet":
-      return "border-violet-500/30 bg-violet-500/10 text-violet-600 dark:text-violet-400";
+      return "bg-[#ede9fe] text-[#6d28d9] dark:bg-violet-950/60 dark:text-violet-300";
     case "red":
-      return "border-red-500/30 bg-red-500/10 text-red-600 dark:text-red-400";
+      return "bg-[#fee2e2] text-[#b91c1c] dark:bg-red-950/60 dark:text-red-300";
     case "gray":
     default:
-      return "border-border bg-muted text-muted-foreground";
+      return "bg-[#e9ebf0] text-[#4b5563] dark:bg-muted/50 dark:text-muted-foreground";
   }
 }
 

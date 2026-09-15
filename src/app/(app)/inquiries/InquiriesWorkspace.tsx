@@ -22,12 +22,12 @@ export function InquiriesWorkspace({ initialInquiries, initialSpaceRegistrations
 
   return (
     <div className="space-y-4">
-      <div className="inline-flex rounded-xl border border-border bg-muted/30 p-1" role="tablist" aria-label="문의 갈래">
+      <div className="inline-flex gap-0.5 rounded-[10px] bg-[#e9ebf0] p-[3px] dark:bg-muted/50" role="tablist" aria-label="문의 갈래">
         <button
           type="button"
           role="tab"
           aria-selected={branch === "customer"}
-          className={`rounded-lg px-4 py-2 text-sm font-medium transition ${branch === "customer" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+          className={`rounded-[8px] px-3.5 py-1.5 text-[13px] transition ${branch === "customer" ? "bg-white font-semibold text-foreground shadow-[0_1px_2px_rgba(0,0,0,0.06)] dark:bg-card" : "font-normal text-[#6b7280] hover:text-foreground dark:text-muted-foreground"}`}
           onClick={() => setBranch("customer")}
         >
           고객 문의
@@ -36,7 +36,7 @@ export function InquiriesWorkspace({ initialInquiries, initialSpaceRegistrations
           type="button"
           role="tab"
           aria-selected={branch === "space-registration"}
-          className={`rounded-lg px-4 py-2 text-sm font-medium transition ${branch === "space-registration" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+          className={`rounded-[8px] px-3.5 py-1.5 text-[13px] transition ${branch === "space-registration" ? "bg-white font-semibold text-foreground shadow-[0_1px_2px_rgba(0,0,0,0.06)] dark:bg-card" : "font-normal text-[#6b7280] hover:text-foreground dark:text-muted-foreground"}`}
           onClick={() => setBranch("space-registration")}
         >
           공간 등록
@@ -45,7 +45,7 @@ export function InquiriesWorkspace({ initialInquiries, initialSpaceRegistrations
           type="button"
           role="tab"
           aria-selected={branch === "space-rental"}
-          className={`rounded-lg px-4 py-2 text-sm font-medium transition ${branch === "space-rental" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+          className={`rounded-[8px] px-3.5 py-1.5 text-[13px] transition ${branch === "space-rental" ? "bg-white font-semibold text-foreground shadow-[0_1px_2px_rgba(0,0,0,0.06)] dark:bg-card" : "font-normal text-[#6b7280] hover:text-foreground dark:text-muted-foreground"}`}
           onClick={() => setBranch("space-rental")}
         >
           공간대관

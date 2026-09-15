@@ -108,7 +108,7 @@ export function Header({ user, onMobileMenuOpen }: HeaderProps) {
   };
 
   return (
-    <header className="h-14 flex items-center justify-between px-4 sm:px-6 border-b border-border bg-background shrink-0">
+    <header className="flex h-16 shrink-0 items-center justify-between border-b border-border bg-background px-4 sm:px-7">
       <div className="flex items-center gap-3">
         {onMobileMenuOpen && (
           <button
@@ -119,9 +119,9 @@ export function Header({ user, onMobileMenuOpen }: HeaderProps) {
             <Menu size={20} />
           </button>
         )}
-        <h1 className="text-sm font-semibold text-foreground">{title || "사내 ERP 시스템"}</h1>
+        <h1 className="font-heading text-xl font-bold text-foreground">{title || "사내 ERP 시스템"}</h1>
       </div>
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2.5">
         <Link href="/messenger" aria-label="메신저" className="relative text-muted-foreground hover:text-primary transition-colors">
           <MessageCircle size={20} />
           {unread > 0 && (

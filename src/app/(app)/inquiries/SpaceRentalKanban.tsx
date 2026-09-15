@@ -36,29 +36,29 @@ import { useVisiblePolling } from "@/lib/useVisiblePolling";
 
 const STAGE_STYLES: Record<SpaceRentalStage, { dot: string; badge: string; header: string }> = {
   문의: {
-    dot: "bg-slate-400 dark:bg-slate-500",
-    badge: "border-slate-200 bg-slate-50 text-slate-700 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-300",
-    header: "bg-slate-50/70 dark:bg-slate-950/30",
+    dot: "bg-[#9ca3af] dark:bg-muted-foreground",
+    badge: "bg-[#ede9fe] text-[#7b68ee] dark:bg-violet-950/60 dark:text-violet-300",
+    header: "",
   },
   "1차 연락": {
-    dot: "bg-sky-500 dark:bg-sky-400",
-    badge: "border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-800 dark:bg-sky-950/50 dark:text-sky-300",
-    header: "bg-sky-50/70 dark:bg-sky-950/20",
+    dot: "bg-[#9ca3af] dark:bg-muted-foreground",
+    badge: "bg-[#e9ebf0] text-[#4b5563] dark:bg-muted/50 dark:text-muted-foreground",
+    header: "",
   },
   "2차 연락": {
-    dot: "bg-amber-500 dark:bg-amber-400",
-    badge: "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300",
-    header: "bg-amber-50/70 dark:bg-amber-950/20",
+    dot: "bg-[#9ca3af] dark:bg-muted-foreground",
+    badge: "bg-[#e9ebf0] text-[#4b5563] dark:bg-muted/50 dark:text-muted-foreground",
+    header: "",
   },
   성사: {
-    dot: "bg-violet-500 dark:bg-violet-400",
-    badge: "border-violet-200 bg-violet-50 text-violet-700 dark:border-violet-800 dark:bg-violet-950/40 dark:text-violet-300",
-    header: "bg-violet-50/70 dark:bg-violet-950/20",
+    dot: "bg-[#9ca3af] dark:bg-muted-foreground",
+    badge: "bg-[#e9ebf0] text-[#4b5563] dark:bg-muted/50 dark:text-muted-foreground",
+    header: "",
   },
   종료: {
-    dot: "bg-emerald-500 dark:bg-emerald-400",
-    badge: "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300",
-    header: "bg-emerald-50/70 dark:bg-emerald-950/20",
+    dot: "bg-[#9ca3af] dark:bg-muted-foreground",
+    badge: "bg-[#e9ebf0] text-[#4b5563] dark:bg-muted/50 dark:text-muted-foreground",
+    header: "",
   },
 };
 
@@ -82,7 +82,7 @@ function suggestedProjectName(rental: SpaceRentalRecord): string {
 function RentalName({ rental }: { rental: Pick<SpaceRentalRecord, "category" | "reserverName"> }) {
   return (
     <>
-      {rental.category && <span className="mr-2 font-mono text-sm font-normal tabular-nums text-muted-foreground">{rental.category}</span>}
+      {rental.category && <span className="mr-[7px] font-heading text-[14px] font-semibold tabular-nums text-[#9ca3af] dark:text-muted-foreground">{rental.category}</span>}
       <span>{displayValue(rental.reserverName)}</span>
     </>
   );
@@ -161,10 +161,10 @@ export function SpaceRentalKanban({ initialRentals, canEdit }: Props) {
 
   return (
     <>
-      <div className="rounded-2xl border border-border bg-muted/20 p-3 sm:p-4">
-        <div className="mb-3 rounded-xl border border-border bg-background px-3 py-2.5 sm:px-4">
+      <div className="border-0 bg-transparent p-0">
+        <div className="mb-3 rounded-[10px] border border-border bg-card px-3 py-2.5 sm:px-4">
           <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+            <div className="flex items-center gap-2 text-[13px] font-medium text-foreground">
               <CalendarDays className="size-4 text-primary" />
               <span>{summaryTitle} 공간대관 요약</span>
             </div>
@@ -177,20 +177,20 @@ export function SpaceRentalKanban({ initialRentals, canEdit }: Props) {
               </Button>
             </div>
           </div>
-          <p className="mt-2 text-xs text-muted-foreground sm:text-sm">
-            {summaryTitle} 공간대관 <span className="font-semibold text-foreground">{summary.totalCount}</span>건 · {SPACE_RENTAL_STAGES.map((stage, index) => (
-              <span key={stage}>{index > 0 && " · "}{stage} <span className="font-semibold text-foreground">{summary.stageCounts[stage]}</span></span>
+          <p className="mt-2 text-[13px] text-[#6b7280] dark:text-muted-foreground">
+            {summaryTitle} 공간대관 <span className="font-semibold tabular-nums text-foreground">{summary.totalCount}</span>건 · {SPACE_RENTAL_STAGES.map((stage, index) => (
+              <span key={stage}>{index > 0 && " · "}{stage} <span className="font-semibold tabular-nums text-foreground">{summary.stageCounts[stage]}</span></span>
             ))}
           </p>
         </div>
 
         <div className="mb-3 flex items-center justify-between gap-3 px-1">
-          <div className="text-sm text-muted-foreground">전체 <span className="font-semibold text-foreground">{visibleRentals.length}</span>건</div>
-          <div className="text-xs text-muted-foreground">{canEdit ? "카드를 끌거나 카드의 단계 변경에서 선택하세요" : "상세 내용을 보려면 카드를 더블클릭하세요"}</div>
+          <div className="text-[13px] text-[#6b7280] dark:text-muted-foreground">전체 <span className="font-semibold tabular-nums text-foreground">{visibleRentals.length}</span>건</div>
+          <div className="text-[12px] text-[#6b7280] dark:text-muted-foreground">{canEdit ? "카드를 끌거나 카드의 단계 변경에서 선택하세요" : "상세 내용을 보려면 카드를 더블클릭하세요"}</div>
         </div>
 
         {visibleRentals.length === 0 && (
-          <div className="mb-3 flex items-center gap-3 rounded-xl border border-dashed border-border bg-background px-4 py-3 text-sm text-muted-foreground">
+          <div className="mb-3 flex items-center gap-3 rounded-[10px] border border-dashed border-[#d1d5db] bg-transparent px-4 py-3 text-[13px] text-[#9ca3af] dark:border-muted dark:text-muted-foreground">
             <Inbox className="size-5 shrink-0 text-primary" />
             <div>
               <p className="font-medium text-foreground">{rentals.length === 0 ? "아직 공간대관 문의가 없습니다." : "현재 표시할 공간대관이 없습니다."}</p>
@@ -200,14 +200,14 @@ export function SpaceRentalKanban({ initialRentals, canEdit }: Props) {
         )}
 
         <div className="pb-2">
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+          <div className="grid grid-cols-1 gap-[14px] md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
             {SPACE_RENTAL_STAGES.map((stage) => {
               const items = visibleRentals.filter((rental) => rental.status === stage);
               const style = STAGE_STYLES[stage];
               return (
                 <section
                   key={stage}
-                  className="flex min-h-56 min-w-0 flex-col rounded-xl border border-border bg-background/80 xl:min-h-[28rem]"
+                  className="flex min-h-56 min-w-0 flex-col gap-[10px] rounded-[12px] bg-[#f5f6f8] p-3 dark:bg-[#202023] xl:min-h-[28rem]"
                   onDragOver={(event) => event.preventDefault()}
                   onDrop={(event) => {
                     event.preventDefault();
@@ -215,13 +215,13 @@ export function SpaceRentalKanban({ initialRentals, canEdit }: Props) {
                     if (rental) void moveRental(rental, stage);
                   }}
                 >
-                  <div className={cn("flex items-center justify-between border-b border-border px-3 py-3", style.header)}>
-                    <div className="flex items-center gap-2"><span className={cn("size-2 rounded-full", style.dot)} /><h2 className="text-sm font-semibold">{stage}</h2></div>
-                    <Badge variant="outline" className={cn("font-normal", style.badge)}>{items.length}</Badge>
+                  <div className={cn("flex items-center justify-between px-1 py-0.5", style.header)}>
+                    <div className="flex items-center gap-2"><span className={cn("size-2 rounded-full", style.dot)} /><h2 className={cn("text-[13px] font-semibold", stage === "종료" && "text-[#6b7280] dark:text-muted-foreground")}>{stage}</h2></div>
+                    <Badge variant="outline" className={cn("h-[22px] rounded-full border-0 px-2 py-0 text-[11.5px] font-semibold tabular-nums", style.badge)}>{items.length}</Badge>
                   </div>
-                  <div className="flex flex-1 flex-col gap-2 p-2">
+                  <div className="flex flex-1 flex-col gap-2">
                     {items.length === 0 ? (
-                      <div className="flex min-h-32 flex-1 flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border/70 bg-muted/10 px-3 py-6 text-center text-xs text-muted-foreground dark:bg-muted/5">
+                      <div className="flex min-h-[120px] flex-1 flex-col items-center justify-center gap-2 rounded-[10px] border border-dashed border-[#d1d5db] bg-transparent px-3 py-6 text-center text-[12px] text-[#9ca3af] dark:border-muted dark:text-muted-foreground">
                         <Inbox className="size-5 text-muted-foreground/70" /><span>이 단계의 공간대관이 없습니다.</span><span className="text-[11px]">카드를 이곳에 놓거나 단계 변경에서 선택하세요.</span>
                       </div>
                     ) : items.map((rental) => {
@@ -235,23 +235,31 @@ export function SpaceRentalKanban({ initialRentals, canEdit }: Props) {
                           onDragEnd={() => setDraggedId(null)}
                           onDoubleClick={() => setSelectedId(rental.id)}
                           className={cn(
-                            "touch-pan-y cursor-grab rounded-xl border bg-card p-3 shadow-xs transition hover:-translate-y-0.5 hover:shadow-sm active:cursor-grabbing",
-                            age.overdue ? "border-rose-400 bg-rose-50/80 ring-2 ring-rose-200/70 dark:bg-rose-950/20" : "border-border",
+                            "touch-pan-y cursor-grab rounded-[10px] border bg-card p-3 text-foreground shadow-xs transition hover:-translate-y-0.5 hover:shadow-sm active:cursor-grabbing",
+                            age.overdue
+                              ? "border-[#fca5a5] dark:border-red-300/70"
+                              : rental.status === "종료"
+                                ? "border-[#ececec] bg-[#fafafa] text-[#9ca3af] dark:border-muted dark:bg-[#202023] dark:text-muted-foreground"
+                                : "border-border",
                             draggedId === rental.id && "opacity-50",
                             saving && "cursor-wait opacity-70",
                           )}
                           title="더블클릭하여 상세 보기"
                         >
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="min-w-0">
-                              <p className="truncate text-base font-semibold text-foreground"><RentalName rental={rental} /></p>
-                              <p className="truncate text-xs text-foreground/80">원청 {displayValue(rental.client)}</p>
-                              <p className="truncate text-xs text-foreground/80">{displayValue(rental.eventName)} · {displayValue(rental.eventType)}</p>
-                              <p className="mt-0.5 text-[11px] text-muted-foreground">접수 {displayDate(rental.receivedAt)}</p>
-                            </div>
-                            {age.overdue && <span className="shrink-0 rounded-md bg-rose-600 px-1.5 py-1 text-[10px] font-semibold text-white">{age.dayLabel}</span>}
+                          {age.overdue && (
+                            <span className="inline-flex w-fit items-center self-start rounded-[6px] bg-[#fee2e2] px-2 py-[3px] text-[11px] font-semibold text-[#dc2626] dark:bg-red-950/60 dark:text-red-300">
+                              {age.dayLabel}
+                            </span>
+                          )}
+                          <div className="flex items-baseline justify-between gap-2">
+                            <p className="min-w-0 truncate text-[14px] font-semibold text-inherit"><RentalName rental={rental} /></p>
+                            <p className="shrink-0 text-[11px] text-[#9ca3af] dark:text-muted-foreground">접수 {displayDate(rental.receivedAt)}</p>
                           </div>
-                          <div className="mt-3 space-y-1 border-t border-border/70 pt-2 text-xs text-muted-foreground">
+                          <div className={cn("space-y-1 text-[12px]", rental.status === "종료" ? "text-inherit" : "text-[#6b7280] dark:text-muted-foreground")}>
+                            <p className="truncate">원청 {displayValue(rental.client)}</p>
+                            <p className="truncate">{displayValue(rental.eventName)} · {displayValue(rental.eventType)}</p>
+                          </div>
+                          <div className={cn("space-y-1 pt-1 text-[12px]", rental.status === "종료" ? "text-inherit" : "text-[#6b7280] dark:text-muted-foreground")}>
                             <p className="flex items-center gap-1.5 truncate"><Phone className="size-3 shrink-0" />{displayValue(rental.phone)}</p>
                             <p className="flex items-center gap-1.5 truncate"><Mail className="size-3 shrink-0" />{displayValue(rental.email)}</p>
                           </div>
@@ -268,7 +276,7 @@ export function SpaceRentalKanban({ initialRentals, canEdit }: Props) {
                               {rental.projectName ? (
                                 <Link href={rental.projectId ? `/projects/${rental.projectId}` : "/projects"} onClick={(event) => event.stopPropagation()} className="block truncate text-xs font-medium text-primary hover:underline">프로젝트 {rental.projectName}</Link>
                               ) : canEdit ? (
-                                <Button type="button" variant="outline" size="sm" className="h-7 w-full text-xs" onClick={(event) => { event.stopPropagation(); setProjectRental(rental); setProjectNameDraft(suggestedProjectName(rental)); }} disabled={saving || projectSaving}>프로젝트로 만들기</Button>
+                             <Button type="button" variant="outline" size="sm" className="h-9 w-full rounded-[10px] px-3.5 text-[13px] font-semibold" onClick={(event) => { event.stopPropagation(); setProjectRental(rental); setProjectNameDraft(suggestedProjectName(rental)); }} disabled={saving || projectSaving}>프로젝트로 만들기</Button>
                               ) : null}
                             </div>
                           )}
