@@ -31,6 +31,7 @@ const pageTitle: Record<string, string> = {
   "/credentials": "ID 관리",
   "/sheets": "구글 시트",
   "/projects/stats": "프로젝트 통계",
+  "/inquiries": "문의",
   "/admin": "관리자",
   "/messenger": "메신저",
 };
