@@ -55,8 +55,7 @@ const CONTRACT_STATUSES = ["활성", "보류", "종료"];
 const SETTLEMENT_TYPES = ["월정산", "건별"];
 const RATE_UNITS = ["건당", "일당", "시간당"];
 
-const SELECT_CLASS =
-  "h-9 rounded-[10px] border border-border bg-input/50 px-3 text-[13px] text-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/30";
+const SELECT_CLASS = "h-9 w-full rounded-[10px] border border-border bg-background px-3 text-[13px] text-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/30";
 
 const emptyForm = {
   name: "",
@@ -575,47 +574,35 @@ export function PartnerTable({
       </div>
 
       <Card>
-        <CardContent className="space-y-3">
-          <div className="flex flex-wrap items-center gap-3">
-            <span className="w-20 shrink-0 text-sm text-muted-foreground">거래상태</span>
-            <select
-              className={`${SELECT_CLASS} w-36`}
-              value={status}
-              onChange={(e) => setStatus(e.target.value)}
-            >
-              <option value="all">전체</option>
-              {CONTRACT_STATUSES.map((s) => (
-                <option key={s} value={s}>{s}</option>
-              ))}
-            </select>
-          </div>
-          <div className="flex flex-wrap items-center gap-3">
-            <span className="w-20 shrink-0 text-sm text-muted-foreground">정산방식</span>
-            <select
-              className={`${SELECT_CLASS} w-36`}
-              value={settlement}
-              onChange={(e) => setSettlement(e.target.value)}
-            >
-              <option value="all">전체</option>
-              {SETTLEMENT_TYPES.map((s) => (
-                <option key={s} value={s}>{s}</option>
-              ))}
-            </select>
-          </div>
-          <div className="flex flex-wrap items-center gap-3">
-            <span className="w-20 shrink-0 text-sm text-muted-foreground">검색키워드</span>
-            <Input
-              className="w-72"
-              placeholder="이름 또는 직업 입력"
-              value={keyword}
-              onChange={(e) => setKeyword(e.target.value)}
-            />
-          </div>
-          <div className="flex justify-end gap-2 pt-1">
-            {/* 조회 버튼은 두지 않는다. 입력하는 대로 목록이 걸러지므로 누를 것이 없다. */}
-            <Button variant="outline" size="sm" onClick={resetFilters}>
-              초기화
-            </Button>
+        <CardContent>
+          {/* 거래처 화면과 같은 한 줄 필터. 세로로 쌓으면 넓은 화면에서 카드가 빈다. */}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-[10rem_10rem_minmax(0,1fr)_auto] lg:items-end">
+            <label className="space-y-1.5 text-[12px]">
+              <span className="block text-muted-foreground">거래상태</span>
+              <select className={SELECT_CLASS} value={status} onChange={(e) => setStatus(e.target.value)}>
+                <option value="all">전체</option>
+                {CONTRACT_STATUSES.map((s) => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
+            </label>
+            <label className="space-y-1.5 text-[12px]">
+              <span className="block text-muted-foreground">정산방식</span>
+              <select className={SELECT_CLASS} value={settlement} onChange={(e) => setSettlement(e.target.value)}>
+                <option value="all">전체</option>
+                {SETTLEMENT_TYPES.map((s) => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
+            </label>
+            <label className="space-y-1.5 text-[12px]">
+              <span className="block text-muted-foreground">검색 키워드</span>
+              <Input placeholder="이름 또는 직업 입력" value={keyword} onChange={(e) => setKeyword(e.target.value)} />
+            </label>
+            <div className="flex gap-2 sm:col-span-2 lg:col-span-1">
+              {/* 조회 버튼은 두지 않는다. 입력하는 대로 목록이 걸러지므로 누를 것이 없다. */}
+              <Button variant="outline" onClick={resetFilters}>초기화</Button>
+            </div>
           </div>
         </CardContent>
       </Card>

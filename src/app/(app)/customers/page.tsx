@@ -9,11 +9,11 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
+import { RESPONSIVE_CONTENT_SELECT_CLASS } from "@/lib/selectStyles";
 import { PageIntro } from "@/components/ui/page-intro";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toneBadgeClass } from "@/lib/badge-tone";
 import { prisma } from "@/lib/prisma";
-import { RESPONSIVE_CONTENT_SELECT_CLASS } from "@/lib/selectStyles";
 import { CustomerCreateButton } from "./CustomerCreateButton";
 import { CustomerEditButton } from "./CustomerEditButton";
 
@@ -78,33 +78,35 @@ export default async function CustomersPage({ searchParams }: { searchParams?: C
       </div>
 
       <Card>
-        <CardContent className="space-y-3">
-          <form method="get" className="space-y-3">
-            <div className="flex flex-wrap items-center gap-3">
-              <label htmlFor="customer-category" className="w-20 shrink-0 text-sm text-muted-foreground">분류</label>
-              <select id="customer-category" name="category" defaultValue={categoryParam} className="h-9 w-36 rounded-[10px] border border-border bg-input/50 px-3 text-[13px] text-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/30">
+        <CardContent>
+          {/* 필터는 한 줄로. 세로로 쌓으면 넓은 화면에서 카드 80% 가 빈다.
+              라벨은 칸 위에 — 공간 DB 검색과 같은 결. 셀렉트는 입력칸과 같은 흰 배경·1px 선. */}
+          <form method="get" className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-[10rem_12rem_10rem_minmax(0,1fr)_auto] lg:items-end">
+            <label className="space-y-1.5 text-[12px]">
+              <span className="block text-muted-foreground">분류</span>
+              <select id="customer-category" name="category" defaultValue={categoryParam} className="h-9 w-full rounded-[10px] border border-border bg-background px-3 text-[13px] text-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/30">
                 <option value="all">전체</option><option value="customer">고객사</option><option value="partner">협력사</option><option value="supplier">공급사</option>
               </select>
-            </div>
-            <div className="flex flex-wrap items-center gap-3">
-              <label htmlFor="customer-industry" className="w-20 shrink-0 text-sm text-muted-foreground">업종</label>
-              <select id="customer-industry" name="industry" defaultValue={industryParam} className={`h-9 ${RESPONSIVE_CONTENT_SELECT_CLASS} rounded-[10px] border border-border bg-input/50 px-3 text-[13px] text-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/30`}>
+            </label>
+            <label className="space-y-1.5 text-[12px]">
+              <span className="block text-muted-foreground">업종</span>
+              <select id="customer-industry" name="industry" defaultValue={industryParam} className="h-9 w-full rounded-[10px] border border-border bg-background px-3 text-[13px] text-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/30">
                 <option value="">전체</option>
                 {industries.map((industry) => <option key={industry} value={industry}>{industry}</option>)}
               </select>
-            </div>
-            <div className="flex flex-wrap items-center gap-3">
-              <label htmlFor="customer-status" className="w-20 shrink-0 text-sm text-muted-foreground">상태</label>
-              <select id="customer-status" name="status" defaultValue={statusParam} className="h-9 w-36 rounded-[10px] border border-border bg-input/50 px-3 text-[13px] text-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/30">
+            </label>
+            <label className="space-y-1.5 text-[12px]">
+              <span className="block text-muted-foreground">상태</span>
+              <select id="customer-status" name="status" defaultValue={statusParam} className="h-9 w-full rounded-[10px] border border-border bg-background px-3 text-[13px] text-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/30">
                 <option value="all">전체</option><option value="active">거래중</option><option value="pending">보류</option><option value="closed">종료</option>
               </select>
-            </div>
-            <div className="flex flex-wrap items-center gap-3">
-              <label htmlFor="customer-keyword" className="w-20 shrink-0 text-sm text-muted-foreground">검색 키워드</label>
-              <Input id="customer-keyword" name="q" defaultValue={keyword} className="w-64" placeholder="회사명, 담당자, 업종 검색" />
-            </div>
-            <div className="flex justify-end gap-2">
-              <a href="/customers" className="inline-flex h-8 items-center rounded-md border border-input bg-background px-3 text-sm font-medium hover:bg-accent hover:text-accent-foreground">초기화</a>
+            </label>
+            <label className="space-y-1.5 text-[12px]">
+              <span className="block text-muted-foreground">검색 키워드</span>
+              <Input id="customer-keyword" name="q" defaultValue={keyword} placeholder="회사명, 담당자, 업종 검색" />
+            </label>
+            <div className="flex gap-2 sm:col-span-2 lg:col-span-1">
+              <a href="/customers" className="inline-flex h-9 items-center rounded-[10px] border border-border bg-background px-3.5 text-[13px] font-semibold hover:bg-muted">초기화</a>
               <Button type="submit">조회</Button>
             </div>
           </form>
@@ -115,8 +117,8 @@ export default async function CustomersPage({ searchParams }: { searchParams?: C
         <p className="text-sm">총 <span className="font-semibold text-primary">{rows.length}</span>건</p>
         <div className="flex w-full min-w-0 flex-col gap-1.5 sm:w-auto sm:flex-row sm:items-center">
           <Button variant="outline" className="shrink-0"><Download className="size-3.5" /> 엑셀 다운로드</Button>
-          <select defaultValue="updated" aria-label="정렬" className={`h-9 ${RESPONSIVE_CONTENT_SELECT_CLASS} rounded-[10px] border border-border bg-input/50 px-3 text-[13px] text-foreground`}><option value="updated">최종수정일순</option><option value="name">회사명순</option></select>
-          <select defaultValue="10" aria-label="페이지 크기" className={`h-9 ${RESPONSIVE_CONTENT_SELECT_CLASS} rounded-[10px] border border-border bg-input/50 px-3 text-[13px] text-foreground`}><option value="10">10개씩 보기</option><option value="20">20개씩 보기</option><option value="50">50개씩 보기</option></select>
+          <select defaultValue="updated" aria-label="정렬" className={`h-9 ${RESPONSIVE_CONTENT_SELECT_CLASS} rounded-[10px] border border-border bg-background px-3 text-[13px] text-foreground`}><option value="updated">최종수정일순</option><option value="name">회사명순</option></select>
+          <select defaultValue="10" aria-label="페이지 크기" className={`h-9 ${RESPONSIVE_CONTENT_SELECT_CLASS} rounded-[10px] border border-border bg-background px-3 text-[13px] text-foreground`}><option value="10">10개씩 보기</option><option value="20">20개씩 보기</option><option value="50">50개씩 보기</option></select>
         </div>
       </div>
 

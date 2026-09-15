@@ -34,7 +34,7 @@ type FormState = {
   memo: string;
 };
 
-const SELECT_CLASS = "h-9 w-full rounded-[10px] border border-transparent bg-input/50 px-3 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/30";
+const SELECT_CLASS = "h-9 w-full rounded-[10px] border border-transparent bg-background px-3 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/30";
 
 function toForm(customer: CustomerEditData): FormState {
   return {
