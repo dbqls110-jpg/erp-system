@@ -55,7 +55,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
   const netIncome = calculateNetIncome(project.revenue, project.cost);
 
   return (
-    <div className="max-w-5xl space-y-4">
+    <div className="space-y-4">
       {/* 브레드크럼 */}
       <nav className="flex items-center gap-1.5 text-sm text-muted-foreground">
         <Link href="/projects" className="hover:text-foreground transition-colors">프로젝트</Link>
@@ -104,6 +104,10 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
         </div>
       </div>
 
+      {/* 넓은 화면에서는 두 열. 왼쪽 요약·매출매입·업무, 오른쪽 파일·메모 — docs/design-A/project-detail.html.
+          한 열로 두면 1920 화면에서 오른쪽 절반이 빈다. */}
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] xl:items-start">
+        <div className="space-y-4">
       {/* 진행률 */}
       <Card className="rounded-[12px] border border-border py-0 shadow-none">
         <CardContent className="px-4 py-3.5">
@@ -161,6 +165,8 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
         </CardContent>
       </Card>
 
+        </div>
+        <div className="space-y-4">
       {/* 파일 */}
       <Card className="rounded-[12px] border border-border py-0 shadow-none">
         <CardHeader className="border-b border-[#f0f0f0] px-4 py-3.5 dark:border-border">
@@ -182,6 +188,8 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
           <MemoEditor projectId={project.id} memo={project.memo} canEdit={canEdit} />
         </CardContent>
       </Card>
+        </div>
+      </div>
     </div>
   );
 }

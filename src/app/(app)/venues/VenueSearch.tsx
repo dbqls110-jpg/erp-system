@@ -409,6 +409,10 @@ export function VenueSearch({ districts, venueTypes }: VenueSearchProps) {
         </p>
       )}
 
+      {/* 넓은 화면에서는 목록 왼쪽 · 지도 오른쪽 — docs/design-A/venues.html.
+          지도가 목록 아래 있으면 스크롤해야 보여 핀과 카드를 같이 볼 수 없다. */}
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] xl:items-start">
+        <div className="space-y-4">
       <Card ref={tableRef} className="rounded-[12px] border border-border py-0 shadow-none">
         <CardContent className="space-y-2 p-3">
           {!result ? (
@@ -454,10 +458,13 @@ export function VenueSearch({ districts, venueTypes }: VenueSearchProps) {
         </div>
       )}
 
-      <div className="space-y-2">
+        </div>
+      <div className="space-y-2 xl:sticky xl:top-4">
         <h2 className="text-sm font-semibold">지도</h2>
-        <VenueMap pins={pins} />
+        <VenueMap pins={pins} height={560} />
       </div>
+      </div>
+
 
       <VenueDetailDialog venueId={openVenueId} onClose={() => setOpenVenueId(null)} />
     </div>
