@@ -344,7 +344,7 @@ export function VenueSearch({ districts, venueTypes }: VenueSearchProps) {
             </label>
             <label className="space-y-1.5 text-[12px]">
               <span className="block text-muted-foreground">희망 요일</span>
-              <select value={form.dayOfWeek} onChange={(event) => setField("dayOfWeek", event.target.value as FormState["dayOfWeek"])} className="h-9 w-full rounded-2xl border border-transparent bg-input/50 px-3 text-sm text-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/30">
+              <select value={form.dayOfWeek} onChange={(event) => setField("dayOfWeek", event.target.value as FormState["dayOfWeek"])} className="h-9 w-full rounded-[10px] border border-transparent bg-input/50 px-3 text-sm text-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/30">
                 <option value="">선택 안 함</option>
                 <option value="평일">평일</option>
                 <option value="토">토</option>
@@ -354,14 +354,14 @@ export function VenueSearch({ districts, venueTypes }: VenueSearchProps) {
             </label>
             <label className="space-y-1.5 text-[12px]">
               <span className="block text-muted-foreground">지역(자치구)</span>
-              <select value={form.district} onChange={(event) => setField("district", event.target.value)} className="h-9 w-full rounded-2xl border border-transparent bg-input/50 px-3 text-sm text-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/30">
+              <select value={form.district} onChange={(event) => setField("district", event.target.value)} className="h-9 w-full rounded-[10px] border border-transparent bg-input/50 px-3 text-sm text-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/30">
                 <option value="전체">전체</option>
                 {districts.map((district) => <option key={district} value={district}>{district}</option>)}
               </select>
             </label>
             <label className="space-y-1.5 text-[12px]">
               <span className="block text-muted-foreground">유형</span>
-              <select value={form.type} onChange={(event) => setField("type", event.target.value)} className="h-9 w-full rounded-2xl border border-transparent bg-input/50 px-3 text-sm text-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/30">
+              <select value={form.type} onChange={(event) => setField("type", event.target.value)} className="h-9 w-full rounded-[10px] border border-transparent bg-input/50 px-3 text-sm text-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/30">
                 <option value="전체">전체</option>
                 {venueTypes.map((type) => <option key={type} value={type}>{type}</option>)}
               </select>

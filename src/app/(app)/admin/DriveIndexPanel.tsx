@@ -5,6 +5,7 @@ import { ExternalLink, FolderSearch, Pause, Play, Plus, RefreshCw } from "lucide
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import { toneBadgeClass } from "@/lib/badge-tone";
 import { formatKoreanDateTime } from "@/lib/dateFormat";
@@ -127,7 +128,7 @@ export function DriveIndexPanel({ initialStatus }: { initialStatus: DriveIndexIn
   return (
     <div className="space-y-4">
       <div>
-        <p className="mt-1 text-sm text-muted-foreground">Google Drive 폴더를 등록하고 변경된 파일을 주기적으로 색인합니다.</p>
+        <p className="text-[13px] text-muted-foreground">Google Drive 폴더를 등록하고 변경된 파일을 주기적으로 색인합니다.</p>
       </div>
 
       <div className="flex flex-col sm:flex-row gap-2">
@@ -138,10 +139,10 @@ export function DriveIndexPanel({ initialStatus }: { initialStatus: DriveIndexIn
           placeholder="Google Drive 폴더 URL"
           className="flex-1"
         />
-        <Button className="h-9 py-2" onClick={addFolder} disabled={adding || !folderUrl.trim()}>
+        <Button onClick={addFolder} disabled={adding || !folderUrl.trim()}>
           <Plus className="size-3.5" /> {adding ? "확인 중" : "폴더 추가"}
         </Button>
-        <Button className="h-9 py-2" variant="outline" onClick={syncNow} disabled={syncing || !status.folders.some((folder) => folder.active)}>
+        <Button variant="outline" onClick={syncNow} disabled={syncing || !status.folders.some((folder) => folder.active)}>
           <RefreshCw className={syncing ? "size-3.5 animate-spin" : "size-3.5"} /> {syncing ? "동기화 중" : "지금 동기화"}
         </Button>
       </div>
@@ -155,10 +156,7 @@ export function DriveIndexPanel({ initialStatus }: { initialStatus: DriveIndexIn
       </div>
 
       {status.folders.length === 0 ? (
-        <div className="flex flex-col items-center gap-3 py-12 text-center">
-          <FolderSearch className="size-6 text-muted-foreground" />
-          <p className="text-sm text-muted-foreground">색인할 회사 Drive 폴더를 추가하세요.</p>
-        </div>
+        <EmptyState icon={<FolderSearch className="size-5" />}>색인할 회사 Drive 폴더를 추가하세요.</EmptyState>
       ) : (
         <div className="divide-y divide-border border-y border-border">
           {status.folders.map((folder) => (

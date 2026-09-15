@@ -4,6 +4,8 @@ import { prisma } from "@/lib/prisma";
 import { notFound, redirect } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { EmptyState } from "@/components/ui/empty-state";
+import { PageIntro } from "@/components/ui/page-intro";
 import { toneBadgeClass } from "@/lib/badge-tone";
 import { CalendarX2, ChevronLeft } from "lucide-react";
 import Link from "next/link";
@@ -61,13 +63,13 @@ export default async function EmployeeAttendancePage({
           <ChevronLeft size={20} />
         </Link>
         <div>
-          <p className="mt-1 text-sm text-muted-foreground">{user.name ?? user.email}의 {year}년 {month}월 근태 기록입니다.</p>
+          <PageIntro>{user.name ?? user.email}의 {year}년 {month}월 근태 기록입니다.</PageIntro>
         </div>
       </div>
 
       {/* 요약 */}
       <div className="grid grid-cols-1 gap-4 @xl/main:grid-cols-3">
-        <Card className="@container/card h-full shadow-xs">
+        <Card className="@container/card h-full">
           <CardHeader>
             <CardDescription>출근일수</CardDescription>
             <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">{attendanceSummary.workDays}일</CardTitle>
@@ -78,7 +80,7 @@ export default async function EmployeeAttendancePage({
             )}
           </CardContent>
         </Card>
-        <Card className="@container/card h-full shadow-xs">
+        <Card className="@container/card h-full">
           <CardHeader>
             <CardDescription>총 근무시간</CardDescription>
             <CardTitle className="text-2xl font-semibold tabular-nums text-primary @[250px]/card:text-3xl">{attendanceSummary.totalHours.toFixed(1)}h</CardTitle>
@@ -89,7 +91,7 @@ export default async function EmployeeAttendancePage({
             )}
           </CardContent>
         </Card>
-        <Card className="@container/card h-full shadow-xs">
+        <Card className="@container/card h-full">
           <CardHeader>
             <CardDescription>일 평균</CardDescription>
             <CardTitle className="text-2xl font-semibold tabular-nums text-primary @[250px]/card:text-3xl">{attendanceSummary.completedDays > 0 ? (attendanceSummary.totalHours / attendanceSummary.completedDays).toFixed(1) : "0"}h</CardTitle>
@@ -101,7 +103,7 @@ export default async function EmployeeAttendancePage({
       </div>
 
       {/* 일별 기록 */}
-      <Card className="shadow-xs">
+      <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle className="text-base font-semibold text-foreground">
@@ -118,7 +120,7 @@ export default async function EmployeeAttendancePage({
           {records.length === 0 ? (
             <div className="flex flex-col items-center gap-3 py-12 text-center">
               <CalendarX2 className="size-6 text-muted-foreground" />
-              <p className="text-sm text-muted-foreground">이번 달 근태 기록이 없습니다.</p>
+              <EmptyState icon={<CalendarX2 className="size-5" />}>이번 달 근태 기록이 없습니다.</EmptyState>
             </div>
           ) : (
             <div className="space-y-1">
@@ -132,7 +134,7 @@ export default async function EmployeeAttendancePage({
                       <Badge variant="outline" className={toneBadgeClass("gray")}>{r.workHours.toFixed(1)}h</Badge>
                     )}
                     {r.clockIn && r.workHours == null && (
-                      <Badge variant="outline" className={`${toneBadgeClass("amber")} text-[10px] py-0`}>
+                      <Badge variant="outline" className={toneBadgeClass("amber")}>
                         {r.clockOut ? "시간 계산 불가" : "퇴근 미기록 · 시간 미계산"}
                       </Badge>
                     )}

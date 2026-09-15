@@ -38,7 +38,7 @@ export function UserRoleSelect({ userId, currentRole, isCurrentUser }: {
 
   return (
     <Select defaultValue={currentRole === "user" ? "member" : currentRole} onValueChange={handleChange}>
-      <SelectTrigger className="w-32 h-8 text-sm">
+      <SelectTrigger className="w-32">
         <SelectValue />
       </SelectTrigger>
       <SelectContent>

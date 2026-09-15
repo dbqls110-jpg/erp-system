@@ -9,8 +9,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PageIntro } from "@/components/ui/page-intro";
 import {
   Table,
   TableBody,
@@ -54,7 +56,7 @@ const SETTLEMENT_TYPES = ["월정산", "건별"];
 const RATE_UNITS = ["건당", "일당", "시간당"];
 
 const SELECT_CLASS =
-  "h-8 rounded-2xl border border-transparent bg-input/50 px-3 text-sm text-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/30";
+  "h-9 rounded-[10px] border border-border bg-input/50 px-3 text-[13px] text-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/30";
 
 const emptyForm = {
   name: "",
@@ -309,9 +311,7 @@ function PartnerRatesDialog({
             <span>삭제</span>
           </div>
           {rates.length === 0 ? (
-            <p className="rounded-lg border border-dashed p-4 text-center text-sm text-muted-foreground">
-              등록된 항목이 없습니다.
-            </p>
+            <EmptyState>등록된 항목이 없습니다.</EmptyState>
           ) : (
             rates.map((rate) => (
               <div
@@ -559,22 +559,13 @@ export function PartnerTable({
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <div className="flex items-center gap-2.5">
-            <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-              <Handshake className="size-4" aria-hidden="true" />
-            </span>
-            <h1 className="truncate text-xl font-semibold tracking-tight text-foreground">파트너 관리</h1>
-          </div>
-          <p className="mt-2 text-sm text-muted-foreground">파트너 개인별 계약 현황</p>
-        </div>
+        <PageIntro>파트너 개인별 계약 현황</PageIntro>
         <div className="flex shrink-0 gap-2">
-          <Button variant="outline" className="h-9 rounded-lg px-3 shadow-xs" onClick={() => router.refresh()}>
+          <Button variant="outline" onClick={() => router.refresh()}>
             <RefreshCw className="size-3.5" /> 새로고침
           </Button>
           {canEdit && (
             <Button
-              className="h-9 rounded-lg px-3 shadow-xs"
               onClick={() => setDialog({ initial: { ...emptyForm }, id: null, key: Date.now() })}
             >
               <Plus className="size-3.5" /> 등록
@@ -583,8 +574,8 @@ export function PartnerTable({
         </div>
       </div>
 
-      <Card className="border-border/70 bg-card/80 shadow-sm">
-        <CardContent className="space-y-3 p-4 sm:p-5">
+      <Card>
+        <CardContent className="space-y-3">
           <div className="flex flex-wrap items-center gap-3">
             <span className="w-20 shrink-0 text-sm text-muted-foreground">거래상태</span>
             <select
@@ -614,7 +605,7 @@ export function PartnerTable({
           <div className="flex flex-wrap items-center gap-3">
             <span className="w-20 shrink-0 text-sm text-muted-foreground">검색키워드</span>
             <Input
-              className="h-8 w-72"
+              className="w-72"
               placeholder="이름 또는 직업 입력"
               value={keyword}
               onChange={(e) => setKeyword(e.target.value)}
@@ -622,7 +613,7 @@ export function PartnerTable({
           </div>
           <div className="flex justify-end gap-2 pt-1">
             {/* 조회 버튼은 두지 않는다. 입력하는 대로 목록이 걸러지므로 누를 것이 없다. */}
-            <Button variant="outline" className="h-8" onClick={resetFilters}>
+            <Button variant="outline" size="sm" onClick={resetFilters}>
               초기화
             </Button>
           </div>
@@ -639,7 +630,7 @@ export function PartnerTable({
         <div className="flex w-full min-w-0 flex-col gap-1.5 sm:w-auto sm:flex-row sm:items-center">
           <Button
             variant="outline"
-            className="h-8 shrink-0 rounded-lg px-3"
+            className="shrink-0"
             onClick={downloadCsv}
             disabled={filtered.length === 0}
           >
@@ -665,14 +656,13 @@ export function PartnerTable({
         </div>
       </div>
 
-      <Card className="overflow-hidden border-border/70 py-0 shadow-sm">
+      <Card>
         <CardContent className="p-0">
           <div className="space-y-2 p-3 md:hidden">
             {shown.length === 0 ? (
-              <div className="flex flex-col items-center gap-3 py-10 text-center">
-                <Handshake className="size-6 text-muted-foreground" />
-                <p className="text-sm text-muted-foreground">{initialData.length === 0 ? "아직 등록된 항목이 없습니다" : "조건에 맞는 파트너가 없습니다"}</p>
-              </div>
+              <EmptyState icon={<Handshake className="size-5" />}>
+                {initialData.length === 0 ? "아직 등록된 항목이 없습니다" : "조건에 맞는 파트너가 없습니다"}
+              </EmptyState>
             ) : shown.map((p) => (
               <article key={p.id} className="rounded-xl border border-border p-3">
                 <div className="flex items-start justify-between gap-3">
@@ -716,7 +706,7 @@ export function PartnerTable({
           </div>
           <div className="hidden overflow-x-auto md:block">
             <p className="mb-2 text-xs text-muted-foreground md:hidden">표를 좌우로 밀어 더 많은 열을 볼 수 있습니다.</p>
-            <Table className="w-full min-w-[820px] table-auto [&_:is(th,td)]:px-4 [&_:is(th,td)]:py-3">
+              <Table className="w-full min-w-[820px] table-auto">
               <TableHeader>
                 <TableRow className="bg-muted/40 hover:bg-muted/40">
                   <TableHead className="whitespace-nowrap">이름</TableHead>
@@ -731,15 +721,12 @@ export function PartnerTable({
               <TableBody>
                 {shown.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={canEdit ? 7 : 6} className="py-12 text-center">
-                      <div className="flex flex-col items-center gap-3">
-                        <Handshake className="size-6 text-muted-foreground" />
-                        <p className="text-sm text-muted-foreground">
+                      <TableCell colSpan={canEdit ? 7 : 6} className="text-center">
+                        <EmptyState icon={<Handshake className="size-5" />}>
                           {initialData.length === 0
                             ? "아직 등록된 항목이 없습니다"
                             : "조건에 맞는 파트너가 없습니다"}
-                        </p>
-                      </div>
+                        </EmptyState>
                     </TableCell>
                   </TableRow>
                 ) : (

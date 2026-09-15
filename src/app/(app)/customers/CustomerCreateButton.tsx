@@ -82,7 +82,7 @@ export function CustomerCreateButton({ industries }: { industries: string[] }) {
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="customer-create-category">분류</Label>
-              <select id="customer-create-category" value={form.category} onChange={(event) => set("category")(event.target.value)} className="h-9 w-full rounded-2xl border border-transparent bg-input/50 px-3 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/30">
+              <select id="customer-create-category" value={form.category} onChange={(event) => set("category")(event.target.value)} className="h-9 w-full rounded-[10px] border border-transparent bg-input/50 px-3 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/30">
                 <option value="고객사">고객사</option>
                 <option value="협력사">협력사</option>
                 <option value="공급사">공급사</option>
@@ -97,7 +97,7 @@ export function CustomerCreateButton({ industries }: { industries: string[] }) {
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="customer-create-status">상태</Label>
-              <select id="customer-create-status" value={form.status} onChange={(event) => set("status")(event.target.value)} className="h-9 w-full rounded-2xl border border-transparent bg-input/50 px-3 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/30">
+              <select id="customer-create-status" value={form.status} onChange={(event) => set("status")(event.target.value)} className="h-9 w-full rounded-[10px] border border-transparent bg-input/50 px-3 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/30">
                 <option value="거래중">거래중</option>
                 <option value="보류">보류</option>
                 <option value="종료">종료</option>

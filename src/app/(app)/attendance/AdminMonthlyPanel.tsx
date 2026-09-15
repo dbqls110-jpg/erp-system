@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -73,9 +74,9 @@ function AttendanceRow({ r, onSaved }: { r: AttendanceRecord; onSaved: () => voi
       {editing ? (
         <div className="flex items-center gap-2 flex-1">
           <span className="text-muted-foreground">출근</span>
-          <Input type="time" value={ci} onChange={(e) => setCi(e.target.value)} className="h-6 text-xs w-28 px-1" />
+          <Input type="time" value={ci} onChange={(e) => setCi(e.target.value)} className="w-28" />
           <span className="text-muted-foreground">퇴근</span>
-          <Input type="time" value={co} onChange={(e) => setCo(e.target.value)} className="h-6 text-xs w-28 px-1" />
+          <Input type="time" value={co} onChange={(e) => setCo(e.target.value)} className="w-28" />
           <button type="button" onClick={handleSave} disabled={saving} className="text-primary hover:opacity-70" aria-label="근태 수정 저장">
             <Check className="size-3.5" />
           </button>
@@ -88,10 +89,10 @@ function AttendanceRow({ r, onSaved }: { r: AttendanceRecord; onSaved: () => voi
           <span>출근 {fmt(r.clockIn)}</span>
           <span>퇴근 {fmt(r.clockOut)}</span>
           {r.workHours != null && (
-            <Badge variant="outline" className="text-[10px] py-0">{r.workHours.toFixed(1)}h</Badge>
+            <Badge variant="outline">{r.workHours.toFixed(1)}h</Badge>
           )}
           {r.clockIn && r.workHours == null && (
-            <Badge variant="outline" className={`${toneBadgeClass("amber")} text-[10px] py-0`}>
+            <Badge variant="outline" className={toneBadgeClass("amber")}>
               {r.clockOut ? "시간 계산 불가" : "퇴근 미기록 · 시간 미계산"}
             </Badge>
           )}
@@ -157,7 +158,7 @@ export function AdminMonthlyPanel({ initialYear, initialMonth }: { initialYear: 
   };
 
   return (
-    <Card className="shadow-xs">
+    <Card>
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle className="text-base font-semibold text-foreground flex items-center gap-2" style={{ fontFamily: "var(--font-plus-jakarta-sans)" }}>
@@ -165,11 +166,11 @@ export function AdminMonthlyPanel({ initialYear, initialMonth }: { initialYear: 
             전체 직원 월별 근태
           </CardTitle>
           <div className="flex items-center gap-1">
-            <Button variant="ghost" size="sm" className="h-9 py-2" onClick={prevMonth} disabled={loading}><ChevronLeft className="size-3.5" /></Button>
+            <Button variant="ghost" size="sm" onClick={prevMonth} disabled={loading}><ChevronLeft className="size-3.5" /></Button>
             <span className="text-sm font-medium text-foreground min-w-[80px] text-center">
               {year}년 {month}월{loading && " …"}
             </span>
-            <Button variant="ghost" size="sm" className="h-9 py-2" onClick={nextMonth} disabled={loading}><ChevronRight className="size-3.5" /></Button>
+            <Button variant="ghost" size="sm" onClick={nextMonth} disabled={loading}><ChevronRight className="size-3.5" /></Button>
           </div>
         </div>
       </CardHeader>
@@ -177,12 +178,12 @@ export function AdminMonthlyPanel({ initialYear, initialMonth }: { initialYear: 
         {summaries.length === 0 && !loading ? (
           <div className="flex flex-col items-center gap-3 py-12 text-center">
             <Users className="size-6 text-muted-foreground" />
-            <p className="text-sm text-muted-foreground">해당 월 근태 기록이 없습니다.</p>
+            <EmptyState>해당 월 근태 기록이 없습니다.</EmptyState>
           </div>
         ) : (
           <div className="space-y-2">
             {summaries.map((s) => (
-              <div key={s.user.id} className="border border-border rounded-lg overflow-hidden">
+              <div key={s.user.id} className="overflow-hidden rounded-[10px] border border-border">
                 <button
                   type="button"
                   className="w-full flex items-center justify-between px-4 py-3 hover:bg-muted transition-colors text-left"
@@ -199,13 +200,13 @@ export function AdminMonthlyPanel({ initialYear, initialMonth }: { initialYear: 
                       {s.user.name ?? s.user.email}
                     </Link>
                     {s.user.isAgent && (
-                      <Badge variant="outline" className={`${toneBadgeClass("purple")} text-[10px] py-0 px-1.5`}>AI</Badge>
+                      <Badge variant="outline" className={toneBadgeClass("purple")}>AI</Badge>
                     )}
                   </div>
                   <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                    <Badge variant="outline" className="text-xs">{s.workDays}일 출근</Badge>
+                      <Badge variant="outline">{s.workDays}일 출근</Badge>
                     {s.missingClockOut > 0 && (
-                      <Badge variant="outline" className={`${toneBadgeClass("amber")} text-xs`}>미퇴근 {s.missingClockOut}건</Badge>
+                      <Badge variant="outline" className={toneBadgeClass("amber")}>미퇴근 {s.missingClockOut}건</Badge>
                     )}
                     <span className="font-medium text-foreground">{s.totalHours.toFixed(1)}h</span>
                     <span>{expanded === s.user.id ? "▲" : "▼"}</span>

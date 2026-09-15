@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Plus, Pencil, Trash2, Eye, EyeOff, ExternalLink, Search, Copy } from "lucide-react";
@@ -102,7 +103,7 @@ function CredentialForm({
       </div>
       <div className="flex justify-end gap-2 pt-1">
         <Button variant="outline" size="sm" onClick={onCancel}>취소</Button>
-        <Button size="sm" className="h-9 py-2" onClick={() => onSave(form)} disabled={!form.name.trim() || saving}>
+        <Button onClick={() => onSave(form)} disabled={!form.name.trim() || saving}>
           {saving ? "저장 중..." : "저장"}
         </Button>
       </div>
@@ -257,30 +258,32 @@ export function CredentialTable({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-3">
-        <div className="relative flex-1 max-w-xs">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            className="pl-8 h-9 text-sm"
-            placeholder="서비스명, 회사, 구분 검색..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </div>
-        {canEdit && (
-          <Button size="sm" className="h-9 gap-1.5 py-2" onClick={() => setDialog({ mode: "add" })}>
-            <Plus className="size-3.5" /> 새로 만들기
-          </Button>
-        )}
-      </div>
+      <Card>
+        <CardContent className="flex items-center gap-3">
+          <div className="relative max-w-xs flex-1">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              className="pl-8"
+              placeholder="서비스명, 회사, 구분 검색..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+          {canEdit && (
+            <Button size="sm" className="gap-1.5" onClick={() => setDialog({ mode: "add" })}>
+              <Plus className="size-3.5" /> 새로 만들기
+            </Button>
+          )}
+          <span className="ml-auto text-[12px] text-muted-foreground">{initialData.length}개</span>
+        </CardContent>
+      </Card>
 
-      <Card className="shadow-xs py-0">
+      <Card>
         <CardContent className="p-0">
           {filtered.length === 0 ? (
-            <div className="flex flex-col items-center gap-3 py-12 text-center">
-              <Search className="size-6 text-muted-foreground" />
-              <p className="text-sm text-muted-foreground">{search ? "검색 결과가 없습니다." : "등록된 계정이 없습니다."}</p>
-            </div>
+            <EmptyState icon={<Search className="size-5" />}>
+              {search ? "검색 결과가 없습니다." : "등록된 계정이 없습니다."}
+            </EmptyState>
           ) : (
             <>
             <div className="space-y-2 p-3 md:hidden">
@@ -288,7 +291,7 @@ export function CredentialTable({
                 const pwVisible = revealedPw[c.id] !== undefined;
                 const usernameVisible = revealedUsername[c.id] !== undefined;
                 return (
-                  <article key={c.id} className="rounded-xl border border-border p-3">
+                  <article key={c.id} className="rounded-[12px] border border-border p-4">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <h3 className="truncate font-medium">{c.name}</h3>
@@ -307,11 +310,11 @@ export function CredentialTable({
             </div>
             <div className="hidden overflow-x-auto md:block">
               <p className="mb-2 text-xs text-muted-foreground md:hidden">표를 좌우로 밀어 더 많은 열을 볼 수 있습니다.</p>
-              <Table className="[&_:is(th,td)]:px-4">
+              <Table>
                 <TableHeader className="bg-muted border-b border-border">
                   <TableRow>
                     {["서비스명", "회사", "구분", "아이디", "비밀번호", "비고", "링크", ""].map((h) => (
-                      <TableHead key={h} className="text-left py-2.5 text-xs font-medium text-muted-foreground whitespace-nowrap">
+                      <TableHead key={h} className="text-left whitespace-nowrap">
                         {h}
                       </TableHead>
                     ))}
@@ -323,15 +326,15 @@ export function CredentialTable({
                     const usernameVisible = revealedUsername[c.id] !== undefined;
                     const catTone = c.category ? (CATEGORY_TONES[c.category] ?? "gray") : "gray";
                     return (
-                      <TableRow key={c.id} className="border-b border-border last:border-0 hover:bg-muted/50 transition-colors">
-                        <TableCell className="py-2.5 font-medium text-foreground whitespace-nowrap">{c.name}</TableCell>
-                        <TableCell className="py-2.5 text-muted-foreground whitespace-nowrap">{c.company ?? "—"}</TableCell>
-                        <TableCell className="py-2.5">
+                      <TableRow key={c.id}>
+                        <TableCell className="font-medium text-foreground whitespace-nowrap">{c.name}</TableCell>
+                        <TableCell className="text-muted-foreground whitespace-nowrap">{c.company ?? "—"}</TableCell>
+                        <TableCell>
                           {c.category ? (
                             <Badge variant="outline" className={`text-xs ${toneBadgeClass(catTone)}`}>{c.category}</Badge>
                           ) : <span className="text-muted-foreground">—</span>}
                         </TableCell>
-                        <TableCell className="py-2.5">
+                        <TableCell>
                           {c.hasUsername ? (
                             <div className="flex items-center gap-1.5">
                               <span className="font-mono text-xs">{usernameVisible ? revealedUsername[c.id] : "••••••••"}</span>
@@ -354,7 +357,7 @@ export function CredentialTable({
                             </div>
                           ) : <span className="text-muted-foreground">—</span>}
                         </TableCell>
-                        <TableCell className="py-2.5">
+                        <TableCell>
                           {c.hasPassword ? (
                             <div className="flex items-center gap-1.5">
                               <span className="font-mono text-xs">
@@ -375,12 +378,12 @@ export function CredentialTable({
                           ) : <span className="text-muted-foreground">—</span>}
                         </TableCell>
                         <TableCell
-                          className="py-2.5 text-muted-foreground max-w-[120px] truncate"
+                          className="max-w-[120px] truncate text-muted-foreground"
                           title={c.memo ?? undefined}
                         >
                           {c.memo ?? "—"}
                         </TableCell>
-                        <TableCell className="py-2.5">
+                        <TableCell>
                           {c.url ? (
                             <a href={c.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-primary hover:underline text-xs truncate max-w-[140px]">
                               {c.url.replace(/^https?:\/\//, "").split("/")[0]}
@@ -388,7 +391,7 @@ export function CredentialTable({
                             </a>
                           ) : <span className="text-muted-foreground">—</span>}
                         </TableCell>
-                        <TableCell className="py-2.5">
+                        <TableCell>
                           {canEdit && (
                             <div className="flex items-center gap-1.5">
                               <button

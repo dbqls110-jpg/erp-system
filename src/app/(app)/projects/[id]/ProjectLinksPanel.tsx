@@ -68,7 +68,7 @@ function Section({
           <Button
             variant="ghost"
             size="sm"
-            className="h-7 text-xs"
+            className="h-8 text-xs"
             onClick={() => setAdding(adding === kind ? null : kind)}
             disabled={busy}
           >
@@ -79,7 +79,7 @@ function Section({
 
       {canEdit && adding === kind && (
         <select
-          className="h-8 w-full rounded-2xl border border-transparent bg-input/50 px-3 text-sm text-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/30"
+          className="h-9 w-full rounded-[10px] border border-transparent bg-input/50 px-3 text-sm text-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/30"
           defaultValue=""
           disabled={busy}
           onChange={(e) => {

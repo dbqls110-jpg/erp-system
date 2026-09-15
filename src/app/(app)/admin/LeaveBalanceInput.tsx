@@ -40,12 +40,12 @@ export function LeaveBalanceInput({ userId, year, totalDays, usedDays, pendingDa
           type="number"
           value={days}
           onChange={(e) => setDays(e.target.value)}
-          className="w-14 h-7 text-sm text-center px-1"
+          className="w-14 text-center"
           min="0"
           step="0.5"
         />
         <span className="text-muted-foreground">일</span>
-        <Button size="sm" variant="outline" className="h-7 px-2 text-xs" disabled={loading} onClick={handleSave}>
+        <Button size="sm" variant="outline" disabled={loading} onClick={handleSave}>
           저장
         </Button>
       </div>

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { linkUserToExternal } from "@/app/actions/admin";
+import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 
 type ExternalOption = { id: string; name: string };
@@ -32,9 +33,9 @@ export function UserExternalLink({
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
         <span>본인</span>
         {hasExternalSelection && (
-          <span className="rounded-full border border-amber-500/30 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-medium text-amber-600 dark:text-amber-500">
+          <Badge variant="outline" className="border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-500">
             외부
-          </span>
+          </Badge>
         )}
       </div>
     );
@@ -69,7 +70,7 @@ export function UserExternalLink({
         value={selectedValue}
         onChange={handleChange}
         disabled={isSaving}
-        className="h-8 rounded-2xl border border-transparent bg-input/50 px-3 text-sm text-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/30"
+        className="h-9 rounded-[10px] border-border bg-input/50 px-3 text-[13px] text-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/30"
         aria-label="외부 연결"
       >
         <option value="">내부 직원</option>
@@ -89,9 +90,9 @@ export function UserExternalLink({
         </optgroup>
       </select>
       {hasExternalSelection && (
-        <span className="rounded-full border border-amber-500/30 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-medium text-amber-600 dark:text-amber-500">
+        <Badge variant="outline" className="border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-500">
           외부
-        </span>
+        </Badge>
       )}
     </div>
   );
