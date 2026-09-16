@@ -4,6 +4,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { buildAssistantPrompt } from "@/lib/assistantPrompt";
+import { getAccessibleMenus } from "@/lib/permissions";
 
 /**
  * 메신저의 ERP 비서.
@@ -198,7 +199,9 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const { prompt, topics, contextChars } = await buildAssistantPrompt(question);
+  // 질문자가 볼 수 있는 메뉴의 자료만 붙인다. 메뉴 권한과 같은 기준이다.
+  const allowedMenus = await getAccessibleMenus(session.user.id, session.user.role);
+  const { prompt, topics, contextChars } = await buildAssistantPrompt(question, allowedMenus);
 
   const job = await prisma.agentJob.create({
     data: {
