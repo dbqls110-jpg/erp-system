@@ -195,11 +195,14 @@ export function AssistantPanel({ initialQuestion = "" }: { initialQuestion?: str
             index === turns.length - 1 && !TERMINAL_STATUSES.includes(turn.status);
           return (
             <div key={turn.id} className="space-y-1.5">
-              <div className="flex justify-end">
-                <div className="max-w-[85%] rounded-2xl rounded-tr-sm bg-primary px-3 py-1.5 text-xs leading-relaxed text-primary-foreground">
-                  {turn.question}
+              {/* 질문이 없는 턴은 비서가 먼저 보낸 알림(가입 신청 등)이다. 답변만 그린다. */}
+              {turn.question && (
+                <div className="flex justify-end">
+                  <div className="max-w-[85%] rounded-2xl rounded-tr-sm bg-primary px-3 py-1.5 text-xs leading-relaxed text-primary-foreground">
+                    {turn.question}
+                  </div>
                 </div>
-              </div>
+              )}
               {turn.status === "error" && turn.errorMsg && (
                 <p className="px-1 text-[10px] text-muted-foreground">{turn.errorMsg}</p>
               )}
