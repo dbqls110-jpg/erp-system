@@ -16,6 +16,23 @@ import { getAccessibleMenus } from "@/lib/permissions";
  * ERP 자료를 미리 붙여 보낸다.
  */
 
+/**
+ * 끝난 비서 대화를 읽음 처리한다. ids 를 주지 않으면 이 사람의 안 읽은 것 전부.
+ * 아직 답이 없는 job 은 건드리지 않는다 — 답이 나중에 와도 배지에 잡혀야 한다.
+ */
+async function markAssistantJobsSeen(userId: string, ids?: string[]) {
+  await prisma.agentJob.updateMany({
+    where: {
+      userId,
+      visibility: "user",
+      status: { in: ["completed", "error"] },
+      seenAt: null,
+      ...(ids ? { id: { in: ids } } : {}),
+    },
+    data: { seenAt: new Date() },
+  });
+}
+
 /** 브릿지가 붙어 있는지 판단하는 기준. 이보다 오래 조용하면 꺼진 것으로 본다. */
 const BRIDGE_STALE_MS = 3 * 60 * 1000;
 const AGENT_TYPE = "agent-1";
@@ -99,6 +116,11 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
 
+    // 답이 도착한 것을 화면이 받아 갔으니 읽은 것으로 표시한다.
+    if (job.status === "completed" || job.status === "error") {
+      await markAssistantJobsSeen(session.user.id, [job.id]);
+    }
+
     const online = heartbeat
       ? Date.now() - heartbeat.lastSeenAt.getTime() < BRIDGE_STALE_MS
       : false;
@@ -150,6 +172,9 @@ export async function GET(req: NextRequest) {
     .reverse()
     .map((job) => toTurn({ ...job, input: legacyInputById.get(job.id) }))
     .filter((turn) => !isInternalAssistantQuestion(turn.question));
+
+  // 목록을 열어 봤으면 끝난 대화(비서가 먼저 보낸 알림 포함)는 전부 읽은 것이다.
+  await markAssistantJobsSeen(session.user.id);
 
   return NextResponse.json({
     turns,

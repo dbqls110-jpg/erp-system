@@ -8,6 +8,7 @@ import { MessageContent } from "@/components/messenger/MessageContent";
 import { ProposalCard } from "@/components/messenger/ProposalCard";
 import { parseProposals, stripProposals } from "@/lib/assistantProposal";
 import { useVisiblePolling } from "@/lib/useVisiblePolling";
+import { useMessenger } from "@/lib/messenger-store";
 import { cn } from "@/lib/utils";
 
 type AssistantStatus = "pending" | "accepted" | "processing" | "completed" | "error";
@@ -48,6 +49,8 @@ export function AssistantPanel({ initialQuestion = "" }: { initialQuestion?: str
   const pollingStartedAt = useRef<number | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  // 목록을 불러오면 서버가 읽음 처리하므로 배지를 바로 내리려면 대화 목록을 다시 받아야 한다.
+  const { refresh: refreshBadges } = useMessenger();
 
   const fetchAssistant = useCallback(async (): Promise<AssistantResponse | null> => {
     try {
@@ -56,13 +59,14 @@ export function AssistantPanel({ initialQuestion = "" }: { initialQuestion?: str
       const data = (await res.json()) as AssistantResponse;
       setTurns(data.turns);
       setBridge(data.bridge);
+      void refreshBadges();
       return data;
     } catch {
       return null;
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [refreshBadges]);
 
   const stopPolling = useCallback(() => {
     setPollingId(null);
@@ -93,11 +97,14 @@ export function AssistantPanel({ initialQuestion = "" }: { initialQuestion?: str
         current.map((turn) => (turn.id === data.turn.id ? data.turn : turn)),
       );
       setBridge(data.bridge);
-      if (TERMINAL_STATUSES.includes(data.turn.status)) stopPolling();
+      if (TERMINAL_STATUSES.includes(data.turn.status)) {
+        stopPolling();
+        void refreshBadges();
+      }
     } catch {
       // 일시적인 네트워크 오류는 기존처럼 다음 폴링에서 다시 시도한다.
     }
-  }, [pollingId, stopPolling]);
+  }, [pollingId, stopPolling, refreshBadges]);
 
   useEffect(() => {
     void (async () => {

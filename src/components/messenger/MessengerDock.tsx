@@ -58,6 +58,7 @@ export function MessengerDock({ myId, myUser }: { myId: string; myUser: Messenge
   const {
     conversations,
     unreadTotal,
+    assistantUnread,
     refresh,
     users,
     loadUsers,
@@ -179,7 +180,7 @@ export function MessengerDock({ myId, myUser }: { myId: string; myUser: Messenge
       // 첫 메시지면 대화가 방금 생겼으므로 목록을 다시 받아 id 를 찾아야 한다.
       const res = await fetch("/api/messenger/conversations");
       if (res.ok) {
-        const convs: ConvItem[] = await res.json();
+        const { conversations: convs } = (await res.json()) as { conversations: ConvItem[] };
         const found = convs.find((c) => c.other.id === dockTarget.id);
         if (found) {
           setConvId(found.conversationId);
@@ -324,12 +325,21 @@ export function MessengerDock({ myId, myUser }: { myId: string; myUser: Messenge
             onClick={() => setAssistantOpen(true)}
             className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left transition-colors hover:bg-muted/50"
           >
-            <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
-              <Sparkles className="size-4" />
+            <div className="relative shrink-0">
+              <div className="flex size-8 items-center justify-center rounded-full bg-primary/10 text-primary">
+                <Sparkles className="size-4" />
+              </div>
+              {assistantUnread > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-0.5 text-[9px] font-bold text-white">
+                  {assistantUnread > 9 ? "9+" : assistantUnread}
+                </span>
+              )}
             </div>
             <div className="min-w-0">
-              <p className="truncate text-sm font-medium">ERP 비서</p>
-              <p className="truncate text-xs text-muted-foreground">무엇이든 물어보세요</p>
+              <p className={cn("truncate text-sm", assistantUnread > 0 ? "font-semibold" : "font-medium")}>ERP 비서</p>
+              <p className="truncate text-xs text-muted-foreground">
+                {assistantUnread > 0 ? `새 알림 ${assistantUnread}건` : "무엇이든 물어보세요"}
+              </p>
             </div>
           </button>
           {conversations.length === 0 && otherUsers.length === 0 && (

@@ -82,7 +82,7 @@ function formatFileSize(size: number | null) {
 export function MessengerView({ myId, myUser, users, todayDate }: { myId: string; myUser: User; users: User[]; todayDate: string }) {
   // 대화 목록은 AppShell 의 MessengerProvider 가 한 번만 폴링해 나눠준다.
   // 여기서 또 폴링하면 플로팅 위젯 · 헤더와 합쳐 요청이 세 배가 된다.
-  const { conversations, refresh: refreshConversations } = useMessenger();
+  const { conversations, assistantUnread, refresh: refreshConversations } = useMessenger();
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [selectedConvId, setSelectedConvId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -243,7 +243,7 @@ export function MessengerView({ myId, myUser, users, todayDate }: { myId: string
       // 첫 메시지면 대화가 방금 생겼으므로 id 를 찾아야 한다.
       const res = await fetch("/api/messenger/conversations");
       if (res.ok) {
-        const convs: { conversationId: string; other: { id: string } }[] = await res.json();
+        const { conversations: convs } = (await res.json()) as { conversations: { conversationId: string; other: { id: string } }[] };
         const found = convs.find(c => c.other.id === receiverId);
         if (found) {
           setSelectedConvId(found.conversationId);
@@ -318,12 +318,21 @@ export function MessengerView({ myId, myUser, users, todayDate }: { myId: string
                 assistantOpen && "bg-accent",
               )}
             >
-              <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/10">
-                <Sparkles className="size-4 text-primary" />
+              <div className="relative shrink-0">
+                <div className="flex size-9 items-center justify-center rounded-full bg-primary/10">
+                  <Sparkles className="size-4 text-primary" />
+                </div>
+                {assistantUnread > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-0.5 text-[9px] font-bold text-white">
+                    {assistantUnread > 9 ? "9+" : assistantUnread}
+                  </span>
+                )}
               </div>
               <div className="min-w-0">
-                <p className="text-sm font-medium text-foreground">ERP 비서</p>
-                <p className="text-xs text-muted-foreground">무엇이든 물어보세요</p>
+                <p className={cn("text-sm text-foreground", assistantUnread > 0 ? "font-semibold" : "font-medium")}>ERP 비서</p>
+                <p className="text-xs text-muted-foreground">
+                  {assistantUnread > 0 ? `새 알림 ${assistantUnread}건` : "무엇이든 물어보세요"}
+                </p>
               </div>
             </button>
 
