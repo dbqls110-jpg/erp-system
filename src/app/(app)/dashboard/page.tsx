@@ -10,6 +10,8 @@ import { getUnreadCount } from "@/app/actions/message";
 import { getCalendarViewer } from "@/lib/calendarViewer";
 import { calendarWhereFor, projectWhereFor } from "@/lib/calendarVisibility";
 import { getDashboardAudience } from "@/lib/dashboardVisibility";
+import { calculateBudgetMetrics } from "@/lib/financeMetrics";
+import { fixedExpenseMonthWhere, monthKey } from "@/lib/fixedExpenseMonths";
 
 export default async function DashboardPage() {
   const today = format(new Date(), "yyyy-MM-dd");
@@ -19,6 +21,8 @@ export default async function DashboardPage() {
 
   const monthStr = String(month).padStart(2, "0");
   const monthStart = `${year}-${monthStr}-01`;
+  const monthEnd = `${year}-${monthStr}-${String(new Date(year, month, 0).getDate()).padStart(2, "0")}`;
+  const viewMonth = monthKey(year, month);
 
   const weekLater = format(new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000), "yyyy-MM-dd");
 
@@ -74,7 +78,7 @@ export default async function DashboardPage() {
       : null,
     canSee("finance")
       ? prisma.expense.aggregate({
-          where: { date: { gte: monthStart }, fixedExpenseId: null },
+          where: { date: { gte: monthStart, lte: monthEnd }, fixedExpenseId: null },
           _sum: { amount: true },
         })
       : { _sum: { amount: 0 } },
@@ -90,15 +94,21 @@ export default async function DashboardPage() {
       where: { userId_year: { userId: viewer.id, year } },
       select: { totalDays: true, usedDays: true, pendingDays: true },
     }),
-    canSee("finance") ? prisma.fixedExpense.aggregate({ _sum: { amount: true } }) : { _sum: { amount: 0 } },
+    canSee("finance")
+      ? prisma.fixedExpense.findMany({
+          where: fixedExpenseMonthWhere(viewMonth),
+          select: { amount: true },
+        })
+      : [],
   ]);
 
   const attendance = monthlyAttendance.find((r) => r.date === today) ?? null;
   const attendanceSummary = summarizeAttendance(monthlyAttendance);
 
   const totalOther = expenses._sum.amount ?? 0;
-  const totalFixed = fixedExpenses._sum.amount ?? 0;
-  const remaining = budget ? budget.amount - totalFixed - totalOther : null;
+  const totalFixed = fixedExpenses.reduce((sum, expense) => sum + expense.amount, 0);
+  const budgetMetrics = calculateBudgetMetrics(budget?.amount ?? null, totalFixed, totalOther);
+  const remaining = budgetMetrics.remaining;
   const remainingLeave = leaveBalance
     ? leaveBalance.totalDays - leaveBalance.usedDays - leaveBalance.pendingDays
     : null;
