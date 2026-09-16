@@ -4,6 +4,8 @@ import { requireMenuAccess } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { EmptyState } from "@/components/ui/empty-state";
+import { PageIntro } from "@/components/ui/page-intro";
 import { toneBadgeClass } from "@/lib/badge-tone";
 import { CalendarOff } from "lucide-react";
 import { LeaveApplyButton } from "./LeaveApplyButton";
@@ -64,7 +66,7 @@ export default async function LeavePage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <p className="mt-1 text-sm text-muted-foreground">휴가를 신청하고 사용 현황과 신청 내역을 확인하세요.</p>
+          <PageIntro>휴가를 신청하고 사용 현황과 신청 내역을 확인하세요.</PageIntro>
         </div>
         <LeaveApplyButton />
       </div>
@@ -77,7 +79,7 @@ export default async function LeavePage() {
           { label: "승인 대기", value: `${pendingDays}일`, color: pendingDays > 0 ? "text-destructive" : "text-muted-foreground" },
           { label: "사용 가능", value: `${remaining}일`, color: isOverused ? "text-destructive" : "text-primary" },
         ].map((item) => (
-          <Card key={item.label} className="@container/card h-full shadow-xs">
+          <Card key={item.label} className="@container/card h-full">
             <CardHeader>
               <CardDescription>{item.label}</CardDescription>
               <CardTitle className={`text-2xl font-semibold tabular-nums @[250px]/card:text-3xl ${item.color}`}>{item.value}</CardTitle>
@@ -92,7 +94,7 @@ export default async function LeavePage() {
       )}
 
       {/* 전체 직원 휴가 현황 */}
-      <Card className="shadow-xs">
+      <Card>
         <CardHeader>
           <CardTitle className="text-base font-semibold text-foreground">
             전체 직원 휴가 현황
@@ -100,10 +102,7 @@ export default async function LeavePage() {
         </CardHeader>
         <CardContent>
           {allRequests.length === 0 ? (
-            <div className="flex flex-col items-center gap-3 py-12 text-center">
-              <CalendarOff className="size-6 text-muted-foreground" />
-              <p className="text-sm text-muted-foreground">승인된 휴가가 없습니다.</p>
-            </div>
+              <EmptyState icon={<CalendarOff className="size-5" />}>승인된 휴가가 없습니다.</EmptyState>
           ) : (
             <div className="space-y-1">
               {allRequests.map((r) => {
@@ -146,7 +145,7 @@ export default async function LeavePage() {
       </Card>
 
       {/* 내 휴가 신청 내역 */}
-      <Card className="shadow-xs">
+      <Card>
         <CardHeader>
           <CardTitle className="text-base font-semibold text-foreground">
             내 휴가 신청 내역
@@ -154,10 +153,7 @@ export default async function LeavePage() {
         </CardHeader>
         <CardContent>
           {myRequests.length === 0 ? (
-            <div className="flex flex-col items-center gap-3 py-12 text-center">
-              <CalendarOff className="size-6 text-muted-foreground" />
-              <p className="text-sm text-muted-foreground">신청 내역이 없습니다.</p>
-            </div>
+              <EmptyState icon={<CalendarOff className="size-5" />}>신청 내역이 없습니다.</EmptyState>
           ) : (
             <div className="space-y-1">
               {myRequests.map((r) => {

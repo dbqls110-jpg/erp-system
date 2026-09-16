@@ -344,7 +344,7 @@ export function VenueSearch({ districts, venueTypes }: VenueSearchProps) {
             </label>
             <label className="space-y-1.5 text-[12px]">
               <span className="block text-muted-foreground">희망 요일</span>
-              <select value={form.dayOfWeek} onChange={(event) => setField("dayOfWeek", event.target.value as FormState["dayOfWeek"])} className="h-9 w-full rounded-2xl border border-transparent bg-input/50 px-3 text-sm text-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/30">
+              <select value={form.dayOfWeek} onChange={(event) => setField("dayOfWeek", event.target.value as FormState["dayOfWeek"])} className="h-9 w-full rounded-[10px] border border-transparent bg-background px-3 text-sm text-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/30">
                 <option value="">선택 안 함</option>
                 <option value="평일">평일</option>
                 <option value="토">토</option>
@@ -354,14 +354,14 @@ export function VenueSearch({ districts, venueTypes }: VenueSearchProps) {
             </label>
             <label className="space-y-1.5 text-[12px]">
               <span className="block text-muted-foreground">지역(자치구)</span>
-              <select value={form.district} onChange={(event) => setField("district", event.target.value)} className="h-9 w-full rounded-2xl border border-transparent bg-input/50 px-3 text-sm text-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/30">
+              <select value={form.district} onChange={(event) => setField("district", event.target.value)} className="h-9 w-full rounded-[10px] border border-transparent bg-background px-3 text-sm text-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/30">
                 <option value="전체">전체</option>
                 {districts.map((district) => <option key={district} value={district}>{district}</option>)}
               </select>
             </label>
             <label className="space-y-1.5 text-[12px]">
               <span className="block text-muted-foreground">유형</span>
-              <select value={form.type} onChange={(event) => setField("type", event.target.value)} className="h-9 w-full rounded-2xl border border-transparent bg-input/50 px-3 text-sm text-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/30">
+              <select value={form.type} onChange={(event) => setField("type", event.target.value)} className="h-9 w-full rounded-[10px] border border-transparent bg-background px-3 text-sm text-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/30">
                 <option value="전체">전체</option>
                 {venueTypes.map((type) => <option key={type} value={type}>{type}</option>)}
               </select>
@@ -409,6 +409,10 @@ export function VenueSearch({ districts, venueTypes }: VenueSearchProps) {
         </p>
       )}
 
+      {/* 넓은 화면에서는 목록 왼쪽 · 지도 오른쪽 — docs/design-A/venues.html.
+          지도가 목록 아래 있으면 스크롤해야 보여 핀과 카드를 같이 볼 수 없다. */}
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] xl:items-start">
+        <div className="space-y-4">
       <Card ref={tableRef} className="rounded-[12px] border border-border py-0 shadow-none">
         <CardContent className="space-y-2 p-3">
           {!result ? (
@@ -454,10 +458,13 @@ export function VenueSearch({ districts, venueTypes }: VenueSearchProps) {
         </div>
       )}
 
-      <div className="space-y-2">
+        </div>
+      <div className="space-y-2 xl:sticky xl:top-4">
         <h2 className="text-sm font-semibold">지도</h2>
-        <VenueMap pins={pins} />
+        <VenueMap pins={pins} height={560} />
       </div>
+      </div>
+
 
       <VenueDetailDialog venueId={openVenueId} onClose={() => setOpenVenueId(null)} />
     </div>

@@ -66,12 +66,12 @@ export default async function AdminPage() {
   return (
     <div className="space-y-4">
       <div>
-        <p className="mt-1 text-sm text-muted-foreground">Google Drive AI 검색과 사용자 관리 설정을 확인하고 관리합니다.</p>
+        <p className="text-[13px] text-muted-foreground">Google Drive AI 검색과 사용자 관리 설정을 확인하고 관리합니다.</p>
       </div>
 
-      <Card className="shadow-xs">
+      <Card>
         <CardHeader>
-          <CardTitle className="text-base font-semibold text-foreground">
+          <CardTitle>
             Google Drive AI 검색
           </CardTitle>
         </CardHeader>
@@ -80,9 +80,9 @@ export default async function AdminPage() {
         </CardContent>
       </Card>
 
-      <Card className="shadow-xs">
+      <Card>
         <CardHeader>
-          <CardTitle className="text-base font-semibold text-foreground">
+          <CardTitle>
             사용자 관리 ({users.length}명)
           </CardTitle>
         </CardHeader>

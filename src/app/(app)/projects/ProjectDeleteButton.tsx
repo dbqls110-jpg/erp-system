@@ -28,7 +28,7 @@ export function ProjectDeleteButton({ id, name }: { id: string; name: string }) 
       <Button
         variant="ghost"
         size="icon"
-        className="h-7 w-7 text-muted-foreground hover:text-red-500 hover:bg-red-50 shrink-0"
+        className="size-8 text-muted-foreground hover:text-red-500 hover:bg-red-50 shrink-0"
         onClick={(e) => { e.preventDefault(); e.stopPropagation(); setOpen(true); }}
       >
         <Trash2 size={13} />

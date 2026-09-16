@@ -3,6 +3,7 @@
 import { useState, useCallback } from "react";
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -239,8 +240,8 @@ export function CalendarView({
 
   return (
     <>
-      <Card className="shadow-xs">
-        <CardContent className="p-4">
+      <Card>
+        <CardContent>
           <div className="flex items-center justify-between mb-4">
             <Button variant="ghost" size="sm" onClick={prevMonth} disabled={loading} aria-label="이전 달"><ChevronLeft size={16} /></Button>
             <h2 className="text-lg font-bold text-foreground" style={{ fontFamily: "var(--font-plus-jakarta-sans)" }}>
@@ -257,7 +258,7 @@ export function CalendarView({
             ))}
           </div>
 
-          <div className="grid grid-cols-7 gap-px bg-border rounded-lg overflow-hidden">
+          <div className="grid grid-cols-7 gap-px overflow-hidden rounded-[10px] bg-border">
             {blanks.map((i) => <div key={`b-${i}`} className="bg-muted/30 min-h-[80px]" />)}
             {days.map((day) => {
               const dateStr = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
@@ -325,13 +326,13 @@ export function CalendarView({
           </div>
 
           {!hasVisibleEvents && (
-            <p className="mt-4 text-center text-sm text-muted-foreground">
+            <EmptyState className="mt-4">
               {isExternalViewer
                 ? "이 달에는 표시할 프로젝트 마감일이 없습니다."
                 : canEditCalendar
                   ? "이 달에는 등록된 일정이 없습니다. 날짜를 눌러 추가하세요."
                   : "이 달에는 등록된 일정이 없습니다."}
-            </p>
+            </EmptyState>
           )}
 
           <div className="flex flex-wrap gap-4 mt-4 text-xs text-muted-foreground">
@@ -443,7 +444,7 @@ export function CalendarView({
                 <select
                   value={projectId}
                   onChange={(e) => setProjectId(e.target.value)}
-                  className="h-8 rounded-2xl border border-transparent bg-input/50 px-3 text-sm text-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/30"
+                  className="h-9 rounded-[10px] border border-border bg-input/50 px-3 text-[13px] text-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/30"
                 >
                   <option value="">연결 안 함 (내부 전용)</option>
                   {projectOptions.map((project) => (
@@ -473,7 +474,7 @@ export function CalendarView({
               </div>
               <div className="flex gap-2 justify-end pt-1">
                 <Button variant="outline" size="sm" onClick={() => setModal({ mode: "closed" })}>취소</Button>
-                <Button size="sm" className="h-9 py-2" onClick={handleCreate} disabled={!title.trim() || saving}>
+                <Button onClick={handleCreate} disabled={!title.trim() || saving}>
                   {saving ? "저장 중..." : "저장"}
                 </Button>
               </div>
@@ -516,7 +517,7 @@ export function CalendarView({
                 <select
                   value={projectId}
                   onChange={(e) => setProjectId(e.target.value)}
-                  className="h-8 rounded-2xl border border-transparent bg-input/50 px-3 text-sm text-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/30"
+                  className="h-9 rounded-[10px] border border-border bg-input/50 px-3 text-[13px] text-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/30"
                 >
                   <option value="">연결 안 함 (내부 전용)</option>
                   {projectOptions.map((project) => (
@@ -546,7 +547,7 @@ export function CalendarView({
               </div>
               <div className="flex gap-2 justify-end pt-1">
                 <Button variant="outline" size="sm" onClick={() => setModal({ mode: "closed" })}>취소</Button>
-                <Button size="sm" className="h-9 py-2" onClick={handleUpdate} disabled={!title.trim() || saving}>
+                <Button onClick={handleUpdate} disabled={!title.trim() || saving}>
                   {saving ? "저장 중..." : "수정"}
                 </Button>
               </div>

@@ -637,7 +637,7 @@ export function ProposalCard({
         <div className="mt-2.5 flex gap-1.5">
           <Button
             size="sm"
-            className={`h-7 text-xs ${actionTone}`}
+            className={`h-8 text-xs ${actionTone}`}
             onClick={apply}
             disabled={state === "saving" || nothingToApply}
             title={nothingToApply ? "적용할 수 있는 항목이 없습니다" : undefined}
@@ -647,7 +647,7 @@ export function ProposalCard({
           <Button
             size="sm"
             variant="ghost"
-            className="h-7 text-xs"
+            className="h-8 text-xs"
             onClick={() => setState("cancelled")}
             disabled={state === "saving"}
           >

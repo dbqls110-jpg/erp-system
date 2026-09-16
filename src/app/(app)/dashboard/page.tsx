@@ -138,6 +138,8 @@ export default async function DashboardPage() {
       title: "이번 달 잔여 예산",
       icon: <Banknote size={16} className="text-primary" />,
       value: remaining !== null ? `${remaining.toLocaleString()}원` : "미설정",
+      // 예산을 넘긴 달은 한눈에 보여야 한다. 재무 화면이 같은 값을 빨갛게 보여주는데 여기만 검으면 어긋난다.
+      valueClassName: remaining !== null && remaining < 0 ? "text-destructive" : undefined,
       sub: budget ? `예산 ${budget.amount.toLocaleString()}원` : "-",
     },
     {
@@ -182,7 +184,7 @@ export default async function DashboardPage() {
             <Card className="@container/card h-full rounded-[12px] border border-border py-0 shadow-none transition-all hover:border-[#d8d4fb] hover:shadow-sm dark:bg-card">
               <CardHeader className="gap-[6px] px-[18px] py-4">
                 <CardDescription className="text-[12px] text-muted-foreground">{w.title}</CardDescription>
-                <CardTitle className="text-[26px] font-bold leading-tight tracking-[-0.01em] tabular-nums" style={{ fontFamily: "var(--font-plus-jakarta-sans)" }}>{w.value}</CardTitle>
+                <CardTitle className={`text-[26px] font-bold leading-tight tracking-[-0.01em] tabular-nums${w.valueClassName ? ` ${w.valueClassName}` : ""}`} style={{ fontFamily: "var(--font-plus-jakarta-sans)" }}>{w.value}</CardTitle>
                 <CardAction>{w.icon}</CardAction>
               </CardHeader>
               <CardContent className="px-[18px] pb-4 pt-0">

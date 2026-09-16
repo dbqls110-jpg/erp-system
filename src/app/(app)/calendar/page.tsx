@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getNotionEvents } from "@/lib/notion";
 import { CalendarView } from "./CalendarView";
+import { PageIntro } from "@/components/ui/page-intro";
 
 import { getCalendarViewer } from "@/lib/calendarViewer";
 import {
@@ -115,7 +116,7 @@ export default async function CalendarPage() {
 
   return (
     <div className="space-y-4">
-      <div><p className="mt-1 text-sm text-muted-foreground">{viewerCanEditCalendar ? "프로젝트와 휴가 일정을 한눈에 확인하세요." : "프로젝트 마감일을 한눈에 확인하세요."}</p></div>
+      <PageIntro>{viewerCanEditCalendar ? "프로젝트와 휴가 일정을 한눈에 확인하세요." : "프로젝트 마감일을 한눈에 확인하세요."}</PageIntro>
       <CalendarView
         initialEvents={events}
         currentYear={year}

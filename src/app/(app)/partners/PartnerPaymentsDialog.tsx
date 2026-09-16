@@ -59,7 +59,7 @@ type PaymentFormState = {
 
 const PAYMENT_UNITS = ["건당", "일당", "시간당"];
 const SELECT_CLASS =
-  "h-8 rounded-2xl border border-transparent bg-input/50 px-3 text-sm text-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/30";
+  "h-9 rounded-[10px] border border-transparent bg-background px-3 text-sm text-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/30";
 
 const EMPTY_PAYMENT: PaymentFormState = {
   item: "",

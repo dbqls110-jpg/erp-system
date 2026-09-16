@@ -3,6 +3,8 @@ import { authOptions } from "@/lib/auth";
 import { requireMenuAccess } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
+import { PageIntro } from "@/components/ui/page-intro";
 import { Badge } from "@/components/ui/badge";
 import { toneBadgeClass } from "@/lib/badge-tone";
 import { format, startOfMonth, endOfMonth } from "date-fns";
@@ -61,7 +63,7 @@ export default async function AttendancePage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <p className="mt-1 text-sm text-muted-foreground">오늘과 이번 달 근태 현황을 확인할 수 있습니다.</p>
+          <PageIntro>오늘과 이번 달 근태 현황을 확인할 수 있습니다.</PageIntro>
         </div>
         <ClockButtons
           hasClockIn={!!todayRecord?.clockIn}
@@ -71,7 +73,7 @@ export default async function AttendancePage() {
 
       {/* 오늘 현황 */}
       <div className="grid grid-cols-1 gap-4 @xl/main:grid-cols-3">
-        <Card className="@container/card h-full shadow-xs">
+        <Card className="@container/card h-full">
           <CardHeader>
             <CardDescription>오늘 출근</CardDescription>
             <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
@@ -80,7 +82,7 @@ export default async function AttendancePage() {
             <CardAction className="flex items-center gap-2">
               <Clock className="size-3.5 text-primary" />
               {late && (
-                <Badge variant="outline" className={`${toneBadgeClass("amber")} text-xs`}>지각</Badge>
+                <Badge variant="outline" className={toneBadgeClass("amber")}>지각</Badge>
               )}
             </CardAction>
           </CardHeader>
@@ -93,7 +95,7 @@ export default async function AttendancePage() {
           </CardContent>
         </Card>
 
-        <Card className="@container/card h-full shadow-xs">
+        <Card className="@container/card h-full">
           <CardHeader>
             <CardDescription>오늘 퇴근</CardDescription>
             <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
@@ -104,13 +106,13 @@ export default async function AttendancePage() {
             <CardAction className="flex items-center gap-2">
               <Clock className="size-3.5 text-primary" />
               {isOvertime(todayRecord?.clockOut ?? null) && (
-                <Badge variant="outline" className={`${toneBadgeClass("purple")} text-xs`}>야근</Badge>
+                <Badge variant="outline" className={toneBadgeClass("purple")}>야근</Badge>
               )}
             </CardAction>
           </CardHeader>
         </Card>
 
-        <Card className="@container/card h-full shadow-xs">
+        <Card className="@container/card h-full">
           <CardHeader>
             <CardDescription>이번 달 총 근무</CardDescription>
             <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
@@ -128,7 +130,7 @@ export default async function AttendancePage() {
 
       {/* 관리자: 오늘 전체 현황 */}
       {isAdmin && (
-        <Card className="shadow-xs">
+        <Card>
           <CardHeader>
             <CardTitle className="text-base font-semibold text-foreground" style={{ fontFamily: "var(--font-plus-jakarta-sans)" }}>
               오늘 직원 현황
@@ -136,10 +138,7 @@ export default async function AttendancePage() {
           </CardHeader>
           <CardContent>
             {allRecords.length === 0 ? (
-              <div className="flex flex-col items-center gap-3 py-12 text-center">
-                <Clock className="size-6 text-muted-foreground" />
-                <p className="text-sm text-muted-foreground">오늘 출근한 직원이 없습니다.</p>
-              </div>
+              <EmptyState icon={<Clock className="size-5" />}>오늘 출근한 직원이 없습니다.</EmptyState>
             ) : (
               <div className="space-y-2">
                 {(allRecords as Array<{ id: string; date: string; user: { name: string | null; email: string; isAgent: boolean }; clockIn: Date | null; clockOut: Date | null; workHours: number | null }>).map((r) => (
@@ -147,20 +146,20 @@ export default async function AttendancePage() {
                     <div className="flex items-center gap-1.5">
                       <span className="text-sm font-medium text-foreground">{r.user.name ?? r.user.email}</span>
                       {r.user.isAgent && (
-                        <Badge variant="outline" className={`${toneBadgeClass("purple")} text-[10px] py-0 px-1.5`}>AI</Badge>
+                        <Badge variant="outline" className={toneBadgeClass("purple")}>AI</Badge>
                       )}
                     </div>
                     <div className="flex items-center gap-3 text-sm text-muted-foreground">
                       <div className="flex items-center gap-1.5">
                         <span>출근 {r.clockIn ? format(new Date(r.clockIn), "HH:mm") : "—"}</span>
                         {isLate(r.clockIn) && (
-                          <Badge variant="outline" className={`${toneBadgeClass("amber")} text-[10px] py-0`}>지각</Badge>
+                          <Badge variant="outline" className={toneBadgeClass("amber")}>지각</Badge>
                         )}
                       </div>
                       <div className="flex items-center gap-1.5">
                         <span>퇴근 {r.clockOut ? format(new Date(r.clockOut), "HH:mm") : "근무 중"}</span>
                         {isOvertime(r.clockOut) && (
-                          <Badge variant="outline" className={`${toneBadgeClass("purple")} text-[10px] py-0`}>야근</Badge>
+                          <Badge variant="outline" className={toneBadgeClass("purple")}>야근</Badge>
                         )}
                       </div>
                       {r.workHours && <Badge variant="outline">{r.workHours.toFixed(1)}h</Badge>}
@@ -183,7 +182,7 @@ export default async function AttendancePage() {
       {isAdmin && <AdminMonthlyPanel initialYear={now.getFullYear()} initialMonth={now.getMonth() + 1} />}
 
       {/* 이번 달 기록 */}
-      <Card className="shadow-xs">
+      <Card>
         <CardHeader>
           <CardTitle className="text-base font-semibold text-foreground" style={{ fontFamily: "var(--font-plus-jakarta-sans)" }}>
             {format(now, "M월", { locale: ko })} 근태 기록
@@ -191,10 +190,7 @@ export default async function AttendancePage() {
         </CardHeader>
         <CardContent>
           {monthlyRecords.length === 0 ? (
-            <div className="flex flex-col items-center gap-3 py-12 text-center">
-              <Clock className="size-6 text-muted-foreground" />
-              <p className="text-sm text-muted-foreground">이번 달 기록이 없습니다.</p>
-            </div>
+              <EmptyState icon={<Clock className="size-5" />}>이번 달 기록이 없습니다.</EmptyState>
           ) : (
             <div className="space-y-1">
               {monthlyRecords.map((r) => {

@@ -60,7 +60,7 @@ export function MemoEditor({ projectId, memo, canEdit }: { projectId: string; me
           <p className="flex-1 whitespace-pre-wrap text-[13px] leading-[1.6] text-foreground">
             {value || <span className="text-muted-foreground">메모 없음</span>}
           </p>
-          <Button size="sm" variant="ghost" onClick={() => setEditing(true)} className="gap-1 shrink-0 h-7 px-2">
+          <Button size="sm" variant="ghost" onClick={() => setEditing(true)} className="gap-1 shrink-0 px-2">
             <Pencil size={13} /> 편집
           </Button>
         </div>

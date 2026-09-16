@@ -47,7 +47,7 @@ export function UserNameInput({ userId, name: initialName }: Props) {
         value={value}
         onChange={e => setValue(e.target.value)}
         onKeyDown={e => { if (e.key === "Enter") handleSave(); if (e.key === "Escape") { setValue(initialName); setEditing(false); } }}
-        className="h-7 text-sm w-28 px-2"
+        className="w-28"
         autoFocus
         disabled={isPending}
       />

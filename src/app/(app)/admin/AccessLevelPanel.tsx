@@ -5,6 +5,7 @@ import { ChevronDown, ChevronUp, Pencil, Plus, Save, Trash2, X } from "lucide-re
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { EmptyState } from "@/components/ui/empty-state"
 import {
   Card,
   CardContent,
@@ -317,7 +318,7 @@ export default function AccessLevelPanel() {
       {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
       {notice ? <p role="status" aria-live="polite" className="text-sm text-muted-foreground">{notice}</p> : null}
 
-      <Card className="shadow-xs">
+      <Card>
         <CardHeader>
           <CardTitle>접근 레벨</CardTitle>
           <CardDescription>
@@ -328,7 +329,7 @@ export default function AccessLevelPanel() {
         <CardContent className="space-y-4">
           <div className="overflow-x-auto rounded-lg border">
             <p className="px-3 pt-2 text-xs text-muted-foreground md:hidden">표를 좌우로 밀어 더 많은 열을 볼 수 있습니다.</p>
-            <Table className="[&_:is(th,td)]:px-4">
+            <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-20">순서</TableHead>
@@ -362,17 +363,17 @@ export default function AccessLevelPanel() {
                               value={editingName}
                               onChange={(event) => setEditingName(event.target.value)}
                               disabled={isBusy}
-                              className="h-8 max-w-60"
+                              className="max-w-60"
                               autoFocus
                             />
-                            <Button type="submit" variant="outline" className="h-8" disabled={isBusy}>
+                            <Button type="submit" variant="outline" size="sm" disabled={isBusy}>
                               <Save className="size-3.5" />
                               저장
                             </Button>
                             <Button
                               type="button"
                               variant="ghost"
-                              className="h-8"
+                              size="sm"
                               onClick={() => setEditingLevelId(null)}
                               disabled={isBusy}
                             >
@@ -388,8 +389,7 @@ export default function AccessLevelPanel() {
                               <Button
                                 type="button"
                                 variant="ghost"
-                                size="icon"
-                                className="size-7"
+                                size="icon-sm"
                                 aria-label={`${level.name} 위로`}
                                 disabled={index === 0 || isBusy}
                                 onClick={() => void handleMove(level, "up")}
@@ -399,8 +399,7 @@ export default function AccessLevelPanel() {
                               <Button
                                 type="button"
                                 variant="ghost"
-                                size="icon"
-                                className="size-7"
+                                size="icon-sm"
                                 aria-label={`${level.name} 아래로`}
                                 disabled={index === levels.length - 1 || isBusy}
                                 onClick={() => void handleMove(level, "down")}
@@ -423,7 +422,7 @@ export default function AccessLevelPanel() {
                               <Button
                                 type="button"
                                 variant="ghost"
-                                className="h-8"
+                                size="sm"
                                 onClick={() => {
                                   setEditingLevelId(level.id)
                                   setEditingName(level.name)
@@ -436,7 +435,7 @@ export default function AccessLevelPanel() {
                               <Button
                                 type="button"
                                 variant="ghost"
-                                className="h-8 text-destructive hover:text-destructive"
+                                size="sm" className="text-destructive hover:text-destructive"
                                 onClick={() => void handleDelete(level)}
                                 disabled={level.isSystem || isBusy}
                                 title={level.isSystem ? "기본 레벨은 삭제할 수 없습니다" : undefined}
@@ -468,7 +467,7 @@ export default function AccessLevelPanel() {
                 value={newName}
                 onChange={(event) => setNewName(event.target.value)}
                 placeholder="예: 인턴"
-                className="h-8"
+                className="font-mono"
                 disabled={busy === "create"}
               />
             </div>
@@ -481,11 +480,11 @@ export default function AccessLevelPanel() {
                 value={newKey}
                 onChange={(event) => setNewKey(event.target.value)}
                 placeholder="예: intern"
-                className="h-8 font-mono"
+                className="font-mono"
                 disabled={busy === "create"}
               />
             </div>
-            <Button type="submit" className="h-9 py-2" disabled={busy === "create"}>
+            <Button type="submit" disabled={busy === "create"}>
               <Plus className="size-3.5" />
               {busy === "create" ? "추가 중…" : "레벨 추가"}
             </Button>
@@ -493,7 +492,7 @@ export default function AccessLevelPanel() {
         </CardContent>
       </Card>
 
-      <Card className="shadow-xs">
+      <Card>
         <CardHeader>
           <CardTitle>메뉴별 권한</CardTitle>
           <CardDescription>
@@ -527,14 +526,14 @@ export default function AccessLevelPanel() {
         </CardHeader>
         <CardContent>
           {levels.length === 0 ? (
-            <p className="py-6 text-sm text-muted-foreground">접근 레벨을 먼저 추가해 주세요.</p>
+            <EmptyState>접근 레벨을 먼저 추가해 주세요.</EmptyState>
           ) : (
             <>
             <div className="space-y-2 md:hidden">
               {MENU_KEYS.map((menu) => {
                 const forMenu = accessByMenu.get(menu.key)
                 return (
-                  <section key={menu.key} className="rounded-xl border border-border p-3">
+                  <section key={menu.key} className="rounded-[10px] border border-border p-3">
                     <h3 className="text-sm font-medium">{menu.label}</h3>
                     <div className="mt-2 space-y-2">
                       {levels.map((level) => {
@@ -558,9 +557,9 @@ export default function AccessLevelPanel() {
                 )
               })}
             </div>
-            <div className="hidden overflow-x-auto rounded-lg border md:block">
+            <div className="hidden overflow-x-auto rounded-[10px] border md:block">
               <p className="px-3 pt-2 text-xs text-muted-foreground md:hidden">권한표를 좌우로 밀어 더 많은 열을 볼 수 있습니다.</p>
-              <Table className="[&_:is(th,td)]:px-4">
+              <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead rowSpan={2} className="align-bottom">
