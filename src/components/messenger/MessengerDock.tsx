@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ArrowLeft, Bookmark, FileText, Maximize2, MessageCircle, Paperclip, Send, Sparkles, X } from "lucide-react";
 import { sendMessage, sendMessageWithAttachment } from "@/app/actions/message";
+import { imageFileFromClipboard, isImageAttachment } from "@/lib/messengerPaste";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useMessenger, type ConvItem, type MessengerUser } from "@/lib/messenger-store";
@@ -148,6 +149,17 @@ export function MessengerDock({ myId, myUser }: { myId: string; myUser: Messenge
 
   function clearSelectedFile() {
     setSelectedFile(null);
+  }
+
+  function handlePaste(event: React.ClipboardEvent<HTMLInputElement>) {
+    const file = imageFileFromClipboard(event.clipboardData.items);
+    if (!file) return; // 글자 붙여넣기는 그대로 둔다
+    event.preventDefault();
+    if (file.size > MAX_MESSENGER_FILE_SIZE) {
+      toast.error("메신저 첨부파일은 50MB 이하만 보낼 수 있습니다.");
+      return;
+    }
+    setSelectedFile(file);
   }
 
   async function handleSend() {
@@ -427,7 +439,18 @@ export function MessengerDock({ myId, myUser }: { myId: string; myUser: Messenge
                       )}
                     >
                       {msg.content && <MessageContent content={msg.content} />}
-                      {msg.attachmentDriveFileId && msg.attachmentUrl && (
+                      {msg.attachmentDriveFileId && isImageAttachment(msg.attachmentMimeType) && (
+                        <a href={`/api/messenger/attachments/${msg.id}`} target="_blank" rel="noreferrer" className="block">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={`/api/messenger/attachments/${msg.id}`}
+                            alt={msg.attachmentName ?? "이미지"}
+                            className="max-h-64 max-w-full rounded-lg object-contain"
+                            loading="lazy"
+                          />
+                        </a>
+                      )}
+                      {msg.attachmentDriveFileId && msg.attachmentUrl && !isImageAttachment(msg.attachmentMimeType) && (
                         <a
                           href={msg.attachmentUrl}
                           target="_blank"
@@ -512,6 +535,7 @@ export function MessengerDock({ myId, myUser }: { myId: string; myUser: Messenge
                     handleSend();
                   }
                 }}
+                onPaste={handlePaste}
                 placeholder={dockTarget.id === myId ? "메모·링크·파일을 나에게 보내기" : "메시지 입력"}
                 className="h-8 flex-1 text-xs"
                 disabled={sending}
