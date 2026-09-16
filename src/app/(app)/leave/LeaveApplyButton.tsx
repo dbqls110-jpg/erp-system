@@ -11,6 +11,13 @@ import { applyLeave } from "@/app/actions/leave";
 import { toast } from "sonner";
 import { Plus } from "lucide-react";
 
+const LEAVE_TYPE_ITEMS: Record<string, string> = {
+  annual: "연차",
+  half_am: "반차 - 오전 (0.5일)",
+  half_pm: "반차 - 오후 (0.5일)",
+  hourly: "시간차",
+};
+
 const isSingleDay = (t: string) => t === "half_am" || t === "half_pm" || t === "hourly";
 
 export function LeaveApplyButton() {
@@ -112,13 +119,12 @@ export function LeaveApplyButton() {
             {validationError && <p className="text-sm text-destructive" role="alert">{validationError}</p>}
             <div className="space-y-1">
               <Label htmlFor="leave-type">휴가 유형</Label>
-              <Select value={type} onValueChange={handleTypeChange}>
+              <Select items={LEAVE_TYPE_ITEMS} value={type} onValueChange={handleTypeChange}>
                 <SelectTrigger id="leave-type"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="annual">연차</SelectItem>
-                  <SelectItem value="half_am">반차 - 오전 (0.5일)</SelectItem>
-                  <SelectItem value="half_pm">반차 - 오후 (0.5일)</SelectItem>
-                  <SelectItem value="hourly">시간차</SelectItem>
+                  {Object.entries(LEAVE_TYPE_ITEMS).map(([v, l]) => (
+                    <SelectItem key={v} value={v}>{l}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
