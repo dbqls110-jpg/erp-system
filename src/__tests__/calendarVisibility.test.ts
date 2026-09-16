@@ -34,10 +34,12 @@ describe("isExternal — 연결이 신분이다", () => {
     expect(canEditCalendar(misconfigured)).toBe(false);
   });
 
-  it("role 이 partner 여도 연결이 없으면 내부로 본다", () => {
-    // 반대 방향. 연결이 없으면 어느 파트너인지 알 수 없어 가릴 기준이 없다.
+  it("role 이 partner 면 연결이 없어도 외부로 본다", () => {
+    // 연결이 없으면 어느 파트너인지 몰라 가릴 기준이 없다 — 그래서 내부로 보던 때가 있었다.
+    // 그러면 관리자가 연결을 깜빡한 파트너 계정이 내부 대시보드를 그대로 봤다.
+    // 이제는 외부로 보되 아무 프로젝트에도 걸리지 않는다(빈 화면).
     const noLink: Viewer = { id: "u6", role: "partner", partnerId: null, customerId: null };
-    expect(isExternal(noLink)).toBe(false);
+    expect(isExternal(noLink)).toBe(true);
   });
 });
 

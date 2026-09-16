@@ -18,15 +18,22 @@ export interface Viewer {
   customerId: string | null;
 }
 
+/** 외부인으로 취급하는 레벨. 연결(partnerId/customerId)이 없어도 이 레벨이면 밖이다. */
+export const EXTERNAL_ROLES: ReadonlySet<string> = new Set(["partner"]);
+
 /**
  * 외부 사용자인지.
  *
- * role 로 판단하지 않는다. role=partner 는 "권한이 낮다"는 뜻일 뿐이고, 실제로
- * 어느 파트너인지는 partnerId 가 말해 준다. 반대로 관리자가 실수로 role 을
- * 높게 줬더라도 partnerId 가 붙어 있으면 외부인이다 — 연결이 곧 신분이다.
+ * 두 기준 중 하나라도 걸리면 외부인이다.
+ * - 연결: partnerId/customerId 가 붙어 있으면 관리자가 role 을 높게 줬더라도 외부인이다.
+ *   어느 파트너인지는 연결이 말해 준다 — 연결이 곧 신분이다.
+ * - 레벨: role=partner 인데 아직 어느 파트너사인지 연결하지 않은 계정. 예전에는 이 경우를
+ *   내부 직원으로 봐서, 관리자가 연결을 깜빡하면 내부 대시보드가 그대로 보였다.
+ *   연결이 없는 외부인은 아무 프로젝트도 못 보는 빈 외부 화면을 본다.
  */
 export function isExternal(viewer: Viewer): boolean {
-  return viewer.partnerId !== null || viewer.customerId !== null;
+  if (viewer.partnerId !== null || viewer.customerId !== null) return true;
+  return viewer.role != null && EXTERNAL_ROLES.has(viewer.role);
 }
 
 /**
