@@ -5,6 +5,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { buildAssistantPrompt } from "@/lib/assistantPrompt";
 import { getAccessibleMenus } from "@/lib/permissions";
+import { APPLY_ENDPOINT, restoreProposalStates, type RestoredProposalState } from "@/lib/proposalStates";
 
 /**
  * 메신저의 ERP 비서.
@@ -168,9 +169,24 @@ export async function GET(req: NextRequest) {
     ? Date.now() - heartbeat.lastSeenAt.getTime() < BRIDGE_STALE_MS
     : false;
 
+  // 이미 적용/취소한 제안 카드가 다시 "적용" 버튼을 달고 나오지 않도록 기록을 함께 준다.
+  const applyLogs = jobs.length
+    ? await prisma.agentAuditLog.findMany({
+        where: {
+          endpoint: APPLY_ENDPOINT,
+          createdAt: { gte: jobs[jobs.length - 1].createdAt },
+        },
+        select: { action: true, payload: true, createdAt: true },
+      })
+    : [];
+  const proposalStates = restoreProposalStates(jobs.map((job) => job.id), applyLogs);
+
   const turns = jobs
     .reverse()
-    .map((job) => toTurn({ ...job, input: legacyInputById.get(job.id) }))
+    .map((job): Turn & { proposalStates: RestoredProposalState[] } => ({
+      ...toTurn({ ...job, input: legacyInputById.get(job.id) }),
+      proposalStates: proposalStates.get(job.id) ?? [],
+    }))
     .filter((turn) => !isInternalAssistantQuestion(turn.question));
 
   // 목록을 열어 봤으면 끝난 대화(비서가 먼저 보낸 알림 포함)는 전부 읽은 것이다.

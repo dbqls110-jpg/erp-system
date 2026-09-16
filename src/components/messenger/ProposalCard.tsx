@@ -97,14 +97,19 @@ export function ProposalCard({
   index,
   jobId,
   onApplied,
+  initialState,
 }: {
   proposal: Proposal;
   /** 같은 답변 안에서 몇 번째 제안인지. 서버가 답변을 다시 읽어 대조할 때 쓴다. */
   index: number;
   jobId: string;
   onApplied?: () => void;
+  /** 서버 기록에서 되살린 상태. 있으면 다시 묻지 않는다. */
+  initialState?: "done" | "cancelled";
 }) {
-  const [state, setState] = useState<"idle" | "saving" | "done" | "cancelled">("idle");
+  const [state, setState] = useState<"idle" | "saving" | "done" | "cancelled">(initialState ?? "idle");
+  // 되살린 done 은 결과 숫자(추가 n개 등)가 없으므로 문구를 단순하게 쓴다.
+  const restored = state === initialState && initialState !== undefined;
   const [error, setError] = useState<string | null>(null);
 
   const { accepted, rejected } = validateProposal(proposal);
@@ -580,7 +585,9 @@ export function ProposalCard({
         <div className="mt-2 text-[11px] text-muted-foreground">
           <p className="flex items-center gap-1">
             <Check className="size-3" />
-            {isInquiryMove
+            {restored
+              ? "이미 반영했습니다"
+              : isInquiryMove
               ? "문의 단계를 바꿨습니다"
               : isInquiryMemo
                 ? "문의 메모에 덧붙였습니다"
@@ -648,7 +655,15 @@ export function ProposalCard({
             size="sm"
             variant="ghost"
             className="h-8 text-xs"
-            onClick={() => setState("cancelled")}
+            onClick={() => {
+              setState("cancelled");
+              // 기록에 남겨 다시 열 때 또 묻지 않게 한다. 실패해도 화면은 취소 상태를 유지한다.
+              void fetch("/api/assistant/apply", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ jobId, index, cancel: true }),
+              }).catch(() => undefined);
+            }}
             disabled={state === "saving"}
           >
             <X className="size-3" />

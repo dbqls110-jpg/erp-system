@@ -21,6 +21,7 @@ import { getSpaceRentals, saveSpaceRentalStage } from "@/lib/spaceRentalSheet";
 import { formatCurrentDateTime, type InquiryStage } from "@/lib/inquiries";
 import type { SpaceRegistrationStage } from "@/lib/spaceRegistrations";
 import type { SpaceRentalStage } from "@/lib/spaceRentals";
+import { PROPOSAL_CANCEL_ACTION } from "@/lib/proposalStates";
 import { prisma } from "@/lib/prisma";
 import { canAccessMenu, canEditMenu } from "@/lib/permissions";
 import { calculateNetIncome } from "@/lib/financeMetrics";
@@ -354,7 +355,7 @@ export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  let body: { jobId?: unknown; index?: unknown };
+  let body: { jobId?: unknown; index?: unknown; cancel?: unknown };
   try {
     body = await req.json();
   } catch {
@@ -364,6 +365,25 @@ export async function POST(req: NextRequest) {
   const jobId = typeof body.jobId === "string" ? body.jobId : "";
   const index = typeof body.index === "number" ? body.index : 0;
   if (!jobId) return NextResponse.json({ error: "jobId 가 필요합니다." }, { status: 400 });
+
+  if (body.cancel === true) {
+    // 취소도 남긴다. 안 남기면 비서를 다시 열 때 그 카드가 또 묻는다.
+    const owned = await prisma.agentJob.findFirst({
+      where: { id: jobId, userId: session.user.id, visibility: "user" },
+      select: { id: true },
+    });
+    if (!owned) return NextResponse.json({ error: "대화를 찾을 수 없습니다." }, { status: 404 });
+    await prisma.agentAuditLog.create({
+      data: {
+        method: "POST",
+        endpoint: "/api/assistant/apply",
+        action: PROPOSAL_CANCEL_ACTION,
+        payload: { jobId, index },
+        result: { by: session.user.id },
+      },
+    });
+    return NextResponse.json({ cancelled: true });
+  }
 
   // 본인 대화의 답변만 적용할 수 있다. 남의 job id 를 넣어도 찾지 못한다.
   const job = await prisma.agentJob.findFirst({

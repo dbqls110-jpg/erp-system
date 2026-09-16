@@ -18,6 +18,8 @@ interface AssistantTurn {
   question: string;
   answer: string | null;
   status: AssistantStatus;
+  /** 이미 적용/취소한 제안. 목록 응답에만 있고 폴링 응답에는 없다. */
+  proposalStates?: { index: number; state: "done" | "cancelled" }[];
   errorMsg: string | null;
   createdAt: string;
   completedAt: string | null;
@@ -234,6 +236,7 @@ export function AssistantPanel({ initialQuestion = "" }: { initialQuestion?: str
                       // 서버가 답변을 다시 읽어 같은 자리의 제안인지 대조한다.
                       index={proposalIndex}
                       jobId={turn.id}
+                      initialState={turn.proposalStates?.find((s) => s.index === proposalIndex)?.state}
                     />
                   ))}
                 </>
