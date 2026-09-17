@@ -26,7 +26,12 @@ export async function GET() {
     orderBy: { lastMessageAt: "desc" },
   });
 
-  if (convs.length === 0) return NextResponse.json([]);
+  // 비서 대화의 안 읽은 답·알림. 직원 DM 과 같은 배지에 합산한다 — 폴러를 하나 더 두지 않기 위해 같은 응답에 싣는다.
+  const assistantUnread = await prisma.agentJob.count({
+    where: { userId: uid, visibility: "user", status: { in: ["completed", "error"] }, seenAt: null },
+  });
+
+  if (convs.length === 0) return NextResponse.json({ conversations: [], assistantUnread });
 
   // N+1 방지: 미읽음 수를 한 번에 조회
   const convIds = convs.map(c => c.id);
@@ -44,5 +49,5 @@ export async function GET() {
     unread: unreadMap[c.id] ?? 0,
   }));
 
-  return NextResponse.json(result);
+  return NextResponse.json({ conversations: result, assistantUnread });
 }

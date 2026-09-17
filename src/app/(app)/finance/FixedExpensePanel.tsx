@@ -246,7 +246,7 @@ export function FixedExpensePanel({ items, checkedIds, year, month, isAdmin }: P
               </div>
               <div className="space-y-1.5">
                 <Label>분류</Label>
-                <Select value={category} onValueChange={(v) => { if (v) setCategory(v); }}>
+                <Select items={CATEGORY_LABELS} value={category} onValueChange={(v) => { if (v) setCategory(v); }}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {Object.entries(CATEGORY_LABELS).map(([v, l]) => (

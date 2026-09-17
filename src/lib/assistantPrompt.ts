@@ -213,8 +213,11 @@ export interface AssistantPrompt {
   contextChars: number;
 }
 
-export async function buildAssistantPrompt(question: string): Promise<AssistantPrompt> {
-  const context = await buildAgentContext(question);
+export async function buildAssistantPrompt(
+  question: string,
+  allowedMenus?: ReadonlySet<string>,
+): Promise<AssistantPrompt> {
+  const context = await buildAgentContext(question, allowedMenus);
   const contextJson = JSON.stringify(context.data, null, 2);
 
   const parts = [SYSTEM_FRAME, "", TABLE_FORMAT, "", UPDATE_FORMAT, "", SHEET_CREATE_FORMAT, "", DRIVE_MOVE_FORMAT, "", "[ERP 자료]"];
@@ -226,6 +229,14 @@ export async function buildAssistantPrompt(question: string): Promise<AssistantP
     parts.push(" 우리 회사 자료가 필요한 질문이면 어느 화면을 보면 되는지 알려주세요.)");
   } else {
     parts.push(contextJson);
+  }
+
+  if (context.blockedTopics.length > 0) {
+    // 권한 밖 자료는 "없다"가 아니라 "볼 수 없다"로 답해야 질문자가 관리자에게 요청할 수 있다.
+    parts.push(
+      `(질문자는 다음 자료를 볼 권한이 없어 붙이지 않았습니다: ${context.blockedTopics.join(", ")}.`,
+      " 그 부분은 추측하지 말고 권한이 없다고만 답하세요.)",
+    );
   }
 
   parts.push("", "[질문]", question.trim());

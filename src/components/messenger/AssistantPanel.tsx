@@ -8,6 +8,7 @@ import { MessageContent } from "@/components/messenger/MessageContent";
 import { ProposalCard } from "@/components/messenger/ProposalCard";
 import { parseProposals, stripProposals } from "@/lib/assistantProposal";
 import { useVisiblePolling } from "@/lib/useVisiblePolling";
+import { useMessenger } from "@/lib/messenger-store";
 import { cn } from "@/lib/utils";
 
 type AssistantStatus = "pending" | "accepted" | "processing" | "completed" | "error";
@@ -17,6 +18,8 @@ interface AssistantTurn {
   question: string;
   answer: string | null;
   status: AssistantStatus;
+  /** 이미 적용/취소한 제안. 목록 응답에만 있고 폴링 응답에는 없다. */
+  proposalStates?: { index: number; state: "done" | "cancelled" }[];
   errorMsg: string | null;
   createdAt: string;
   completedAt: string | null;
@@ -48,6 +51,8 @@ export function AssistantPanel({ initialQuestion = "" }: { initialQuestion?: str
   const pollingStartedAt = useRef<number | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  // 목록을 불러오면 서버가 읽음 처리하므로 배지를 바로 내리려면 대화 목록을 다시 받아야 한다.
+  const { refresh: refreshBadges } = useMessenger();
 
   const fetchAssistant = useCallback(async (): Promise<AssistantResponse | null> => {
     try {
@@ -56,13 +61,14 @@ export function AssistantPanel({ initialQuestion = "" }: { initialQuestion?: str
       const data = (await res.json()) as AssistantResponse;
       setTurns(data.turns);
       setBridge(data.bridge);
+      void refreshBadges();
       return data;
     } catch {
       return null;
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [refreshBadges]);
 
   const stopPolling = useCallback(() => {
     setPollingId(null);
@@ -93,11 +99,14 @@ export function AssistantPanel({ initialQuestion = "" }: { initialQuestion?: str
         current.map((turn) => (turn.id === data.turn.id ? data.turn : turn)),
       );
       setBridge(data.bridge);
-      if (TERMINAL_STATUSES.includes(data.turn.status)) stopPolling();
+      if (TERMINAL_STATUSES.includes(data.turn.status)) {
+        stopPolling();
+        void refreshBadges();
+      }
     } catch {
       // 일시적인 네트워크 오류는 기존처럼 다음 폴링에서 다시 시도한다.
     }
-  }, [pollingId, stopPolling]);
+  }, [pollingId, stopPolling, refreshBadges]);
 
   useEffect(() => {
     void (async () => {
@@ -195,11 +204,14 @@ export function AssistantPanel({ initialQuestion = "" }: { initialQuestion?: str
             index === turns.length - 1 && !TERMINAL_STATUSES.includes(turn.status);
           return (
             <div key={turn.id} className="space-y-1.5">
-              <div className="flex justify-end">
-                <div className="max-w-[85%] rounded-2xl rounded-tr-sm bg-primary px-3 py-1.5 text-xs leading-relaxed text-primary-foreground">
-                  {turn.question}
+              {/* 질문이 없는 턴은 비서가 먼저 보낸 알림(가입 신청 등)이다. 답변만 그린다. */}
+              {turn.question && (
+                <div className="flex justify-end">
+                  <div className="max-w-[85%] rounded-2xl rounded-tr-sm bg-primary px-3 py-1.5 text-xs leading-relaxed text-primary-foreground">
+                    {turn.question}
+                  </div>
                 </div>
-              </div>
+              )}
               {turn.status === "error" && turn.errorMsg && (
                 <p className="px-1 text-[10px] text-muted-foreground">{turn.errorMsg}</p>
               )}
@@ -224,6 +236,7 @@ export function AssistantPanel({ initialQuestion = "" }: { initialQuestion?: str
                       // 서버가 답변을 다시 읽어 같은 자리의 제안인지 대조한다.
                       index={proposalIndex}
                       jobId={turn.id}
+                      initialState={turn.proposalStates?.find((s) => s.index === proposalIndex)?.state}
                     />
                   ))}
                 </>

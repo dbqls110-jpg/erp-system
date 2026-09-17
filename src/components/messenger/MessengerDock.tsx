@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ArrowLeft, Bookmark, FileText, Maximize2, MessageCircle, Paperclip, Send, Sparkles, X } from "lucide-react";
 import { sendMessage, sendMessageWithAttachment } from "@/app/actions/message";
+import { imageFileFromClipboard, isImageAttachment } from "@/lib/messengerPaste";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useMessenger, type ConvItem, type MessengerUser } from "@/lib/messenger-store";
@@ -57,6 +58,7 @@ export function MessengerDock({ myId, myUser }: { myId: string; myUser: Messenge
   const {
     conversations,
     unreadTotal,
+    assistantUnread,
     refresh,
     users,
     loadUsers,
@@ -150,6 +152,17 @@ export function MessengerDock({ myId, myUser }: { myId: string; myUser: Messenge
     setSelectedFile(null);
   }
 
+  function handlePaste(event: React.ClipboardEvent<HTMLInputElement>) {
+    const file = imageFileFromClipboard(event.clipboardData.items);
+    if (!file) return; // 글자 붙여넣기는 그대로 둔다
+    event.preventDefault();
+    if (file.size > MAX_MESSENGER_FILE_SIZE) {
+      toast.error("메신저 첨부파일은 50MB 이하만 보낼 수 있습니다.");
+      return;
+    }
+    setSelectedFile(file);
+  }
+
   async function handleSend() {
     const text = input.trim();
     if ((!text && !selectedFile) || !dockTarget) return;
@@ -167,7 +180,7 @@ export function MessengerDock({ myId, myUser }: { myId: string; myUser: Messenge
       // 첫 메시지면 대화가 방금 생겼으므로 목록을 다시 받아 id 를 찾아야 한다.
       const res = await fetch("/api/messenger/conversations");
       if (res.ok) {
-        const convs: ConvItem[] = await res.json();
+        const { conversations: convs } = (await res.json()) as { conversations: ConvItem[] };
         const found = convs.find((c) => c.other.id === dockTarget.id);
         if (found) {
           setConvId(found.conversationId);
@@ -312,12 +325,21 @@ export function MessengerDock({ myId, myUser }: { myId: string; myUser: Messenge
             onClick={() => setAssistantOpen(true)}
             className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left transition-colors hover:bg-muted/50"
           >
-            <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
-              <Sparkles className="size-4" />
+            <div className="relative shrink-0">
+              <div className="flex size-8 items-center justify-center rounded-full bg-primary/10 text-primary">
+                <Sparkles className="size-4" />
+              </div>
+              {assistantUnread > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-0.5 text-[9px] font-bold text-white">
+                  {assistantUnread > 9 ? "9+" : assistantUnread}
+                </span>
+              )}
             </div>
             <div className="min-w-0">
-              <p className="truncate text-sm font-medium">ERP 비서</p>
-              <p className="truncate text-xs text-muted-foreground">무엇이든 물어보세요</p>
+              <p className={cn("truncate text-sm", assistantUnread > 0 ? "font-semibold" : "font-medium")}>ERP 비서</p>
+              <p className="truncate text-xs text-muted-foreground">
+                {assistantUnread > 0 ? `새 알림 ${assistantUnread}건` : "무엇이든 물어보세요"}
+              </p>
             </div>
           </button>
           {conversations.length === 0 && otherUsers.length === 0 && (
@@ -427,7 +449,18 @@ export function MessengerDock({ myId, myUser }: { myId: string; myUser: Messenge
                       )}
                     >
                       {msg.content && <MessageContent content={msg.content} />}
-                      {msg.attachmentDriveFileId && msg.attachmentUrl && (
+                      {msg.attachmentDriveFileId && isImageAttachment(msg.attachmentMimeType) && (
+                        <a href={`/api/messenger/attachments/${msg.id}`} target="_blank" rel="noreferrer" className="block">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={`/api/messenger/attachments/${msg.id}`}
+                            alt={msg.attachmentName ?? "이미지"}
+                            className="max-h-64 max-w-full rounded-lg object-contain"
+                            loading="lazy"
+                          />
+                        </a>
+                      )}
+                      {msg.attachmentDriveFileId && msg.attachmentUrl && !isImageAttachment(msg.attachmentMimeType) && (
                         <a
                           href={msg.attachmentUrl}
                           target="_blank"
@@ -512,6 +545,7 @@ export function MessengerDock({ myId, myUser }: { myId: string; myUser: Messenge
                     handleSend();
                   }
                 }}
+                onPaste={handlePaste}
                 placeholder={dockTarget.id === myId ? "메모·링크·파일을 나에게 보내기" : "메시지 입력"}
                 className="h-8 flex-1 text-xs"
                 disabled={sending}

@@ -37,8 +37,37 @@ export function detectTopics(question: string): ContextTopic[] {
   );
 }
 
+/**
+ * 주제마다 어느 메뉴의 자료인지. 질문한 사람이 그 메뉴를 못 보면 자료도 붙이지 않는다.
+ * 메뉴를 숨겨 놓아도 AI 에게 물어보면 그대로 새어 나가는 것을 막기 위함이다 —
+ * 파트너는 메신저만 열려 있는데, 거기서 "프로젝트 목록"을 물으면 전부 나왔다.
+ */
+export const TOPIC_MENU: Record<ContextTopic, string> = {
+  venues: "venues",
+  customers: "customers",
+  partners: "partners",
+  projects: "projects",
+  inquiries: "inquiries",
+  // 직원 이름 목록은 메신저 상대 목록과 같은 범위다.
+  users: "messenger",
+};
+
+export function filterTopicsByMenus(
+  topics: ContextTopic[],
+  allowedMenus: ReadonlySet<string>,
+): { allowed: ContextTopic[]; blocked: ContextTopic[] } {
+  const allowed: ContextTopic[] = [];
+  const blocked: ContextTopic[] = [];
+  for (const topic of topics) {
+    (allowedMenus.has(TOPIC_MENU[topic]) ? allowed : blocked).push(topic);
+  }
+  return { allowed, blocked };
+}
+
 export interface AgentContext {
   topics: ContextTopic[];
+  /** 질문과 맞았지만 질문자 권한 밖이라 붙이지 않은 주제. */
+  blockedTopics: ContextTopic[];
   data: Record<string, unknown>;
   /** 지도에 찍을 좌표. 좌표가 없는 항목은 포함하지 않는다. */
   pins: { id: string; name: string; lat: number; lng: number; note?: string }[];
@@ -163,8 +192,14 @@ function venueDistrictWhere(districts: string[]) {
   return { OR: clauses };
 }
 
-export async function buildAgentContext(question: string): Promise<AgentContext> {
-  const topics = detectTopics(question);
+export async function buildAgentContext(
+  question: string,
+  allowedMenus?: ReadonlySet<string>,
+): Promise<AgentContext> {
+  const detected = detectTopics(question);
+  const { allowed: topics, blocked: blockedTopics } = allowedMenus
+    ? filterTopicsByMenus(detected, allowedMenus)
+    : { allowed: detected, blocked: [] as ContextTopic[] };
   const data: Record<string, unknown> = {};
   const pins: AgentContext["pins"] = [];
 
@@ -363,5 +398,5 @@ export async function buildAgentContext(question: string): Promise<AgentContext>
     }),
   );
 
-  return { topics, data, pins };
+  return { topics, blockedTopics, data, pins };
 }

@@ -29,10 +29,18 @@ export interface ConvItem {
   unread: number;
 }
 
+export interface ConversationsResponse {
+  conversations: ConvItem[];
+  /** 비서가 보낸 답·알림 중 아직 안 본 수. */
+  assistantUnread: number;
+}
+
 interface MessengerContextValue {
   conversations: ConvItem[];
-  /** 전체 미읽음 합계. 헤더 배지와 위젯 배지가 같은 값을 쓴다. */
+  /** 전체 미읽음 합계(직원 DM + 비서). 헤더 배지와 위젯 배지가 같은 값을 쓴다. */
   unreadTotal: number;
+  /** 비서 대화만의 미읽음. 목록의 비서 줄에 배지로 붙는다. */
+  assistantUnread: number;
   /** 대화 목록을 즉시 다시 가져온다. 메시지 전송 직후처럼 폴링을 기다릴 수 없을 때 쓴다. */
   refresh: () => Promise<void>;
 
@@ -66,6 +74,7 @@ const MessengerContext = createContext<MessengerContextValue | null>(null);
  */
 export function MessengerProvider({ children }: { children: React.ReactNode }) {
   const [conversations, setConversations] = useState<ConvItem[]>([]);
+  const [assistantUnread, setAssistantUnread] = useState(0);
   const [users, setUsers] = useState<MessengerUser[]>([]);
   const [dockOpen, setDockOpen] = useState(false);
   const [dockTarget, setDockTarget] = useState<MessengerUser | null>(null);
@@ -75,7 +84,11 @@ export function MessengerProvider({ children }: { children: React.ReactNode }) {
   const refresh = useCallback(async () => {
     try {
       const res = await fetch("/api/messenger/conversations");
-      if (res.ok) setConversations(await res.json());
+      if (res.ok) {
+        const data = (await res.json()) as ConversationsResponse;
+        setConversations(data.conversations);
+        setAssistantUnread(data.assistantUnread);
+      }
     } catch {
       // 네트워크 오류는 조용히 넘긴다. 다음 폴링에서 회복된다.
     }
@@ -114,14 +127,15 @@ export function MessengerProvider({ children }: { children: React.ReactNode }) {
   );
 
   const unreadTotal = useMemo(
-    () => conversations.reduce((sum, c) => sum + c.unread, 0),
-    [conversations],
+    () => conversations.reduce((sum, c) => sum + c.unread, 0) + assistantUnread,
+    [conversations, assistantUnread],
   );
 
   const value = useMemo(
     () => ({
       conversations,
       unreadTotal,
+      assistantUnread,
       refresh,
       users,
       loadUsers,
@@ -136,6 +150,7 @@ export function MessengerProvider({ children }: { children: React.ReactNode }) {
     [
       conversations,
       unreadTotal,
+      assistantUnread,
       refresh,
       users,
       loadUsers,

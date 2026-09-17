@@ -13,7 +13,15 @@ const roleConfig: Record<string, { label: string; class: string }> = {
   partner: { label: "파트너", class: "bg-primary/10 text-primary border-primary/20" },
   // 레벨 도입 전의 값. 마이그레이션 전 계정이 "알 수 없음"으로 보이지 않게 남겨둔다.
   user: { label: "사원", class: "bg-primary/10 text-primary border-primary/20" },
-  pending: { label: "승인 대기", class: "bg-yellow-50 text-yellow-700 border-yellow-200" },
+  pending: { label: "멤버 (설정 전)", class: "bg-yellow-50 text-yellow-700 border-yellow-200" },
+};
+
+const ROLE_ITEMS: Record<string, string> = {
+  admin: roleConfig.admin.label,
+  manager: roleConfig.manager.label,
+  member: roleConfig.member.label,
+  partner: roleConfig.partner.label,
+  pending: roleConfig.pending.label,
 };
 
 export function UserRoleSelect({ userId, currentRole, isCurrentUser }: {
@@ -37,16 +45,15 @@ export function UserRoleSelect({ userId, currentRole, isCurrentUser }: {
   };
 
   return (
-    <Select defaultValue={currentRole === "user" ? "member" : currentRole} onValueChange={handleChange}>
+    // Base UI 의 SelectValue 는 items 를 주지 않으면 라벨이 아니라 원시값("manager")을 그린다.
+    <Select items={ROLE_ITEMS} defaultValue={currentRole === "user" ? "member" : currentRole} onValueChange={handleChange}>
       <SelectTrigger className="w-32">
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
-        <SelectItem value="admin">관리자</SelectItem>
-        <SelectItem value="manager">팀장</SelectItem>
-        <SelectItem value="member">사원</SelectItem>
-        <SelectItem value="partner">파트너</SelectItem>
-        <SelectItem value="pending">승인 대기</SelectItem>
+        {Object.entries(ROLE_ITEMS).map(([v, l]) => (
+          <SelectItem key={v} value={v}>{l}</SelectItem>
+        ))}
       </SelectContent>
     </Select>
   );

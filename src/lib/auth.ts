@@ -1,6 +1,7 @@
 import { NextAuthOptions } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
 import { prisma } from "@/lib/prisma";
+import { notifyAdminsOfSignup } from "@/lib/signupNotice";
 
 /** role 을 DB 에서 다시 읽는 주기. 짧을수록 반영이 빠르고 DB 왕복이 는다. */
 const ROLE_REFRESH_MS = 60_000;
@@ -56,6 +57,15 @@ export const authOptions: NextAuthOptions = {
               RETURNING id, role, name, image, "partnerId", "customerId"
             `;
             dbUser = newUsers[0];
+
+            // 승인 대기 계정이 생기면 관리자 메신저에 알린다. 알림이 실패해도 로그인은 되어야 한다.
+            if (dbUser.role === "pending") {
+              try {
+                await notifyAdminsOfSignup(prisma, { id: dbUser.id, name: dbUser.name, email: profile.email });
+              } catch (err) {
+                console.error("[ERP Auth] 가입 신청 알림 실패", err);
+              }
+            }
           }
 
           token.id = dbUser.id;

@@ -187,6 +187,14 @@ export async function uploadMessengerFile(file: DriveUploadFile): Promise<Messen
 }
 
 /** 메신저 업로드가 DB 저장 전에 실패했을 때 남은 Drive 파일을 정리한다. */
+/** 첨부 원본을 대표 계정 권한으로 읽어 웹 스트림으로 돌려준다. 말풍선 안 이미지 표시용. */
+export async function streamMessengerFile(driveFileId: string): Promise<ReadableStream<Uint8Array>> {
+  return withOwnerDrive(async (drive) => {
+    const res = await drive.files.get({ fileId: driveFileId, alt: "media" }, { responseType: "stream" });
+    return Readable.toWeb(res.data as Readable) as ReadableStream<Uint8Array>;
+  });
+}
+
 export async function deleteDriveFileAsOwner(driveFileId: string): Promise<void> {
   await withOwnerDrive((drive) => drive.files.delete({ fileId: driveFileId }).then(() => undefined));
 }

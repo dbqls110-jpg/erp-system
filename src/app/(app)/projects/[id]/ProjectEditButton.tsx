@@ -12,6 +12,12 @@ import { toast } from "sonner";
 import { Pencil } from "lucide-react";
 import { COMPANY_NAMES } from "@/lib/companyFinance";
 
+const PROJECT_STATUS_ITEMS: Record<string, string> = {
+  active: "진행 중",
+  completed: "완료",
+  on_hold: "보류",
+};
+
 interface Project {
   id: string;
   name: string;
@@ -89,12 +95,12 @@ export function ProjectEditButton({ project }: { project: Project }) {
               </div>
               <div className="space-y-1">
                 <Label>상태</Label>
-                <Select value={status} onValueChange={(v) => v && setStatus(v)}>
+                <Select items={PROJECT_STATUS_ITEMS} value={status} onValueChange={(v) => v && setStatus(v)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="active">진행 중</SelectItem>
-                    <SelectItem value="completed">완료</SelectItem>
-                    <SelectItem value="on_hold">보류</SelectItem>
+                    {Object.entries(PROJECT_STATUS_ITEMS).map(([v, l]) => (
+                      <SelectItem key={v} value={v}>{l}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>

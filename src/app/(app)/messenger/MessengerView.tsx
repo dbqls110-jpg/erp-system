@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Send, MessageCircle, ArrowLeft, CalendarPlus, Sparkles, Paperclip, FileText, X, Bot, Bookmark } from "lucide-react";
 import { sendMessage, sendMessageWithAttachment } from "@/app/actions/message";
+import { imageFileFromClipboard, isImageAttachment } from "@/lib/messengerPaste";
 import { createCalendarEvent } from "@/app/actions/calendar";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -81,7 +82,7 @@ function formatFileSize(size: number | null) {
 export function MessengerView({ myId, myUser, users, todayDate }: { myId: string; myUser: User; users: User[]; todayDate: string }) {
   // 대화 목록은 AppShell 의 MessengerProvider 가 한 번만 폴링해 나눠준다.
   // 여기서 또 폴링하면 플로팅 위젯 · 헤더와 합쳐 요청이 세 배가 된다.
-  const { conversations, refresh: refreshConversations } = useMessenger();
+  const { conversations, assistantUnread, refresh: refreshConversations } = useMessenger();
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [selectedConvId, setSelectedConvId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -212,6 +213,17 @@ export function MessengerView({ myId, myUser, users, todayDate }: { myId: string
     setSelectedFile(null);
   }
 
+  function handlePaste(event: React.ClipboardEvent<HTMLInputElement>) {
+    const file = imageFileFromClipboard(event.clipboardData.items);
+    if (!file) return; // 글자 붙여넣기는 그대로 둔다
+    event.preventDefault();
+    if (file.size > MAX_MESSENGER_FILE_SIZE) {
+      toast.error("메신저 첨부파일은 50MB 이하만 보낼 수 있습니다.");
+      return;
+    }
+    setSelectedFile(file);
+  }
+
   async function handleSend() {
     if ((!input.trim() && !selectedFile) || !selectedUser) return;
     setSending(true);
@@ -231,7 +243,7 @@ export function MessengerView({ myId, myUser, users, todayDate }: { myId: string
       // 첫 메시지면 대화가 방금 생겼으므로 id 를 찾아야 한다.
       const res = await fetch("/api/messenger/conversations");
       if (res.ok) {
-        const convs: { conversationId: string; other: { id: string } }[] = await res.json();
+        const { conversations: convs } = (await res.json()) as { conversations: { conversationId: string; other: { id: string } }[] };
         const found = convs.find(c => c.other.id === receiverId);
         if (found) {
           setSelectedConvId(found.conversationId);
@@ -306,12 +318,21 @@ export function MessengerView({ myId, myUser, users, todayDate }: { myId: string
                 assistantOpen && "bg-accent",
               )}
             >
-              <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/10">
-                <Sparkles className="size-4 text-primary" />
+              <div className="relative shrink-0">
+                <div className="flex size-9 items-center justify-center rounded-full bg-primary/10">
+                  <Sparkles className="size-4 text-primary" />
+                </div>
+                {assistantUnread > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-0.5 text-[9px] font-bold text-white">
+                    {assistantUnread > 9 ? "9+" : assistantUnread}
+                  </span>
+                )}
               </div>
               <div className="min-w-0">
-                <p className="text-sm font-medium text-foreground">ERP 비서</p>
-                <p className="text-xs text-muted-foreground">무엇이든 물어보세요</p>
+                <p className={cn("text-sm text-foreground", assistantUnread > 0 ? "font-semibold" : "font-medium")}>ERP 비서</p>
+                <p className="text-xs text-muted-foreground">
+                  {assistantUnread > 0 ? `새 알림 ${assistantUnread}건` : "무엇이든 물어보세요"}
+                </p>
               </div>
             </button>
 
@@ -449,7 +470,18 @@ export function MessengerView({ myId, myUser, users, todayDate }: { myId: string
                           isMine ? "bg-primary text-primary-foreground rounded-tr-sm" : "bg-muted text-foreground rounded-tl-sm"
                         )}>
                           {msg.content && <MessageContent content={msg.content} />}
-                          {msg.attachmentDriveFileId && msg.attachmentUrl && (
+                          {msg.attachmentDriveFileId && isImageAttachment(msg.attachmentMimeType) && (
+                            <a href={`/api/messenger/attachments/${msg.id}`} target="_blank" rel="noreferrer" className="block">
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img
+                                src={`/api/messenger/attachments/${msg.id}`}
+                                alt={msg.attachmentName ?? "이미지"}
+                                className="max-h-80 max-w-full rounded-lg object-contain"
+                                loading="lazy"
+                              />
+                            </a>
+                          )}
+                          {msg.attachmentDriveFileId && msg.attachmentUrl && !isImageAttachment(msg.attachmentMimeType) && (
                             <a
                               href={msg.attachmentUrl}
                               target="_blank"
@@ -528,6 +560,7 @@ export function MessengerView({ myId, myUser, users, todayDate }: { myId: string
                     value={input}
                     onChange={e => setInput(e.target.value)}
                     onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
+                    onPaste={handlePaste}
                     placeholder={selectedUser.id === myId ? "메모·링크·파일을 나에게 보내기" : `${selectedUser.name ?? "직원"}에게 메시지 보내기`}
                     className="flex-1"
                     disabled={sending}

@@ -11,6 +11,15 @@ import { addExpense } from "@/app/actions/finance";
 import { toast } from "sonner";
 import { Plus } from "lucide-react";
 
+const EXPENSE_CATEGORY_ITEMS: Record<string, string> = {
+  rent: "임차료",
+  salary: "인건비",
+  telecom: "통신비",
+  supplies: "비품",
+  food: "식대",
+  other: "기타",
+};
+
 export function ExpenseAddButton({ initialDate }: { initialDate: string }) {
   const [open, setOpen] = useState(false);
   const [category, setCategory] = useState("other");
@@ -57,15 +66,12 @@ export function ExpenseAddButton({ initialDate }: { initialDate: string }) {
             </div>
             <div className="space-y-1">
               <Label>카테고리</Label>
-              <Select value={category} onValueChange={(v) => v && setCategory(v)}>
+              <Select items={EXPENSE_CATEGORY_ITEMS} value={category} onValueChange={(v) => v && setCategory(v)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="rent">임차료</SelectItem>
-                  <SelectItem value="salary">인건비</SelectItem>
-                  <SelectItem value="telecom">통신비</SelectItem>
-                  <SelectItem value="supplies">비품</SelectItem>
-                  <SelectItem value="food">식대</SelectItem>
-                  <SelectItem value="other">기타</SelectItem>
+                  {Object.entries(EXPENSE_CATEGORY_ITEMS).map(([v, l]) => (
+                    <SelectItem key={v} value={v}>{l}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>

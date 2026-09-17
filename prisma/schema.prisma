@@ -507,6 +507,8 @@ model AgentJob {
   errorMsg    String? // 오류 메시지
   claimedAt   DateTime? // 브릿지가 수락한 시각
   completedAt DateTime?
+  /// 요청자가 답(또는 비서가 먼저 보낸 알림)을 화면에서 본 시각. null 이면 안 읽음 배지에 잡힌다.
+  seenAt      DateTime?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
@@ -516,6 +518,7 @@ model AgentJob {
 
   @@index([agentType, status, createdAt])
   @@index([userId, visibility, createdAt])
+  @@index([userId, visibility, seenAt])
   @@map("agent_jobs")
 }
 

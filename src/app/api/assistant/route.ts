@@ -4,6 +4,8 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { buildAssistantPrompt } from "@/lib/assistantPrompt";
+import { getAccessibleMenus } from "@/lib/permissions";
+import { APPLY_ENDPOINT, restoreProposalStates, type RestoredProposalState } from "@/lib/proposalStates";
 
 /**
  * 메신저의 ERP 비서.
@@ -14,6 +16,23 @@ import { buildAssistantPrompt } from "@/lib/assistantPrompt";
  * 답을 만드는 쪽(브릿지)은 우리 DB 에 접근할 수 없으므로, 여기서 질문에 맞는
  * ERP 자료를 미리 붙여 보낸다.
  */
+
+/**
+ * 끝난 비서 대화를 읽음 처리한다. ids 를 주지 않으면 이 사람의 안 읽은 것 전부.
+ * 아직 답이 없는 job 은 건드리지 않는다 — 답이 나중에 와도 배지에 잡혀야 한다.
+ */
+async function markAssistantJobsSeen(userId: string, ids?: string[]) {
+  await prisma.agentJob.updateMany({
+    where: {
+      userId,
+      visibility: "user",
+      status: { in: ["completed", "error"] },
+      seenAt: null,
+      ...(ids ? { id: { in: ids } } : {}),
+    },
+    data: { seenAt: new Date() },
+  });
+}
 
 /** 브릿지가 붙어 있는지 판단하는 기준. 이보다 오래 조용하면 꺼진 것으로 본다. */
 const BRIDGE_STALE_MS = 3 * 60 * 1000;
@@ -98,6 +117,11 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
 
+    // 답이 도착한 것을 화면이 받아 갔으니 읽은 것으로 표시한다.
+    if (job.status === "completed" || job.status === "error") {
+      await markAssistantJobsSeen(session.user.id, [job.id]);
+    }
+
     const online = heartbeat
       ? Date.now() - heartbeat.lastSeenAt.getTime() < BRIDGE_STALE_MS
       : false;
@@ -145,10 +169,28 @@ export async function GET(req: NextRequest) {
     ? Date.now() - heartbeat.lastSeenAt.getTime() < BRIDGE_STALE_MS
     : false;
 
+  // 이미 적용/취소한 제안 카드가 다시 "적용" 버튼을 달고 나오지 않도록 기록을 함께 준다.
+  const applyLogs = jobs.length
+    ? await prisma.agentAuditLog.findMany({
+        where: {
+          endpoint: APPLY_ENDPOINT,
+          createdAt: { gte: jobs[jobs.length - 1].createdAt },
+        },
+        select: { action: true, payload: true, createdAt: true },
+      })
+    : [];
+  const proposalStates = restoreProposalStates(jobs.map((job) => job.id), applyLogs);
+
   const turns = jobs
     .reverse()
-    .map((job) => toTurn({ ...job, input: legacyInputById.get(job.id) }))
+    .map((job): Turn & { proposalStates: RestoredProposalState[] } => ({
+      ...toTurn({ ...job, input: legacyInputById.get(job.id) }),
+      proposalStates: proposalStates.get(job.id) ?? [],
+    }))
     .filter((turn) => !isInternalAssistantQuestion(turn.question));
+
+  // 목록을 열어 봤으면 끝난 대화(비서가 먼저 보낸 알림 포함)는 전부 읽은 것이다.
+  await markAssistantJobsSeen(session.user.id);
 
   return NextResponse.json({
     turns,
@@ -198,7 +240,9 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const { prompt, topics, contextChars } = await buildAssistantPrompt(question);
+  // 질문자가 볼 수 있는 메뉴의 자료만 붙인다. 메뉴 권한과 같은 기준이다.
+  const allowedMenus = await getAccessibleMenus(session.user.id, session.user.role);
+  const { prompt, topics, contextChars } = await buildAssistantPrompt(question, allowedMenus);
 
   const job = await prisma.agentJob.create({
     data: {
