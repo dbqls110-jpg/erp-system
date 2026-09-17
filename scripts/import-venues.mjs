@@ -38,6 +38,7 @@ import {
   makeDriveClient,
 } from "./lib/drive.mjs";
 import { districtFromAddress } from "../src/lib/venueDistrict.mjs";
+import { blockedReason } from "../src/lib/venueBlocklist.mjs";
 
 const SOURCE_NAME = "서울경기_대관공간_DB.csv";
 const COORDS_NAME = "venue_coordinates.csv";
@@ -300,7 +301,19 @@ async function main() {
     }
   }
 
-  const venues = rows.map((r) => toVenue(r, coords.get(sourceKey(r))));
+  // 제외 목록(src/lib/venueBlocklist.mjs)에 있는 곳은 원본에 다시 들어와도 넣지 않는다.
+  const blocked = [];
+  const kept = rows.filter((r) => {
+    const reason = blockedReason({ name: r["이름"], address: r["위치"] });
+    if (reason) blocked.push(`${r["이름"]} — ${reason}`);
+    return !reason;
+  });
+  if (blocked.length) {
+    console.log(`제외 목록에 걸려 넣지 않는 행 ${blocked.length}건:`);
+    for (const b of blocked) console.log(`  · ${b}`);
+  }
+
+  const venues = kept.map((r) => toVenue(r, coords.get(sourceKey(r))));
 
   // 열쇠가 겹치는 행이 있으면 마지막 것만 남는다. 몇 건인지 알려 준다.
   const unique = new Map(venues.map((v) => [v.sourceKey, v]));
@@ -342,6 +355,19 @@ async function main() {
       }
     }
     console.log("\n");
+
+    // 이미 들어와 있던 제외 대상도 지운다. 목록에 나중에 추가된 곳이 남아 있을 수 있다.
+    const existing = await prisma.venue.findMany({ select: { id: true, name: true, address: true } });
+    const stale = existing.filter((v) => blockedReason(v));
+    if (stale.length) {
+      const backup = path.join("backup", `제외목록_삭제_${new Date().toISOString().replace(/[:.]/g, "-")}.json`);
+      fs.mkdirSync("backup", { recursive: true });
+      fs.writeFileSync(backup, JSON.stringify(await prisma.venue.findMany({ where: { id: { in: stale.map((v) => v.id) } } }), null, 2));
+      await prisma.venue.deleteMany({ where: { id: { in: stale.map((v) => v.id) } } });
+      console.log(`제외 목록에 걸린 기존 행 ${stale.length}건 삭제 (백업 ${backup})`);
+      for (const v of stale) console.log(`  · ${v.name} — ${blockedReason(v)}`);
+    }
+
     console.log(`venues 표 총 ${await prisma.venue.count()}건`);
   } finally {
     await prisma.$disconnect();
