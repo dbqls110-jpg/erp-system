@@ -8,6 +8,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { usePathname } from "next/navigation";
 import { useVisiblePolling } from "@/lib/useVisiblePolling";
 
 export interface MessengerUser {
@@ -76,6 +77,7 @@ const MessengerContext = createContext<MessengerContextValue | null>(null);
  * 만들 수 있다. 즉 위젯을 추가하면서 오히려 요청 수가 줄어든다.
  */
 export function MessengerProvider({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
   const [conversations, setConversations] = useState<ConvItem[]>([]);
   const [assistantUnread, setAssistantUnread] = useState(0);
   const [users, setUsers] = useState<MessengerUser[]>([]);
@@ -100,9 +102,11 @@ export function MessengerProvider({ children }: { children: React.ReactNode }) {
   // 탭이 보이는 동안에만 폴링한다. 새벽 시간대 차단(respectQuietHours)은 쓰지 않는다 —
   // 탭이 보인다는 건 사람이 실제로 앞에 있다는 뜻이고, 야간 행사 대응 중에 메신저가
   // 멈춘 것처럼 보이는 편이 더 나쁘다. 헤더도 같은 이유로 이 옵션을 쓰지 않는다.
-  // VenueDA 상담은 외부 방문자 응답을 기다리는 업무라 30초는 너무 길다.
-  // 5초면 평균 지연을 약 2.5초로 낮추면서, SSE 없이도 DB 요청을 과도하게 만들지 않는다.
-  useVisiblePolling(refresh, 5000);
+  // 메신저 화면/플로팅 창을 실제로 보고 있을 때만 빠르게 확인한다. AppShell 전체에서
+  // Provider가 살아 있으므로 5초를 전역으로 걸면 모든 ERP 탭이 DB를 6배 더 두드린다.
+  // 그 밖의 화면은 30초로 유지해 알림은 계속 오되 무료 DB 부하를 제한한다.
+  const fastPolling = pathname === "/messenger" || pathname.startsWith("/messenger/") || dockOpen;
+  useVisiblePolling(refresh, fastPolling ? 5000 : 30000, { refreshKey: fastPolling });
 
   const loadUsers = useCallback(() => {
     if (usersLoaded.current) return;
