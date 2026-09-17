@@ -26,5 +26,5 @@ export const config = {
   // (제외 전에는 세션이 없으면 /login 으로 307 리다이렉트되어 헬스체크로 쓸 수 없었다)
   // dev-preview 는 개발 중 컴포넌트를 로그인 없이 확인하는 경로다. 페이지 자체가
   // 프로덕션에서 notFound() 를 던지므로 배포본에는 존재하지 않는다.
-  matcher: ["/((?!api/auth|api/agent|api/health|dev-preview|_next/static|_next/image|favicon.ico|public/).*)"],
+  matcher: ["/((?!api/auth|api/agent|api/health|api/public/|dev-preview|_next/static|_next/image|favicon.ico|public/).*)"],
 };
