@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Send, MessageCircle, ArrowLeft, CalendarPlus, Sparkles, Paperclip, FileText, X, Bot, Bookmark } from "lucide-react";
 import { sendMessage, sendMessageWithAttachment } from "@/app/actions/message";
+import { sendVenueDaReply } from "@/app/actions/venueDaMessenger";
 import { imageFileFromClipboard, isImageAttachment } from "@/lib/messengerPaste";
 import { createCalendarEvent } from "@/app/actions/calendar";
 import { toast } from "sonner";
@@ -32,6 +33,9 @@ interface User {
   role?: string;
   isAgent?: boolean;
   agentType?: string | null;
+  source?: string;
+  venueDaThreadId?: string;
+  subtitle?: string;
 }
 
 interface Message {
@@ -231,7 +235,12 @@ export function MessengerView({ myId, myUser, users, todayDate }: { myId: string
     const receiverId = selectedUser.id;
     setInput("");
     try {
-      if (selectedFile) {
+      const isVenueDa = selectedUser.source === "venueda" || receiverId.startsWith("venueda:");
+      if (isVenueDa) {
+        if (selectedFile) throw new Error("VenueDA 상담 첨부파일은 준비 중입니다.");
+        const threadId = selectedUser.venueDaThreadId ?? receiverId.slice("venueda:".length);
+        await sendVenueDaReply(threadId, text);
+      } else if (selectedFile) {
         const formData = new FormData();
         formData.set("file", selectedFile);
         await sendMessageWithAttachment(receiverId, text, formData);
@@ -361,7 +370,10 @@ export function MessengerView({ myId, myUser, users, todayDate }: { myId: string
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium text-foreground truncate">{conv.other.name ?? "직원"}</span>
+                        <span className="flex min-w-0 items-center gap-1.5">
+                          <span className="text-sm font-medium text-foreground truncate">{conv.other.name ?? "직원"}</span>
+                          {conv.other.source === "venueda" && <Badge variant="secondary" className="shrink-0 px-1.5 py-0 text-[9px]">VenueDA</Badge>}
+                        </span>
                         {conv.lastMsg && <span className="text-[10px] text-muted-foreground shrink-0 ml-1">{timeStr(conv.lastMsg.createdAt)}</span>}
                       </div>
                       {conv.lastMsg && (
@@ -369,6 +381,9 @@ export function MessengerView({ myId, myUser, users, todayDate }: { myId: string
                           {conv.lastMsg.senderId === myId ? "나: " : ""}
                           {conv.lastMsg.attachmentName ? `📎 ${conv.lastMsg.attachmentName}` : conv.lastMsg.content}
                         </p>
+                      )}
+                      {conv.other.source === "venueda" && conv.other.subtitle && (
+                        <p className="truncate text-[10px] text-muted-foreground/80">{conv.other.subtitle}</p>
                       )}
                     </div>
                   </button>
@@ -437,7 +452,13 @@ export function MessengerView({ myId, myUser, users, todayDate }: { myId: string
                   <AvatarFallback className="text-xs bg-muted">{initials(selectedUser.name)}</AvatarFallback>
                 </Avatar>
                 <div className="flex flex-col min-w-0">
-                  <span className="text-sm font-semibold text-foreground">{selectedUser.name}</span>
+                  <span className="flex items-center gap-1.5 text-sm font-semibold text-foreground">
+                    <span className="truncate">{selectedUser.name}</span>
+                    {selectedUser.source === "venueda" && <Badge variant="secondary" className="px-1.5 py-0 text-[9px]">VenueDA</Badge>}
+                  </span>
+                  {selectedUser.source === "venueda" && selectedUser.subtitle && (
+                    <span className="truncate text-[10px] text-muted-foreground">{selectedUser.subtitle}</span>
+                  )}
                 </div>
                 <span className="text-xs text-muted-foreground ml-auto">메시지 우클릭 → 캘린더 · 파일 정리</span>
               </div>
@@ -541,6 +562,7 @@ export function MessengerView({ myId, myUser, users, todayDate }: { myId: string
                   type="file"
                   className="hidden"
                   onChange={handleFileChange}
+                  disabled={selectedUser.source === "venueda"}
                 />
                 <div className="flex gap-2">
                   <Button
@@ -548,10 +570,10 @@ export function MessengerView({ myId, myUser, users, todayDate }: { myId: string
                     variant="outline"
                     size="icon"
                     onClick={() => fileInputRef.current?.click()}
-                    disabled={sending}
+                    disabled={sending || selectedUser.source === "venueda"}
                     className="h-9 w-9 shrink-0"
                     aria-label="파일 첨부"
-                    title="파일 첨부 (최대 50MB)"
+                    title={selectedUser.source === "venueda" ? "VenueDA 상담은 첨부파일 준비 중입니다" : "파일 첨부 (최대 50MB)"}
                   >
                     <Paperclip className="size-3.5" aria-hidden="true" />
                   </Button>

@@ -2,6 +2,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
+import { listVenueDaMessages } from "@/lib/venueDaMessenger";
 
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions);
@@ -9,6 +10,13 @@ export async function GET(req: NextRequest) {
 
   const convId = req.nextUrl.searchParams.get("conversationId");
   if (!convId) return NextResponse.json([]);
+
+  if (convId.startsWith("venueda:")) {
+    const threadId = convId.slice("venueda:".length);
+    const messages = await listVenueDaMessages(threadId, session.user.id, session.user.role);
+    if (!messages) return NextResponse.json({ error: "상담을 찾을 수 없습니다." }, { status: 404 });
+    return NextResponse.json(messages);
+  }
 
   const conv = await prisma.conversation.findUnique({ where: { id: convId } });
   if (!conv) return NextResponse.json([]);

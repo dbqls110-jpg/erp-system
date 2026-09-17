@@ -15,6 +15,9 @@ export interface MessengerUser {
   name: string | null;
   image: string | null;
   role?: string;
+  source?: string;
+  venueDaThreadId?: string;
+  subtitle?: string;
 }
 
 export interface ConvItem {

@@ -23,3 +23,10 @@ services:
         sync: false
       - key: DRIVE_TOKEN_ENC_KEY
         sync: false
+      # VenueDA 외부 상담 연동. secret 값은 Render 대시보드에서 직접 입력한다.
+      - key: VENUEDA_BASE_URL
+        value: https://venueda.pages.dev
+      - key: VENUEDA_INTEGRATION_SECRET
+        sync: false
+      - key: VENUEDA_DEFAULT_ASSIGNEE_EMAIL
+        value: qkrtjrdud952@gmail.com

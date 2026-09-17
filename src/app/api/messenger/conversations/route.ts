@@ -2,6 +2,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getConversationOther } from "@/lib/messenger-conversation";
+import { listVenueDaThreadsForUser } from "@/lib/venueDaMessenger";
 import { NextResponse } from "next/server";
 
 export async function GET() {
@@ -31,23 +32,30 @@ export async function GET() {
     where: { userId: uid, visibility: "user", status: { in: ["completed", "error"] }, seenAt: null },
   });
 
-  if (convs.length === 0) return NextResponse.json({ conversations: [], assistantUnread });
-
-  // N+1 방지: 미읽음 수를 한 번에 조회
+  // N+1 방지: 내부 대화의 미읽음 수를 한 번에 조회한다.
   const convIds = convs.map(c => c.id);
-  const unreadGroups = await prisma.message.groupBy({
+  const unreadGroups = convIds.length === 0 ? [] : await prisma.message.groupBy({
     by: ["conversationId"],
     where: { conversationId: { in: convIds }, senderId: { not: uid }, readAt: null },
     _count: { id: true },
   });
   const unreadMap = Object.fromEntries(unreadGroups.map(u => [u.conversationId, u._count.id]));
 
-  const result = convs.map((c) => ({
+  const internalResult = convs.map((c) => ({
     conversationId: c.id,
     other: getConversationOther(c, uid),
     lastMsg: c.messages[0] ?? null,
     unread: unreadMap[c.id] ?? 0,
   }));
+
+  // VenueDA 외부 상담도 같은 목록에 합친다. 이 조회는 역할·담당자 기준으로
+  // 내부에서 다시 필터링하므로, URL을 직접 호출해도 다른 상담이 노출되지 않는다.
+  const venueDaResult = await listVenueDaThreadsForUser(uid, session.user.role);
+  const result = [...internalResult, ...venueDaResult].sort((a, b) => {
+    const aTime = a.lastMsg ? new Date(a.lastMsg.createdAt).getTime() : 0;
+    const bTime = b.lastMsg ? new Date(b.lastMsg.createdAt).getTime() : 0;
+    return bTime - aTime;
+  });
 
   return NextResponse.json({ conversations: result, assistantUnread });
 }
