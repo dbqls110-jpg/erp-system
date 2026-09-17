@@ -2,6 +2,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
+import { messengerContactWhere } from "@/lib/messengerContacts";
 
 /**
  * 메신저에서 말을 걸 수 있는 직원 목록.
@@ -16,13 +17,15 @@ export async function GET() {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) return NextResponse.json([], { status: 401 });
 
+  // 외부인(파트너·호스트·거래처)은 담당 직원만 보인다. 규칙은 messengerContacts 한 곳에 있다.
+  const me = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: { id: true, role: true, partnerId: true, customerId: true, venueId: true, staffUserId: true },
+  });
+  if (!me) return NextResponse.json([], { status: 401 });
+
   const users = await prisma.user.findMany({
-    where: {
-      active: true,
-      isAgent: false,
-      id: { not: session.user.id },
-      role: { not: "pending" },
-    },
+    where: messengerContactWhere(me),
     select: { id: true, name: true, image: true, role: true },
     orderBy: { name: "asc" },
   });

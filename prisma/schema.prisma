@@ -24,6 +24,10 @@ model User {
    */
   partnerId  String?
   customerId String?
+  /// 공간 호스트 계정이 어느 공간(공간 DB)의 주인인지. 파트너·거래처와 같은 외부 연결이다.
+  venueId    String?
+  /// 외부인(파트너·호스트·거래처)의 담당 직원. 메신저에서 이 사람에게만 말을 걸 수 있다. 내부 직원이면 null.
+  staffUserId String?
   isAgent    Boolean  @default(false) // true = Agent bot
   agentType  String? // "hermes" | "marketer" | null
   active     Boolean  @default(true)
@@ -46,9 +50,14 @@ model User {
 
   partner  Partner?  @relation(fields: [partnerId], references: [id], onDelete: SetNull)
   customer Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  venue    Venue?    @relation("VenueHost", fields: [venueId], references: [id], onDelete: SetNull)
+  staffUser         User?  @relation("AssignedStaff", fields: [staffUserId], references: [id], onDelete: SetNull)
+  assignedExternals User[] @relation("AssignedStaff")
 
   @@index([partnerId])
   @@index([customerId])
+  @@index([venueId])
+  @@index([staffUserId])
   @@map("users")
 }
 
@@ -955,6 +964,9 @@ model Venue {
   @@index([district])
   @@index([type])
   @@index([capacityMax])
+  /// 이 공간의 호스트 계정(공간 호스트 레벨). 여러 명일 수 있다.
+  hostUsers User[] @relation("VenueHost")
+
   @@map("venues")
 }
 

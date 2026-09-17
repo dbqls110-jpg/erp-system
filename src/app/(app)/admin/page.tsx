@@ -30,6 +30,9 @@ export default async function AdminPage() {
         role: true,
         partnerId: true,
         customerId: true,
+        venueId: true,
+        venue: { select: { name: true, district: true } },
+        staffUserId: true,
         leaveBalances: { where: { year } },
       },
     }),
@@ -120,8 +123,15 @@ export default async function AdminPage() {
                     <UserExternalLink
                       userId={u.id}
                       isCurrentUser={u.id === session.user.id}
+                      role={u.role}
                       partnerId={u.partnerId}
                       customerId={u.customerId}
+                      venueId={u.venueId}
+                      venueName={u.venue ? (u.venue.district ? `${u.venue.name} · ${u.venue.district}` : u.venue.name) : null}
+                      staffUserId={u.staffUserId}
+                      staff={users
+                        .filter((s) => s.id !== u.id && ["admin", "manager", "member", "user"].includes(s.role) && !s.partnerId && !s.customerId && !s.venueId)
+                        .map((s) => ({ id: s.id, name: s.name ?? s.email ?? s.id }))}
                       partners={partners}
                       customers={customers}
                     />

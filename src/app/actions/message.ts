@@ -10,6 +10,22 @@ import {
   uploadMessengerFile,
 } from "@/lib/googleDrive";
 import { getConversationOther } from "@/lib/messenger-conversation";
+import { canMessage } from "@/lib/messengerContacts";
+
+const CONTACT_SELECT = {
+  id: true, role: true, partnerId: true, customerId: true, venueId: true, staffUserId: true, active: true, isAgent: true,
+} as const;
+
+/** 외부인은 담당 직원에게만 보낼 수 있다. 목록에서 가려도 주소로 보내는 길이 남으므로 여기서도 막는다. */
+async function assertCanMessage(senderId: string, receiverId: string) {
+  const [sender, receiver] = await Promise.all([
+    prisma.user.findUnique({ where: { id: senderId }, select: CONTACT_SELECT }),
+    prisma.user.findUnique({ where: { id: receiverId }, select: CONTACT_SELECT }),
+  ]);
+  if (!sender || !receiver || !canMessage(sender, receiver)) {
+    throw new Error("이 상대에게는 메시지를 보낼 수 없습니다.");
+  }
+}
 
 // 대화 가져오기 (없으면 생성)
 async function getOrCreateConversation(userAId: string, userBId: string) {
@@ -29,6 +45,7 @@ export async function sendMessage(receiverId: string, content: string): Promise<
   if (!content.trim()) throw new Error("내용을 입력해주세요.");
   const trimmed = content.trim();
   const senderId = session.user.id;
+  await assertCanMessage(senderId, receiverId);
 
   const conv = await getOrCreateConversation(senderId, receiverId);
 
@@ -60,6 +77,7 @@ export async function sendMessageWithAttachment(
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) throw new Error("Unauthorized");
   if (!receiverId.trim()) throw new Error("받는 사람을 선택해 주세요.");
+  await assertCanMessage(session.user.id, receiverId);
 
   const entry = formData.get("file");
   if (!(entry instanceof File) || entry.size === 0) {

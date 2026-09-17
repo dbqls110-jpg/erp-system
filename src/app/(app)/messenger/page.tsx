@@ -2,6 +2,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { requireMenuAccess } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
+import { messengerContactWhere } from "@/lib/messengerContacts";
 import { MessengerView } from "./MessengerView";
 
 export default async function MessengerPage() {
@@ -10,15 +11,14 @@ export default async function MessengerPage() {
   const now = new Date();
   const todayDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
 
+  // 외부인은 담당 직원만 보인다. 목록 API(/api/messenger/users)와 같은 규칙.
+  // isAgent 제외: 에이전트 계정은 말을 걸어도 답하지 않는다 — 목록에 남기면 "답 없는 유령 연락처"가 된다.
+  const me = await prisma.user.findUnique({
+    where: { id: session!.user.id },
+    select: { id: true, role: true, partnerId: true, customerId: true, venueId: true, staffUserId: true },
+  });
   const users = await prisma.user.findMany({
-    // isAgent 제외: AI 대화 파이프라인을 들어내서 에이전트 계정은 말을 걸어도 답하지 않는다.
-    // 목록에 남겨두면 "답 없는 유령 연락처"가 된다.
-    where: {
-      active: true,
-      isAgent: false,
-      id: { not: session!.user.id },
-      role: { not: "pending" },
-    },
+    where: me ? messengerContactWhere(me) : { id: "__none__" },
     select: { id: true, name: true, image: true, role: true, isAgent: true, agentType: true },
     orderBy: { name: "asc" },
   });
