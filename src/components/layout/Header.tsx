@@ -83,9 +83,24 @@ export function Header({ user, onMobileMenuOpen }: HeaderProps) {
     .sort(([left], [right]) => right.length - left.length)
     .find(([key]) => pathname === key || pathname.startsWith(key + "/"))?.[1] ?? "";
   useEffect(() => {
-    const nextTitle = title ? `${title} | 사내 ERP 시스템` : "사내 ERP 시스템";
+    const baseTitle = title ? `${title} | 사내 ERP 시스템` : "사내 ERP 시스템";
+    let blinkOn = false;
+
     const applyTitle = () => {
+      // 브라우저 최상단 탭은 웹 페이지에서 색을 직접 바꿀 수 없으므로
+      // 미읽음이 있는 동안 탭 제목을 번갈아 보여 새 메시지를 알린다.
+      const isBackgroundTab = document.visibilityState === "hidden";
+      const nextTitle = unread > 0
+        ? (isBackgroundTab && blinkOn ? `🔴 새 메시지 ${unread}건` : baseTitle)
+        : baseTitle;
       if (document.title !== nextTitle) document.title = nextTitle;
+    };
+
+    const onVisibilityChange = () => {
+      // 탭을 다시 열면 원래 화면 제목으로 돌린다. 미읽음 배지는 앱 헤더에서
+      // 계속 보여 주므로 사용자가 알림을 놓치지 않는다.
+      blinkOn = false;
+      applyTitle();
     };
 
     // Next's metadata manager can restore the root title after hydration. Keep
@@ -93,10 +108,23 @@ export function Header({ user, onMobileMenuOpen }: HeaderProps) {
     // markup used for the server render.
     applyTitle();
     const titleElement = document.querySelector("title");
+    const blinkId = unread > 0
+      ? window.setInterval(() => {
+        if (document.visibilityState === "hidden") {
+          blinkOn = !blinkOn;
+          applyTitle();
+        }
+      }, 1200)
+      : null;
     const observer = titleElement ? new MutationObserver(applyTitle) : null;
     observer?.observe(titleElement!, { childList: true, characterData: true, subtree: true });
-    return () => observer?.disconnect();
-  }, [title]);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      if (blinkId !== null) window.clearInterval(blinkId);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      observer?.disconnect();
+    };
+  }, [title, unread]);
   const initials = user.name
     ? user.name.slice(0, 2).toUpperCase()
     : user.email?.slice(0, 2).toUpperCase() ?? "?";
@@ -123,14 +151,28 @@ export function Header({ user, onMobileMenuOpen }: HeaderProps) {
         <h1 className="font-heading text-xl font-bold text-foreground">{title || "사내 ERP 시스템"}</h1>
       </div>
       <div className="flex items-center gap-2.5">
-        <Link href="/messenger" aria-label="메신저" className="relative text-muted-foreground hover:text-primary transition-colors">
-          <MessageCircle size={20} />
+        <Link
+          href="/messenger"
+          aria-label={unread > 0 ? `메신저, 안 읽은 메시지 ${unread}건` : "메신저"}
+          title={unread > 0 ? `새 메시지 ${unread}건` : "메신저"}
+          className={[
+            "relative inline-flex items-center justify-center rounded-full p-1.5 text-muted-foreground transition-colors hover:text-primary",
+            unread > 0 && "bg-destructive/10 text-destructive ring-2 ring-destructive/20 motion-safe:animate-pulse",
+          ].filter(Boolean).join(" ")}
+        >
+          <MessageCircle size={20} aria-hidden="true" />
           {unread > 0 && (
-            <span className="absolute -top-1 -right-1 h-4 min-w-4 px-0.5 rounded-full bg-destructive text-white text-[10px] flex items-center justify-center font-bold">
+            <span
+              aria-hidden="true"
+              className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-0.5 text-[10px] font-bold text-white shadow-sm"
+            >
               {unread > 9 ? "9+" : unread}
             </span>
           )}
         </Link>
+        <span className="sr-only" aria-live="polite" aria-atomic="true">
+          {unread > 0 ? `안 읽은 메신저 ${unread}건` : "안 읽은 메신저가 없습니다"}
+        </span>
         {user.role === "admin" ? (
           <Link href="/admin">
             <Badge variant="outline" className="hidden sm:inline-flex cursor-pointer hover:opacity-80 transition-opacity">

@@ -32,11 +32,14 @@ export function UserNameInput({ userId, name: initialName }: Props) {
   if (!editing) {
     return (
       <button
+        type="button"
         onClick={() => setEditing(true)}
-        className="flex items-center gap-1.5 group text-sm font-medium text-foreground hover:text-primary transition-colors"
+        title="표시 이름 수정"
+        aria-label={`${value || "이름 없음"} 표시 이름 수정`}
+        className="group flex items-center gap-1.5 rounded-md text-sm font-medium text-foreground transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
         {value || "이름 없음"}
-        <Pencil size={12} className="opacity-0 group-hover:opacity-60 transition-opacity" />
+        <Pencil size={12} aria-hidden="true" className="text-muted-foreground opacity-60 transition-opacity group-hover:opacity-100" />
       </button>
     );
   }
@@ -48,14 +51,28 @@ export function UserNameInput({ userId, name: initialName }: Props) {
         onChange={e => setValue(e.target.value)}
         onKeyDown={e => { if (e.key === "Enter") handleSave(); if (e.key === "Escape") { setValue(initialName); setEditing(false); } }}
         className="w-28"
+        aria-label="표시 이름"
         autoFocus
         disabled={isPending}
       />
-      <button onClick={handleSave} disabled={isPending} className="text-green-600 hover:text-green-700 transition-colors">
-        <Check size={15} />
+      <button
+        type="button"
+        onClick={handleSave}
+        disabled={isPending}
+        title="표시 이름 저장"
+        aria-label="표시 이름 저장"
+        className="text-green-600 transition-colors hover:text-green-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+      >
+        <Check size={15} aria-hidden="true" />
       </button>
-      <button onClick={() => { setValue(initialName); setEditing(false); }} className="text-muted-foreground hover:text-destructive transition-colors">
-        <X size={15} />
+      <button
+        type="button"
+        onClick={() => { setValue(initialName); setEditing(false); }}
+        title="수정 취소"
+        aria-label="표시 이름 수정 취소"
+        className="text-muted-foreground transition-colors hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      >
+        <X size={15} aria-hidden="true" />
       </button>
     </div>
   );
