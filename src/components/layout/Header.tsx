@@ -85,6 +85,7 @@ export function Header({ user, onMobileMenuOpen }: HeaderProps) {
   useEffect(() => {
     const baseTitle = title ? `${title} | 사내 ERP 시스템` : "사내 ERP 시스템";
     let blinkOn = false;
+    let blinkTimeout: number | null = null;
 
     const applyTitle = () => {
       // 브라우저 최상단 탭은 웹 페이지에서 색을 직접 바꿀 수 없으므로
@@ -100,7 +101,22 @@ export function Header({ user, onMobileMenuOpen }: HeaderProps) {
       // 탭을 다시 열면 원래 화면 제목으로 돌린다. 미읽음 배지는 앱 헤더에서
       // 계속 보여 주므로 사용자가 알림을 놓치지 않는다.
       blinkOn = false;
+      if (blinkTimeout !== null) {
+        window.clearTimeout(blinkTimeout);
+        blinkTimeout = null;
+      }
       applyTitle();
+      scheduleBlink();
+    };
+
+    const scheduleBlink = () => {
+      if (unread <= 0 || document.visibilityState !== "hidden" || blinkTimeout !== null) return;
+      blinkTimeout = window.setTimeout(() => {
+        blinkTimeout = null;
+        blinkOn = !blinkOn;
+        applyTitle();
+        scheduleBlink();
+      }, 1200);
     };
 
     // Next's metadata manager can restore the root title after hydration. Keep
@@ -108,19 +124,12 @@ export function Header({ user, onMobileMenuOpen }: HeaderProps) {
     // markup used for the server render.
     applyTitle();
     const titleElement = document.querySelector("title");
-    const blinkId = unread > 0
-      ? window.setInterval(() => {
-        if (document.visibilityState === "hidden") {
-          blinkOn = !blinkOn;
-          applyTitle();
-        }
-      }, 1200)
-      : null;
+    scheduleBlink();
     const observer = titleElement ? new MutationObserver(applyTitle) : null;
     observer?.observe(titleElement!, { childList: true, characterData: true, subtree: true });
     document.addEventListener("visibilitychange", onVisibilityChange);
     return () => {
-      if (blinkId !== null) window.clearInterval(blinkId);
+      if (blinkTimeout !== null) window.clearTimeout(blinkTimeout);
       document.removeEventListener("visibilitychange", onVisibilityChange);
       observer?.disconnect();
     };
