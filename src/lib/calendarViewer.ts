@@ -17,5 +17,6 @@ export async function getCalendarViewer(): Promise<Viewer | null> {
     role: session.user.role,
     partnerId: session.user.partnerId,
     customerId: session.user.customerId,
+    venueId: session.user.venueId,
   };
 }

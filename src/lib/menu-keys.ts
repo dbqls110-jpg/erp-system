@@ -14,6 +14,8 @@ export const DEFAULT_ACCESS_LEVELS = [
   { key: "manager", name: "팀장", rank: 60, isSystem: true },
   { key: "member", name: "사원", rank: 30, isSystem: true },
   { key: "partner", name: "파트너", rank: 10, isSystem: true },
+  // 공간 DB 에 올라간 공간의 주인. 파트너와 같은 외부인 등급이며, ID 관리에서 어느 공간인지 연결한다.
+  { key: "host", name: "공간 호스트", rank: 10, isSystem: true },
 ] as const;
 
 /**
@@ -56,7 +58,7 @@ export const MENU_KEYS = [
 
 export type MenuKey = (typeof MENU_KEYS)[number]["key"];
 
-const ALL = ["admin", "manager", "member", "partner"];
+const ALL = ["admin", "manager", "member", "partner", "host"];
 const MEMBER_UP = ["admin", "manager", "member"];
 const MANAGER_UP = ["admin", "manager"];
 const ADMIN_ONLY = ["admin"];
@@ -84,7 +86,7 @@ export const DEFAULT_MENU_RULES: Record<string, { view: string[]; edit: string[]
   // 파트너·거래처도 캘린더를 본다. 다만 자기가 참여한 프로젝트의 일정만 보이고
   // (src/lib/calendarVisibility.ts) 고칠 수는 없다. 여기서 view 를 주지 않으면
   // 가시성 로직이 아무리 정확해도 문 앞에서 막혀 빈 화면조차 못 본다.
-  calendar: { view: [...MANAGER_UP, "partner"], edit: MANAGER_UP },
+  calendar: { view: [...MANAGER_UP, "partner", "host"], edit: MANAGER_UP },
 
   customers: { view: MEMBER_UP, edit: MANAGER_UP },
   partners: { view: MEMBER_UP, edit: MANAGER_UP },

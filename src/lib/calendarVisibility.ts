@@ -16,10 +16,12 @@ export interface Viewer {
   partnerId: string | null;
   /** 이 계정이 어느 거래처인지. 내부 직원이면 null. */
   customerId: string | null;
+  /** 공간 호스트면 어느 공간인지. 내부 직원이면 null. 예전 호출부를 위해 없어도 된다. */
+  venueId?: string | null;
 }
 
 /** 외부인으로 취급하는 레벨. 연결(partnerId/customerId)이 없어도 이 레벨이면 밖이다. */
-export const EXTERNAL_ROLES: ReadonlySet<string> = new Set(["partner"]);
+export const EXTERNAL_ROLES: ReadonlySet<string> = new Set(["partner", "host"]);
 
 /**
  * 외부 사용자인지.
@@ -33,6 +35,7 @@ export const EXTERNAL_ROLES: ReadonlySet<string> = new Set(["partner"]);
  */
 export function isExternal(viewer: Viewer): boolean {
   if (viewer.partnerId !== null || viewer.customerId !== null) return true;
+  if (viewer.venueId != null) return true;
   return viewer.role != null && EXTERNAL_ROLES.has(viewer.role);
 }
 

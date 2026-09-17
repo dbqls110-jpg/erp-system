@@ -51,6 +51,7 @@ const roleLabel: Record<string, { label: string }> = {
   manager: { label: "팀장" },
   member: { label: "사원" },
   partner: { label: "파트너" },
+  host: { label: "공간 호스트" },
   // 레벨 도입 전의 값. 아직 살아 있는 세션 토큰이 이 값을 들고 온다.
   user: { label: "사원" },
   pending: { label: "승인 대기" },

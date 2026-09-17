@@ -33,8 +33,9 @@ export const authOptions: NextAuthOptions = {
               image: string | null;
               partnerId: string | null;
               customerId: string | null;
+              venueId: string | null;
             }>
-          >`SELECT id, role, name, image, "partnerId", "customerId" FROM users WHERE email = ${profile.email}`;
+          >`SELECT id, role, name, image, "partnerId", "customerId", "venueId" FROM users WHERE email = ${profile.email}`;
           let dbUser = users[0];
 
           if (!dbUser) {
@@ -48,13 +49,14 @@ export const authOptions: NextAuthOptions = {
                 image: string | null;
                 partnerId: string | null;
                 customerId: string | null;
+                venueId: string | null;
               }>
             >`
               INSERT INTO users (id, email, name, image, role, active, "createdAt", "updatedAt")
               VALUES (gen_random_uuid()::text, ${profile.email}, ${profile.name ?? null},
                 ${(profile as { picture?: string }).picture ?? null},
                 ${count === 0 ? "admin" : "pending"}, true, NOW(), NOW())
-              RETURNING id, role, name, image, "partnerId", "customerId"
+              RETURNING id, role, name, image, "partnerId", "customerId", "venueId"
             `;
             dbUser = newUsers[0];
 
@@ -72,6 +74,7 @@ export const authOptions: NextAuthOptions = {
           token.role = dbUser.role;
           token.partnerId = dbUser.partnerId;
           token.customerId = dbUser.customerId;
+          token.venueId = dbUser.venueId;
           token.roleCheckedAt = Date.now();
           token.name = dbUser.name;
           token.picture = dbUser.image;
@@ -91,6 +94,7 @@ export const authOptions: NextAuthOptions = {
           token.role = "pending";
           token.partnerId = null;
           token.customerId = null;
+          token.venueId = null;
         }
       }
       // 로그인 이후에도 role 을 주기적으로 다시 읽는다.
@@ -107,14 +111,15 @@ export const authOptions: NextAuthOptions = {
           // 연결(어느 파트너·거래처인지)도 함께 읽는다. 관리자가 승인하며 연결을
           // 바꿔도 상대가 재로그인해야 반영되면 안 된다.
           const rows = await prisma.$queryRaw<
-            Array<{ role: string; partnerId: string | null; customerId: string | null }>
+            Array<{ role: string; partnerId: string | null; customerId: string | null; venueId: string | null }>
           >`
-            SELECT role, "partnerId", "customerId" FROM users WHERE id = ${token.id as string}
+            SELECT role, "partnerId", "customerId", "venueId" FROM users WHERE id = ${token.id as string}
           `;
           if (rows[0]) {
             token.role = rows[0].role;
             token.partnerId = rows[0].partnerId;
             token.customerId = rows[0].customerId;
+            token.venueId = rows[0].venueId;
           }
           token.roleCheckedAt = Date.now();
         } catch (err) {
@@ -132,6 +137,7 @@ export const authOptions: NextAuthOptions = {
         session.user.role = (token.role as string) ?? "pending";
         session.user.partnerId = (token.partnerId as string | null) ?? null;
         session.user.customerId = (token.customerId as string | null) ?? null;
+        session.user.venueId = (token.venueId as string | null) ?? null;
       }
       session.accessToken = token.accessToken as string | undefined;
       return session;

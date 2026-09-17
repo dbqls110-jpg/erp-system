@@ -11,6 +11,7 @@ const roleConfig: Record<string, { label: string; class: string }> = {
   manager: { label: "팀장", class: "bg-primary/10 text-primary border-primary/20" },
   member: { label: "사원", class: "bg-primary/10 text-primary border-primary/20" },
   partner: { label: "파트너", class: "bg-primary/10 text-primary border-primary/20" },
+  host: { label: "공간 호스트", class: "bg-primary/10 text-primary border-primary/20" },
   // 레벨 도입 전의 값. 마이그레이션 전 계정이 "알 수 없음"으로 보이지 않게 남겨둔다.
   user: { label: "사원", class: "bg-primary/10 text-primary border-primary/20" },
   pending: { label: "멤버 (설정 전)", class: "bg-yellow-50 text-yellow-700 border-yellow-200" },
@@ -21,6 +22,7 @@ const ROLE_ITEMS: Record<string, string> = {
   manager: roleConfig.manager.label,
   member: roleConfig.member.label,
   partner: roleConfig.partner.label,
+  host: roleConfig.host.label,
   pending: roleConfig.pending.label,
 };
 

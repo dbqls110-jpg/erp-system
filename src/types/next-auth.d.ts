@@ -15,6 +15,8 @@ declare module "next-auth" {
        */
       partnerId: string | null;
       customerId: string | null;
+      /** 공간 호스트가 어느 공간인지. 아니면 null. */
+      venueId: string | null;
     };
     accessToken?: string;
   }

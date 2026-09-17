@@ -348,7 +348,8 @@ export function MessengerView({ myId, myUser, users, todayDate }: { myId: string
             {recentUsers.length === 0 && otherUsers.length === 0 && (
               <div className="flex flex-col items-center gap-3 py-12 text-center">
                 <MessageCircle className="size-6 text-muted-foreground" />
-                <p className="text-sm text-muted-foreground">다른 직원이 없습니다.</p>
+                <p className="text-sm text-muted-foreground">말을 걸 수 있는 상대가 없습니다.</p>
+                <p className="text-xs text-muted-foreground/70">외부 계정은 관리자가 담당 직원을 지정해야 메신저를 쓸 수 있습니다.</p>
               </div>
             )}
             {recentUsers.length > 0 && (
