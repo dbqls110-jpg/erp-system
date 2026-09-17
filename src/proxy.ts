@@ -2,13 +2,15 @@ import { withAuth } from "next-auth/middleware";
 import { NextResponse } from "next/server";
 
 export default withAuth(
-  function middleware(req) {
-    const role = req.nextauth?.token?.role as string | undefined;
-    const { pathname } = req.nextUrl;
-
-    if (role === "pending" && !pathname.startsWith("/pending")) {
-      return NextResponse.redirect(new URL("/pending", req.url));
-    }
+  // 승인 대기(pending) 판정은 여기서 하지 않는다.
+  //
+  // 미들웨어는 쿠키 속 JWT 를 그대로 읽는데, 서버 컴포넌트의 getServerSession 은 DB 에서
+  // 최신 role 을 다시 읽어도 쿠키를 새로 써 주지 못한다. 그래서 관리자가 승인한 뒤에도
+  // 쿠키는 "pending" 인 채로 남고, 미들웨어(→ /pending)와 /pending 페이지(승인됐으니
+  // → /dashboard)가 서로 튕겨 ERR_TOO_MANY_REDIRECTS 가 났다.
+  // pending 안내는 (app)/layout.tsx 와 /pending 페이지가 같은 getServerSession 기준으로
+  // 처리하므로 여기서는 로그인 여부만 본다.
+  function middleware() {
     return NextResponse.next();
   },
   {
