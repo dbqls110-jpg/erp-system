@@ -247,10 +247,14 @@ export async function listVenueDaMessages(threadId: string, userId: string, role
   const thread = await getVenueDaThreadForUser(threadId, userId, role);
   if (!thread) return null;
 
-  await prisma.venueDaMessage.updateMany({
-    where: { threadId, authorType: "visitor", readAt: null },
-    data: { readAt: new Date() },
-  });
+  // 여러 관리자가 상담을 볼 수 있어도 읽음 기준은 담당자 한 명으로 고정한다.
+  // 담당자가 아닌 서브 관리자가 열어 본 것만으로는 담당자 알림을 지우지 않는다.
+  if (thread.assigneeId === userId) {
+    await prisma.venueDaMessage.updateMany({
+      where: { threadId, authorType: "visitor", readAt: null },
+      data: { readAt: new Date() },
+    });
+  }
   const messages = await prisma.venueDaMessage.findMany({ where: { threadId }, orderBy: { createdAt: "asc" }, take: 200 });
   return messages.map((message) => ({
     id: message.id,

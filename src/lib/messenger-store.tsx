@@ -100,7 +100,9 @@ export function MessengerProvider({ children }: { children: React.ReactNode }) {
   // 탭이 보이는 동안에만 폴링한다. 새벽 시간대 차단(respectQuietHours)은 쓰지 않는다 —
   // 탭이 보인다는 건 사람이 실제로 앞에 있다는 뜻이고, 야간 행사 대응 중에 메신저가
   // 멈춘 것처럼 보이는 편이 더 나쁘다. 헤더도 같은 이유로 이 옵션을 쓰지 않는다.
-  useVisiblePolling(refresh, 30000);
+  // VenueDA 상담은 외부 방문자 응답을 기다리는 업무라 30초는 너무 길다.
+  // 5초면 평균 지연을 약 2.5초로 낮추면서, SSE 없이도 DB 요청을 과도하게 만들지 않는다.
+  useVisiblePolling(refresh, 5000);
 
   const loadUsers = useCallback(() => {
     if (usersLoaded.current) return;

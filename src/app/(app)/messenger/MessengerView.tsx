@@ -122,7 +122,7 @@ export function MessengerView({ myId, myUser, users, todayDate }: { myId: string
   // 열려 있는 대화의 메시지만 자체 폴링한다. 대화 목록은 Provider 담당이다.
   useVisiblePolling(
     () => { if (selectedConvId) fetchMessages(selectedConvId); },
-    8000,
+    3000,
     { refreshKey: selectedConvId },
   );
 
