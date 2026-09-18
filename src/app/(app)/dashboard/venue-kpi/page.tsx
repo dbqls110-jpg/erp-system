@@ -31,7 +31,7 @@ export default async function VenueKpiPage({ searchParams }: { searchParams: Pro
   const requested = validWeek(params.week);
   const range = getVenueWeekRange(requested ?? new Date());
   const owner = await prisma.user.findFirst({
-    where: { name: "이석준", active: true, role: { not: "pending" } },
+    where: { name: "박석영", active: true, role: { not: "pending" } },
     select: { id: true, name: true, email: true },
     orderBy: { createdAt: "asc" },
   });
@@ -52,14 +52,14 @@ export default async function VenueKpiPage({ searchParams }: { searchParams: Pro
           <ChevronLeft size={20} />
         </Link>
         <div>
-          <PageIntro>이석준의 주간 공간 등록</PageIntro>
-          <p className="mt-1 text-[13px] text-muted-foreground">ERP DB에 이석준이 등록한 공간을 주 단위로 집계합니다.</p>
+          <PageIntro>주간 공간 등록</PageIntro>
+          <p className="mt-1 text-[13px] text-muted-foreground">ERP DB에 박석영 팀장이 등록한 공간을 주 단위로 집계합니다.</p>
         </div>
       </div>
 
       <div className="grid grid-cols-1 gap-4 @xl/main:grid-cols-3">
         <Card><CardHeader><CardDescription>등록 공간</CardDescription><CardTitle className="text-3xl tabular-nums">{venues.length}건</CardTitle><p className="text-xs text-muted-foreground">{formatDate(range.start)} ~ {formatDate(new Date(range.endExclusive.getTime() - 24 * 60 * 60 * 1000))}</p></CardHeader></Card>
-        <Card className="@xl/main:col-span-2"><CardHeader><CardDescription>담당자</CardDescription><CardTitle className="text-xl">{owner?.name ?? "이석준 계정 없음"}</CardTitle><p className="text-xs text-muted-foreground">{owner?.email ?? "관리자에서 이석준 계정을 먼저 확인해 주세요."}</p></CardHeader></Card>
+        <Card className="@xl/main:col-span-2"><CardHeader><CardDescription>담당자</CardDescription><CardTitle className="text-xl">{owner?.name ?? "박석영 팀장 계정 없음"}</CardTitle><p className="text-xs text-muted-foreground">{owner?.email ?? "관리자에서 박석영 팀장 계정을 먼저 확인해 주세요."}</p></CardHeader></Card>
       </div>
 
       <Card>

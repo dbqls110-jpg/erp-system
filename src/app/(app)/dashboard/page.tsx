@@ -104,7 +104,7 @@ export default async function DashboardPage() {
       : [],
     canSee("venues")
       ? prisma.user.findFirst({
-          where: { name: "이석준", active: true, role: { not: "pending" } },
+          where: { name: "박석영", active: true, role: { not: "pending" } },
           select: { id: true, name: true },
           orderBy: { createdAt: "asc" },
         })
@@ -185,6 +185,15 @@ export default async function DashboardPage() {
       value: remainingLeave !== null ? `${remainingLeave}일` : "미설정",
       sub: leaveBalance ? `총 ${leaveBalance.totalDays}일 중 ${leaveBalance.usedDays}일 사용` : "휴가 잔여일 미설정",
     },
+    {
+      href: `/dashboard/venue-kpi?week=${venueWeek.startDate}`,
+      menuKey: "venues",
+      title: "주간 공간 등록",
+      icon: <MapPinned size={16} className="text-primary" />,
+      value: `${venueKpiRows.length}건`,
+      valueClassName: venueKpiRows.length <= 4 ? "text-destructive" : undefined,
+      sub: `${venueWeek.startDate.slice(5)} ~ ${venueWeek.endDate.slice(5)} · 공간명·주소·링크 보기`,
+    },
   ];
 
   const visibleWidgets = widgets.filter((w) => canSee(w.menuKey));
@@ -211,21 +220,6 @@ export default async function DashboardPage() {
           </Link>
         ))}
       </div>
-
-      {canSee("venues") && (
-        <Link href={`/dashboard/venue-kpi?week=${venueWeek.startDate}`} className="block">
-          <Card className="rounded-[12px] border border-border py-0 shadow-none transition-all hover:border-[#d8d4fb] hover:shadow-sm dark:bg-card">
-            <CardHeader className="gap-[6px] px-[18px] py-4">
-              <CardDescription className="text-[12px] text-muted-foreground">이석준 · 이번 주 공간 등록</CardDescription>
-              <CardTitle className="text-[26px] font-bold leading-tight tracking-[-0.01em] tabular-nums" style={{ fontFamily: "var(--font-plus-jakarta-sans)" }}>{venueKpiRows.length}건</CardTitle>
-              <CardAction><MapPinned size={16} className="text-primary" /></CardAction>
-            </CardHeader>
-            <CardContent className="px-[18px] pb-4 pt-0">
-              <p className="text-[12px] leading-4 text-muted-foreground">{venueWeek.startDate.slice(5)} ~ {venueWeek.endDate.slice(5)} · 공간명·주소·링크 보기</p>
-            </CardContent>
-          </Card>
-        </Link>
-      )}
 
       {upcomingEvents.length > 0 && (
         <Card className="rounded-[12px] border border-border py-0 shadow-none dark:bg-card">
