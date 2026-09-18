@@ -6,6 +6,11 @@ import { prisma } from "@/lib/prisma";
 import { buildAssistantPrompt } from "@/lib/assistantPrompt";
 import { getAccessibleMenus } from "@/lib/permissions";
 import { APPLY_ENDPOINT, restoreProposalStates, type RestoredProposalState } from "@/lib/proposalStates";
+import {
+  deleteDriveFileAsOwner,
+  MAX_MESSENGER_FILE_SIZE,
+  uploadMessengerFile,
+} from "@/lib/googleDrive";
 
 /**
  * 메신저의 ERP 비서.
@@ -60,6 +65,15 @@ interface Turn {
   errorMsg: string | null;
   createdAt: string;
   completedAt: string | null;
+  attachment: AssistantAttachment | null;
+}
+
+export interface AssistantAttachment {
+  driveFileId: string;
+  name: string;
+  mimeType: string;
+  size: number;
+  url: string;
 }
 
 function toTurn(job: {
@@ -71,6 +85,11 @@ function toTurn(job: {
   errorMsg: string | null;
   createdAt: Date;
   completedAt: Date | null;
+  attachmentDriveFileId: string | null;
+  attachmentName: string | null;
+  attachmentMimeType: string | null;
+  attachmentSizeBytes: number | null;
+  attachmentUrl: string | null;
 }): Turn {
   const fallbackQuestion = job.input?.split("[질문]").pop()?.trim() ?? job.input ?? "";
 
@@ -83,6 +102,17 @@ function toTurn(job: {
     errorMsg: job.errorMsg,
     createdAt: job.createdAt.toISOString(),
     completedAt: job.completedAt?.toISOString() ?? null,
+    attachment: job.attachmentDriveFileId
+      ? {
+          driveFileId: job.attachmentDriveFileId,
+          name: job.attachmentName ?? "사진",
+          mimeType: job.attachmentMimeType ?? "image/*",
+          size: job.attachmentSizeBytes ?? 0,
+          // Drive 링크는 대표 계정 권한이 필요하므로 브라우저에는 권한 확인용
+          // ERP 스트림 경로만 준다.
+          url: `/api/assistant/attachments/${job.id}`,
+        }
+      : null,
   };
 }
 
@@ -101,6 +131,8 @@ export async function GET(req: NextRequest) {
         select: {
           id: true, input: true, userInput: true, output: true, status: true,
           errorMsg: true, createdAt: true, completedAt: true,
+          attachmentDriveFileId: true, attachmentName: true, attachmentMimeType: true,
+          attachmentSizeBytes: true, attachmentUrl: true,
         },
       }),
       prisma.agentBridgeHeartbeat.findFirst({
@@ -146,6 +178,8 @@ export async function GET(req: NextRequest) {
       select: {
         id: true, userInput: true, output: true, status: true,
         errorMsg: true, createdAt: true, completedAt: true,
+        attachmentDriveFileId: true, attachmentName: true, attachmentMimeType: true,
+        attachmentSizeBytes: true, attachmentUrl: true,
       },
     }),
     prisma.agentBridgeHeartbeat.findFirst({
@@ -207,14 +241,30 @@ export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  let body: { message?: unknown };
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  let question = "";
+  let image: File | null = null;
+  const contentType = req.headers.get("content-type") ?? "";
+  if (contentType.includes("multipart/form-data")) {
+    let form: FormData;
+    try {
+      form = await req.formData();
+    } catch {
+      return NextResponse.json({ error: "첨부파일 요청을 읽지 못했습니다." }, { status: 400 });
+    }
+    const message = form.get("message");
+    question = typeof message === "string" ? message.trim() : "";
+    const entry = form.get("file");
+    if (entry instanceof File && entry.size > 0) image = entry;
+  } else {
+    let body: { message?: unknown };
+    try {
+      body = await req.json();
+    } catch {
+      return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+    }
+    question = typeof body.message === "string" ? body.message.trim() : "";
   }
 
-  const question = typeof body.message === "string" ? body.message.trim() : "";
   if (!question) return NextResponse.json({ error: "질문을 입력해주세요." }, { status: 400 });
   if (question.length > MAX_QUESTION_LEN) {
     return NextResponse.json(
@@ -240,21 +290,80 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  if (image) {
+    if (!image.type.startsWith("image/")) {
+      return NextResponse.json({ error: "ERP 비서에는 사진 파일만 첨부할 수 있습니다." }, { status: 400 });
+    }
+    if (image.size > MAX_MESSENGER_FILE_SIZE) {
+      return NextResponse.json({ error: "사진은 50MB 이하만 첨부할 수 있습니다." }, { status: 400 });
+    }
+  }
+
   // 질문자가 볼 수 있는 메뉴의 자료만 붙인다. 메뉴 권한과 같은 기준이다.
   const allowedMenus = await getAccessibleMenus(session.user.id, session.user.role);
-  const { prompt, topics, contextChars } = await buildAssistantPrompt(question, allowedMenus);
+  const { prompt: basePrompt, topics, contextChars } = await buildAssistantPrompt(question, allowedMenus);
 
-  const job = await prisma.agentJob.create({
-    data: {
-      agentType: AGENT_TYPE,
-      userId: session.user.id,
-      visibility: "user",
-      status: "pending",
-      input: prompt,
-      userInput: question,
-    },
-    select: { id: true },
-  });
+  // 사진은 질문을 작성하는 동안에는 브라우저에만 보관한다. 전송을 누른 뒤에만
+  // Drive 업로드를 하고, DB 작업 생성에 실패하면 고아 파일도 바로 정리한다.
+  let uploaded: Awaited<ReturnType<typeof uploadMessengerFile>> | null = null;
+  try {
+    if (image) {
+      const name = image.name.split(/[\\/]/).pop()?.trim() || "사진";
+      uploaded = await uploadMessengerFile({
+        buffer: Buffer.from(await image.arrayBuffer()),
+        name,
+        mimeType: image.type,
+        size: image.size,
+      });
+    }
 
-  return NextResponse.json({ id: job.id, topics, contextChars }, { status: 201 });
+    const prompt = uploaded
+      ? `${basePrompt}\n\n[첨부 사진]\n파일명: ${uploaded.name}\n사진이 이 질문에 함께 첨부되었습니다. 사진 자체를 확인할 수 없는 경우에는 그 사실을 먼저 알리고, 사진에 없는 내용을 추측하지 마세요.`
+      : basePrompt;
+
+    const job = await prisma.agentJob.create({
+      data: {
+        agentType: AGENT_TYPE,
+        userId: session.user.id,
+        visibility: "user",
+        status: "pending",
+        input: prompt,
+        userInput: question,
+        ...(uploaded
+          ? {
+              attachmentDriveFileId: uploaded.driveFileId,
+              attachmentName: uploaded.name,
+              attachmentMimeType: uploaded.mimeType,
+              attachmentSizeBytes: uploaded.size,
+              attachmentUrl: uploaded.driveUrl,
+            }
+          : {}),
+      },
+      select: { id: true },
+    });
+
+    return NextResponse.json({
+      id: job.id,
+      topics,
+      contextChars,
+      attachment: uploaded
+        ? {
+            driveFileId: uploaded.driveFileId,
+            name: uploaded.name,
+            mimeType: uploaded.mimeType,
+            size: uploaded.size,
+            url: `/api/assistant/attachments/${job.id}`,
+          }
+        : null,
+    }, { status: 201 });
+  } catch (error) {
+    if (uploaded) {
+      try {
+        await deleteDriveFileAsOwner(uploaded.driveFileId);
+      } catch (cleanupError) {
+        console.error("[assistant attachment] orphan Drive file cleanup failed", cleanupError);
+      }
+    }
+    throw error;
+  }
 }

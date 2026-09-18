@@ -565,6 +565,13 @@ model AgentJob {
   userInput   String?
   output      String? // 최종 응답
   errorMsg    String? // 오류 메시지
+  // ERP 비서 질문에 붙인 사진. 파일은 회사 소유 Drive/메신저에 보관하고
+  // 화면에는 사용자 권한을 확인한 서버 스트림으로 보여 준다.
+  attachmentDriveFileId String?
+  attachmentName        String?
+  attachmentMimeType    String?
+  attachmentSizeBytes   Int?
+  attachmentUrl         String?
   claimedAt   DateTime? // 브릿지가 수락한 시각
   completedAt DateTime?
   /// 요청자가 답(또는 비서가 먼저 보낸 알림)을 화면에서 본 시각. null 이면 안 읽음 배지에 잡힌다.
@@ -579,6 +586,7 @@ model AgentJob {
   @@index([agentType, status, createdAt])
   @@index([userId, visibility, createdAt])
   @@index([userId, visibility, seenAt])
+  @@index([attachmentDriveFileId])
   @@map("agent_jobs")
 }
 

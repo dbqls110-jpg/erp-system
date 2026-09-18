@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Send, Sparkles } from "lucide-react";
+import { Image as ImageIcon, Paperclip, Send, Sparkles, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { MessageContent } from "@/components/messenger/MessageContent";
@@ -10,6 +10,9 @@ import { parseProposals, stripProposals } from "@/lib/assistantProposal";
 import { useVisiblePolling } from "@/lib/useVisiblePolling";
 import { useMessenger } from "@/lib/messenger-store";
 import { cn } from "@/lib/utils";
+import { imageFileFromClipboard, isImageAttachment } from "@/lib/messengerPaste";
+
+const MAX_ASSISTANT_IMAGE_SIZE = 50 * 1024 * 1024;
 
 type AssistantStatus = "pending" | "accepted" | "processing" | "completed" | "error";
 
@@ -23,6 +26,15 @@ interface AssistantTurn {
   errorMsg: string | null;
   createdAt: string;
   completedAt: string | null;
+  attachment: AssistantAttachment | null;
+}
+
+interface AssistantAttachment {
+  driveFileId: string;
+  name: string;
+  mimeType: string;
+  size: number;
+  url: string;
 }
 
 interface AssistantResponse {
@@ -48,9 +60,11 @@ export function AssistantPanel({ initialQuestion = "" }: { initialQuestion?: str
   const [pollingId, setPollingId] = useState<string | null>(null);
   const [sendError, setSendError] = useState<string | null>(null);
   const [timedOut, setTimedOut] = useState(false);
+  const [pendingImage, setPendingImage] = useState<{ file: File; previewUrl: string } | null>(null);
   const pollingStartedAt = useRef<number | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   // 목록을 불러오면 서버가 읽음 처리하므로 배지를 바로 내리려면 대화 목록을 다시 받아야 한다.
   const { refresh: refreshBadges } = useMessenger();
 
@@ -134,22 +148,64 @@ export function AssistantPanel({ initialQuestion = "" }: { initialQuestion?: str
     inputRef.current?.focus();
   }, []);
 
+  function chooseImage(file: File | null) {
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setSendError("ERP 비서에는 사진 파일만 첨부할 수 있습니다.");
+      return;
+    }
+    if (file.size > MAX_ASSISTANT_IMAGE_SIZE) {
+      setSendError("사진은 50MB 이하만 첨부할 수 있습니다.");
+      return;
+    }
+    setSendError(null);
+    if (pendingImage) URL.revokeObjectURL(pendingImage.previewUrl);
+    setPendingImage({ file, previewUrl: URL.createObjectURL(file) });
+  }
+
+  function clearPendingImage() {
+    if (pendingImage) URL.revokeObjectURL(pendingImage.previewUrl);
+    setPendingImage(null);
+  }
+
+  function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
+    chooseImage(event.target.files?.[0] ?? null);
+    // 같은 사진을 다시 선택해도 change 이벤트가 발생하도록 초기화한다.
+    event.target.value = "";
+  }
+
+  function handlePaste(event: React.ClipboardEvent<HTMLInputElement>) {
+    const file = imageFileFromClipboard(event.clipboardData.items);
+    if (!file) return;
+    event.preventDefault();
+    chooseImage(file);
+  }
+
   async function handleSend() {
     const text = input.trim();
-    if (!text || !bridge?.online || sending) return;
+    if ((!text && !pendingImage) || !bridge?.online || sending) return;
 
     setSending(true);
     setInput("");
     setSendError(null);
     setTimedOut(false);
 
+    const imageToSend = pendingImage;
+
     try {
+      const form = new FormData();
+      form.set("message", text);
+      if (imageToSend) form.set("file", imageToSend.file);
       const res = await fetch("/api/assistant", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: text }),
+        body: form,
       });
-      const data = (await res.json()) as { id?: string; error?: string; pendingId?: string };
+      const data = (await res.json()) as {
+        id?: string;
+        error?: string;
+        pendingId?: string;
+        attachment?: AssistantAttachment | null;
+      };
 
       if (!res.ok) {
         const message = data.error ?? "전송 실패";
@@ -166,6 +222,8 @@ export function AssistantPanel({ initialQuestion = "" }: { initialQuestion?: str
         return;
       }
 
+      clearPendingImage();
+
       setTurns((current) => [
         ...current,
         {
@@ -176,6 +234,7 @@ export function AssistantPanel({ initialQuestion = "" }: { initialQuestion?: str
           errorMsg: null,
           createdAt: new Date().toISOString(),
           completedAt: null,
+          attachment: data.attachment ?? null,
         },
       ]);
       startPolling(turnId);
@@ -207,8 +266,19 @@ export function AssistantPanel({ initialQuestion = "" }: { initialQuestion?: str
               {/* 질문이 없는 턴은 비서가 먼저 보낸 알림(가입 신청 등)이다. 답변만 그린다. */}
               {turn.question && (
                 <div className="flex justify-end">
-                  <div className="max-w-[85%] rounded-2xl rounded-tr-sm bg-primary px-3 py-1.5 text-xs leading-relaxed text-primary-foreground">
-                    {turn.question}
+                  <div className="max-w-[85%] space-y-2 rounded-2xl rounded-tr-sm bg-primary px-3 py-1.5 text-xs leading-relaxed text-primary-foreground">
+                    {turn.attachment && isImageAttachment(turn.attachment.mimeType) && (
+                      <a href={turn.attachment.url} target="_blank" rel="noreferrer" className="block">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={turn.attachment.url}
+                          alt={turn.attachment.name}
+                          className="max-h-64 max-w-full rounded-lg object-contain"
+                          loading="lazy"
+                        />
+                      </a>
+                    )}
+                    {turn.question && <span className="block whitespace-pre-wrap">{turn.question}</span>}
                   </div>
                 </div>
               )}
@@ -257,7 +327,43 @@ export function AssistantPanel({ initialQuestion = "" }: { initialQuestion?: str
           <p className="mb-1.5 text-[10px] text-muted-foreground">AI 가 지금 꺼져 있습니다</p>
         )}
         {sendError && <p className="mb-1.5 text-[10px] text-destructive">{sendError}</p>}
+        {pendingImage && (
+          <div className="mb-2 flex items-center gap-2 rounded-lg border border-border bg-muted/40 px-2.5 py-2">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={pendingImage.previewUrl} alt="보낼 사진 미리보기" className="size-10 rounded object-cover" />
+            <ImageIcon className="size-4 shrink-0 text-primary" aria-hidden="true" />
+            <span className="min-w-0 flex-1 truncate text-xs font-medium">{pendingImage.file.name}</span>
+            <button
+              type="button"
+              onClick={clearPendingImage}
+              className="rounded-md p-1 text-muted-foreground hover:bg-background hover:text-foreground"
+              aria-label="사진 첨부 선택 취소"
+            >
+              <X className="size-3.5" aria-hidden="true" />
+            </button>
+          </div>
+        )}
         <div className="flex gap-2">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={handleFileChange}
+            disabled={!bridge?.online || sending}
+          />
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={!bridge?.online || sending}
+            className="size-8 shrink-0"
+            aria-label="ERP 비서에 사진 첨부"
+            title="사진 첨부 (최대 50MB)"
+          >
+            <Paperclip className="size-3.5" />
+          </Button>
           <Input
             ref={inputRef}
             value={input}
@@ -268,6 +374,7 @@ export function AssistantPanel({ initialQuestion = "" }: { initialQuestion?: str
                 void handleSend();
               }
             }}
+            onPaste={handlePaste}
             placeholder="ERP 비서에게 질문"
             className="h-8 flex-1 text-xs"
             disabled={!bridge?.online || sending}
@@ -275,7 +382,7 @@ export function AssistantPanel({ initialQuestion = "" }: { initialQuestion?: str
           <Button
             size="icon"
             onClick={() => void handleSend()}
-            disabled={!input.trim() || !bridge?.online || sending}
+            disabled={(!input.trim() && !pendingImage) || !bridge?.online || sending}
             className="size-8 shrink-0"
             aria-label="질문 전송"
             title="질문 전송"
