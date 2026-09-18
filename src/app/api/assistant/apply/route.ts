@@ -49,6 +49,7 @@ import {
   moveMessengerFileToProject,
 } from "@/lib/googleDrive";
 import { createSpreadsheet, SheetCreationError } from "@/lib/sheetCreation";
+import { syncVenueSource, venueSourceKey } from "@/lib/venueSourceSync";
 
 /**
  * 비서가 내놓은 변경 제안을 실제로 적용한다.
@@ -62,6 +63,8 @@ import { createSpreadsheet, SheetCreationError } from "@/lib/sheetCreation";
 /** 대상마다 어느 메뉴의 수정 권한이 필요한지. */
 const MENU_FOR: Record<ProposalTarget, string> = {
   venue: "venues",
+  venue_source_update: "venues",
+  venue_create: "venues",
   partner: "partners",
   project: "projects",
   drive_file: "messenger",
@@ -83,6 +86,8 @@ const MENU_FOR: Record<ProposalTarget, string> = {
 };
 
 const STRICT_NEW_TARGETS = new Set<ProposalTarget>([
+  "venue_source_update",
+  "venue_create",
   "inquiry_move", "inquiry_memo",
   "customer_create", "customer_update", "partner_create", "partner_update",
   "expense_create", "calendar_create", "leave_request", "message_send",
@@ -171,6 +176,7 @@ function getContextIdRequirement(
 ): { collection: string; id: string } | { inquiryBranch: InquiryBranch; id: string } | null {
   if (proposal.target === "customer_update") return { collection: "customers", id: proposal.id };
   if (proposal.target === "partner_update") return { collection: "partners", id: proposal.id };
+  if (proposal.target === "venue_source_update") return { collection: "venues", id: proposal.id };
   if (proposal.target === "inquiry_move" || proposal.target === "inquiry_memo") {
     const branch = proposal.changes.branch;
     if (branch === "customer" || branch === "space" || branch === "rental") {
@@ -1012,6 +1018,7 @@ export async function POST(req: NextRequest) {
     const legacyAccepted = accepted as Record<string, string | number | Date | null>;
     let name: string;
     let moveResult: { name: string; folderPath: string; driveUrl: string } | null = null;
+    let sourceSyncResult: Awaited<ReturnType<typeof syncVenueSource>> | null = null;
     if (proposal.target === "drive_file") {
       // 파일 ID만 알고 있으면 누구나 다른 파일을 옮길 수 없도록
       // 현재 사용자가 참여한 대화의 첨부파일인지 먼저 확인한다.
@@ -1046,6 +1053,77 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "파일을 보낼 폴더가 올바르지 않습니다." }, { status: 400 });
       }
       name = moveResult.name;
+    } else if (proposal.target === "venue_source_update") {
+      const venue = await prisma.venue.findUnique({
+        where: { id: proposal.id },
+        select: { id: true, sourceKey: true, name: true, address: true, raw: true },
+      });
+      if (!venue) return NextResponse.json({ error: "지정한 공간을 찾을 수 없습니다." }, { status: 404 });
+      const field = String(accepted.field);
+      const value = String(accepted.value);
+      // Drive 원본을 먼저 갱신한다. 원본을 못 고치면 ERP DB만 바뀌지 않도록 한다.
+      sourceSyncResult = await syncVenueSource({
+        mode: "updated",
+        sourceKey: venue.sourceKey ?? venueSourceKey(venue.name, venue.address ?? ""),
+        row: { name: venue.name, address: venue.address ?? "" },
+        field,
+        value,
+      });
+      const raw = venue.raw && typeof venue.raw === "object" && !Array.isArray(venue.raw)
+        ? venue.raw as Record<string, unknown>
+        : {};
+      const row = await prisma.venue.update({
+        where: { id: venue.id },
+        data: { raw: JSON.parse(JSON.stringify({ ...raw, [field]: value })) },
+        select: { name: true },
+      });
+      name = row.name;
+    } else if (proposal.target === "venue_create") {
+      const fields = accepted as Record<string, unknown>;
+      const venueName = String(fields.name);
+      const venueAddress = String(fields.address);
+      const duplicate = await prisma.venue.findFirst({
+        where: { name: venueName, address: venueAddress },
+        select: { id: true, name: true },
+      });
+      if (duplicate) return NextResponse.json({ error: `같은 이름과 주소의 공간이 이미 있습니다: ${duplicate.name}` }, { status: 409 });
+      const raw = typeof fields.field === "string" && typeof fields.value === "string"
+        ? { [fields.field]: fields.value }
+        : undefined;
+      const created = await prisma.venue.create({
+        data: {
+          sourceKey: venueSourceKey(venueName, venueAddress),
+          name: venueName,
+          address: venueAddress,
+          district: typeof fields.district === "string" ? fields.district : null,
+          type: typeof fields.type === "string" ? fields.type : null,
+          phone: typeof fields.phone === "string" ? fields.phone : null,
+          reserveUrl: typeof fields.reserveUrl === "string" ? fields.reserveUrl : null,
+          raw,
+          createdById: session.user.id,
+        },
+        select: { id: true, name: true, address: true, district: true, type: true, phone: true, reserveUrl: true },
+      });
+      try {
+        sourceSyncResult = await syncVenueSource({
+          mode: "created",
+          sourceKey: venueSourceKey(created.name, created.address ?? ""),
+          row: {
+            name: created.name,
+            address: created.address ?? "",
+            district: created.district,
+            type: created.type,
+            phone: created.phone,
+            reserveUrl: created.reserveUrl,
+          },
+          field: typeof fields.field === "string" ? fields.field : "",
+          value: typeof fields.value === "string" ? fields.value : "",
+        });
+      } catch (error) {
+        await prisma.venue.delete({ where: { id: created.id } }).catch(() => undefined);
+        throw error;
+      }
+      name = created.name;
     } else if (proposal.target === "venue") {
       const row = await prisma.venue.update({
         where: { id: proposal.id },
@@ -1087,6 +1165,7 @@ export async function POST(req: NextRequest) {
           rejected: rejected.map((r) => `${r.field}: ${r.reason}`),
           by: session.user.id,
           ...(moveResult ? { folderPath: moveResult.folderPath, driveUrl: moveResult.driveUrl } : {}),
+          ...(sourceSyncResult ? { sourceSync: JSON.parse(JSON.stringify(sourceSyncResult)) } : {}),
         },
       },
     });

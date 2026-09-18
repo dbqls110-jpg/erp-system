@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { getAccessibleMenus } from "@/lib/permissions";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Clock, FolderKanban, Banknote, Calendar, CalendarCheck, Palmtree, MessageCircle } from "lucide-react";
+import { Clock, FolderKanban, Banknote, Calendar, CalendarCheck, Palmtree, MessageCircle, MapPinned } from "lucide-react";
 import { format } from "date-fns";
 import { ko } from "date-fns/locale";
 import Link from "next/link";
@@ -12,6 +12,7 @@ import { calendarWhereFor, projectWhereFor } from "@/lib/calendarVisibility";
 import { getDashboardAudience } from "@/lib/dashboardVisibility";
 import { calculateBudgetMetrics } from "@/lib/financeMetrics";
 import { fixedExpenseMonthWhere, monthKey } from "@/lib/fixedExpenseMonths";
+import { getVenueWeekRange } from "@/lib/venueKpi";
 
 export default async function DashboardPage() {
   const today = format(new Date(), "yyyy-MM-dd");
@@ -66,7 +67,8 @@ export default async function DashboardPage() {
   const canSee = (menuKey: string) => allowed.has(menuKey);
 
   // 근태 쿼리 2개 → 1개로 통합 (today 포함 이번달 전체)
-  const [monthlyAttendance, activeProjects, budget, expenses, upcomingEvents, leaveBalance, fixedExpenses] = await Promise.all([
+  const venueWeek = getVenueWeekRange(now);
+  const [monthlyAttendance, activeProjects, budget, expenses, upcomingEvents, leaveBalance, fixedExpenses, venueKpiOwner] = await Promise.all([
     prisma.attendance.findMany({
       where: { userId: viewer.id, date: { gte: monthStart, lte: today } },
       select: { date: true, clockIn: true, clockOut: true },
@@ -100,7 +102,22 @@ export default async function DashboardPage() {
           select: { amount: true },
         })
       : [],
+    canSee("venues")
+      ? prisma.user.findFirst({
+          where: { name: "이석준", active: true, role: { not: "pending" } },
+          select: { id: true, name: true },
+          orderBy: { createdAt: "asc" },
+        })
+      : null,
   ]);
+
+  const venueKpiRows = venueKpiOwner
+    ? await prisma.venue.findMany({
+        where: { createdById: venueKpiOwner.id, createdAt: { gte: venueWeek.start, lt: venueWeek.endExclusive } },
+        select: { id: true, name: true, address: true, reserveUrl: true, createdAt: true },
+        orderBy: { createdAt: "desc" },
+      })
+    : [];
 
   const attendance = monthlyAttendance.find((r) => r.date === today) ?? null;
   const attendanceSummary = summarizeAttendance(monthlyAttendance);
@@ -194,6 +211,21 @@ export default async function DashboardPage() {
           </Link>
         ))}
       </div>
+
+      {canSee("venues") && (
+        <Link href={`/dashboard/venue-kpi?week=${venueWeek.startDate}`} className="block">
+          <Card className="rounded-[12px] border border-border py-0 shadow-none transition-all hover:border-[#d8d4fb] hover:shadow-sm dark:bg-card">
+            <CardHeader className="gap-[6px] px-[18px] py-4">
+              <CardDescription className="text-[12px] text-muted-foreground">이석준 · 이번 주 공간 등록</CardDescription>
+              <CardTitle className="text-[26px] font-bold leading-tight tracking-[-0.01em] tabular-nums" style={{ fontFamily: "var(--font-plus-jakarta-sans)" }}>{venueKpiRows.length}건</CardTitle>
+              <CardAction><MapPinned size={16} className="text-primary" /></CardAction>
+            </CardHeader>
+            <CardContent className="px-[18px] pb-4 pt-0">
+              <p className="text-[12px] leading-4 text-muted-foreground">{venueWeek.startDate.slice(5)} ~ {venueWeek.endDate.slice(5)} · 공간명·주소·링크 보기</p>
+            </CardContent>
+          </Card>
+        </Link>
+      )}
 
       {upcomingEvents.length > 0 && (
         <Card className="rounded-[12px] border border-border py-0 shadow-none dark:bg-card">

@@ -333,6 +333,10 @@ export function ProposalCard({
 
   const targetLabel = proposal.target === "venue"
     ? "공간"
+    : proposal.target === "venue_source_update"
+      ? "공간 원본 동기화"
+      : proposal.target === "venue_create"
+        ? "공간 등록"
     : proposal.target === "partner"
       ? "파트너"
       : proposal.target === "project"

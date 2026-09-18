@@ -108,7 +108,7 @@ export function buildDetailGroups(
   raw: Record<string, unknown> | null | undefined,
 ): Array<{ title: string; hint?: string; rows: Array<{ label: string; value: string }> }> {
   const source = raw ?? {};
-  return RAW_GROUPS.map((group) => ({
+  const groups = RAW_GROUPS.map((group) => ({
     title: group.title,
     hint: group.hint,
     rows: group.fields.flatMap((field) => {
@@ -120,4 +120,11 @@ export function buildDetailGroups(
       return [{ label: field.label, value: text }];
     }),
   })).filter((group) => group.rows.length > 0);
+  const knownKeys = new Set(RAW_GROUPS.flatMap((group) => group.fields.map((field) => field.key)));
+  const extraRows = Object.entries(source)
+    .filter(([key, value]) => !knownKeys.has(key) && value !== null && value !== undefined && String(value).trim() && String(value).trim() !== "-")
+    .sort(([left], [right]) => left.localeCompare(right, "ko"))
+    .map(([label, value]) => ({ label, value: String(value).trim() }));
+  if (extraRows.length > 0) groups.push({ title: "추가 정보", hint: "원본에 새로 추가된 열입니다.", rows: extraRows });
+  return groups;
 }

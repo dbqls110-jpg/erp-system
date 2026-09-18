@@ -33,6 +33,20 @@ export const EDITABLE_FIELDS = {
     calledPrice: "확인 요금",
     calledNote: "통화 메모",
   },
+  venue_source_update: {
+    field: "원본 열",
+    value: "원본 값",
+  },
+  venue_create: {
+    name: "공간명",
+    address: "주소",
+    district: "지역",
+    type: "유형",
+    phone: "연락처",
+    reserveUrl: "예약 링크",
+    field: "추가 열",
+    value: "추가 값",
+  },
   partner: {
     phone: "연락처",
     contractStatus: "거래 상태",
@@ -254,6 +268,17 @@ export interface MessageSendContent {
   text: string;
 }
 
+export interface VenueCreateContent {
+  name: string;
+  address: string;
+  district?: string;
+  type?: string;
+  phone?: string;
+  reserveUrl?: string;
+  field?: string;
+  value?: string;
+}
+
 export interface Proposal {
   target: ProposalTarget;
   /** 기존 자료 제안의 id. 새 시트를 만드는 제안은 빈 문자열이다. */
@@ -305,7 +330,7 @@ export function parseProposals(answer: string): Proposal[] {
       const isProjectAmount = p.target === "project_amount";
       const isNoIdCreate = [
         "sheet_create", "project_create", "customer_create", "partner_create",
-        "expense_create", "calendar_create", "leave_request", "message_send",
+        "expense_create", "calendar_create", "leave_request", "message_send", "venue_create",
       ].includes(p.target);
       const isInquiryMove = p.target === "inquiry_move";
       const isInquiryMemo = p.target === "inquiry_memo";
@@ -374,6 +399,8 @@ export function validateProposal(proposal: Proposal): ValidatedProposal {
   if (proposal.target === "calendar_create") return validateCalendarCreateProposal(proposal);
   if (proposal.target === "leave_request") return validateLeaveRequestProposal(proposal);
   if (proposal.target === "message_send") return validateMessageSendProposal(proposal);
+  if (proposal.target === "venue_source_update") return validateVenueSourceUpdateProposal(proposal);
+  if (proposal.target === "venue_create") return validateVenueCreateProposal(proposal);
 
   const allowed = EDITABLE_FIELDS[proposal.target] as Record<string, string>;
   const accepted: Record<string, unknown> = {};
@@ -467,6 +494,43 @@ export function validateProposal(proposal: Proposal): ValidatedProposal {
     }
   }
 
+  return { proposal, accepted, rejected };
+}
+
+const SOURCE_FIELD_LIMIT = 80;
+const SOURCE_VALUE_LIMIT = 1000;
+
+function validateVenueSourceUpdateProposal(proposal: Proposal): ValidatedProposal {
+  const accepted: Record<string, unknown> = {};
+  const rejected: ProposalIssue[] = [];
+  const field = proposal.changes.field;
+  const value = proposal.changes.value;
+  if (typeof field !== "string" || !field.trim()) rejected.push({ field: "field", reason: "원본에 추가할 열 이름이 필요합니다." });
+  else if (field.trim().length > SOURCE_FIELD_LIMIT || /[\r\n,]/.test(field)) rejected.push({ field: "field", reason: "열 이름은 쉼표·줄바꿈 없이 80자 이내여야 합니다." });
+  else accepted.field = field.trim();
+  if (typeof value !== "string") rejected.push({ field: "value", reason: "원본 값은 글자여야 합니다." });
+  else if (value.length > SOURCE_VALUE_LIMIT) rejected.push({ field: "value", reason: `${SOURCE_VALUE_LIMIT}자를 넘습니다.` });
+  else accepted.value = value;
+  if (Object.keys(accepted).length !== 2 && rejected.length === 0) rejected.push({ field: "changes", reason: "원본 열과 값이 모두 필요합니다." });
+  return { proposal, accepted, rejected };
+}
+
+function validateVenueCreateProposal(proposal: Proposal): ValidatedProposal {
+  const accepted: Record<string, unknown> = {};
+  const rejected: ProposalIssue[] = [];
+  const fields = asRecord(proposal.changes.fields) ?? proposal.changes;
+  rejectUnknownFields(fields, new Set(["name", "address", "district", "type", "phone", "reserveUrl", "field", "value"]), rejected);
+  addTextField(accepted, rejected, fields, "name", { required: true, limit: 200 });
+  addTextField(accepted, rejected, fields, "address", { required: true, limit: 300 });
+  for (const field of ["district", "type", "phone", "reserveUrl"] as const) addTextField(accepted, rejected, fields, field, { limit: 300 });
+  const sourceField = fields.field;
+  const sourceValue = fields.value;
+  if (sourceField !== undefined || sourceValue !== undefined) {
+    if (typeof sourceField !== "string" || !sourceField.trim() || sourceField.length > SOURCE_FIELD_LIMIT || /[\r\n,]/.test(sourceField)) rejected.push({ field: "field", reason: "추가 열 이름이 올바르지 않습니다." });
+    else accepted.field = sourceField.trim();
+    if (typeof sourceValue !== "string" || sourceValue.length > SOURCE_VALUE_LIMIT) rejected.push({ field: "value", reason: "추가 값이 올바르지 않습니다." });
+    else accepted.value = sourceValue;
+  }
   return { proposal, accepted, rejected };
 }
 
