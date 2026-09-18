@@ -16,7 +16,7 @@ import {
   saveInquiryMemo,
   saveInquiryStage,
 } from "@/lib/inquirySheet";
-import { getSpaceRegistrations, saveSpaceRegistrationMemo, saveSpaceRegistrationStage } from "@/lib/spaceRegistrationSheet";
+import { appendSpaceRegistrationRow, getSpaceRegistrations, saveSpaceRegistrationMemo, saveSpaceRegistrationStage } from "@/lib/spaceRegistrationSheet";
 import { getSpaceRentals, saveSpaceRentalStage } from "@/lib/spaceRentalSheet";
 import { formatCurrentDateTime, type InquiryStage } from "@/lib/inquiries";
 import type { SpaceRegistrationStage } from "@/lib/spaceRegistrations";
@@ -41,12 +41,14 @@ import {
   type ProjectAmountContent,
   type ProjectCreateFields,
   type ProjectChecklistContent,
+  type SpaceRegistrationCreateContent,
   type SheetCreateContent,
   type ProposalTarget,
 } from "@/lib/assistantProposal";
 import {
   moveMessengerFileToCategory,
   moveMessengerFileToProject,
+  moveMessengerFileToSpaceRegistration,
 } from "@/lib/googleDrive";
 import { createSpreadsheet, SheetCreationError } from "@/lib/sheetCreation";
 import { syncVenueSource, venueSourceKey } from "@/lib/venueSourceSync";
@@ -65,6 +67,7 @@ const MENU_FOR: Record<ProposalTarget, string> = {
   venue: "venues",
   venue_source_update: "venues",
   venue_create: "venues",
+  space_registration_create: "venues",
   partner: "partners",
   project: "projects",
   drive_file: "messenger",
@@ -88,6 +91,7 @@ const MENU_FOR: Record<ProposalTarget, string> = {
 const STRICT_NEW_TARGETS = new Set<ProposalTarget>([
   "venue_source_update",
   "venue_create",
+  "space_registration_create",
   "inquiry_move", "inquiry_memo",
   "customer_create", "customer_update", "partner_create", "partner_update",
   "expense_create", "calendar_create", "leave_request", "message_send",
@@ -394,7 +398,14 @@ export async function POST(req: NextRequest) {
   // 본인 대화의 답변만 적용할 수 있다. 남의 job id 를 넣어도 찾지 못한다.
   const job = await prisma.agentJob.findFirst({
     where: { id: jobId, userId: session.user.id, visibility: "user" },
-    select: { input: true, output: true, status: true },
+    select: {
+      input: true,
+      output: true,
+      status: true,
+      attachmentDriveFileId: true,
+      attachmentName: true,
+      attachmentMimeType: true,
+    },
   });
   if (!job) return NextResponse.json({ error: "대화를 찾을 수 없습니다." }, { status: 404 });
   if (job.status !== "completed" || !job.output) {
@@ -1008,6 +1019,66 @@ export async function POST(req: NextRequest) {
       await prisma.agentAuditLog.create({
         data: {
           method: "POST", endpoint: "/api/assistant/apply", action: "assistant_apply_message_send",
+          payload: { jobId, index, changes: JSON.parse(JSON.stringify(proposal.changes)) },
+          result: { ...result, by: session.user.id },
+        },
+      });
+      return NextResponse.json({ ok: true, ...result }, { status: 201 });
+    }
+
+    if (proposal.target === "space_registration_create") {
+      const existing = await findExistingApplyResult(jobId, index, "assistant_apply_space_registration_create");
+      if (existing) return NextResponse.json({ ok: true, ...existing, reused: true });
+
+      const content = accepted as unknown as SpaceRegistrationCreateContent;
+      let photo: Awaited<ReturnType<typeof moveMessengerFileToSpaceRegistration>> | null = null;
+      if (job.attachmentDriveFileId) {
+        photo = await moveMessengerFileToSpaceRegistration(job.attachmentDriveFileId);
+      }
+
+      const saved = await appendSpaceRegistrationRow({
+        spaceName: content.spaceName,
+        contactName: content.contactName,
+        relationship: content.relationship,
+        phone: content.phone,
+        email: content.email,
+        spaceType: content.spaceType,
+        address: content.address,
+        desiredRegion: content.desiredRegion,
+        description: content.description,
+        area: content.area,
+        capacity: content.capacity,
+        dailyRate: content.dailyRate,
+        negotiable: content.negotiable,
+        conditions: content.conditions,
+        photoFolderUrl: photo?.folderUrl,
+        photoCount: photo ? 1 : 0,
+        privacyConsentAt: content.privacyConsentAt,
+        photoPermission: content.photoPermission,
+        cooling: content.cooling,
+        restroom: content.restroom,
+        wifi: content.wifi,
+        parkingCount: content.parkingCount,
+        fireNotAllowed: content.fireNotAllowed,
+        drillingNotAllowed: content.drillingNotAllowed,
+        noiseLimit: content.noiseLimit,
+        equipmentRental: content.equipmentRental,
+        nightWork: content.nightWork,
+        foodAllowed: content.foodAllowed,
+        extraConditions: content.extraConditions,
+      });
+      const result = {
+        name: saved.spaceName,
+        registrationId: saved.registrationId,
+        rowNumber: saved.rowNumber,
+        photoCount: photo ? 1 : 0,
+        ...(photo ? { folderPath: photo.folderPath, folderUrl: photo.folderUrl, driveUrl: photo.driveUrl } : {}),
+      };
+      await prisma.agentAuditLog.create({
+        data: {
+          method: "POST",
+          endpoint: "/api/assistant/apply",
+          action: "assistant_apply_space_registration_create",
           payload: { jobId, index, changes: JSON.parse(JSON.stringify(proposal.changes)) },
           result: { ...result, by: session.user.id },
         },

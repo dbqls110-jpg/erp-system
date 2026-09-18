@@ -160,7 +160,7 @@ export function ProposalCard({
     (count, rows) => Math.max(count, ...(Array.isArray(rows) ? rows.map((row) => row.length) : [])),
     0,
   );
-  const isStrictNewProposal = isInquiryMove || isInquiryMemo || isCustomerCreate || isCustomerUpdate || isPartnerCreate || isPartnerUpdate || isExpenseCreate || isCalendarCreate || isLeaveRequest || isMessageSend;
+  const isStrictNewProposal = proposal.target === "space_registration_create" || isInquiryMove || isInquiryMemo || isCustomerCreate || isCustomerUpdate || isPartnerCreate || isPartnerUpdate || isExpenseCreate || isCalendarCreate || isLeaveRequest || isMessageSend;
   const nothingToApply = isSheetCreate
     ? rejected.length > 0 || typeof sheet?.title !== "string"
     : isProjectChecklist
@@ -337,6 +337,8 @@ export function ProposalCard({
       ? "공간 원본 동기화"
       : proposal.target === "venue_create"
         ? "공간 등록"
+      : proposal.target === "space_registration_create"
+        ? "공간 등록 접수"
     : proposal.target === "partner"
       ? "파트너"
       : proposal.target === "project"
@@ -372,7 +374,9 @@ export function ProposalCard({
                                     : proposal.target === "message_send"
                                       ? "메시지 전송"
                   : "구글 시트";
-  const savingLabel = isProjectCreate
+  const savingLabel = proposal.target === "space_registration_create"
+    ? "공간 등록 접수 중…"
+    : isProjectCreate
     ? "프로젝트 만드는 중…"
     : isChecklistDone
       ? "업무 상태 적용 중…"
@@ -403,7 +407,9 @@ export function ProposalCard({
           : isSheetCreate
             ? "시트 만드는 중…"
             : "저장 중…";
-  const applyLabel = isProjectCreate
+  const applyLabel = proposal.target === "space_registration_create"
+    ? "공간 등록 접수"
+    : isProjectCreate
     ? "프로젝트 만들기"
     : isChecklistDone
       ? `업무 ${checklistDoneItems.length}건 적용`

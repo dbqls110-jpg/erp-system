@@ -4,6 +4,8 @@ import { categorizeFileName } from "@/lib/fileCategory";
 import { isInvalidGrantError, makeDriveClientAsOwner } from "@/lib/googleClient";
 
 const ROOT_FOLDER_NAME = "천우영 시스템";
+const SPACE_REGISTRATION_ROOT_FOLDER_NAME = "천우영 프로젝트";
+const SPACE_REGISTRATION_FOLDER_NAME = "공간 등록";
 export const MESSENGER_FOLDER_NAME = "메신저";
 export const MAX_MESSENGER_FILE_SIZE = 50 * 1024 * 1024;
 
@@ -234,5 +236,22 @@ export async function moveMessengerFileToCategory(
     const moved = await moveDriveFileToFolder(drive, driveFileId, categoryId);
 
     return { ...moved, folderPath: `${ROOT_FOLDER_NAME}/${MESSENGER_FOLDER_NAME}/${category}` };
+  });
+}
+
+/** 공간등록 접수 사진을 별도 업무 폴더로 이동한다. */
+export async function moveMessengerFileToSpaceRegistration(
+  driveFileId: string,
+): Promise<{ name: string; driveUrl: string; folderPath: string; folderUrl: string }> {
+  return withOwnerDrive(async (drive) => {
+    const rootId = await findOrCreateFolder(drive, SPACE_REGISTRATION_ROOT_FOLDER_NAME);
+    const folderId = await findOrCreateFolder(drive, SPACE_REGISTRATION_FOLDER_NAME, rootId);
+    const moved = await moveDriveFileToFolder(drive, driveFileId, folderId);
+
+    return {
+      ...moved,
+      folderPath: `${SPACE_REGISTRATION_ROOT_FOLDER_NAME}/${SPACE_REGISTRATION_FOLDER_NAME}`,
+      folderUrl: `https://drive.google.com/drive/folders/${folderId}`,
+    };
   });
 }

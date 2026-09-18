@@ -12,7 +12,7 @@ import { formatCurrentDateTime } from "@/lib/inquiries";
 export const SPACE_REGISTRATIONS_SPREADSHEET_ID = "1A5xN_nii5AeAkM9JSF0morcetMCI3A7TDcvk3xRjd1M";
 export const SPACE_REGISTRATIONS_TAB_NAME = "공간 등록 접수";
 
-const SPACE_REGISTRATIONS_RANGE = `'${SPACE_REGISTRATIONS_TAB_NAME}'!A1:AB`;
+const SPACE_REGISTRATIONS_RANGE = `'${SPACE_REGISTRATIONS_TAB_NAME}'!A1:AM`;
 const MEMO_COLUMN = "W";
 const FINAL_PROCESSED_COLUMN = "X";
 const STAGE_TIME_COLUMNS: Partial<Record<SpaceRegistrationStage, string>> = {
@@ -27,6 +27,40 @@ const DEFAULT_ROW_BACKGROUND = { red: 1, green: 1, blue: 1 };
 
 type SheetRows = readonly (readonly unknown[])[];
 type SheetsClient = Awaited<ReturnType<typeof makeSheetsClientAsOwner>>;
+
+/** ERP 비서의 공간등록 제안을 접수 시트 한 행으로 바꾸는 입력값. */
+export interface SpaceRegistrationSheetRowInput {
+  spaceName: string;
+  contactName?: string;
+  relationship?: string;
+  phone?: string;
+  email?: string;
+  spaceType?: string;
+  address?: string;
+  desiredRegion?: string;
+  description?: string;
+  area?: string | number;
+  capacity?: string | number;
+  dailyRate?: string | number;
+  negotiable?: string;
+  conditions?: string;
+  photoFolderUrl?: string;
+  photoCount?: number;
+  privacyConsentAt?: string;
+  photoPermission?: string;
+  cooling?: string;
+  restroom?: string;
+  wifi?: string;
+  parkingCount?: string | number;
+  fireNotAllowed?: string;
+  drillingNotAllowed?: string;
+  noiseLimit?: string;
+  equipmentRental?: string;
+  nightWork?: string;
+  foodAllowed?: string;
+  extraConditions?: string;
+  receivedAt?: Date;
+}
 
 async function readSpaceRegistrationSheet() {
   const sheets = await makeSheetsClientAsOwner();
@@ -68,6 +102,115 @@ async function getSheetId(sheets: SheetsClient): Promise<number> {
   const sheetId = sheet?.properties?.sheetId;
   if (typeof sheetId !== "number") throw new Error(`‘${SPACE_REGISTRATIONS_TAB_NAME}’ 탭을 찾지 못했습니다.`);
   return sheetId;
+}
+
+function sheetCellValue(value: unknown): { userEnteredValue: { stringValue: string } | { numberValue: number } } {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return { userEnteredValue: { numberValue: value } };
+  }
+  if (typeof value === "string" && value.trim() !== "" && /^-?\d+(?:\.\d+)?$/.test(value.trim())) {
+    return { userEnteredValue: { numberValue: Number(value.trim()) } };
+  }
+  return { userEnteredValue: { stringValue: String(value ?? "") } };
+}
+
+function nextRegistrationId(rows: SheetRows): string {
+  const max = rows.slice(1).reduce((highest, row) => {
+    const value = Number(String(row[0] ?? "").replace(/[^0-9]/g, ""));
+    return Number.isSafeInteger(value) ? Math.max(highest, value) : highest;
+  }, 0);
+  return String(max + 1);
+}
+
+function registrationRowValues(input: SpaceRegistrationSheetRowInput, registrationId: string): unknown[] {
+  const now = input.receivedAt ?? new Date();
+  return [
+    registrationId,
+    formatCurrentDateTime(now),
+    "신규",
+    input.contactName,
+    input.relationship,
+    input.phone,
+    input.email,
+    input.spaceName,
+    input.spaceType,
+    input.address,
+    input.desiredRegion,
+    input.description,
+    input.area,
+    input.capacity,
+    input.dailyRate,
+    input.negotiable,
+    input.conditions,
+    input.photoFolderUrl,
+    input.photoCount,
+    input.privacyConsentAt,
+    input.photoPermission,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    input.cooling,
+    input.restroom,
+    input.wifi,
+    input.parkingCount,
+    input.fireNotAllowed,
+    input.drillingNotAllowed,
+    input.noiseLimit,
+    input.equipmentRental,
+    input.nightWork,
+    input.foodAllowed,
+    input.extraConditions,
+  ];
+}
+
+/** 공간 등록 접수 탭에 새 행을 추가한다. 기존 행의 형식·드롭다운을 복사한 뒤 값만 쓴다. */
+export async function appendSpaceRegistrationRow(input: SpaceRegistrationSheetRowInput) {
+  const spaceName = input.spaceName.trim();
+  if (!spaceName) throw new Error("공간명이 필요합니다.");
+
+  const { sheets, rows } = await readSpaceRegistrationSheet();
+  const registrationId = nextRegistrationId(rows);
+  const rowNumber = Math.max(rows.length + 1, 2);
+  const sourceRowNumber = rows.length >= 2 ? rows.length : 1;
+  const sheetId = await getSheetId(sheets);
+  const values = registrationRowValues({ ...input, spaceName }, registrationId);
+  const requests: object[] = [
+    {
+      copyPaste: {
+        source: rowRange(sheetId, sourceRowNumber, "A", "AM"),
+        destination: rowRange(sheetId, rowNumber, "A", "AM"),
+        pasteType: "PASTE_NORMAL",
+      },
+    },
+    {
+      updateCells: {
+        range: rowRange(sheetId, rowNumber, "A", "AM"),
+        rows: [{ values: values.map(sheetCellValue) }],
+        fields: "userEnteredValue",
+      },
+    },
+  ];
+
+  await sheets.spreadsheets.batchUpdate({
+    spreadsheetId: SPACE_REGISTRATIONS_SPREADSHEET_ID,
+    requestBody: { requests },
+  });
+
+  const verify = await sheets.spreadsheets.values.get({
+    spreadsheetId: SPACE_REGISTRATIONS_SPREADSHEET_ID,
+    range: `'${SPACE_REGISTRATIONS_TAB_NAME}'!A${rowNumber}:S${rowNumber}`,
+    valueRenderOption: "FORMATTED_VALUE",
+  });
+  const saved = verify.data.values?.[0] ?? [];
+  if (String(saved[0] ?? "") !== registrationId || String(saved[7] ?? "") !== spaceName) {
+    throw new Error("공간 등록 접수 행 저장 후 확인에 실패했습니다.");
+  }
+
+  return { registrationId, rowNumber, spaceName, receivedAt: String(saved[1] ?? "") };
 }
 
 function columnIndex(column: string): number {

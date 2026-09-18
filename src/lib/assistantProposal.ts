@@ -47,6 +47,35 @@ export const EDITABLE_FIELDS = {
     field: "추가 열",
     value: "추가 값",
   },
+  space_registration_create: {
+    spaceName: "공간명",
+    contactName: "담당자 이름",
+    relationship: "공간과의 관계",
+    phone: "연락처",
+    email: "이메일",
+    spaceType: "공간 유형",
+    address: "상세 주소",
+    desiredRegion: "공개 희망 지역",
+    description: "공간 소개",
+    area: "면적(㎡)",
+    capacity: "수용 인원",
+    dailyRate: "희망 1일 대관료(만원)",
+    negotiable: "요금 협의 여부",
+    conditions: "시설·대관 조건",
+    privacyConsentAt: "개인정보 동의 일시",
+    photoPermission: "등록·사진 사용 권한",
+    cooling: "냉난방",
+    restroom: "화장실",
+    wifi: "Wi-Fi",
+    parkingCount: "주차 가능 대수",
+    fireNotAllowed: "화기 불가",
+    drillingNotAllowed: "타공 불가",
+    noiseLimit: "소음 제한",
+    equipmentRental: "집기 렌탈",
+    nightWork: "야간 작업",
+    foodAllowed: "음식 섭취 가능",
+    extraConditions: "추가 조건",
+  },
   partner: {
     phone: "연락처",
     contractStatus: "거래 상태",
@@ -279,6 +308,36 @@ export interface VenueCreateContent {
   value?: string;
 }
 
+export interface SpaceRegistrationCreateContent {
+  spaceName: string;
+  contactName?: string;
+  relationship?: string;
+  phone?: string;
+  email?: string;
+  spaceType?: string;
+  address?: string;
+  desiredRegion?: string;
+  description?: string;
+  area?: string | number;
+  capacity?: string | number;
+  dailyRate?: string | number;
+  negotiable?: string;
+  conditions?: string;
+  privacyConsentAt?: string;
+  photoPermission?: string;
+  cooling?: string;
+  restroom?: string;
+  wifi?: string;
+  parkingCount?: string | number;
+  fireNotAllowed?: string;
+  drillingNotAllowed?: string;
+  noiseLimit?: string;
+  equipmentRental?: string;
+  nightWork?: string;
+  foodAllowed?: string;
+  extraConditions?: string;
+}
+
 export interface Proposal {
   target: ProposalTarget;
   /** 기존 자료 제안의 id. 새 시트를 만드는 제안은 빈 문자열이다. */
@@ -331,6 +390,7 @@ export function parseProposals(answer: string): Proposal[] {
       const isNoIdCreate = [
         "sheet_create", "project_create", "customer_create", "partner_create",
         "expense_create", "calendar_create", "leave_request", "message_send", "venue_create",
+        "space_registration_create",
       ].includes(p.target);
       const isInquiryMove = p.target === "inquiry_move";
       const isInquiryMemo = p.target === "inquiry_memo";
@@ -401,6 +461,7 @@ export function validateProposal(proposal: Proposal): ValidatedProposal {
   if (proposal.target === "message_send") return validateMessageSendProposal(proposal);
   if (proposal.target === "venue_source_update") return validateVenueSourceUpdateProposal(proposal);
   if (proposal.target === "venue_create") return validateVenueCreateProposal(proposal);
+  if (proposal.target === "space_registration_create") return validateSpaceRegistrationCreateProposal(proposal);
 
   const allowed = EDITABLE_FIELDS[proposal.target] as Record<string, string>;
   const accepted: Record<string, unknown> = {};
@@ -530,6 +591,52 @@ function validateVenueCreateProposal(proposal: Proposal): ValidatedProposal {
     else accepted.field = sourceField.trim();
     if (typeof sourceValue !== "string" || sourceValue.length > SOURCE_VALUE_LIMIT) rejected.push({ field: "value", reason: "추가 값이 올바르지 않습니다." });
     else accepted.value = sourceValue;
+  }
+  return { proposal, accepted, rejected };
+}
+
+function addRegistrationValue(
+  accepted: Record<string, unknown>,
+  rejected: ProposalIssue[],
+  fields: Record<string, unknown>,
+  field: string,
+  options: { required?: boolean; numeric?: boolean } = {},
+) {
+  const value = fields[field];
+  if (value === undefined) {
+    if (options.required) rejected.push({ field, reason: "값이 필요합니다." });
+    return;
+  }
+  if (options.numeric) {
+    if (typeof value === "number" && Number.isFinite(value) && value >= 0) {
+      accepted[field] = value;
+      return;
+    }
+    if (typeof value === "string" && value.trim() && /^\d+(?:\.\d+)?$/.test(value.trim())) {
+      accepted[field] = Number(value.trim());
+      return;
+    }
+    rejected.push({ field, reason: "0 이상의 숫자여야 합니다." });
+    return;
+  }
+  addTextField(accepted, rejected, fields, field, { limit: 500, required: options.required });
+}
+
+function validateSpaceRegistrationCreateProposal(proposal: Proposal): ValidatedProposal {
+  const accepted: Record<string, unknown> = {};
+  const rejected: ProposalIssue[] = [];
+  const fields = asRecord(proposal.changes.fields) ?? proposal.changes;
+  const allowed = new Set(Object.keys(EDITABLE_FIELDS.space_registration_create));
+  rejectUnknownFields(fields, allowed, rejected);
+  addRegistrationValue(accepted, rejected, fields, "spaceName", { required: true });
+  for (const field of [
+    "contactName", "relationship", "phone", "email", "spaceType", "address", "desiredRegion",
+    "description", "negotiable", "conditions", "privacyConsentAt", "photoPermission", "cooling",
+    "restroom", "wifi", "fireNotAllowed", "drillingNotAllowed", "noiseLimit", "equipmentRental",
+    "nightWork", "foodAllowed", "extraConditions",
+  ]) addRegistrationValue(accepted, rejected, fields, field);
+  for (const field of ["area", "capacity", "dailyRate", "parkingCount"]) {
+    addRegistrationValue(accepted, rejected, fields, field, { numeric: true });
   }
   return { proposal, accepted, rejected };
 }
