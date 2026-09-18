@@ -104,7 +104,14 @@ export default async function DashboardPage() {
       : [],
     canSee("venues")
       ? prisma.user.findFirst({
-          where: { name: "박석영", active: true, role: { not: "pending" } },
+          where: {
+            active: true,
+            role: { not: "pending" },
+            OR: [
+              { name: { contains: "박석영" } },
+              { email: "qkrtjrdud952@gmail.com" },
+            ],
+          },
           select: { id: true, name: true },
           orderBy: { createdAt: "asc" },
         })

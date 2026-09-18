@@ -31,7 +31,14 @@ export default async function VenueKpiPage({ searchParams }: { searchParams: Pro
   const requested = validWeek(params.week);
   const range = getVenueWeekRange(requested ?? new Date());
   const owner = await prisma.user.findFirst({
-    where: { name: "박석영", active: true, role: { not: "pending" } },
+    where: {
+      active: true,
+      role: { not: "pending" },
+      OR: [
+        { name: { contains: "박석영" } },
+        { email: "qkrtjrdud952@gmail.com" },
+      ],
+    },
     select: { id: true, name: true, email: true },
     orderBy: { createdAt: "asc" },
   });
