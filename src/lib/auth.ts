@@ -2,9 +2,20 @@ import { NextAuthOptions } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
 import { prisma } from "@/lib/prisma";
 import { notifyAdminsOfSignup } from "@/lib/signupNotice";
+import { becameInternal, shouldAutoClockIn } from "@/lib/autoAttendance";
 
 /** role 을 DB 에서 다시 읽는 주기. 짧을수록 반영이 빠르고 DB 왕복이 는다. */
 const ROLE_REFRESH_MS = 60_000;
+
+/** 오늘 출근을 찍는다. 이미 있으면 그대로 둔다(퇴근 시각 등을 덮지 않기 위해). */
+async function clockInToday(userId: string) {
+  const today = new Date().toISOString().split("T")[0];
+  await prisma.$executeRaw`
+    INSERT INTO attendances (id, "userId", date, "clockIn", "createdAt", "updatedAt")
+    VALUES (gen_random_uuid()::text, ${userId}, ${today}, NOW(), NOW(), NOW())
+    ON CONFLICT ("userId", date) DO NOTHING
+  `;
+}
 
 export const authOptions: NextAuthOptions = {
   secret: process.env.NEXTAUTH_SECRET ?? process.env.AUTH_SECRET,
@@ -79,14 +90,9 @@ export const authOptions: NextAuthOptions = {
           token.name = dbUser.name;
           token.picture = dbUser.image;
 
-          // 출근 자동 기록 (당일 첫 로그인만)
-          if (dbUser.role !== "pending") {
-            const today = new Date().toISOString().split("T")[0];
-            await prisma.$executeRaw`
-              INSERT INTO attendances (id, "userId", date, "clockIn", "createdAt", "updatedAt")
-              VALUES (gen_random_uuid()::text, ${dbUser.id}, ${today}, NOW(), NOW(), NOW())
-              ON CONFLICT ("userId", date) DO NOTHING
-            `;
+          // 출근 자동 기록 (당일 첫 로그인만). 직원만 — 파트너·호스트는 출근이 없다.
+          if (shouldAutoClockIn(dbUser)) {
+            await clockInToday(dbUser.id);
           }
         } catch (err) {
           console.error("[ERP Auth Error]", err);
@@ -116,6 +122,10 @@ export const authOptions: NextAuthOptions = {
             SELECT role, "partnerId", "customerId", "venueId" FROM users WHERE id = ${token.id as string}
           `;
           if (rows[0]) {
+            // 승인 대기로 로그인했다가 지금 직원이 된 사람은 로그인 때 출근이 안 찍혔다. 지금 찍는다.
+            if (becameInternal(token.role as string | undefined, rows[0])) {
+              await clockInToday(token.id as string);
+            }
             token.role = rows[0].role;
             token.partnerId = rows[0].partnerId;
             token.customerId = rows[0].customerId;
