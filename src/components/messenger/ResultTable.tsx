@@ -1,10 +1,40 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, MapPinned } from "lucide-react";
 
 import type { ResultColumn, ResultTablePayload } from "@/lib/messageSegments";
 import { VenueMap } from "@/components/map/VenueMap";
+
+function uniqueIds(values: unknown[]) {
+  return [...new Set(values.filter((value): value is string => typeof value === "string" && value.trim().length > 0))];
+}
+
+function venueDbAction(payload: ResultTablePayload) {
+  const actions = Array.isArray(payload.actions) ? payload.actions : [];
+  const explicitAction = actions.find((action) => action?.type === "venue_db");
+  const rowIds = payload.rows.flatMap((row) => [row.id, row.venueId, row.spaceId]);
+  const actionIds = actions
+    .filter((action) => action?.type === "venue_db")
+    .flatMap((action) => Array.isArray(action.ids) ? action.ids : []);
+  const ids = uniqueIds([
+    ...(Array.isArray(payload.venueIds) ? payload.venueIds : []),
+    ...actionIds,
+    ...(Array.isArray(payload.pins) ? payload.pins.map((pin) => pin.id) : []),
+    ...rowIds,
+  ]);
+  const text = [
+    payload.title ?? "",
+    ...payload.columns.map((column) => column.label),
+  ].join(" ");
+  const looksLikeVenueTable = /공간|장소|시설|대관|후보/.test(text);
+  if (!explicitAction && (!looksLikeVenueTable || ids.length === 0)) return null;
+
+  return {
+    label: explicitAction?.label?.trim() || "공간 DB로 이동",
+    href: ids.length > 0 ? `/venues?ids=${encodeURIComponent(ids.join(","))}` : "/venues",
+  };
+}
 
 function Cell({ value, column }: { value: unknown; column: ResultColumn }) {
   if (column.missing) {
@@ -18,6 +48,7 @@ function Cell({ value, column }: { value: unknown; column: ResultColumn }) {
 
 export function ResultTable({ payload }: { payload: ResultTablePayload }) {
   const { title, columns, rows, notes, pins } = payload;
+  const venueAction = venueDbAction(payload);
 
   return (
     <div className="space-y-2">
@@ -67,6 +98,18 @@ export function ResultTable({ payload }: { payload: ResultTablePayload }) {
       )}
 
       {pins && pins.length > 0 && <VenueMap pins={pins} />}
+
+      {venueAction && (
+        <a
+          href={venueAction.href}
+          onClick={(event) => event.stopPropagation()}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-primary/25 bg-primary/5 px-2.5 py-1.5 text-xs font-medium text-primary transition-colors hover:bg-primary/10"
+          aria-label={venueAction.label}
+        >
+          <MapPinned className="size-3.5" aria-hidden="true" />
+          {venueAction.label}
+        </a>
+      )}
 
       {notes && notes.length > 0 && (
         <ul className="space-y-1">

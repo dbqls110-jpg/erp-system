@@ -40,6 +40,9 @@ const TABLE_FORMAT = [
   "- 값을 모르는 칸은 null 로 두세요. 화면이 \"미상\"으로 표시합니다.",
   "- 이 둘을 뭉뚱그리지 마세요. 앞은 전화로 물어봐야 아는 것이고 뒤는 그 항목만 빠진 것이라,",
   "  읽는 사람이 다음에 할 행동이 다릅니다.",
+  "- 공간·장소·대관 후보 표라면 각 rows 항목에 [ERP 자료] venues.items의 id를 화면에 표시하지 않는 id 키로 반드시 넣으세요.",
+  "  좌표가 있는 후보는 [ERP 자료] mapPins의 id·name·lat·lng를 그대로 pins에 넣으세요(좌표를 지어내지 마세요).",
+  '  표 아래에 \'공간 DB로 이동\' 버튼을 만들려면 actions에 {"type":"venue_db","label":"공간 DB로 이동","ids":["...공간 id..."]}를 넣으세요.',
 ].join("\n");
 
 /**
@@ -218,7 +221,13 @@ export async function buildAssistantPrompt(
   allowedMenus?: ReadonlySet<string>,
 ): Promise<AssistantPrompt> {
   const context = await buildAgentContext(question, allowedMenus);
-  const contextJson = JSON.stringify(context.data, null, 2);
+  // 지도 좌표는 표의 pins를 만들 때만 필요한 기계 판독용 자료다. 답변에 보이지 않는
+  // 별도 필드로 붙여 AI가 공간 DB 이동 링크를 정확히 만들 수 있게 한다.
+  const contextJson = JSON.stringify(
+    context.pins.length > 0 ? { ...context.data, mapPins: context.pins } : context.data,
+    null,
+    2,
+  );
 
   const parts = [SYSTEM_FRAME, "", TABLE_FORMAT, "", UPDATE_FORMAT, "", SHEET_CREATE_FORMAT, "", DRIVE_MOVE_FORMAT, "", "[ERP 자료]"];
 

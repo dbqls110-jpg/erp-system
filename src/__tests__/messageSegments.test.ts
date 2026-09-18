@@ -17,6 +17,13 @@ const VALID = JSON.stringify({
   notes: ["취식 가능 여부는 DB 에 없어 전화 확인이 필요합니다."],
 });
 
+const VENUE_ACTION = JSON.stringify({
+  title: "서울 대관 공간 후보",
+  columns: [{ key: "name", label: "공간명" }],
+  rows: [{ id: "venue-1", name: "구민회관" }],
+  actions: [{ type: "venue_db", label: "공간 DB로 이동", ids: ["venue-1"] }],
+});
+
 describe("parseMessage", () => {
   it("표가 없는 평범한 메시지는 통째로 텍스트 한 조각이다", () => {
     const segments = parseMessage("내일 회의 3시로 미룰 수 있을까요?");
@@ -66,5 +73,17 @@ describe("parseMessage", () => {
 
   it("빈 문자열은 조각을 만들지 않는다", () => {
     expect(parseMessage("")).toEqual([]);
+  });
+
+  it("공간 DB 이동 action과 후보 id를 보존한다", () => {
+    const segments = parseMessage(fence(VENUE_ACTION));
+    expect(segments[0].kind).toBe("table");
+    if (segments[0].kind !== "table") throw new Error("표가 아님");
+    expect(segments[0].value.rows[0].id).toBe("venue-1");
+    expect(segments[0].value.actions?.[0]).toEqual({
+      type: "venue_db",
+      label: "공간 DB로 이동",
+      ids: ["venue-1"],
+    });
   });
 });

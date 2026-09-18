@@ -26,6 +26,14 @@ export interface ResultPin {
   lng: number;
 }
 
+/** 표 아래에 표시할 후속 작업. 현재는 공간 DB 바로가기를 지원한다. */
+export interface ResultAction {
+  type: "venue_db";
+  label?: string;
+  /** 공간 DB 검색에 넘길 ERP 공간 id 목록. */
+  ids?: string[];
+}
+
 export interface ResultTablePayload {
   title?: string;
   columns: ResultColumn[];
@@ -37,6 +45,9 @@ export interface ResultTablePayload {
    * 위치가 무관한 질문(거래처 목록 등)에 빈 지도가 붙으면 방해만 된다.
    */
   pins?: ResultPin[];
+  /** 지도·행의 id를 다시 쓰지 않아도 되는 명시적 공간 DB 이동 정보. */
+  venueIds?: string[];
+  actions?: ResultAction[];
 }
 
 export type Segment =

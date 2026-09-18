@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { VenueMap } from "@/components/map/VenueMap";
 import { VenueDetailDialog } from "./VenueDetailDialog";
@@ -91,6 +91,15 @@ const initialForm: FormState = {
   sound: false,
   commercial: false,
 };
+
+function venueIdsFromUrl(): string[] | null {
+  if (typeof window === "undefined") return null;
+  const rawIds = new URLSearchParams(window.location.search).get("ids");
+  const ids = rawIds
+    ? [...new Set(rawIds.split(",").map((id) => id.trim()).filter(Boolean))].slice(0, 100)
+    : [];
+  return ids.length > 0 ? ids : null;
+}
 
 function numberOrUndefined(value: string) {
   if (!value.trim()) return undefined;
@@ -225,10 +234,13 @@ export function VenueSearch({ districts, venueTypes }: VenueSearchProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [openVenueId, setOpenVenueId] = useState<string | null>(null);
+  const [focusedVenueIds, setFocusedVenueIds] = useState<string[] | null>(venueIdsFromUrl);
   const tableRef = useRef<HTMLDivElement>(null);
   const searchCursorRef = useRef<{ key: string; cursor: SearchCursor } | null>(null);
 
   function setField<Key extends keyof FormState>(key: Key, value: FormState[Key]) {
+    // 메신저에서 들어온 후보 고정 검색은 조건을 직접 바꾸는 순간 일반 검색으로 전환한다.
+    setFocusedVenueIds(null);
     setForm((current) => ({ ...current, [key]: value }));
   }
 
@@ -240,7 +252,7 @@ export function VenueSearch({ districts, venueTypes }: VenueSearchProps) {
    * 첫 조회가 확정한 후보 ID 순서를 커서로 되돌려 보내면 다음 장에서 같은 순위 계산을
    * 다시 하지 않아도 되고, 서버 메모리에 사용자별 결과를 붙잡아 둘 필요도 없다.
    */
-  async function search(offset = 0) {
+  async function search(offset = 0, idsOverride?: string[] | null) {
     const body: Record<string, unknown> = {
       needs: {
         parking: form.parking,
@@ -252,6 +264,12 @@ export function VenueSearch({ districts, venueTypes }: VenueSearchProps) {
       limit: PAGE_SIZE,
       offset,
     };
+    const ids = idsOverride === undefined ? focusedVenueIds : idsOverride;
+    if (ids && ids.length > 0) {
+      body.ids = ids;
+      // 후보 이동은 보통 8~10건이다. 한 번에 모두 보여 주되 API 상한은 지킨다.
+      body.limit = Math.min(50, Math.max(PAGE_SIZE, ids.length));
+    }
 
     const people = numberOrUndefined(form.people);
     const budget = numberOrUndefined(form.budget);
@@ -302,7 +320,17 @@ export function VenueSearch({ districts, venueTypes }: VenueSearchProps) {
     setResult(null);
     setError(null);
     searchCursorRef.current = null;
+    setFocusedVenueIds(null);
   }
+
+  useEffect(() => {
+    if (!focusedVenueIds) return;
+    // URL 진입 시 한 번만 서버 검색을 시작하는 외부 동기화다.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void search(0, focusedVenueIds);
+    // URL에서 한 번만 초기 검색한다. 이후에는 사용자가 직접 조건을 조작한다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const pins = result?.candidates.flatMap(({ venue }) => {
     if (venue.lat === null || venue.lng === null) return [];
@@ -405,6 +433,9 @@ export function VenueSearch({ districts, venueTypes }: VenueSearchProps) {
               {(result.offset + 1).toLocaleString()}~
               {Math.min(result.offset + result.limit, result.total).toLocaleString()}번째 표시
             </span>
+          )}
+          {focusedVenueIds && (
+            <span className="ml-1 text-primary">· 메신저 추천 공간 {focusedVenueIds.length}곳</span>
           )}
         </p>
       )}

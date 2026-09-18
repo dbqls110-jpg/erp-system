@@ -59,6 +59,7 @@ type SearchCursor = {
 };
 
 type SearchBody = {
+  ids?: unknown;
   name?: unknown;
   offset?: unknown;
   people?: unknown;
@@ -72,6 +73,14 @@ type SearchBody = {
   limit?: unknown;
   searchCursor?: unknown;
 };
+
+const MAX_ID_FILTER = 100;
+
+function parseIds(value: unknown): string[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const ids = [...new Set(value.filter((id): id is string => typeof id === "string" && id.trim().length > 0).map((id) => id.trim()))];
+  return ids.length > 0 && ids.length <= MAX_ID_FILTER ? ids : undefined;
+}
 
 function positiveNumber(value: unknown): number | undefined {
   const number = typeof value === "number" ? value : typeof value === "string" ? Number(value) : NaN;
@@ -123,6 +132,7 @@ function parseQuery(body: SearchBody) {
 
   return {
     query,
+    ids: parseIds(body.ids),
     // 이름은 "전체" 도 검색어가 될 수 있어 nonEmptyString 을 쓰지 않는다.
     name: typeof body.name === "string" && body.name.trim() ? body.name.trim() : undefined,
     district: nonEmptyString(body.district),
@@ -235,8 +245,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "검색 조건 형식이 올바르지 않습니다." }, { status: 400 });
   }
 
-  const { query, name, district, type, limit, offset, searchCursor } = parseQuery(rawBody as SearchBody);
+  const { query, ids, name, district, type, limit, offset, searchCursor } = parseQuery(rawBody as SearchBody);
   const baseWhere: Prisma.VenueWhereInput = {
+    ...(ids ? { id: { in: ids } } : {}),
     ...(district ? { district } : {}),
     ...(type ? { type } : {}),
     // 이름은 DB 에서 거른다. 3,721건을 전부 읽어 와서 자바스크립트로 거르면
