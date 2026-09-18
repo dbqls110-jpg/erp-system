@@ -287,7 +287,7 @@ export function VenueDetailDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) handleClose(); }}>
-      <DialogContent className="max-h-[85vh] overflow-y-auto rounded-[12px] sm:max-w-3xl">
+      <DialogContent className="max-h-[92vh] w-[min(96vw,72rem)] max-w-none overflow-y-auto rounded-[16px] p-5 sm:p-6">
         {isLoading && (
           <div className="space-y-2 py-8 text-center text-sm text-muted-foreground" role="status">
             <p>공간 정보를 불러오는 중입니다.</p>
@@ -433,19 +433,19 @@ function VenueDetailContent({ detail }: { detail: VenueDetailResponse }) {
                     </article>
                   ))}
                 </div>
-                <div className="hidden overflow-x-auto border-t border-border md:block">
-                  <Table className="min-w-[36rem]">
+                <div className="hidden border-t border-border md:block">
+                  <Table className="w-full min-w-0 table-fixed">
                     <TableHeader>
                       <TableRow>
-                        <TableHead>항목</TableHead>
+                        <TableHead className="w-28">항목</TableHead>
                         <TableHead>내용</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {group.rows.map((row, rowIndex) => (
                         <TableRow key={`${row.label}-${rowIndex}`}>
-                          <TableCell className="whitespace-nowrap text-muted-foreground">{row.label}</TableCell>
-                          <TableCell>{row.value}</TableCell>
+                          <TableCell className="w-28 whitespace-nowrap text-muted-foreground">{row.label}</TableCell>
+                          <TableCell className="whitespace-normal break-words align-top leading-5">{row.value}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
