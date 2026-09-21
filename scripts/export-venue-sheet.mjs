@@ -18,6 +18,7 @@ import { google } from "googleapis";
 import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { getRefreshToken, findOrCreateFolder } from "./lib/drive.mjs";
+import { isInternalRawKey } from "../src/lib/venueColumns.mjs";
 
 const DRY_RUN = process.argv.includes("--dry-run");
 /** `천우영 시트` 폴더. sync-drive-sheets.mjs 와 같은 값. */
@@ -95,7 +96,8 @@ try {
   const seen = new Set();
   for (const v of venues) {
     for (const k of Object.keys(v.raw ?? {})) {
-      if (!seen.has(k) && !leadNames.has(k)) { seen.add(k); rawCols.push(k); }
+      // 밑줄로 시작하는 키(_작업로그)는 DB팀 작업 이력이라 시트에 내보내지 않는다.
+      if (!seen.has(k) && !leadNames.has(k) && !isInternalRawKey(k)) { seen.add(k); rawCols.push(k); }
     }
   }
   const header = [...LEAD.map(([n]) => n), ...rawCols];

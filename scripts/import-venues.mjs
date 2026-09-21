@@ -39,6 +39,7 @@ import {
 } from "./lib/drive.mjs";
 import { districtFromAddress } from "../src/lib/venueDistrict.mjs";
 import { blockedReason } from "../src/lib/venueBlocklist.mjs";
+import { normalizeVenueRaw } from "../src/lib/venueColumns.mjs";
 
 const SOURCE_NAME = "서울경기_대관공간_DB.csv";
 const COORDS_NAME = "venue_coordinates.csv";
@@ -227,7 +228,8 @@ function toVenue(row, coord) {
     lng: coord?.lng ?? null,
     geoSource: coord?.source ?? null,
 
-    raw,
+    // 빈 열·중복 열·옛 스크랩 열·작업 이력 열을 정리한다(src/lib/venueColumns.mjs). 원본은 스냅샷에 남는다.
+    raw: normalizeVenueRaw(raw),
   };
 }
 
