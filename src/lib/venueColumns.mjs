@@ -47,7 +47,9 @@ const blank = (v) => v === undefined || v === null || String(v).trim() === "";
  * @param {Record<string, unknown>} raw
  */
 export function normalizeVenueRaw(raw) {
+  /** @type {Record<string, unknown>} */
   const out = {};
+  /** @type {Record<string, unknown>} */
   const log = {};
   const legacyParts = [];
 
