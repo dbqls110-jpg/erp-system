@@ -1,4 +1,5 @@
 import { buildAgentContext } from "@/lib/agentContext";
+import type { Viewer } from "@/lib/calendarVisibility";
 
 /**
  * ERP 비서에게 보낼 프롬프트를 만든다.
@@ -95,7 +96,7 @@ const UPDATE_FORMAT = [
   "- 사용자가 '공간등록', '호스트 공간 등록', '공간 등록 접수'를 요청하면 venue_create가 아니라 space_registration_create 제안을 만드세요.",
   "  이 제안은 Google Sheets '호스트 문의'의 '공간 등록 접수' 탭에 접수하는 용도이며, 사람이 카드의 반영 버튼을 눌렀을 때만 저장됩니다.",
   "  spaceName은 필수입니다. 알고 있는 값만 fields에 넣고, 모르는 연락처·주소·요금은 지어내지 마세요.",
-  "  사용할 수 있는 fields: spaceName, contactName, relationship, phone, email, spaceType, address, desiredRegion, description, area, capacity, dailyRate, negotiable, conditions, privacyConsentAt, photoPermission, cooling, restroom, wifi, parkingCount, fireNotAllowed, drillingNotAllowed, noiseLimit, equipmentRental, nightWork, foodAllowed, extraConditions.",
+  "  사용할 수 있는 fields: spaceName, contactName, relationship, phone, email, spaceType, address, desiredRegion, description, area, capacity, dailyRate, negotiable, conditions, privacyConsentAt, photoPermission, cooling, restroom, wifi, parkingCount, fireNotAllowed, drillingNotAllowed, noiseLimit, equipmentRental, nightWork, foodAllowed, extraConditions, areaPyeong, rentableFloors, rentableTotalArea, rentableFloorArea, outdoorYard, kitchen, usage, storageOffice, roomCount, powerCapacity, elevator, freightElevator, ooh, wasteDisposal, drilling, accessHours, parkingAvailable, parkingSpaces, floorPlan, ceilingHeight, lighting, wiredInternet, floorFinish, deposit, managementFee, tourMethod.",
   "  질문에 사진을 첨부했다면 사진은 서버가 '천우영 프로젝트/공간 등록' 폴더로 옮겨 접수 행에 연결하므로 photoFolderUrl·photoCount를 지어내지 마세요.",
   "",
   "```erp-update",
@@ -247,8 +248,9 @@ export interface AssistantPrompt {
 export async function buildAssistantPrompt(
   question: string,
   allowedMenus?: ReadonlySet<string>,
+  viewer?: Viewer | null,
 ): Promise<AssistantPrompt> {
-  const context = await buildAgentContext(question, allowedMenus);
+  const context = await buildAgentContext(question, allowedMenus, viewer);
   // 지도 좌표는 표의 pins를 만들 때만 필요한 기계 판독용 자료다. 답변에 보이지 않는
   // 별도 필드로 붙여 AI가 공간 DB 이동 링크를 정확히 만들 수 있게 한다.
   const contextJson = JSON.stringify(

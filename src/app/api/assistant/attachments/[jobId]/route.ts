@@ -9,31 +9,42 @@ import { streamMessengerFile } from "@/lib/googleDrive";
  * Drive 링크를 그대로 노출하지 않고, 질문 소유자만 ERP를 통해 볼 수 있게 한다.
  */
 export async function GET(
-  _req: Request,
+  req: Request,
   { params }: { params: Promise<{ jobId: string }> },
 ) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { jobId } = await params;
+  const requestedDriveFileId = new URL(req.url).searchParams.get("driveFileId");
   const job = await prisma.agentJob.findFirst({
     where: { id: jobId, userId: session.user.id, visibility: "user" },
     select: {
       attachmentDriveFileId: true,
       attachmentMimeType: true,
       attachmentName: true,
+      attachments: {
+        where: requestedDriveFileId ? { driveFileId: requestedDriveFileId } : undefined,
+        select: { driveFileId: true, mimeType: true, name: true },
+        take: 1,
+      },
     },
   });
-  if (!job?.attachmentDriveFileId) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (!job) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  const selected = job.attachments[0];
+  if (requestedDriveFileId && !selected) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  const driveFileId = selected?.driveFileId ?? job?.attachmentDriveFileId;
+  if (!driveFileId) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   try {
-    const body = await streamMessengerFile(job.attachmentDriveFileId);
+    const body = await streamMessengerFile(driveFileId);
     const headers = new Headers({
-      "Content-Type": job.attachmentMimeType ?? "application/octet-stream",
+      "Content-Type": selected?.mimeType ?? job.attachmentMimeType ?? "application/octet-stream",
       "Cache-Control": "private, max-age=3600",
     });
-    if (job.attachmentName) {
-      headers.set("Content-Disposition", `inline; filename*=UTF-8''${encodeURIComponent(job.attachmentName)}`);
+    const name = selected?.name ?? job.attachmentName;
+    if (name) {
+      headers.set("Content-Disposition", `inline; filename*=UTF-8''${encodeURIComponent(name)}`);
     }
     return new Response(body, { headers });
   } catch (error) {

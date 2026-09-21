@@ -7,7 +7,7 @@ import { NextResponse } from "next/server";
 
 export async function GET() {
   const session = await getServerSession(authOptions);
-  if (!session?.user?.id) return NextResponse.json([], { status: 401 });
+  if (!session?.user?.id || session.user.active === false) return NextResponse.json([], { status: 401 });
 
   const uid = session.user.id;
 

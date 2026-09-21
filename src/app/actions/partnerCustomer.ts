@@ -169,13 +169,6 @@ export async function updatePartner(
   revalidatePath("/partners");
 }
 
-export async function deletePartner(id: string) {
-  await requireEditAccess("partners");
-  await prisma.partner.delete({ where: { id } });
-  await syncPartnerSheet();
-  revalidatePath("/partners");
-}
-
 function isUniqueConstraintError(error: unknown) {
   // Prisma의 고유 제약 오류만 사용자가 알아볼 수 있는 작업명 중복 안내로 바꾼다.
   return typeof error === "object" && error !== null && (error as { code?: unknown }).code === "P2002";

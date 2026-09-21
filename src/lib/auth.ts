@@ -40,13 +40,14 @@ export const authOptions: NextAuthOptions = {
             Array<{
               id: string;
               role: string;
+              active: boolean;
               name: string | null;
               image: string | null;
               partnerId: string | null;
               customerId: string | null;
               venueId: string | null;
             }>
-          >`SELECT id, role, name, image, "partnerId", "customerId", "venueId" FROM users WHERE email = ${profile.email}`;
+          >`SELECT id, role, active, name, image, "partnerId", "customerId", "venueId" FROM users WHERE email = ${profile.email}`;
           let dbUser = users[0];
 
           if (!dbUser) {
@@ -56,6 +57,7 @@ export const authOptions: NextAuthOptions = {
               Array<{
                 id: string;
                 role: string;
+                active: boolean;
                 name: string | null;
                 image: string | null;
                 partnerId: string | null;
@@ -67,7 +69,7 @@ export const authOptions: NextAuthOptions = {
               VALUES (gen_random_uuid()::text, ${profile.email}, ${profile.name ?? null},
                 ${(profile as { picture?: string }).picture ?? null},
                 ${count === 0 ? "admin" : "pending"}, true, NOW(), NOW())
-              RETURNING id, role, name, image, "partnerId", "customerId", "venueId"
+              RETURNING id, role, active, name, image, "partnerId", "customerId", "venueId"
             `;
             dbUser = newUsers[0];
 
@@ -83,6 +85,7 @@ export const authOptions: NextAuthOptions = {
 
           token.id = dbUser.id;
           token.role = dbUser.role;
+          token.active = dbUser.active;
           token.partnerId = dbUser.partnerId;
           token.customerId = dbUser.customerId;
           token.venueId = dbUser.venueId;
@@ -98,6 +101,7 @@ export const authOptions: NextAuthOptions = {
           console.error("[ERP Auth Error]", err);
           token.id = token.sub ?? "unknown";
           token.role = "pending";
+          token.active = false;
           token.partnerId = null;
           token.customerId = null;
           token.venueId = null;
@@ -117,9 +121,9 @@ export const authOptions: NextAuthOptions = {
           // 연결(어느 파트너·거래처인지)도 함께 읽는다. 관리자가 승인하며 연결을
           // 바꿔도 상대가 재로그인해야 반영되면 안 된다.
           const rows = await prisma.$queryRaw<
-            Array<{ role: string; partnerId: string | null; customerId: string | null; venueId: string | null }>
+            Array<{ role: string; active: boolean; partnerId: string | null; customerId: string | null; venueId: string | null }>
           >`
-            SELECT role, "partnerId", "customerId", "venueId" FROM users WHERE id = ${token.id as string}
+            SELECT role, active, "partnerId", "customerId", "venueId" FROM users WHERE id = ${token.id as string}
           `;
           if (rows[0]) {
             // 승인 대기로 로그인했다가 지금 직원이 된 사람은 로그인 때 출근이 안 찍혔다. 지금 찍는다.
@@ -127,6 +131,7 @@ export const authOptions: NextAuthOptions = {
               await clockInToday(token.id as string);
             }
             token.role = rows[0].role;
+            token.active = rows[0].active;
             token.partnerId = rows[0].partnerId;
             token.customerId = rows[0].customerId;
             token.venueId = rows[0].venueId;
@@ -144,7 +149,8 @@ export const authOptions: NextAuthOptions = {
     async session({ session, token }) {
       if (session.user) {
         session.user.id = token.id as string;
-        session.user.role = (token.role as string) ?? "pending";
+        session.user.active = token.active !== false;
+        session.user.role = session.user.active ? ((token.role as string) ?? "pending") : "inactive";
         session.user.partnerId = (token.partnerId as string | null) ?? null;
         session.user.customerId = (token.customerId as string | null) ?? null;
         session.user.venueId = (token.venueId as string | null) ?? null;

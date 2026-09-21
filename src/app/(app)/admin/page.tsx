@@ -3,13 +3,9 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { UserRoleSelect } from "./UserRoleSelect";
-import { UserExternalLink } from "./UserExternalLink";
-import { LeaveBalanceInput } from "./LeaveBalanceInput";
-import { UserNameInput } from "./UserNameInput";
 import { DriveIndexPanel, type DriveIndexInitialStatus } from "./DriveIndexPanel";
 import AccessLevelPanel from "./AccessLevelPanel";
+import { AdminUserList, type AdminUserRow } from "./AdminUserList";
 
 export default async function AdminPage() {
   const session = await getServerSession(authOptions);
@@ -28,6 +24,7 @@ export default async function AdminPage() {
         name: true,
         email: true,
         role: true,
+        active: true,
         partnerId: true,
         customerId: true,
         venueId: true,
@@ -66,6 +63,31 @@ export default async function AdminPage() {
     },
   };
 
+  const adminUsers: AdminUserRow[] = users.map((user) => ({
+    id: user.id,
+    image: user.image,
+    name: user.name,
+    email: user.email,
+    role: user.role,
+    active: user.active,
+    partnerId: user.partnerId,
+    customerId: user.customerId,
+    venueId: user.venueId,
+    venueName: user.venue ? (user.venue.district ? `${user.venue.name} · ${user.venue.district}` : user.venue.name) : null,
+    staffUserId: user.staffUserId,
+    leaveBalance: user.leaveBalances[0]
+      ? {
+          totalDays: user.leaveBalances[0].totalDays,
+          usedDays: user.leaveBalances[0].usedDays,
+          pendingDays: user.leaveBalances[0].pendingDays,
+        }
+      : null,
+  }));
+  const staff = adminUsers
+    .filter((user) => user.active && ["admin", "manager", "member", "user"].includes(user.role)
+      && !user.partnerId && !user.customerId && !user.venueId)
+    .map((user) => ({ id: user.id, name: user.name ?? user.email ?? user.id }));
+
   return (
     <div className="space-y-4">
       <div>
@@ -90,56 +112,14 @@ export default async function AdminPage() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="space-y-3">
-            {users.map((u) => {
-              const balance = u.leaveBalances[0];
-              return (
-                <div key={u.id} className="flex items-center justify-between py-3 border-b border-border last:border-0 gap-4 flex-wrap">
-                  <div className="flex items-center gap-3">
-                    <Avatar className="h-9 w-9">
-                      <AvatarImage src={u.image ?? undefined} />
-                      <AvatarFallback className="bg-muted text-foreground text-sm">
-                        {(u.name ?? u.email ?? "?").slice(0, 2).toUpperCase()}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <UserNameInput userId={u.id} name={u.name ?? ""} />
-                      <p className="text-xs text-muted-foreground">{u.email}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <LeaveBalanceInput
-                      userId={u.id}
-                      year={year}
-                      totalDays={balance?.totalDays ?? 15}
-                      usedDays={balance?.usedDays ?? 0}
-                      pendingDays={balance?.pendingDays ?? 0}
-                    />
-                    <UserRoleSelect
-                      userId={u.id}
-                      currentRole={u.role}
-                      isCurrentUser={u.id === session.user.id}
-                    />
-                    <UserExternalLink
-                      userId={u.id}
-                      isCurrentUser={u.id === session.user.id}
-                      role={u.role}
-                      partnerId={u.partnerId}
-                      customerId={u.customerId}
-                      venueId={u.venueId}
-                      venueName={u.venue ? (u.venue.district ? `${u.venue.name} · ${u.venue.district}` : u.venue.name) : null}
-                      staffUserId={u.staffUserId}
-                      staff={users
-                        .filter((s) => s.id !== u.id && ["admin", "manager", "member", "user"].includes(s.role) && !s.partnerId && !s.customerId && !s.venueId)
-                        .map((s) => ({ id: s.id, name: s.name ?? s.email ?? s.id }))}
-                      partners={partners}
-                      customers={customers}
-                    />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+          <AdminUserList
+            users={adminUsers}
+            year={year}
+            currentUserId={session.user.id}
+            staff={staff}
+            partners={partners}
+            customers={customers}
+          />
         </CardContent>
       </Card>
 

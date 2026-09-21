@@ -15,7 +15,7 @@ export default async function MessengerPage() {
   // isAgent 제외: 에이전트 계정은 말을 걸어도 답하지 않는다 — 목록에 남기면 "답 없는 유령 연락처"가 된다.
   const me = await prisma.user.findUnique({
     where: { id: session!.user.id },
-    select: { id: true, role: true, partnerId: true, customerId: true, venueId: true, staffUserId: true },
+    select: { id: true, role: true, partnerId: true, customerId: true, venueId: true, staffUserId: true, active: true, isAgent: true },
   });
   const users = await prisma.user.findMany({
     where: me ? messengerContactWhere(me) : { id: "__none__" },

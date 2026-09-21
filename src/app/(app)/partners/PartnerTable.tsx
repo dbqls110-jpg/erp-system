@@ -26,7 +26,6 @@ import { RESPONSIVE_CONTENT_SELECT_CLASS } from "@/lib/selectStyles";
 import {
   addPartnerRate,
   createPartner,
-  deletePartner,
   deletePartnerRate,
   updatePartner,
   updatePartnerRate,
@@ -510,15 +509,19 @@ export function PartnerTable({
     }
   }
 
-  async function handleDelete(p: PartnerRow) {
-    if (!window.confirm(`'${p.name}' 님을 삭제하시겠습니까?`)) return;
+  async function handleStatusChange(p: PartnerRow) {
+    const nextStatus = p.contractStatus === "종료" ? "활성" : "종료";
+    const message = nextStatus === "종료"
+      ? `'${p.name}' 님을 종료 처리할까요? 프로젝트·지급 이력은 보존됩니다.`
+      : `'${p.name}' 님을 다시 활성화할까요?`;
+    if (!window.confirm(message)) return;
     setBusyId(p.id);
     try {
-      await deletePartner(p.id);
-      toast.success("삭제했습니다.");
+      await updatePartner(p.id, { contractStatus: nextStatus });
+      toast.success(nextStatus === "종료" ? "파트너를 종료 처리했습니다." : "파트너를 다시 활성화했습니다.");
       router.refresh();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "삭제 실패");
+      toast.error(err instanceof Error ? err.message : "상태 변경 실패");
     } finally {
       setBusyId(null);
     }
@@ -685,7 +688,9 @@ export function PartnerTable({
                   <div className="mt-3 flex justify-end gap-2 border-t border-border pt-2">
                     <button type="button" onClick={() => setPaymentDialog({ partner: p, key: Date.now() })} className="rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-muted hover:text-primary" aria-label={`${p.name} 실제 지급 이력`}><ReceiptText className="mr-1 inline size-3.5" />지급 이력</button>
                     <button type="button" onClick={() => setDialog({ id: p.id, key: Date.now(), initial: { name: p.name, job: p.job ?? "", phone: p.phone ?? "", rate: p.rate === null ? "" : String(p.rate), rateUnit: p.rateUnit ?? "건당", contractStatus: p.contractStatus, settlementType: p.settlementType ?? "", memo: p.memo ?? "" } })} className="rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-muted hover:text-primary" aria-label={`${p.name} 수정`}><Pencil className="mr-1 inline size-3.5" />수정</button>
-                    <button type="button" onClick={() => handleDelete(p)} disabled={busyId === p.id} className="rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-muted hover:text-destructive" aria-label={`${p.name} 삭제`}><Trash2 className="mr-1 inline size-3.5" />삭제</button>
+                    <button type="button" onClick={() => handleStatusChange(p)} disabled={busyId === p.id} className="rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-muted hover:text-destructive" aria-label={`${p.name} ${p.contractStatus === "종료" ? "재활성화" : "종료 처리"}`}>
+                      {p.contractStatus === "종료" ? "재활성화" : "종료 처리"}
+                    </button>
                   </div>
                 )}
               </article>
@@ -820,13 +825,13 @@ export function PartnerTable({
                             </button>
                             <button
                               type="button"
-                              onClick={() => handleDelete(p)}
+                              onClick={() => handleStatusChange(p)}
                               disabled={busyId === p.id}
                               className="text-muted-foreground transition-colors hover:text-destructive"
-                              title="삭제"
-                              aria-label={`${p.name} 삭제`}
+                              title={p.contractStatus === "종료" ? "재활성화" : "종료 처리"}
+                              aria-label={`${p.name} ${p.contractStatus === "종료" ? "재활성화" : "종료 처리"}`}
                             >
-                              <Trash2 className="size-3.5" />
+                              {p.contractStatus === "종료" ? "↻" : "종료"}
                             </button>
                           </div>
                         </TableCell>

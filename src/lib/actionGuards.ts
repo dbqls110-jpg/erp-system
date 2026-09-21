@@ -1,6 +1,7 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { requireMenuEdit } from "@/lib/permissions";
+import { isExternal } from "@/lib/calendarVisibility";
 
 /**
  * 서버 액션용 권한 가드.
@@ -24,6 +25,17 @@ export async function requireSessionUser() {
  */
 export async function requireEditAccess(menuKey: string) {
   const session = await requireSessionUser();
+  // 외부 사용자는 연결된 프로젝트를 읽기만 한다. 메뉴 권한을 관리자가 잘못
+  // 열어도 서버 액션으로 프로젝트 업무·금액·메모를 바꿀 수 없어야 한다.
+  if (menuKey === "projects" && isExternal({
+    id: session.user.id,
+    role: session.user.role,
+    partnerId: session.user.partnerId,
+    customerId: session.user.customerId,
+    venueId: session.user.venueId,
+  })) {
+    throw new Error("외부 계정은 프로젝트를 수정할 수 없습니다.");
+  }
   await requireMenuEdit(session.user.id, menuKey, session.user.role);
   return session;
 }

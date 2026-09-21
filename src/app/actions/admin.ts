@@ -38,6 +38,42 @@ export async function updateUserRole(userId: string, role: string) {
   revalidatePath("/admin");
 }
 
+/**
+ * 직원 계정은 삭제하지 않고 로그인·메신저 접근만 끈다.
+ * 근태·휴가·메시지 이력을 보존해야 하므로 User.active 를 단일 기준으로 쓴다.
+ */
+export async function setUserActive(userId: string, active: boolean) {
+  const session = await getServerSession(authOptions);
+  if (session?.user?.role !== "admin") throw new Error("Unauthorized");
+  if (session.user.id === userId) throw new Error("현재 로그인한 관리자 계정은 비활성화할 수 없습니다.");
+
+  const target = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { id: true, role: true, isAgent: true, active: true },
+  });
+  if (!target || target.isAgent) throw new Error("비활성화할 사용자를 찾을 수 없습니다.");
+  if (target.active === active) return;
+
+  if (!active && target.role === "admin") {
+    const activeAdmins = await prisma.user.count({
+      where: { role: "admin", active: true, isAgent: false },
+    });
+    if (activeAdmins <= 1) throw new Error("활성 관리자 계정이 최소 1개는 필요합니다.");
+  }
+
+  if (!active) {
+    const assignedExternalCount = await prisma.user.count({ where: { staffUserId: userId, active: true } });
+    if (assignedExternalCount > 0) {
+      throw new Error(`담당 직원으로 지정된 외부 계정 ${assignedExternalCount}개를 먼저 재배정해주세요.`);
+    }
+  }
+
+  await prisma.user.update({ where: { id: userId }, data: { active } });
+  revalidatePath("/admin");
+  revalidatePath("/dashboard");
+  revalidatePath("/messenger");
+}
+
 export async function linkUserToExternal(
   userId: string,
   link: { partnerId?: string | null; customerId?: string | null; venueId?: string | null },

@@ -5,6 +5,7 @@ import { LoginForm } from "./LoginForm";
 
 export default async function LoginPage() {
   const session = await getServerSession(authOptions);
+  if (session?.user?.active === false) redirect("/inactive");
   if (session?.user?.role && session.user.role !== "pending") {
     redirect("/dashboard");
   }

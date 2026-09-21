@@ -16,6 +16,39 @@ export const SPACE_REGISTRATION_STAGES = [
 
 export type SpaceRegistrationStage = (typeof SPACE_REGISTRATION_STAGES)[number];
 
+/** 기존 접수 열과 중복되지 않는 호스트 상세 열. 접수·호스트·공간DB 동기화에 공통으로 쓴다. */
+export const SPACE_REGISTRATION_EXTRA_COLUMNS = [
+  { key: "areaPyeong", header: "대관 규모(평)" },
+  { key: "rentableFloors", header: "대관 가능 층수" },
+  { key: "rentableTotalArea", header: "대관 가능 총 면적" },
+  { key: "rentableFloorArea", header: "대관 가능 층별 면적" },
+  { key: "outdoorYard", header: "야외마당" },
+  { key: "kitchen", header: "주방" },
+  { key: "usage", header: "용도" },
+  { key: "storageOffice", header: "창고/운영사무국" },
+  { key: "roomCount", header: "룸 개수" },
+  { key: "powerCapacity", header: "전력량" },
+  { key: "elevator", header: "E/V" },
+  { key: "freightElevator", header: "화물승강기" },
+  { key: "ooh", header: "OOH" },
+  { key: "wasteDisposal", header: "쓰레기 불출" },
+  { key: "drilling", header: "타공 유무" },
+  { key: "accessHours", header: "개방/시간방법" },
+  { key: "parkingAvailable", header: "주차 유무" },
+  { key: "parkingSpaces", header: "주차 댓수" },
+  { key: "floorPlan", header: "도면" },
+  { key: "ceilingHeight", header: "층고" },
+  { key: "lighting", header: "조명" },
+  { key: "wiredInternet", header: "인터넷 선" },
+  { key: "floorFinish", header: "바닥마감" },
+  { key: "deposit", header: "보증금" },
+  { key: "managementFee", header: "관리비" },
+  { key: "tourMethod", header: "답사 방법" },
+] as const;
+
+export type SpaceRegistrationExtraFieldKey = (typeof SPACE_REGISTRATION_EXTRA_COLUMNS)[number]["key"];
+export const SPACE_REGISTRATION_COLUMN_COUNT = 39 + SPACE_REGISTRATION_EXTRA_COLUMNS.length;
+
 export interface SpaceRegistrationIdentity {
   registrationId: string;
   receivedAt: string;
@@ -58,6 +91,43 @@ export interface SpaceRegistrationRecord {
   confirmationCompletedAt: string;
   registrationCompletedAt: string;
   rejectedAt: string;
+  cooling: string;
+  restroom: string;
+  wifi: string;
+  parkingCount: string;
+  fireNotAllowed: string;
+  drillingNotAllowed: string;
+  noiseLimit: string;
+  equipmentRental: string;
+  nightWork: string;
+  foodAllowed: string;
+  extraConditions: string;
+  areaPyeong: string;
+  rentableFloors: string;
+  rentableTotalArea: string;
+  rentableFloorArea: string;
+  outdoorYard: string;
+  kitchen: string;
+  usage: string;
+  storageOffice: string;
+  roomCount: string;
+  powerCapacity: string;
+  elevator: string;
+  freightElevator: string;
+  ooh: string;
+  wasteDisposal: string;
+  drilling: string;
+  accessHours: string;
+  parkingAvailable: string;
+  parkingSpaces: string;
+  floorPlan: string;
+  ceilingHeight: string;
+  lighting: string;
+  wiredInternet: string;
+  floorFinish: string;
+  deposit: string;
+  managementFee: string;
+  tourMethod: string;
 }
 
 export interface SpaceRegistrationRowMatch {
@@ -158,13 +228,17 @@ export function parseSpaceRegistrationRows(
   rows: readonly (readonly unknown[])[],
 ): SpaceRegistrationRecord[] {
   return rows.slice(1).flatMap((values, index) => {
-    const normalized = Array.from({ length: 28 }, (_, columnIndex) => column(values, columnIndex));
+    const normalized = Array.from({ length: SPACE_REGISTRATION_COLUMN_COUNT }, (_, columnIndex) => column(values, columnIndex));
     if (!normalized.some(Boolean)) return [];
 
     const identity = identityFromValues(normalized);
     const rowNumber = index + 2;
     const status = isSpaceRegistrationStage(normalized[2]) ? normalized[2] : "접수";
     const id = identity.registrationId || `${spaceRegistrationIdentityKey(identity)}:${rowNumber}`;
+
+    const extraFields = Object.fromEntries(
+      SPACE_REGISTRATION_EXTRA_COLUMNS.map(({ key }, extraIndex) => [key, normalized[39 + extraIndex]]),
+    ) as Record<SpaceRegistrationExtraFieldKey, string>;
 
     return [{
       id,
@@ -198,6 +272,18 @@ export function parseSpaceRegistrationRows(
       confirmationCompletedAt: normalized[25],
       registrationCompletedAt: normalized[26],
       rejectedAt: normalized[27],
+      cooling: normalized[28],
+      restroom: normalized[29],
+      wifi: normalized[30],
+      parkingCount: normalized[31],
+      fireNotAllowed: normalized[32],
+      drillingNotAllowed: normalized[33],
+      noiseLimit: normalized[34],
+      equipmentRental: normalized[35],
+      nightWork: normalized[36],
+      foodAllowed: normalized[37],
+      extraConditions: normalized[38],
+      ...extraFields,
     }];
   });
 }

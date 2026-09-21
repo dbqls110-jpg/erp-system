@@ -3,16 +3,19 @@ import {
   findSpaceRegistrationRows,
   isSpaceRegistrationStage,
   parseSpaceRegistrationRows,
+  SPACE_REGISTRATION_EXTRA_COLUMNS,
   type SpaceRegistrationIdentity,
   type SpaceRegistrationRecord,
   type SpaceRegistrationStage,
 } from "@/lib/spaceRegistrations";
 import { formatCurrentDateTime } from "@/lib/inquiries";
+import { syncCompletedSpaceRegistration } from "@/lib/spaceDatabaseSync";
+import { blockedReason } from "@/lib/venueBlocklist.mjs";
 
 export const SPACE_REGISTRATIONS_SPREADSHEET_ID = "1A5xN_nii5AeAkM9JSF0morcetMCI3A7TDcvk3xRjd1M";
 export const SPACE_REGISTRATIONS_TAB_NAME = "공간 등록 접수";
 
-const SPACE_REGISTRATIONS_RANGE = `'${SPACE_REGISTRATIONS_TAB_NAME}'!A1:AM`;
+const SPACE_REGISTRATIONS_RANGE = `'${SPACE_REGISTRATIONS_TAB_NAME}'!A1:BM`;
 const MEMO_COLUMN = "W";
 const FINAL_PROCESSED_COLUMN = "X";
 const STAGE_TIME_COLUMNS: Partial<Record<SpaceRegistrationStage, string>> = {
@@ -27,6 +30,14 @@ const DEFAULT_ROW_BACKGROUND = { red: 1, green: 1, blue: 1 };
 
 type SheetRows = readonly (readonly unknown[])[];
 type SheetsClient = Awaited<ReturnType<typeof makeSheetsClientAsOwner>>;
+
+/** 절대 제외 목록은 접수 저장 전과 등록 완료 전 양쪽에서 검사한다. */
+export function assertSpaceRegistrationAllowed(input: Pick<SpaceRegistrationSheetRowInput, "spaceName" | "address">) {
+  const reason = blockedReason({ name: input.spaceName, address: input.address });
+  if (reason) {
+    throw new Error(`절대 등록 금지 공간이라 접수하지 않았습니다. (${reason})`);
+  }
+}
 
 /** ERP 비서의 공간등록 제안을 접수 시트 한 행으로 바꾸는 입력값. */
 export interface SpaceRegistrationSheetRowInput {
@@ -59,6 +70,32 @@ export interface SpaceRegistrationSheetRowInput {
   nightWork?: string;
   foodAllowed?: string;
   extraConditions?: string;
+  areaPyeong?: string | number;
+  rentableFloors?: string;
+  rentableTotalArea?: string | number;
+  rentableFloorArea?: string;
+  outdoorYard?: string;
+  kitchen?: string;
+  usage?: string;
+  storageOffice?: string;
+  roomCount?: string | number;
+  powerCapacity?: string;
+  elevator?: string;
+  freightElevator?: string;
+  ooh?: string;
+  wasteDisposal?: string;
+  drilling?: string;
+  accessHours?: string;
+  parkingAvailable?: string;
+  parkingSpaces?: string | number;
+  floorPlan?: string;
+  ceilingHeight?: string;
+  lighting?: string;
+  wiredInternet?: string;
+  floorFinish?: string;
+  deposit?: string | number;
+  managementFee?: string | number;
+  tourMethod?: string;
   receivedAt?: Date;
 }
 
@@ -124,7 +161,7 @@ function nextRegistrationId(rows: SheetRows): string {
 
 function registrationRowValues(input: SpaceRegistrationSheetRowInput, registrationId: string): unknown[] {
   const now = input.receivedAt ?? new Date();
-  return [
+  const baseValues = [
     registrationId,
     formatCurrentDateTime(now),
     "신규",
@@ -165,12 +202,17 @@ function registrationRowValues(input: SpaceRegistrationSheetRowInput, registrati
     input.foodAllowed,
     input.extraConditions,
   ];
+  return [
+    ...baseValues,
+    ...SPACE_REGISTRATION_EXTRA_COLUMNS.map(({ key }) => input[key]),
+  ];
 }
 
 /** 공간 등록 접수 탭에 새 행을 추가한다. 기존 행의 형식·드롭다운을 복사한 뒤 값만 쓴다. */
 export async function appendSpaceRegistrationRow(input: SpaceRegistrationSheetRowInput) {
   const spaceName = input.spaceName.trim();
   if (!spaceName) throw new Error("공간명이 필요합니다.");
+  assertSpaceRegistrationAllowed({ spaceName, address: input.address });
 
   const { sheets, rows } = await readSpaceRegistrationSheet();
   const registrationId = nextRegistrationId(rows);
@@ -181,14 +223,14 @@ export async function appendSpaceRegistrationRow(input: SpaceRegistrationSheetRo
   const requests: object[] = [
     {
       copyPaste: {
-        source: rowRange(sheetId, sourceRowNumber, "A", "AM"),
-        destination: rowRange(sheetId, rowNumber, "A", "AM"),
+        source: rowRange(sheetId, sourceRowNumber, "A", "BM"),
+        destination: rowRange(sheetId, rowNumber, "A", "BM"),
         pasteType: "PASTE_NORMAL",
       },
     },
     {
       updateCells: {
-        range: rowRange(sheetId, rowNumber, "A", "AM"),
+        range: rowRange(sheetId, rowNumber, "A", "BM"),
         rows: [{ values: values.map(sheetCellValue) }],
         fields: "userEnteredValue",
       },
@@ -238,6 +280,9 @@ export async function saveSpaceRegistrationStage(
   // A 접수번호가 있으면 그것을 먼저 찾고, 비어 있으면 접수일시·연락처·공간명 등 여러 값을 재확인한다.
   // 최신 시트에서 일치 행이 하나일 때만 쓰므로 행 이동이나 중복 행이 다른 자료를 덮지 못한다.
   const match = locateUniqueRow(rows, identity);
+  const matchedRecord = parseSpaceRegistrationRows(rows).find((record) => record.rowNumber === match.rowNumber);
+  if (!matchedRecord) throw new Error("공간 등록 행의 상세값을 읽지 못했습니다.");
+  if (nextStage === "등록 완료") assertSpaceRegistrationAllowed(matchedRecord);
   const timestamp = formatCurrentDateTime(now);
   const stageTimeColumn = STAGE_TIME_COLUMNS[nextStage];
   const sheetId = await getSheetId(sheets);
@@ -288,7 +333,13 @@ export async function saveSpaceRegistrationStage(
     requestBody: { requests },
   });
 
-  return { stage: nextStage, timestamp };
+  // 등록 완료 시 접수 탭 → 호스트 등록 공간 → 운영 공간DB를 같은 요청에서 idempotent하게 맞춘다.
+  // 시트 반영이 먼저 끝난 뒤 동기화가 실패하면 다음 재시도에서 같은 접수번호를 안전하게 upsert한다.
+  const spaceDatabaseSync = nextStage === "등록 완료"
+    ? await syncCompletedSpaceRegistration({ ...matchedRecord, status: nextStage }, now)
+    : null;
+
+  return { stage: nextStage, timestamp, ...(spaceDatabaseSync ? { spaceDatabaseSync } : {}) };
 }
 
 export async function saveSpaceRegistrationMemo(identity: SpaceRegistrationIdentity, memo: string) {

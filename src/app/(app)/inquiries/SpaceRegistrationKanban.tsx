@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import { CalendarDays, ChevronLeft, ChevronRight, Inbox, Mail, Phone, UserRound } from "lucide-react";
+import { CalendarDays, ChevronLeft, ChevronRight, Inbox, Mail, Phone, RefreshCw, Search, UserRound } from "lucide-react";
 import { updateSpaceRegistrationMemo, updateSpaceRegistrationStage } from "@/app/actions/inquiries";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -25,7 +25,7 @@ import {
   shiftSpaceRegistrationMonth,
   summarizeSpaceRegistrations,
 } from "@/lib/spaceRegistrations";
-import { formatSheetDateTime } from "@/lib/inquiries";
+import { formatSheetDateTime, parseSheetDateTime } from "@/lib/inquiries";
 import { cn } from "@/lib/utils";
 import { useVisiblePolling } from "@/lib/useVisiblePolling";
 
@@ -36,6 +36,9 @@ const STAGE_STYLES: Record<SpaceRegistrationStage, { dot: string; badge: string 
   "등록 완료": { dot: "bg-[#9ca3af] dark:bg-muted-foreground", badge: "bg-[#e9ebf0] text-[#4b5563] dark:bg-muted/50 dark:text-muted-foreground" },
   반려: { dot: "bg-[#9ca3af] dark:bg-muted-foreground", badge: "bg-[#e9ebf0] text-[#4b5563] dark:bg-muted/50 dark:text-muted-foreground" },
 };
+
+type RegistrationStatusFilter = SpaceRegistrationStage | "전체";
+type RegistrationDateFilter = "전체" | "오늘" | "최근 7일" | "이번 달";
 
 interface Props {
   initialRegistrations: SpaceRegistrationRecord[];
@@ -59,6 +62,10 @@ export function SpaceRegistrationKanban({ initialRegistrations, canEdit }: Props
   const [memoDraft, setMemoDraft] = useState("");
   const [memoSaving, setMemoSaving] = useState(false);
   const [summaryMonth, setSummaryMonth] = useState(() => getCurrentSpaceRegistrationMonth());
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<RegistrationStatusFilter>("전체");
+  const [dateFilter, setDateFilter] = useState<RegistrationDateFilter>("전체");
+  const [refreshing, setRefreshing] = useState(false);
 
   useVisiblePolling(() => setNow(new Date()), 60_000, { immediate: false });
 
@@ -66,6 +73,34 @@ export function SpaceRegistrationKanban({ initialRegistrations, canEdit }: Props
   const summary = summarizeSpaceRegistrations(registrations, summaryMonth);
   const currentMonth = getCurrentSpaceRegistrationMonth(now);
   const summaryTitle = summaryMonth === currentMonth ? "이번 달" : formatSpaceRegistrationMonth(summaryMonth);
+  const filteredRegistrations = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    const todayStart = new Date(now);
+    todayStart.setHours(0, 0, 0, 0);
+    const sevenDaysAgo = new Date(todayStart);
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
+    return registrations.filter((registration) => {
+      if (statusFilter !== "전체" && registration.status !== statusFilter) return false;
+      if (query) {
+        const searchable = [
+          registration.registrationId,
+          registration.spaceName,
+          registration.address,
+          registration.desiredRegion,
+          registration.contactName,
+          registration.phone,
+          registration.email,
+        ].join(" ").toLowerCase();
+        if (!searchable.includes(query)) return false;
+      }
+      if (dateFilter === "전체") return true;
+      const receivedAt = parseSheetDateTime(registration.receivedAt);
+      if (!receivedAt) return false;
+      if (dateFilter === "오늘") return receivedAt >= todayStart;
+      if (dateFilter === "최근 7일") return receivedAt >= sevenDaysAgo;
+      return receivedAt.getFullYear() === now.getFullYear() && receivedAt.getMonth() === now.getMonth();
+    });
+  }, [dateFilter, now, registrations, searchQuery, statusFilter]);
 
   const openDetail = (registration: SpaceRegistrationRecord) => {
     setSelectedId(registration.id);
@@ -161,12 +196,71 @@ export function SpaceRegistrationKanban({ initialRegistrations, canEdit }: Props
           </p>
         </div>
 
-        <div className="mb-3 flex items-center justify-between gap-3 px-1">
-          <div className="text-[13px] text-[#6b7280] dark:text-muted-foreground">
-            전체 <span className="font-semibold tabular-nums text-foreground">{registrations.length}</span>건
+        <div className="mb-3 rounded-[10px] border border-border bg-card px-3 py-2.5 sm:px-4">
+          <div className="flex flex-col gap-2.5 lg:flex-row lg:items-center">
+            <label className="relative min-w-0 flex-1">
+              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+              <input
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                placeholder="공간명·주소·담당자·연락처·접수번호 검색"
+                aria-label="공간 등록 검색"
+                className="h-9 w-full rounded-md border border-border bg-background pl-9 pr-3 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
+              />
+            </label>
+            <div className="flex flex-wrap items-center gap-2">
+              <select
+                value={statusFilter}
+                onChange={(event) => setStatusFilter(event.target.value as RegistrationStatusFilter)}
+                aria-label="공간 등록 상태 필터"
+                className="h-9 rounded-md border border-border bg-background px-2.5 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+              >
+                <option value="전체">전체 상태</option>
+                <option value="접수">신규 접수</option>
+                <option value="검토 중">검토 중</option>
+                <option value="확인 완료">확인 완료</option>
+                <option value="등록 완료">등록 완료</option>
+                <option value="반려">반려</option>
+              </select>
+              <select
+                value={dateFilter}
+                onChange={(event) => setDateFilter(event.target.value as RegistrationDateFilter)}
+                aria-label="공간 등록 접수 기간 필터"
+                className="h-9 rounded-md border border-border bg-background px-2.5 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+              >
+                <option value="전체">전체 기간</option>
+                <option value="오늘">오늘 접수</option>
+                <option value="최근 7일">최근 7일</option>
+                <option value="이번 달">이번 달</option>
+              </select>
+              {(searchQuery || statusFilter !== "전체" || dateFilter !== "전체") && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => { setSearchQuery(""); setStatusFilter("전체"); setDateFilter("전체"); }}
+                >
+                  필터 초기화
+                </Button>
+              )}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setRefreshing(true);
+                  window.location.reload();
+                }}
+                disabled={refreshing}
+              >
+                <RefreshCw className={cn("size-3.5", refreshing && "animate-spin")} />
+                새로고침
+              </Button>
+            </div>
           </div>
-          <div className="text-[12px] text-[#6b7280] dark:text-muted-foreground">
-            {canEdit ? "카드를 끌어 단계에 놓으세요" : "상세 내용을 보려면 카드를 더블클릭하세요"}
+          <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-[12px] text-[#6b7280] dark:text-muted-foreground">
+            <span>표시 <span className="font-semibold tabular-nums text-foreground">{filteredRegistrations.length}</span>건 · 전체 {registrations.length}건</span>
+            <span>{canEdit ? "카드를 끌어 단계에 놓으세요" : "카드를 더블클릭하면 상세 내용을 볼 수 있습니다"}</span>
           </div>
         </div>
 
@@ -180,10 +274,20 @@ export function SpaceRegistrationKanban({ initialRegistrations, canEdit }: Props
           </div>
         )}
 
+        {registrations.length > 0 && filteredRegistrations.length === 0 && (
+          <div className="mb-3 flex items-center gap-3 rounded-[10px] border border-dashed border-[#d1d5db] bg-transparent px-4 py-3 text-[13px] text-[#9ca3af] dark:border-muted dark:text-muted-foreground">
+            <Search className="size-5 shrink-0 text-primary" />
+            <div>
+              <p className="font-medium text-foreground">조건에 맞는 공간 등록이 없습니다.</p>
+              <p className="mt-0.5 text-xs">상태를 ‘신규 접수’로 선택하면 팝업에서 들어온 미처리 등록을 바로 볼 수 있습니다.</p>
+            </div>
+          </div>
+        )}
+
         <div className="pb-2">
           <div className="grid grid-cols-1 gap-[14px] md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
             {SPACE_REGISTRATION_STAGES.map((stage) => {
-              const items = registrations.filter((registration) => registration.status === stage);
+              const items = filteredRegistrations.filter((registration) => registration.status === stage);
               const style = STAGE_STYLES[stage];
               return (
                 <section

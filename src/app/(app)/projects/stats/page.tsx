@@ -6,6 +6,9 @@ import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/ca
 import { RevenueCharts } from "./RevenueChartsWrapper";
 import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
+import { getCalendarViewer } from "@/lib/calendarViewer";
+import { canViewLinkedProjects } from "@/lib/projectVisibility";
+import { redirect } from "next/navigation";
 
 const now = new Date();
 
@@ -15,6 +18,9 @@ function getQuarter(month: number) {
 
 export default async function ProjectStatsPage() {
   const session = await getServerSession(authOptions);
+  const viewer = await getCalendarViewer();
+  // 외부 계정은 연결된 프로젝트 상세만 볼 수 있고, 회사 전체 매출·매입 통계는 볼 수 없다.
+  if (canViewLinkedProjects(viewer)) redirect("/projects");
   await requireMenuAccess(session!.user.id, "projects", session!.user.role);
   const year = now.getFullYear();
 

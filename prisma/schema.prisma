@@ -581,6 +581,7 @@ model AgentJob {
 
   sourceMessageId String? @unique // 메신저에서 발생한 job이면 원본 Message.id (없으면 메신저 외부 요청)
 
+  attachments AgentJobAttachment[]
   deltas AgentJobDelta[]
 
   @@index([agentType, status, createdAt])
@@ -588,6 +589,23 @@ model AgentJob {
   @@index([userId, visibility, seenAt])
   @@index([attachmentDriveFileId])
   @@map("agent_jobs")
+}
+
+model AgentJobAttachment {
+  id            String   @id @default(cuid())
+  jobId         String
+  driveFileId   String
+  name          String
+  mimeType      String
+  sizeBytes     Int
+  driveUrl      String?
+  createdAt     DateTime @default(now())
+
+  job AgentJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@unique([jobId, driveFileId])
+  @@index([jobId, createdAt])
+  @@map("agent_job_attachments")
 }
 
 model AgentJobDelta {

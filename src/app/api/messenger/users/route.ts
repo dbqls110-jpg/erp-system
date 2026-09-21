@@ -20,7 +20,7 @@ export async function GET() {
   // 외부인(파트너·호스트·거래처)은 담당 직원만 보인다. 규칙은 messengerContacts 한 곳에 있다.
   const me = await prisma.user.findUnique({
     where: { id: session.user.id },
-    select: { id: true, role: true, partnerId: true, customerId: true, venueId: true, staffUserId: true },
+    select: { id: true, role: true, partnerId: true, customerId: true, venueId: true, staffUserId: true, active: true, isAgent: true },
   });
   if (!me) return NextResponse.json([], { status: 401 });
 

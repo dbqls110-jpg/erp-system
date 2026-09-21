@@ -17,6 +17,8 @@ import { Calendar, User, Building, ChevronRight, TrendingUp, TrendingDown } from
 import Link from "next/link";
 import { calculateNetIncome, calculateOperatingProfit } from "@/lib/financeMetrics";
 import { toneBadgeClass } from "@/lib/badge-tone";
+import { getCalendarViewer } from "@/lib/calendarViewer";
+import { canViewLinkedProjects, projectWhereForViewer } from "@/lib/projectVisibility";
 
 const statusConfig: Record<string, { label: string; class: string }> = {
   active: { label: "진행 중", class: toneBadgeClass("blue") },
@@ -27,12 +29,16 @@ const statusConfig: Record<string, { label: string; class: string }> = {
 export default async function ProjectDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const session = await getServerSession(authOptions);
-  await requireMenuAccess(session!.user.id, "projects", session!.user.role);
-  const canEdit = await canEditMenu(session!.user.id, "projects", session!.user.role);
+  const viewer = await getCalendarViewer();
+  const linkedExternal = canViewLinkedProjects(viewer);
+  if (!linkedExternal) {
+    await requireMenuAccess(session!.user.id, "projects", session!.user.role);
+  }
+  const canEdit = linkedExternal ? false : await canEditMenu(session!.user.id, "projects", session!.user.role);
   const isAdmin = session?.user?.role === "admin";
 
   const project = await prisma.project.findUnique({
-    where: { id },
+    where: { id, AND: [projectWhereForViewer(viewer)] },
     include: {
       checklistItems: { orderBy: { order: "asc" } },
       files: { orderBy: { createdAt: "desc" } },
@@ -45,10 +51,12 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
   if (!project) notFound();
 
   // 연결 후보 목록. 목록이 커지면 검색형으로 바꾼다.
-  const [allCustomers, allPartners] = await Promise.all([
-    prisma.customer.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
-    prisma.partner.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
-  ]);
+  const [allCustomers, allPartners] = canEdit
+    ? await Promise.all([
+        prisma.customer.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
+        prisma.partner.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
+      ])
+    : [[], []];
 
   const s = statusConfig[project.status] ?? statusConfig.active;
   const operatingProfit = calculateOperatingProfit(project.revenue, project.cost);

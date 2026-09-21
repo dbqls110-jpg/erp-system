@@ -5,6 +5,8 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { buildAssistantPrompt } from "@/lib/assistantPrompt";
 import { getAccessibleMenus } from "@/lib/permissions";
+import { withLinkedProjectMenu } from "@/lib/projectVisibility";
+import type { Viewer } from "@/lib/calendarVisibility";
 import { APPLY_ENDPOINT, restoreProposalStates, type RestoredProposalState } from "@/lib/proposalStates";
 import {
   deleteDriveFileAsOwner,
@@ -43,6 +45,7 @@ async function markAssistantJobsSeen(userId: string, ids?: string[]) {
 const BRIDGE_STALE_MS = 3 * 60 * 1000;
 const AGENT_TYPE = "agent-1";
 const MAX_QUESTION_LEN = 2000;
+const MAX_ASSISTANT_IMAGE_COUNT = 10;
 const INTERNAL_ASSISTANT_MARKERS = [
   "[ERP AI 평가",
   "[배포 검증]",
@@ -66,6 +69,7 @@ interface Turn {
   createdAt: string;
   completedAt: string | null;
   attachment: AssistantAttachment | null;
+  attachments: AssistantAttachment[];
 }
 
 export interface AssistantAttachment {
@@ -90,8 +94,31 @@ function toTurn(job: {
   attachmentMimeType: string | null;
   attachmentSizeBytes: number | null;
   attachmentUrl: string | null;
+  attachments?: Array<{
+    id: string;
+    driveFileId: string;
+    name: string;
+    mimeType: string;
+    sizeBytes: number;
+  }>;
 }): Turn {
   const fallbackQuestion = job.input?.split("[질문]").pop()?.trim() ?? job.input ?? "";
+  const attachments = (job.attachments ?? []).map((item) => ({
+    driveFileId: item.driveFileId,
+    name: item.name,
+    mimeType: item.mimeType,
+    size: item.sizeBytes,
+    url: `/api/assistant/attachments/${job.id}?driveFileId=${encodeURIComponent(item.driveFileId)}`,
+  }));
+  if (attachments.length === 0 && job.attachmentDriveFileId) {
+    attachments.push({
+      driveFileId: job.attachmentDriveFileId,
+      name: job.attachmentName ?? "사진",
+      mimeType: job.attachmentMimeType ?? "image/*",
+      size: job.attachmentSizeBytes ?? 0,
+      url: `/api/assistant/attachments/${job.id}`,
+    });
+  }
 
   return {
     id: job.id,
@@ -102,24 +129,15 @@ function toTurn(job: {
     errorMsg: job.errorMsg,
     createdAt: job.createdAt.toISOString(),
     completedAt: job.completedAt?.toISOString() ?? null,
-    attachment: job.attachmentDriveFileId
-      ? {
-          driveFileId: job.attachmentDriveFileId,
-          name: job.attachmentName ?? "사진",
-          mimeType: job.attachmentMimeType ?? "image/*",
-          size: job.attachmentSizeBytes ?? 0,
-          // Drive 링크는 대표 계정 권한이 필요하므로 브라우저에는 권한 확인용
-          // ERP 스트림 경로만 준다.
-          url: `/api/assistant/attachments/${job.id}`,
-        }
-      : null,
+    attachment: attachments[0] ?? null,
+    attachments,
   };
 }
 
 /** GET: 내 대화 내역. 화면이 답을 기다릴 때도 이걸 다시 부른다. */
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions);
-  if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!session?.user?.id || session.user.active === false) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const jobId = req.nextUrl.searchParams.get("job");
 
@@ -133,6 +151,10 @@ export async function GET(req: NextRequest) {
           errorMsg: true, createdAt: true, completedAt: true,
           attachmentDriveFileId: true, attachmentName: true, attachmentMimeType: true,
           attachmentSizeBytes: true, attachmentUrl: true,
+          attachments: {
+            orderBy: { createdAt: "asc" },
+            select: { id: true, driveFileId: true, name: true, mimeType: true, sizeBytes: true },
+          },
         },
       }),
       prisma.agentBridgeHeartbeat.findFirst({
@@ -180,6 +202,10 @@ export async function GET(req: NextRequest) {
         errorMsg: true, createdAt: true, completedAt: true,
         attachmentDriveFileId: true, attachmentName: true, attachmentMimeType: true,
         attachmentSizeBytes: true, attachmentUrl: true,
+        attachments: {
+          orderBy: { createdAt: "asc" },
+          select: { id: true, driveFileId: true, name: true, mimeType: true, sizeBytes: true },
+        },
       },
     }),
     prisma.agentBridgeHeartbeat.findFirst({
@@ -239,10 +265,10 @@ export async function GET(req: NextRequest) {
 /** POST: 질문을 넣는다. 답은 바로 오지 않으므로 job id 만 돌려준다. */
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
-  if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!session?.user?.id || session.user.active === false) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   let question = "";
-  let image: File | null = null;
+  let images: File[] = [];
   const contentType = req.headers.get("content-type") ?? "";
   if (contentType.includes("multipart/form-data")) {
     let form: FormData;
@@ -253,8 +279,8 @@ export async function POST(req: NextRequest) {
     }
     const message = form.get("message");
     question = typeof message === "string" ? message.trim() : "";
-    const entry = form.get("file");
-    if (entry instanceof File && entry.size > 0) image = entry;
+    images = [...form.getAll("file"), ...form.getAll("files")]
+      .filter((entry): entry is File => entry instanceof File && entry.size > 0);
   } else {
     let body: { message?: unknown };
     try {
@@ -290,7 +316,10 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  if (image) {
+  if (images.length > MAX_ASSISTANT_IMAGE_COUNT) {
+    return NextResponse.json({ error: `사진은 한 번에 최대 ${MAX_ASSISTANT_IMAGE_COUNT}장까지 첨부할 수 있습니다.` }, { status: 400 });
+  }
+  for (const image of images) {
     if (!image.type.startsWith("image/")) {
       return NextResponse.json({ error: "ERP 비서에는 사진 파일만 첨부할 수 있습니다." }, { status: 400 });
     }
@@ -300,25 +329,35 @@ export async function POST(req: NextRequest) {
   }
 
   // 질문자가 볼 수 있는 메뉴의 자료만 붙인다. 메뉴 권한과 같은 기준이다.
-  const allowedMenus = await getAccessibleMenus(session.user.id, session.user.role);
-  const { prompt: basePrompt, topics, contextChars } = await buildAssistantPrompt(question, allowedMenus);
+  const viewer: Viewer = {
+    id: session.user.id,
+    role: session.user.role,
+    partnerId: session.user.partnerId,
+    customerId: session.user.customerId,
+    venueId: session.user.venueId,
+  };
+  const allowedMenus = withLinkedProjectMenu(
+    await getAccessibleMenus(session.user.id, session.user.role),
+    viewer,
+  );
+  const { prompt: basePrompt, topics, contextChars } = await buildAssistantPrompt(question, allowedMenus, viewer);
 
   // 사진은 질문을 작성하는 동안에는 브라우저에만 보관한다. 전송을 누른 뒤에만
   // Drive 업로드를 하고, DB 작업 생성에 실패하면 고아 파일도 바로 정리한다.
-  let uploaded: Awaited<ReturnType<typeof uploadMessengerFile>> | null = null;
+  const uploaded: Awaited<ReturnType<typeof uploadMessengerFile>>[] = [];
   try {
-    if (image) {
+    for (const image of images) {
       const name = image.name.split(/[\\/]/).pop()?.trim() || "사진";
-      uploaded = await uploadMessengerFile({
+      uploaded.push(await uploadMessengerFile({
         buffer: Buffer.from(await image.arrayBuffer()),
         name,
         mimeType: image.type,
         size: image.size,
-      });
+      }));
     }
 
-    const prompt = uploaded
-      ? `${basePrompt}\n\n[첨부 사진]\n파일명: ${uploaded.name}\n사진이 이 질문에 함께 첨부되었습니다. 사진 자체를 확인할 수 없는 경우에는 그 사실을 먼저 알리고, 사진에 없는 내용을 추측하지 마세요.`
+    const prompt = uploaded.length > 0
+      ? `${basePrompt}\n\n[첨부 사진]\n파일명: ${uploaded.map((file) => file.name).join(", ")}\n사진이 이 질문에 함께 첨부되었습니다. 현재 브리지에는 사진 픽셀을 직접 전달하지 않으므로, 사진에 없는 내용을 추측하지 마세요.`
       : basePrompt;
 
     const job = await prisma.agentJob.create({
@@ -329,13 +368,22 @@ export async function POST(req: NextRequest) {
         status: "pending",
         input: prompt,
         userInput: question,
-        ...(uploaded
+        ...(uploaded.length > 0
           ? {
-              attachmentDriveFileId: uploaded.driveFileId,
-              attachmentName: uploaded.name,
-              attachmentMimeType: uploaded.mimeType,
-              attachmentSizeBytes: uploaded.size,
-              attachmentUrl: uploaded.driveUrl,
+              attachmentDriveFileId: uploaded[0].driveFileId,
+              attachmentName: uploaded[0].name,
+              attachmentMimeType: uploaded[0].mimeType,
+              attachmentSizeBytes: uploaded[0].size,
+              attachmentUrl: uploaded[0].driveUrl,
+              attachments: {
+                create: uploaded.map((file) => ({
+                  driveFileId: file.driveFileId,
+                  name: file.name,
+                  mimeType: file.mimeType,
+                  sizeBytes: file.size,
+                  driveUrl: file.driveUrl,
+                })),
+              },
             }
           : {}),
       },
@@ -346,20 +394,27 @@ export async function POST(req: NextRequest) {
       id: job.id,
       topics,
       contextChars,
-      attachment: uploaded
+      attachment: uploaded[0]
         ? {
-            driveFileId: uploaded.driveFileId,
-            name: uploaded.name,
-            mimeType: uploaded.mimeType,
-            size: uploaded.size,
+            driveFileId: uploaded[0].driveFileId,
+            name: uploaded[0].name,
+            mimeType: uploaded[0].mimeType,
+            size: uploaded[0].size,
             url: `/api/assistant/attachments/${job.id}`,
           }
         : null,
+      attachments: uploaded.map((file) => ({
+        driveFileId: file.driveFileId,
+        name: file.name,
+        mimeType: file.mimeType,
+        size: file.size,
+        url: `/api/assistant/attachments/${job.id}?driveFileId=${encodeURIComponent(file.driveFileId)}`,
+      })),
     }, { status: 201 });
   } catch (error) {
-    if (uploaded) {
+    for (const file of uploaded) {
       try {
-        await deleteDriveFileAsOwner(uploaded.driveFileId);
+        await deleteDriveFileAsOwner(file.driveFileId);
       } catch (cleanupError) {
         console.error("[assistant attachment] orphan Drive file cleanup failed", cleanupError);
       }

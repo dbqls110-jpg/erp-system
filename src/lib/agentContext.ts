@@ -8,6 +8,8 @@ import {
 import { getInquiries } from "@/lib/inquirySheet";
 import { getSpaceRegistrations } from "@/lib/spaceRegistrationSheet";
 import { getSpaceRentals } from "@/lib/spaceRentalSheet";
+import { projectWhereForViewer } from "@/lib/projectVisibility";
+import type { Viewer } from "@/lib/calendarVisibility";
 
 export { extractVenueQuery, extractVenueMatchQuery } from "@/lib/venueQuery";
 
@@ -195,6 +197,7 @@ function venueDistrictWhere(districts: string[]) {
 export async function buildAgentContext(
   question: string,
   allowedMenus?: ReadonlySet<string>,
+  viewer?: Viewer | null,
 ): Promise<AgentContext> {
   const detected = detectTopics(question);
   const { allowed: topics, blocked: blockedTopics } = allowedMenus
@@ -229,7 +232,7 @@ export async function buildAgentContext(
         }
         case "projects": {
           const rows = await prisma.project.findMany({
-            where: { status: "active" },
+            where: { status: "active", AND: [projectWhereForViewer(viewer)] },
             select: {
               id: true, name: true, client: true, company: true, deadline: true,
               progress: true, assignee: true, revenue: true, cost: true,

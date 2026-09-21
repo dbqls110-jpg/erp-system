@@ -15,6 +15,8 @@ import { isExternal, type Viewer } from "@/lib/calendarVisibility";
 export interface ContactUser extends Viewer {
   /** 외부인의 담당 직원. 내부 직원이면 null. */
   staffUserId: string | null;
+  active: boolean;
+  isAgent: boolean;
 }
 
 export function isExternalContact(user: ContactUser): boolean {
@@ -24,6 +26,7 @@ export function isExternalContact(user: ContactUser): boolean {
 /** 이 사람이 말을 걸 수 있는 상대의 Prisma where. 목록 API 와 메신저 페이지가 같이 쓴다. */
 export function messengerContactWhere(me: ContactUser) {
   const base = { active: true, isAgent: false, id: { not: me.id }, role: { not: "pending" } };
+  if (!me.active || me.isAgent) return { ...base, id: "__none__" };
   if (!isExternalContact(me)) return base;
   // 외부인은 담당 직원 한 명뿐. 지정 전이면 아무도 없다.
   return { ...base, id: me.staffUserId ?? "__none__" };
@@ -31,6 +34,7 @@ export function messengerContactWhere(me: ContactUser) {
 
 /** 보낼 수 있는지. 자기 자신(메모)은 언제나 된다. */
 export function canMessage(sender: ContactUser, receiver: ContactUser & { active: boolean; isAgent: boolean }): boolean {
+  if (!sender.active || sender.isAgent) return false;
   if (sender.id === receiver.id) return true;
   if (!receiver.active || receiver.isAgent || receiver.role === "pending") return false;
   if (!isExternalContact(sender)) {

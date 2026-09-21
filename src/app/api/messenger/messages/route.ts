@@ -6,7 +6,7 @@ import { listVenueDaMessages } from "@/lib/venueDaMessenger";
 
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions);
-  if (!session?.user?.id) return NextResponse.json([], { status: 401 });
+  if (!session?.user?.id || session.user.active === false) return NextResponse.json([], { status: 401 });
 
   const convId = req.nextUrl.searchParams.get("conversationId");
   if (!convId) return NextResponse.json([]);

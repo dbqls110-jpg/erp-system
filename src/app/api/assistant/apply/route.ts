@@ -16,7 +16,7 @@ import {
   saveInquiryMemo,
   saveInquiryStage,
 } from "@/lib/inquirySheet";
-import { appendSpaceRegistrationRow, getSpaceRegistrations, saveSpaceRegistrationMemo, saveSpaceRegistrationStage } from "@/lib/spaceRegistrationSheet";
+import { appendSpaceRegistrationRow, assertSpaceRegistrationAllowed, getSpaceRegistrations, saveSpaceRegistrationMemo, saveSpaceRegistrationStage } from "@/lib/spaceRegistrationSheet";
 import { getSpaceRentals, saveSpaceRentalStage } from "@/lib/spaceRentalSheet";
 import { formatCurrentDateTime, type InquiryStage } from "@/lib/inquiries";
 import type { SpaceRegistrationStage } from "@/lib/spaceRegistrations";
@@ -24,6 +24,7 @@ import type { SpaceRentalStage } from "@/lib/spaceRentals";
 import { PROPOSAL_CANCEL_ACTION } from "@/lib/proposalStates";
 import { prisma } from "@/lib/prisma";
 import { canAccessMenu, canEditMenu } from "@/lib/permissions";
+import { isExternal } from "@/lib/calendarVisibility";
 import { calculateNetIncome } from "@/lib/financeMetrics";
 import {
   parseProposals,
@@ -405,6 +406,10 @@ export async function POST(req: NextRequest) {
       attachmentDriveFileId: true,
       attachmentName: true,
       attachmentMimeType: true,
+      attachments: {
+        orderBy: { createdAt: "asc" },
+        select: { driveFileId: true },
+      },
     },
   });
   if (!job) return NextResponse.json({ error: "대화를 찾을 수 없습니다." }, { status: 404 });
@@ -420,6 +425,19 @@ export async function POST(req: NextRequest) {
   }
 
   const menuKey = MENU_FOR[proposal.target];
+  const externalProjectViewer = menuKey === "projects" && isExternal({
+    id: session.user.id,
+    role: session.user.role,
+    partnerId: session.user.partnerId,
+    customerId: session.user.customerId,
+    venueId: session.user.venueId,
+  });
+  if (externalProjectViewer) {
+    return NextResponse.json(
+      { error: "외부 계정은 프로젝트를 수정할 수 없습니다." },
+      { status: 403 },
+    );
+  }
   const hasPermission = proposal.target === "leave_request"
     ? await canAccessMenu(session.user.id, menuKey)
     : await canEditMenu(session.user.id, menuKey, session.user.role);
@@ -1031,9 +1049,15 @@ export async function POST(req: NextRequest) {
       if (existing) return NextResponse.json({ ok: true, ...existing, reused: true });
 
       const content = accepted as unknown as SpaceRegistrationCreateContent;
+      // 금지 공간은 사진을 Drive로 이동하기 전에 차단해 부수효과가 남지 않게 한다.
+      assertSpaceRegistrationAllowed({ spaceName: content.spaceName, address: content.address });
+      const photoFileIds = [...new Set([
+        ...(job.attachments ?? []).map((attachment) => attachment.driveFileId),
+        ...(job.attachmentDriveFileId ? [job.attachmentDriveFileId] : []),
+      ])];
       let photo: Awaited<ReturnType<typeof moveMessengerFileToSpaceRegistration>> | null = null;
-      if (job.attachmentDriveFileId) {
-        photo = await moveMessengerFileToSpaceRegistration(job.attachmentDriveFileId);
+      for (const driveFileId of photoFileIds) {
+        photo = await moveMessengerFileToSpaceRegistration(driveFileId);
       }
 
       const saved = await appendSpaceRegistrationRow({
@@ -1052,7 +1076,7 @@ export async function POST(req: NextRequest) {
         negotiable: content.negotiable,
         conditions: content.conditions,
         photoFolderUrl: photo?.folderUrl,
-        photoCount: photo ? 1 : 0,
+        photoCount: photoFileIds.length,
         privacyConsentAt: content.privacyConsentAt,
         photoPermission: content.photoPermission,
         cooling: content.cooling,
@@ -1066,12 +1090,38 @@ export async function POST(req: NextRequest) {
         nightWork: content.nightWork,
         foodAllowed: content.foodAllowed,
         extraConditions: content.extraConditions,
+        areaPyeong: content.areaPyeong,
+        rentableFloors: content.rentableFloors,
+        rentableTotalArea: content.rentableTotalArea,
+        rentableFloorArea: content.rentableFloorArea,
+        outdoorYard: content.outdoorYard,
+        kitchen: content.kitchen,
+        usage: content.usage,
+        storageOffice: content.storageOffice,
+        roomCount: content.roomCount,
+        powerCapacity: content.powerCapacity,
+        elevator: content.elevator,
+        freightElevator: content.freightElevator,
+        ooh: content.ooh,
+        wasteDisposal: content.wasteDisposal,
+        drilling: content.drilling,
+        accessHours: content.accessHours,
+        parkingAvailable: content.parkingAvailable,
+        parkingSpaces: content.parkingSpaces,
+        floorPlan: content.floorPlan,
+        ceilingHeight: content.ceilingHeight,
+        lighting: content.lighting,
+        wiredInternet: content.wiredInternet,
+        floorFinish: content.floorFinish,
+        deposit: content.deposit,
+        managementFee: content.managementFee,
+        tourMethod: content.tourMethod,
       });
       const result = {
         name: saved.spaceName,
         registrationId: saved.registrationId,
         rowNumber: saved.rowNumber,
-        photoCount: photo ? 1 : 0,
+        photoCount: photoFileIds.length,
         ...(photo ? { folderPath: photo.folderPath, folderUrl: photo.folderUrl, driveUrl: photo.driveUrl } : {}),
       };
       await prisma.agentAuditLog.create({
@@ -1245,6 +1295,9 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     if (err instanceof SheetCreationError) {
       return NextResponse.json({ error: err.message, code: err.code, ...err.details }, { status: err.status });
+    }
+    if (err instanceof Error && err.message.startsWith("절대 등록 금지 공간")) {
+      return NextResponse.json({ error: err.message, code: "BLOCKED_VENUE" }, { status: 422 });
     }
     // 대상이 이미 지워졌거나 id 가 틀린 경우가 대부분이다.
     console.error("[assistant apply]", err);

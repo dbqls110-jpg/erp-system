@@ -11,6 +11,8 @@ import { ProjectDeleteButton } from "./ProjectDeleteButton";
 import { ProjectFilter } from "./ProjectFilter";
 import { Calendar, User, FolderOpen, BarChart2 } from "lucide-react";
 import { toneBadgeClass } from "@/lib/badge-tone";
+import { getCalendarViewer } from "@/lib/calendarViewer";
+import { canViewLinkedProjects, projectWhereForViewer } from "@/lib/projectVisibility";
 
 const statusConfig: Record<string, { label: string; class: string }> = {
   active: { label: "진행 중", class: toneBadgeClass("blue") },
@@ -28,18 +30,20 @@ export default async function ProjectsPage({
 
   const session = await getServerSession(authOptions);
   const isAdmin = session?.user?.role === "admin";
-  const canEdit = await canEditMenu(session!.user.id, "projects", session!.user.role);
+  const viewer = await getCalendarViewer();
+  const linkedExternal = canViewLinkedProjects(viewer);
+  if (!linkedExternal) {
+    await requireMenuAccess(session!.user.id, "projects", session!.user.role);
+  }
+  // 외부 연결 계정은 연결된 프로젝트를 읽기 전용으로만 본다.
+  const canEdit = linkedExternal ? false : await canEditMenu(session!.user.id, "projects", session!.user.role);
 
   const whereStatus = currentFilter === "all" ? {} : { status: currentFilter };
-  // 권한 검사가 실패하면 JSX를 반환하지 않으므로 프로젝트 목록을 함께 조회해도 응답에 포함되지 않는다.
-  const [, projects] = await Promise.all([
-    requireMenuAccess(session!.user.id, "projects", session!.user.role),
-    prisma.project.findMany({
-      where: whereStatus,
+  const projects = await prisma.project.findMany({
+      where: { ...whereStatus, AND: [projectWhereForViewer(viewer)] },
       include: { _count: { select: { checklistItems: true } } },
       orderBy: { createdAt: "desc" },
-    }),
-  ]);
+    });
 
   return (
     <div className="space-y-4">
@@ -49,9 +53,11 @@ export default async function ProjectsPage({
         </div>
         <div className="flex items-center gap-3 flex-wrap">
           <ProjectFilter current={currentFilter} />
-          <Link href="/projects/stats" className="flex h-9 items-center gap-1.5 rounded-[10px] border border-border px-3.5 text-[13px] font-semibold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
-            <BarChart2 className="size-3.5" /> 통계
-          </Link>
+          {!linkedExternal && (
+            <Link href="/projects/stats" className="flex h-9 items-center gap-1.5 rounded-[10px] border border-border px-3.5 text-[13px] font-semibold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
+              <BarChart2 className="size-3.5" /> 통계
+            </Link>
+          )}
           {canEdit && <ProjectCreateButton />}
         </div>
       </div>
@@ -62,9 +68,13 @@ export default async function ProjectsPage({
             <div className="flex flex-col items-center gap-3 py-12 text-center">
               <FolderOpen className="size-6 text-muted-foreground" />
               <p className="text-sm text-muted-foreground">
-                {currentFilter === "all" ? "등록된 프로젝트가 없습니다" : `${({ active: "진행 중", completed: "완료", on_hold: "보류" } as Record<string, string>)[currentFilter]} 프로젝트가 없습니다`}
+                {linkedExternal
+                  ? "연결된 파트너·거래처 프로젝트가 없습니다"
+                  : currentFilter === "all"
+                    ? "등록된 프로젝트가 없습니다"
+                    : `${({ active: "진행 중", completed: "완료", on_hold: "보류" } as Record<string, string>)[currentFilter]} 프로젝트가 없습니다`}
               </p>
-              <p className="text-sm text-muted-foreground">새 프로젝트를 추가해 보세요</p>
+              {!linkedExternal && <p className="text-sm text-muted-foreground">새 프로젝트를 추가해 보세요</p>}
             </div>
           </CardContent>
         </Card>

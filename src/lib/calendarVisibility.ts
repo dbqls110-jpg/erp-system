@@ -34,7 +34,9 @@ export const EXTERNAL_ROLES: ReadonlySet<string> = new Set(["partner", "host"]);
  *   연결이 없는 외부인은 아무 프로젝트도 못 보는 빈 외부 화면을 본다.
  */
 export function isExternal(viewer: Viewer): boolean {
-  if (viewer.partnerId !== null || viewer.customerId !== null) return true;
+  // 세션·테스트 fixture가 아직 필드를 넣지 않은 경우(undefined)도 내부 계정으로
+  // 취급한다. null과 undefined 모두 "연결되지 않음"이다.
+  if (viewer.partnerId != null || viewer.customerId != null) return true;
   if (viewer.venueId != null) return true;
   return viewer.role != null && EXTERNAL_ROLES.has(viewer.role);
 }

@@ -290,9 +290,9 @@ function ExternalDashboard({
               <ul className="divide-y divide-[#f0f0f0] dark:divide-border">
                 {participatingProjects.map((project) => (
                   <li key={project.id} className="flex items-center justify-between gap-4 py-3 text-[12px] leading-4">
-                    <span className="min-w-0 truncate font-medium text-foreground">
+                    <Link href={`/projects/${project.id}`} className="min-w-0 truncate font-medium text-foreground transition-colors hover:text-primary">
                       {project.name}
-                    </span>
+                    </Link>
                     <span className="shrink-0 text-[12px] text-muted-foreground">
                       {project.deadline ? `${project.deadline} 마감` : "마감일 미정"}
                     </span>

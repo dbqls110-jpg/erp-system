@@ -75,6 +75,32 @@ export const EDITABLE_FIELDS = {
     nightWork: "야간 작업",
     foodAllowed: "음식 섭취 가능",
     extraConditions: "추가 조건",
+    areaPyeong: "대관 규모(평)",
+    rentableFloors: "대관 가능 층수",
+    rentableTotalArea: "대관 가능 총 면적",
+    rentableFloorArea: "대관 가능 층별 면적",
+    outdoorYard: "야외마당",
+    kitchen: "주방",
+    usage: "용도",
+    storageOffice: "창고/운영사무국",
+    roomCount: "룸 개수",
+    powerCapacity: "전력량",
+    elevator: "E/V",
+    freightElevator: "화물승강기",
+    ooh: "OOH",
+    wasteDisposal: "쓰레기 불출",
+    drilling: "타공 유무",
+    accessHours: "개방/시간방법",
+    parkingAvailable: "주차 유무",
+    parkingSpaces: "주차 댓수",
+    floorPlan: "도면",
+    ceilingHeight: "층고",
+    lighting: "조명",
+    wiredInternet: "인터넷 선",
+    floorFinish: "바닥마감",
+    deposit: "보증금",
+    managementFee: "관리비",
+    tourMethod: "답사 방법",
   },
   partner: {
     phone: "연락처",
@@ -336,6 +362,32 @@ export interface SpaceRegistrationCreateContent {
   nightWork?: string;
   foodAllowed?: string;
   extraConditions?: string;
+  areaPyeong?: string | number;
+  rentableFloors?: string;
+  rentableTotalArea?: string | number;
+  rentableFloorArea?: string;
+  outdoorYard?: string;
+  kitchen?: string;
+  usage?: string;
+  storageOffice?: string;
+  roomCount?: string | number;
+  powerCapacity?: string;
+  elevator?: string;
+  freightElevator?: string;
+  ooh?: string;
+  wasteDisposal?: string;
+  drilling?: string;
+  accessHours?: string;
+  parkingAvailable?: string;
+  parkingSpaces?: string | number;
+  floorPlan?: string;
+  ceilingHeight?: string;
+  lighting?: string;
+  wiredInternet?: string;
+  floorFinish?: string;
+  deposit?: string | number;
+  managementFee?: string | number;
+  tourMethod?: string;
 }
 
 export interface Proposal {
@@ -636,6 +688,14 @@ function validateSpaceRegistrationCreateProposal(proposal: Proposal): ValidatedP
     "nightWork", "foodAllowed", "extraConditions",
   ]) addRegistrationValue(accepted, rejected, fields, field);
   for (const field of ["area", "capacity", "dailyRate", "parkingCount"]) {
+    addRegistrationValue(accepted, rejected, fields, field, { numeric: true });
+  }
+  for (const field of [
+    "rentableFloors", "rentableFloorArea", "outdoorYard", "kitchen", "usage", "storageOffice",
+    "powerCapacity", "elevator", "freightElevator", "ooh", "wasteDisposal", "drilling", "accessHours",
+    "parkingAvailable", "floorPlan", "ceilingHeight", "lighting", "wiredInternet", "floorFinish", "tourMethod",
+  ]) addRegistrationValue(accepted, rejected, fields, field);
+  for (const field of ["areaPyeong", "rentableTotalArea", "roomCount", "parkingSpaces", "deposit", "managementFee"]) {
     addRegistrationValue(accepted, rejected, fields, field, { numeric: true });
   }
   return { proposal, accepted, rejected };
