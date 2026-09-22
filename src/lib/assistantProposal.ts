@@ -660,6 +660,13 @@ function addRegistrationValue(
     return;
   }
   if (options.numeric) {
+    // 요금·면적처럼 선택 입력인 숫자 칸은 AI가 "확인 필요", "협의", "-"처럼
+    // 모르는 값을 넣어도 접수 전체를 막지 않는다. 값은 비워 두고 사람이 후속
+    // 확인할 수 있어야 한다. 필수 숫자 칸만 오류로 남긴다.
+    if (value === null || (typeof value === "string" && /^(?:-|—|확인 필요|미상|없음|협의(?: 필요)?|정보 없음)$/u.test(value.trim()))) {
+      if (options.required) rejected.push({ field, reason: "값이 필요합니다." });
+      return;
+    }
     if (typeof value === "number" && Number.isFinite(value) && value >= 0) {
       accepted[field] = value;
       return;

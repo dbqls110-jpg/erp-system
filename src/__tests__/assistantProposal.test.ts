@@ -119,6 +119,18 @@ describe("validateProposal — 무엇을 받아들이고 무엇을 버리는가"
     expect(rejected).toEqual([]);
   });
 
+  it("공간 접수의 모르는 선택 숫자값은 접수를 막지 않는다", () => {
+    const { accepted, rejected } = validateProposal({
+      target: "space_registration_create",
+      id: "",
+      changes: { spaceName: "아티코 한남", dailyRate: "확인 필요", capacity: null },
+    });
+    expect(accepted.spaceName).toBe("아티코 한남");
+    expect(accepted.dailyRate).toBeUndefined();
+    expect(accepted.capacity).toBeUndefined();
+    expect(rejected).toEqual([]);
+  });
+
   it("지나치게 긴 글은 버린다", () => {
     // 막지 않으면 AI 가 답변을 통째로 메모에 밀어 넣는 일이 생긴다.
     const { rejected } = validateProposal(make({ calledNote: "가".repeat(501) }));
