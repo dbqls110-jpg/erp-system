@@ -29,6 +29,15 @@ const TAB = "공간DB";
 /** 한 번에 보내는 행 수. 157열 × 400행이면 요청 하나가 1MB 안팎이다. */
 const CHUNK = 400;
 
+// 운영 공간DB에서 더 이상 관리하지 않는 원본/검증 열이다.
+// 이 목록을 export 단계에서도 걸러야 다음 전체 재내보내기 때 삭제한 열이 되살아나지 않는다.
+const SHEET_OMITTED_COLUMNS = new Set([
+  "근거_야외", "영리_검증일", "대여물품", "소음제한", "그늘천막", "우천시",
+  "화장실_비고", "전기_비고", "대관방법_표준", "신청채널_대분류", "주차_대수",
+  "빔_수량", "첨부파일경로", "요금_신뢰도", "접근제한_표준", "신청절차_표준",
+  "수용_신뢰도", "통화_제한", "통화_요금", "구_요금", "구_대관방법", "구_전화",
+]);
+
 /** 앞에 두는 열: 컬럼으로 옮긴 원본 칸(적재 스크립트의 MAPPED 와 같은 이름) + ERP 통화 기록. 나머지 원본 칸은 뒤에 붙는다. */
 const LEAD = [
   ["이름", (v) => v.name],
@@ -90,20 +99,24 @@ const LEAD = [
 const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }) });
 try {
   const venues = await prisma.venue.findMany({ orderBy: [{ district: "asc" }, { name: "asc" }] });
+  const activeLead = LEAD.filter(([name]) => !SHEET_OMITTED_COLUMNS.has(name));
   // raw 칸 이름의 합집합. 행마다 있는 칸이 조금씩 다르다.
-  const leadNames = new Set(LEAD.map(([n]) => n));
+  const leadNames = new Set(activeLead.map(([n]) => n));
   const rawCols = [];
   const seen = new Set();
   for (const v of venues) {
     for (const k of Object.keys(v.raw ?? {})) {
       // 밑줄로 시작하는 키(_작업로그)는 DB팀 작업 이력이라 시트에 내보내지 않는다.
-      if (!seen.has(k) && !leadNames.has(k) && !isInternalRawKey(k)) { seen.add(k); rawCols.push(k); }
+      if (!seen.has(k) && !leadNames.has(k) && !SHEET_OMITTED_COLUMNS.has(k) && !isInternalRawKey(k)) {
+        seen.add(k);
+        rawCols.push(k);
+      }
     }
   }
-  const header = [...LEAD.map(([n]) => n), ...rawCols];
+  const header = [...activeLead.map(([n]) => n), ...rawCols];
   const cell = (x) => (x === null || x === undefined ? "" : typeof x === "object" ? JSON.stringify(x) : x);
-  const rows = venues.map((v) => [...LEAD.map(([, f]) => cell(f(v))), ...rawCols.map((k) => cell(v.raw?.[k]))]);
-  console.log(`공간 ${rows.length}행 × ${header.length}열 (ERP 열 ${LEAD.length} + 원본 칸 ${rawCols.length})`);
+  const rows = venues.map((v) => [...activeLead.map(([, f]) => cell(f(v))), ...rawCols.map((k) => cell(v.raw?.[k]))]);
+  console.log(`공간 ${rows.length}행 × ${header.length}열 (ERP 열 ${activeLead.length} + 원본 칸 ${rawCols.length})`);
   if (DRY_RUN) { console.log("--dry-run 이라 쓰지 않습니다."); process.exit(0); }
 
   const oauth2 = new google.auth.OAuth2(process.env.AUTH_GOOGLE_ID, process.env.AUTH_GOOGLE_SECRET);
