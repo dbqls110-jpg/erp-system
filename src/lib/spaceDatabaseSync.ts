@@ -122,11 +122,12 @@ async function getSheetGridProperties(sheets: SheetsClient, spreadsheetId: strin
   });
   const sheet = response.data.sheets?.find((item) => item.properties?.title === title);
   const sheetId = sheet?.properties?.sheetId;
+  const rowCount = sheet?.properties?.gridProperties?.rowCount;
   const columnCount = sheet?.properties?.gridProperties?.columnCount;
-  if (typeof sheetId !== "number" || typeof columnCount !== "number") {
-    throw new Error(`‘${title}’ 탭의 열 구조를 읽지 못했습니다.`);
+  if (typeof sheetId !== "number" || typeof rowCount !== "number" || typeof columnCount !== "number") {
+    throw new Error(`‘${title}’ 탭의 행·열 구조를 읽지 못했습니다.`);
   }
-  return { sheetId, columnCount };
+  return { sheetId, rowCount, columnCount };
 }
 
 /** 호스트 등록 완료본에 필요한 열만 보장한다. 접수 원본의 세부 열은 다시 만들지 않는다. */
@@ -548,6 +549,35 @@ export async function syncCompletedSpaceRegistration(record: SpaceRegistrationRe
   const { rows, headers, sheetId: venueSheetId, endColumn } = schema;
   const venue = venueRowValues(headers, rows, record, timestamp);
   const sourceRowNumber = rows.length >= 2 ? rows.length : 1;
+  // Google Sheets grid rows are bounded. When the last existing row is
+  // already occupied, extend the grid before writing the new venue row.
+  // Without this, a valid registration can update the host sheet but fail
+  // when the matching 공간DB row is one past the current grid limit.
+  const venueGrid = await getSheetGridProperties(
+    sheets,
+    SPACE_DATABASE_SPREADSHEET_ID,
+    SPACE_DATABASE_TAB_NAME,
+  );
+  if (venue.rowNumber > venueGrid.rowCount) {
+    await sheets.spreadsheets.batchUpdate({
+      spreadsheetId: SPACE_DATABASE_SPREADSHEET_ID,
+      requestBody: {
+        requests: [
+          {
+            insertDimension: {
+              range: {
+                sheetId: venueSheetId,
+                dimension: "ROWS",
+                startIndex: venueGrid.rowCount,
+                endIndex: venue.rowNumber,
+              },
+              inheritFromBefore: true,
+            },
+          },
+        ],
+      },
+    });
+  }
   await writeNativeRow(sheets, SPACE_DATABASE_SPREADSHEET_ID, venueSheetId, venue.rowNumber, sourceRowNumber, "A", endColumn, venue.values);
   const verify = await sheets.spreadsheets.values.get({
     spreadsheetId: SPACE_DATABASE_SPREADSHEET_ID,
