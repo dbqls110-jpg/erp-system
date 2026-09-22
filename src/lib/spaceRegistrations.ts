@@ -44,6 +44,10 @@ export const SPACE_REGISTRATION_EXTRA_COLUMNS = [
   { key: "deposit", header: "보증금" },
   { key: "managementFee", header: "관리비" },
   { key: "tourMethod", header: "답사 방법" },
+  { key: "weekdayRate", header: "평일 대관료" },
+  { key: "weekendHolidayRate", header: "주말·공휴일 대관료" },
+  { key: "minimumRentalDays", header: "최소 대관일" },
+  { key: "vatIncluded", header: "VAT 여부" },
 ] as const;
 
 export type SpaceRegistrationExtraFieldKey = (typeof SPACE_REGISTRATION_EXTRA_COLUMNS)[number]["key"];
@@ -128,6 +132,10 @@ export interface SpaceRegistrationRecord {
   deposit: string;
   managementFee: string;
   tourMethod: string;
+  weekdayRate: string;
+  weekendHolidayRate: string;
+  minimumRentalDays: string;
+  vatIncluded: string;
 }
 
 export interface SpaceRegistrationRowMatch {

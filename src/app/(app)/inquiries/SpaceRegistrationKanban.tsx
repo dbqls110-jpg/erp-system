@@ -389,6 +389,10 @@ export function SpaceRegistrationKanban({ initialRegistrations, canEdit }: Props
                 <DetailField label="면적 (㎡)" value={displayValue(selected.area)} />
                 <DetailField label="수용 인원 (명)" value={displayValue(selected.capacity)} />
                 <DetailField label="희망 1일 대관료 (만원)" value={displayValue(selected.dailyRate)} />
+                <DetailField label="평일 대관료 (만원)" value={displayValue(selected.weekdayRate)} />
+                <DetailField label="주말·공휴일 대관료 (만원)" value={displayValue(selected.weekendHolidayRate)} />
+                <DetailField label="최소 대관일" value={displayValue(selected.minimumRentalDays)} />
+                <DetailField label="VAT 여부" value={displayValue(selected.vatIncluded)} />
                 <DetailField label="요금 협의 여부" value={displayValue(selected.negotiable)} />
                 <DetailField label="사진 수" value={displayValue(selected.photoCount)} />
                 <DetailField label="개인정보 동의 일시" value={displayDate(selected.privacyConsentAt)} />

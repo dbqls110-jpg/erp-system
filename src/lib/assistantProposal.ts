@@ -101,6 +101,10 @@ export const EDITABLE_FIELDS = {
     deposit: "보증금",
     managementFee: "관리비",
     tourMethod: "답사 방법",
+    weekdayRate: "평일 대관료(만원)",
+    weekendHolidayRate: "주말·공휴일 대관료(만원)",
+    minimumRentalDays: "최소 대관일",
+    vatIncluded: "VAT 여부",
   },
   partner: {
     phone: "연락처",
@@ -347,6 +351,10 @@ export interface SpaceRegistrationCreateContent {
   area?: string | number;
   capacity?: string | number;
   dailyRate?: string | number;
+  weekdayRate?: string | number;
+  weekendHolidayRate?: string | number;
+  minimumRentalDays?: string | number;
+  vatIncluded?: string;
   negotiable?: string;
   conditions?: string;
   privacyConsentAt?: string;
@@ -694,13 +702,13 @@ function validateSpaceRegistrationCreateProposal(proposal: Proposal): ValidatedP
     "restroom", "wifi", "fireNotAllowed", "drillingNotAllowed", "noiseLimit", "equipmentRental",
     "nightWork", "foodAllowed", "extraConditions",
   ]) addRegistrationValue(accepted, rejected, fields, field);
-  for (const field of ["area", "capacity", "dailyRate", "parkingCount"]) {
+  for (const field of ["area", "capacity", "dailyRate", "parkingCount", "weekdayRate", "weekendHolidayRate", "minimumRentalDays"]) {
     addRegistrationValue(accepted, rejected, fields, field, { numeric: true });
   }
   for (const field of [
     "rentableFloors", "rentableFloorArea", "outdoorYard", "kitchen", "usage", "storageOffice",
     "powerCapacity", "elevator", "freightElevator", "ooh", "wasteDisposal", "drilling", "accessHours",
-    "parkingAvailable", "floorPlan", "ceilingHeight", "lighting", "wiredInternet", "floorFinish", "tourMethod",
+    "parkingAvailable", "floorPlan", "ceilingHeight", "lighting", "wiredInternet", "floorFinish", "tourMethod", "vatIncluded",
   ]) addRegistrationValue(accepted, rejected, fields, field);
   for (const field of ["areaPyeong", "rentableTotalArea", "roomCount", "parkingSpaces", "deposit", "managementFee"]) {
     addRegistrationValue(accepted, rejected, fields, field, { numeric: true });

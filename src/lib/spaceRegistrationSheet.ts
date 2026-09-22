@@ -4,6 +4,7 @@ import {
   isSpaceRegistrationStage,
   parseSpaceRegistrationRows,
   SPACE_REGISTRATION_EXTRA_COLUMNS,
+  SPACE_REGISTRATION_COLUMN_COUNT,
   type SpaceRegistrationIdentity,
   type SpaceRegistrationRecord,
   type SpaceRegistrationStage,
@@ -15,7 +16,7 @@ import { blockedReason } from "@/lib/venueBlocklist.mjs";
 export const SPACE_REGISTRATIONS_SPREADSHEET_ID = "1A5xN_nii5AeAkM9JSF0morcetMCI3A7TDcvk3xRjd1M";
 export const SPACE_REGISTRATIONS_TAB_NAME = "공간 등록 접수";
 
-const SPACE_REGISTRATIONS_RANGE = `'${SPACE_REGISTRATIONS_TAB_NAME}'!A1:BM`;
+const SPACE_REGISTRATIONS_RANGE = `'${SPACE_REGISTRATIONS_TAB_NAME}'!A1:${columnName(SPACE_REGISTRATION_COLUMN_COUNT - 1)}`;
 const MEMO_COLUMN = "W";
 const FINAL_PROCESSED_COLUMN = "X";
 const STAGE_TIME_COLUMNS: Partial<Record<SpaceRegistrationStage, string>> = {
@@ -96,6 +97,10 @@ export interface SpaceRegistrationSheetRowInput {
   deposit?: string | number;
   managementFee?: string | number;
   tourMethod?: string;
+  weekdayRate?: string | number;
+  weekendHolidayRate?: string | number;
+  minimumRentalDays?: string | number;
+  vatIncluded?: string;
   receivedAt?: Date;
 }
 
@@ -139,6 +144,54 @@ async function getSheetId(sheets: SheetsClient): Promise<number> {
   const sheetId = sheet?.properties?.sheetId;
   if (typeof sheetId !== "number") throw new Error(`‘${SPACE_REGISTRATIONS_TAB_NAME}’ 탭을 찾지 못했습니다.`);
   return sheetId;
+}
+
+/** 새 상세 열이 없는 기존 접수 탭에도 헤더와 그리드를 안전하게 확장한다. */
+async function ensureSpaceRegistrationHeaders(sheets: SheetsClient, rows: SheetRows) {
+  const response = await sheets.spreadsheets.get({
+    spreadsheetId: SPACE_REGISTRATIONS_SPREADSHEET_ID,
+    fields: "sheets.properties(sheetId,title,gridProperties(columnCount))",
+  });
+  const sheet = response.data.sheets?.find((item) => item.properties?.title === SPACE_REGISTRATIONS_TAB_NAME);
+  const sheetId = sheet?.properties?.sheetId;
+  const currentColumnCount = sheet?.properties?.gridProperties?.columnCount;
+  if (typeof sheetId !== "number" || typeof currentColumnCount !== "number") {
+    throw new Error(`‘${SPACE_REGISTRATIONS_TAB_NAME}’ 탭의 열 구조를 읽지 못했습니다.`);
+  }
+  const requests: object[] = [];
+  if (currentColumnCount < SPACE_REGISTRATION_COLUMN_COUNT) {
+    requests.push({
+      appendDimension: {
+        sheetId,
+        dimension: "COLUMNS",
+        length: SPACE_REGISTRATION_COLUMN_COUNT - currentColumnCount,
+      },
+    });
+  }
+  const currentHeaders = rows[0] ?? [];
+  SPACE_REGISTRATION_EXTRA_COLUMNS.forEach(({ header }, index) => {
+    const column = 39 + index;
+    if (String(currentHeaders[column] ?? "").trim()) return;
+    requests.push({
+      updateCells: {
+        range: {
+          sheetId,
+          startRowIndex: 0,
+          endRowIndex: 1,
+          startColumnIndex: column,
+          endColumnIndex: column + 1,
+        },
+        rows: [{ values: [{ userEnteredValue: { stringValue: header } }] }],
+        fields: "userEnteredValue",
+      },
+    });
+  });
+  if (requests.length > 0) {
+    await sheets.spreadsheets.batchUpdate({
+      spreadsheetId: SPACE_REGISTRATIONS_SPREADSHEET_ID,
+      requestBody: { requests },
+    });
+  }
 }
 
 function sheetCellValue(value: unknown): { userEnteredValue: { stringValue: string } | { numberValue: number } } {
@@ -215,6 +268,7 @@ export async function appendSpaceRegistrationRow(input: SpaceRegistrationSheetRo
   assertSpaceRegistrationAllowed({ spaceName, address: input.address });
 
   const { sheets, rows } = await readSpaceRegistrationSheet();
+  await ensureSpaceRegistrationHeaders(sheets, rows);
   const registrationId = nextRegistrationId(rows);
   const rowNumber = Math.max(rows.length + 1, 2);
   const sourceRowNumber = rows.length >= 2 ? rows.length : 1;
@@ -223,14 +277,14 @@ export async function appendSpaceRegistrationRow(input: SpaceRegistrationSheetRo
   const requests: object[] = [
     {
       copyPaste: {
-        source: rowRange(sheetId, sourceRowNumber, "A", "BM"),
-        destination: rowRange(sheetId, rowNumber, "A", "BM"),
+        source: rowRange(sheetId, sourceRowNumber, "A", columnName(SPACE_REGISTRATION_COLUMN_COUNT - 1)),
+        destination: rowRange(sheetId, rowNumber, "A", columnName(SPACE_REGISTRATION_COLUMN_COUNT - 1)),
         pasteType: "PASTE_NORMAL",
       },
     },
     {
       updateCells: {
-        range: rowRange(sheetId, rowNumber, "A", "BM"),
+        range: rowRange(sheetId, rowNumber, "A", columnName(SPACE_REGISTRATION_COLUMN_COUNT - 1)),
         rows: [{ values: values.map(sheetCellValue) }],
         fields: "userEnteredValue",
       },
@@ -257,6 +311,17 @@ export async function appendSpaceRegistrationRow(input: SpaceRegistrationSheetRo
 
 function columnIndex(column: string): number {
   return [...column].reduce((result, letter) => result * 26 + letter.charCodeAt(0) - 64, 0) - 1;
+}
+
+function columnName(index: number): string {
+  let value = index + 1;
+  let result = "";
+  while (value > 0) {
+    const remainder = (value - 1) % 26;
+    result = String.fromCharCode(65 + remainder) + result;
+    value = Math.floor((value - 1) / 26);
+  }
+  return result;
 }
 
 function rowRange(sheetId: number, rowNumber: number, startColumn: string, endColumn: string) {

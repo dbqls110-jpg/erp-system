@@ -131,6 +131,25 @@ describe("validateProposal — 무엇을 받아들이고 무엇을 버리는가"
     expect(rejected).toEqual([]);
   });
 
+  it("공간 접수의 평일·주말 요금과 최소 대관일·VAT를 받는다", () => {
+    const { accepted, rejected } = validateProposal({
+      target: "space_registration_create",
+      id: "",
+      changes: {
+        spaceName: "아티코 한남",
+        weekdayRate: 88,
+        weekendHolidayRate: "110",
+        minimumRentalDays: 3,
+        vatIncluded: "별도",
+      },
+    });
+    expect(accepted.weekdayRate).toBe(88);
+    expect(accepted.weekendHolidayRate).toBe(110);
+    expect(accepted.minimumRentalDays).toBe(3);
+    expect(accepted.vatIncluded).toBe("별도");
+    expect(rejected).toEqual([]);
+  });
+
   it("지나치게 긴 글은 버린다", () => {
     // 막지 않으면 AI 가 답변을 통째로 메모에 밀어 넣는 일이 생긴다.
     const { rejected } = validateProposal(make({ calledNote: "가".repeat(501) }));

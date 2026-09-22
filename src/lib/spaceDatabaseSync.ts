@@ -9,10 +9,11 @@ export const SPACE_DATABASE_TAB_NAME = "공간DB";
 const SPACE_REGISTRATION_SPREADSHEET_ID = "1A5xN_nii5AeAkM9JSF0morcetMCI3A7TDcvk3xRjd1M";
 // 호스트 등록 공간은 주차 대수와 타공 여부를 각각 한 칸으로 정리한다.
 // 기존 접수 탭의 원본 열은 그대로 두고, 완료본(호스트 등록 공간)만 정규화한다.
-const HOST_REGISTERED_RANGE = `'${HOST_REGISTERED_SPACES_TAB_NAME}'!A1:BL`;
 const HOST_REGISTERED_EXTRA_COLUMNS = SPACE_REGISTRATION_EXTRA_COLUMNS.filter(
   ({ key }) => key !== "drilling" && key !== "parkingSpaces",
 );
+const HOST_REGISTERED_COLUMN_COUNT = 40 + HOST_REGISTERED_EXTRA_COLUMNS.length;
+const HOST_REGISTERED_RANGE = `'${HOST_REGISTERED_SPACES_TAB_NAME}'!A1:${columnName(HOST_REGISTERED_COLUMN_COUNT - 1)}`;
 // 운영 공간DB는 원본 `전체` 탭의 121열을 기본으로 하되, 호스트 상세 열은
 // 등록 완료 시 헤더를 보존하면서 오른쪽에 자동으로 확장한다.
 const SPACE_DATABASE_MIN_COLUMN_COUNT = 121;
@@ -52,6 +53,10 @@ const SPACE_DATABASE_REQUIRED_COLUMNS = [
   "담당자 연락처",
   "대기공간",
   "등록출처",
+  "평일 대관료",
+  "주말·공휴일 대관료",
+  "최소 대관일",
+  "VAT 여부",
 ] as const;
 const HOST_SOURCE_URL = `https://docs.google.com/spreadsheets/d/${SPACE_REGISTRATION_SPREADSHEET_ID}/edit?gid=698680621#gid=698680621`;
 
@@ -128,6 +133,50 @@ async function getSheetGridProperties(sheets: SheetsClient, spreadsheetId: strin
     throw new Error(`‘${title}’ 탭의 열 구조를 읽지 못했습니다.`);
   }
   return { sheetId, columnCount };
+}
+
+/** 새 요금·부가세 열이 없는 기존 호스트 등록 공간 탭도 다음 동기화 때 확장한다. */
+async function ensureHostRegisteredHeaders(sheets: SheetsClient) {
+  const grid = await getSheetGridProperties(sheets, SPACE_REGISTRATION_SPREADSHEET_ID, HOST_REGISTERED_SPACES_TAB_NAME);
+  const headers = await readValues(
+    sheets,
+    SPACE_REGISTRATION_SPREADSHEET_ID,
+    `'${HOST_REGISTERED_SPACES_TAB_NAME}'!A1:${columnName(Math.max(grid.columnCount, HOST_REGISTERED_COLUMN_COUNT) - 1)}`,
+  );
+  const currentHeaders = headers[0] ?? [];
+  const requests: Array<Record<string, unknown>> = [];
+  if (grid.columnCount < HOST_REGISTERED_COLUMN_COUNT) {
+    requests.push({
+      appendDimension: {
+        sheetId: grid.sheetId,
+        dimension: "COLUMNS",
+        length: HOST_REGISTERED_COLUMN_COUNT - grid.columnCount,
+      },
+    });
+  }
+  HOST_REGISTERED_EXTRA_COLUMNS.forEach(({ header }, index) => {
+    const column = 40 + index;
+    if (String(currentHeaders[column] ?? "").trim()) return;
+    requests.push({
+      updateCells: {
+        range: {
+          sheetId: grid.sheetId,
+          startRowIndex: 0,
+          endRowIndex: 1,
+          startColumnIndex: column,
+          endColumnIndex: column + 1,
+        },
+        rows: [{ values: [{ userEnteredValue: { stringValue: header } }] }],
+        fields: "userEnteredValue",
+      },
+    });
+  });
+  if (requests.length > 0) {
+    await sheets.spreadsheets.batchUpdate({
+      spreadsheetId: SPACE_REGISTRATION_SPREADSHEET_ID,
+      requestBody: { requests },
+    });
+  }
 }
 
 async function readValues(sheets: SheetsClient, spreadsheetId: string, range: string) {
@@ -309,6 +358,7 @@ async function upsertHostRegisteredSpace(
   record: SpaceRegistrationRecord,
   timestamp: string,
 ) {
+  await ensureHostRegisteredHeaders(sheets);
   const rows = await readValues(sheets, SPACE_REGISTRATION_SPREADSHEET_ID, HOST_REGISTERED_RANGE);
   const existingIndex = rows.slice(1).findIndex((row) => {
     const sameId = String(row[0] ?? "").trim() === record.registrationId.trim() && record.registrationId.trim() !== "";
@@ -326,7 +376,7 @@ async function upsertHostRegisteredSpace(
     rowNumber,
     sourceRowNumber,
     "A",
-    "BL",
+    columnName(40 + HOST_REGISTERED_EXTRA_COLUMNS.length - 1),
     hostRowValues(record, timestamp, existingValues),
   );
   return { rowNumber, registrationId: record.registrationId };
@@ -365,6 +415,11 @@ function venueRowValues(headers: string[], rows: SheetRows, record: SpaceRegistr
   const area = parsedNumber(record.area);
   const dailyRateMan = parsedNumber(record.dailyRate);
   const dailyRateWon = dailyRateMan === null ? null : dailyRateMan * 10000;
+  const weekdayRateMan = parsedNumber(record.weekdayRate);
+  const weekdayRateWon = weekdayRateMan === null ? null : weekdayRateMan * 10000;
+  const weekendHolidayRateMan = parsedNumber(record.weekendHolidayRate);
+  const weekendHolidayRateWon = weekendHolidayRateMan === null ? null : weekendHolidayRateMan * 10000;
+  const minimumRentalDays = parsedNumber(record.minimumRentalDays);
   set("이름", record.spaceName);
   set("공간명", record.spaceName);
   set("대표공간명", record.spaceName);
@@ -447,6 +502,10 @@ function venueRowValues(headers: string[], rows: SheetRows, record: SpaceRegistr
     보증금: record.deposit,
     관리비: record.managementFee,
     "답사 방법": record.tourMethod,
+    "평일 대관료": weekdayRateWon,
+    "주말·공휴일 대관료": weekendHolidayRateWon,
+    "최소 대관일": minimumRentalDays,
+    "VAT 여부": record.vatIncluded,
   };
   for (const [header, value] of Object.entries(extraValues)) set(header, value);
   return { rowNumber, values };
