@@ -131,6 +131,22 @@ describe("validateProposal — 무엇을 받아들이고 무엇을 버리는가"
     expect(rejected).toEqual([]);
   });
 
+  it("공간 접수의 단위가 붙은 선택 숫자값은 비워 두고 접수한다", () => {
+    const { accepted, rejected } = validateProposal({
+      target: "space_registration_create",
+      id: "",
+      changes: {
+        spaceName: "아티코 한남",
+        address: "서울 용산구 한남동",
+        dailyRate: "월-목 80만원 / 금-일 100만원",
+      },
+    });
+    expect(accepted.spaceName).toBe("아티코 한남");
+    expect(accepted.address).toBe("서울 용산구 한남동");
+    expect(accepted.dailyRate).toBeUndefined();
+    expect(rejected).toEqual([]);
+  });
+
   it("공간 접수의 평일·주말 요금과 최소 대관일·VAT를 받는다", () => {
     const { accepted, rejected } = validateProposal({
       target: "space_registration_create",

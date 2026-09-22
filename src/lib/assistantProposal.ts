@@ -683,6 +683,11 @@ function addRegistrationValue(
       accepted[field] = Number(value.trim());
       return;
     }
+    // 공간 접수의 숫자 칸은 대부분 선택 입력이다. AI가 원문에서
+    // "80~100만원", "협의", "확인 필요"처럼 단일 숫자로 확정할 수
+    // 없는 값을 읽어도, 이름·주소 등 유효한 정보까지 접수를 막지 않는다.
+    // 필수 숫자 칸만 위에서 오류로 남긴다.
+    if (!options.required) return;
     rejected.push({ field, reason: "0 이상의 숫자여야 합니다." });
     return;
   }
