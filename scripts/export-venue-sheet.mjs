@@ -17,14 +17,12 @@ import "dotenv/config";
 import { google } from "googleapis";
 import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
-import { getRefreshToken, findOrCreateFolder } from "./lib/drive.mjs";
+import { getRefreshToken } from "./lib/drive.mjs";
 import { isInternalRawKey } from "../src/lib/venueColumns.mjs";
 
 const DRY_RUN = process.argv.includes("--dry-run");
-/** `천우영 시트` 폴더. sync-drive-sheets.mjs 와 같은 값. */
-const SHEETS_FOLDER_ID = "1sINhEgqROuCDybbvD5PbnpWaVH8V0mi_";
-const SUBFOLDER = "공간DB";
-const SHEET_TITLE = "서울경기_대관공간_DB";
+/** 운영 공간DB로 사용할 고정 Google Sheet. 새 파일을 만들거나 이름 검색으로 우회하지 않는다. */
+const CANONICAL_SPREADSHEET_ID = "1XFfEdhOwFMyZE7IuDcykDaRNQ8IXtPq6bvwA-StjII4";
 const TAB = "공간DB";
 /** 한 번에 보내는 행 수. 157열 × 400행이면 요청 하나가 1MB 안팎이다. */
 const CHUNK = 400;
@@ -121,28 +119,10 @@ try {
 
   const oauth2 = new google.auth.OAuth2(process.env.AUTH_GOOGLE_ID, process.env.AUTH_GOOGLE_SECRET);
   oauth2.setCredentials({ refresh_token: await getRefreshToken() });
-  const drive = google.drive({ version: "v3", auth: oauth2 });
   const sheets = google.sheets({ version: "v4", auth: oauth2 });
-
-  const folderId = await findOrCreateFolder(drive, SUBFOLDER, SHEETS_FOLDER_ID);
-  const existing = await drive.files.list({
-    q: `'${folderId}' in parents and name = '${SHEET_TITLE}' and mimeType = 'application/vnd.google-apps.spreadsheet' and trashed = false`,
-    fields: "files(id,name,webViewLink)",
-  });
-  let spreadsheetId = existing.data.files?.[0]?.id;
-  let url = existing.data.files?.[0]?.webViewLink;
-  if (!spreadsheetId) {
-    const created = await sheets.spreadsheets.create({
-      requestBody: { properties: { title: SHEET_TITLE }, sheets: [{ properties: { title: TAB, gridProperties: { frozenRowCount: 1 } } }] },
-      fields: "spreadsheetId,spreadsheetUrl",
-    });
-    spreadsheetId = created.data.spreadsheetId;
-    url = created.data.spreadsheetUrl;
-    await drive.files.update({ fileId: spreadsheetId, addParents: folderId, removeParents: "root", fields: "id" });
-    console.log("시트 새로 만듦");
-  } else {
-    console.log("기존 시트 덮어씀");
-  }
+  const spreadsheetId = CANONICAL_SPREADSHEET_ID;
+  const url = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit`;
+  console.log("지정된 운영 공간DB 시트에 덮어씀");
 
   // 탭이 없으면(사람이 이름을 바꿨거나) 만들고, 있으면 비운다.
   const meta = await sheets.spreadsheets.get({ spreadsheetId, fields: "sheets.properties" });
