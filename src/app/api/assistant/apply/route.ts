@@ -16,7 +16,7 @@ import {
   saveInquiryMemo,
   saveInquiryStage,
 } from "@/lib/inquirySheet";
-import { appendSpaceRegistrationRow, assertSpaceRegistrationAllowed, getSpaceRegistrations, saveSpaceRegistrationMemo, saveSpaceRegistrationStage } from "@/lib/spaceRegistrationSheet";
+import { assertSpaceRegistrationAllowed, getSpaceRegistrations, saveSpaceRegistrationMemo, saveSpaceRegistrationStage } from "@/lib/spaceRegistrationSheet";
 import { getSpaceRentals, saveSpaceRentalStage } from "@/lib/spaceRentalSheet";
 import { formatCurrentDateTime, type InquiryStage } from "@/lib/inquiries";
 import type { SpaceRegistrationStage } from "@/lib/spaceRegistrations";
@@ -53,6 +53,7 @@ import {
 } from "@/lib/googleDrive";
 import { createSpreadsheet, SheetCreationError } from "@/lib/sheetCreation";
 import { syncVenueSource, venueSourceKey } from "@/lib/venueSourceSync";
+import { syncSpaceRegistrationDirect } from "@/lib/spaceDatabaseSync";
 
 /**
  * 비서가 내놓은 변경 제안을 실제로 적용한다.
@@ -1060,7 +1061,7 @@ export async function POST(req: NextRequest) {
         photo = await moveMessengerFileToSpaceRegistration(driveFileId);
       }
 
-      const saved = await appendSpaceRegistrationRow({
+      const saved = await syncSpaceRegistrationDirect({
         spaceName: content.spaceName,
         contactName: content.contactName,
         relationship: content.relationship,
@@ -1122,9 +1123,10 @@ export async function POST(req: NextRequest) {
         tourMethod: content.tourMethod,
       });
       const result = {
-        name: saved.spaceName,
+        name: content.spaceName,
         registrationId: saved.registrationId,
-        rowNumber: saved.rowNumber,
+        hostRowNumber: saved.hostRowNumber,
+        venueRowNumber: saved.venueRowNumber,
         photoCount: photoFileIds.length,
         ...(photo ? { folderPath: photo.folderPath, folderUrl: photo.folderUrl, driveUrl: photo.driveUrl } : {}),
       };

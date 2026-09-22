@@ -338,7 +338,7 @@ export function ProposalCard({
       : proposal.target === "venue_create"
         ? "공간 등록"
       : proposal.target === "space_registration_create"
-        ? "공간 등록 접수"
+        ? "호스트 등록 공간"
     : proposal.target === "partner"
       ? "파트너"
       : proposal.target === "project"
@@ -375,7 +375,7 @@ export function ProposalCard({
                                       ? "메시지 전송"
                   : "구글 시트";
   const savingLabel = proposal.target === "space_registration_create"
-    ? "공간 등록 접수 중…"
+    ? "호스트 등록 공간 반영 중…"
     : isProjectCreate
     ? "프로젝트 만드는 중…"
     : isChecklistDone
@@ -408,7 +408,7 @@ export function ProposalCard({
             ? "시트 만드는 중…"
             : "저장 중…";
   const applyLabel = proposal.target === "space_registration_create"
-    ? "공간 등록 접수"
+    ? "호스트 등록 공간에 반영"
     : isProjectCreate
     ? "프로젝트 만들기"
     : isChecklistDone
@@ -617,6 +617,8 @@ export function ProposalCard({
                               ? "휴가를 신청했습니다"
                               : isMessageSend
                                 ? "메시지를 보냈습니다"
+                                : proposal.target === "space_registration_create"
+                                  ? "호스트 등록 공간과 공간DB에 반영했습니다"
                                 : isProjectCreate
               ? projectAlreadyExists ? "이미 있는 프로젝트입니다" : "프로젝트를 만들었습니다"
               : isChecklistDone

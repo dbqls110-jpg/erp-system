@@ -1,6 +1,7 @@
 import { makeSheetsClientAsOwner } from "@/lib/googleClient";
 import { formatCurrentDateTime } from "@/lib/inquiries";
 import { SPACE_REGISTRATION_EXTRA_COLUMNS, type SpaceRegistrationRecord } from "@/lib/spaceRegistrations";
+import type { SpaceRegistrationSheetRowInput } from "@/lib/spaceRegistrationSheet";
 import { blockedReason } from "@/lib/venueBlocklist.mjs";
 
 export const HOST_REGISTERED_SPACES_TAB_NAME = "호스트 등록 공간";
@@ -556,4 +557,113 @@ export async function syncCompletedSpaceRegistration(record: SpaceRegistrationRe
   const saved = verify.data.values?.[0] ?? [];
   if (String(saved[0] ?? "") !== record.spaceName) throw new Error("공간DB 자동 반영 후 공간명 확인에 실패했습니다.");
   return { hostRowNumber: host.rowNumber, venueRowNumber: venue.rowNumber, timestamp };
+}
+
+/**
+ * AI 비서의 공간등록 카드를 바로 운영 시트에 반영한다.
+ *
+ * 접수 탭에 먼저 쓴 뒤 관리자가 다시 "등록 완료"로 바꾸는 흐름은
+ * AI 비서의 확인 카드를 누른 사용자의 기대와 달랐다. 카드 반영은 이미
+ * 사람의 확인을 거친 동작이므로, 접수번호를 새로 만들고 완료본(호스트
+ * 등록 공간 + 공간DB)을 한 번에 idempotent하게 갱신한다.
+ */
+export async function syncSpaceRegistrationDirect(
+  input: SpaceRegistrationSheetRowInput,
+  now = new Date(),
+) {
+  const spaceName = input.spaceName.trim();
+  if (!spaceName) throw new Error("공간명이 필요합니다.");
+  const address = String(input.address ?? "").trim();
+  const blocked = blockedReason({ name: spaceName, address });
+  if (blocked) throw new Error(`절대 등록 금지 공간이라 반영하지 않았습니다. (${blocked})`);
+
+  const receivedAt = formatCurrentDateTime(now);
+  // 접수 탭의 숫자형 접수번호와 충돌하지 않도록 AI 반영 전용 접두사를 붙인다.
+  const registrationId = `AI-${now.getTime()}-${Math.random().toString(36).slice(2, 8)}`;
+  const text = (value: unknown) => String(value ?? "");
+  const record = {
+    id: registrationId,
+    rowNumber: 0,
+    identity: {
+      registrationId,
+      receivedAt,
+      contactName: text(input.contactName),
+      relationship: text(input.relationship),
+      phone: text(input.phone),
+      email: text(input.email),
+      spaceName,
+    },
+    registrationId,
+    receivedAt,
+    status: "등록 완료" as const,
+    contactName: text(input.contactName),
+    relationship: text(input.relationship),
+    phone: text(input.phone),
+    email: text(input.email),
+    spaceName,
+    spaceType: text(input.spaceType),
+    address,
+    desiredRegion: text(input.desiredRegion),
+    description: text(input.description),
+    area: text(input.area),
+    capacity: text(input.capacity),
+    dailyRate: text(input.dailyRate),
+    negotiable: text(input.negotiable),
+    conditions: text(input.conditions),
+    photoFolderUrl: text(input.photoFolderUrl),
+    photoCount: text(input.photoCount),
+    privacyConsentAt: text(input.privacyConsentAt),
+    photoPermission: text(input.photoPermission),
+    manager: "",
+    memo: "AI 비서 카드에서 직접 반영",
+    finalProcessedAt: receivedAt,
+    reviewStartedAt: "",
+    confirmationCompletedAt: receivedAt,
+    registrationCompletedAt: receivedAt,
+    rejectedAt: "",
+    cooling: text(input.cooling),
+    restroom: text(input.restroom),
+    wifi: text(input.wifi),
+    parkingCount: text(input.parkingCount),
+    fireNotAllowed: text(input.fireNotAllowed),
+    drillingNotAllowed: text(input.drillingNotAllowed),
+    noiseLimit: text(input.noiseLimit),
+    equipmentRental: text(input.equipmentRental),
+    nightWork: text(input.nightWork),
+    foodAllowed: text(input.foodAllowed),
+    extraConditions: text(input.extraConditions),
+    areaPyeong: text(input.areaPyeong),
+    rentableFloors: text(input.rentableFloors),
+    rentableTotalArea: text(input.rentableTotalArea),
+    rentableFloorArea: text(input.rentableFloorArea),
+    outdoorYard: text(input.outdoorYard),
+    kitchen: text(input.kitchen),
+    usage: text(input.usage),
+    storageOffice: text(input.storageOffice),
+    roomCount: text(input.roomCount),
+    powerCapacity: text(input.powerCapacity),
+    elevator: text(input.elevator),
+    freightElevator: text(input.freightElevator),
+    ooh: text(input.ooh),
+    wasteDisposal: text(input.wasteDisposal),
+    drilling: text(input.drilling),
+    accessHours: text(input.accessHours),
+    parkingAvailable: text(input.parkingAvailable),
+    parkingSpaces: text(input.parkingSpaces),
+    floorPlan: text(input.floorPlan),
+    ceilingHeight: text(input.ceilingHeight),
+    lighting: text(input.lighting),
+    wiredInternet: text(input.wiredInternet),
+    floorFinish: text(input.floorFinish),
+    deposit: text(input.deposit),
+    managementFee: text(input.managementFee),
+    tourMethod: text(input.tourMethod),
+    weekdayRate: text(input.weekdayRate),
+    weekendHolidayRate: text(input.weekendHolidayRate),
+    minimumRentalDays: text(input.minimumRentalDays),
+    vatIncluded: text(input.vatIncluded),
+  } satisfies SpaceRegistrationRecord;
+
+  const synced = await syncCompletedSpaceRegistration(record, now);
+  return { registrationId, ...synced };
 }
