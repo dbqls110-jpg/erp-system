@@ -7,13 +7,31 @@ export const HOST_REGISTERED_SPACES_TAB_NAME = "호스트 등록 공간";
 export const SPACE_DATABASE_SPREADSHEET_ID = "1XFfEdhOwFMyZE7IuDcykDaRNQ8IXtPq6bvwA-StjII4";
 export const SPACE_DATABASE_TAB_NAME = "공간DB";
 const SPACE_REGISTRATION_SPREADSHEET_ID = "1A5xN_nii5AeAkM9JSF0morcetMCI3A7TDcvk3xRjd1M";
+// 접수 탭은 원문 열을 보존하지만, 완료본(호스트 등록 공간)은 세부 시설값을
+// 비고 한 칸으로 묶어 운영자가 읽기 쉽게 유지한다. 원본 접수 탭의 열은
+// 건드리지 않으므로 접수 파싱 순서도 바뀌지 않는다.
+const HOST_REGISTERED_BASE_HEADERS = [
+  "등록번호", "등록일시 (한국시간)", "등록 상태", "공간명", "지역", "공간 유형", "상세 주소",
+  "담당자 이름", "연락처", "이메일", "공간과의 관계", "면적 (㎡)", "수용 인원 (명)",
+  "1일 대관료 (만원)", "요금 협의", "공간 소개", "시설·대관 조건 원문", "사진 수",
+  "사진 링크 (Drive 권한 필요)", "공개 공간 ID", "공간 페이지", "검토일시", "반려 사유",
+  "최종 수정일시", "정보 사실 확인", "24시간 응답 동의", "90일 점검 동의", "직거래 금지 동의",
+  "운영 동의일시", "냉난방", "화장실", "Wi-Fi", "주차 가능 대수", "화기 불가",
+  "소음 제한", "집기 렌탈", "야간 작업", "음식 섭취 가능", "추가 조건",
+] as const;
+const HOST_REGISTERED_NOTE_KEYS = new Set([
+  "outdoorYard", "kitchen", "usage", "storageOffice", "roomCount", "freightElevator",
+  "wasteDisposal", "drilling", "accessHours", "wiredInternet", "floorFinish", "managementFee", "tourMethod",
+]);
 // 호스트 등록 공간은 주차 대수와 타공 여부를 각각 한 칸으로 정리한다.
-// 기존 접수 탭의 원본 열은 그대로 두고, 완료본(호스트 등록 공간)만 정규화한다.
 const HOST_REGISTERED_EXTRA_COLUMNS = SPACE_REGISTRATION_EXTRA_COLUMNS.filter(
-  ({ key }) => key !== "drilling" && key !== "parkingSpaces",
+  ({ key }) => key !== "drilling" && key !== "parkingSpaces" && !HOST_REGISTERED_NOTE_KEYS.has(key),
 );
-const HOST_REGISTERED_COLUMN_COUNT = 40 + HOST_REGISTERED_EXTRA_COLUMNS.length;
-const HOST_REGISTERED_RANGE = `'${HOST_REGISTERED_SPACES_TAB_NAME}'!A1:${columnName(HOST_REGISTERED_COLUMN_COUNT - 1)}`;
+const HOST_REGISTERED_HEADERS = [
+  ...HOST_REGISTERED_BASE_HEADERS,
+  ...HOST_REGISTERED_EXTRA_COLUMNS.map(({ header }) => header),
+  "비고",
+];
 // 운영 공간DB는 원본 `전체` 탭의 121열을 기본으로 하되, 호스트 상세 열은
 // 등록 완료 시 헤더를 보존하면서 오른쪽에 자동으로 확장한다.
 const SPACE_DATABASE_MIN_COLUMN_COUNT = 121;
@@ -24,18 +42,9 @@ const SPACE_DATABASE_REQUIRED_COLUMNS = [
   "대관 가능 층수",
   "대관 가능 총 면적",
   "대관 가능 층별 면적",
-  "야외마당",
-  "주방",
-  "용도",
-  "창고/운영사무국",
-  "룸 개수",
   "전력량",
   "E/V",
-  "화물승강기",
   "OOH",
-  "쓰레기 불출",
-  "타공 유무",
-  "개방/시간방법",
   "주차 유무",
   "주차 댓수",
   "도면",
@@ -43,20 +52,16 @@ const SPACE_DATABASE_REQUIRED_COLUMNS = [
   "냉난방",
   "조명",
   "wifi",
-  "인터넷 선",
-  "바닥마감",
   "화장실",
   "보증금",
   "대관료",
-  "관리비",
-  "답사 방법",
   "담당자 연락처",
   "대기공간",
-  "등록출처",
   "평일 대관료",
   "주말·공휴일 대관료",
   "최소 대관일",
   "VAT 여부",
+  "비고",
 ] as const;
 const HOST_SOURCE_URL = `https://docs.google.com/spreadsheets/d/${SPACE_REGISTRATION_SPREADSHEET_ID}/edit?gid=698680621#gid=698680621`;
 
@@ -96,20 +101,6 @@ function cellValue(value: unknown): { userEnteredValue: { stringValue: string } 
   return { userEnteredValue: { stringValue: String(value ?? "") } };
 }
 
-function normalizeDrillingAvailability(record: Pick<SpaceRegistrationRecord, "drilling" | "drillingNotAllowed">): string {
-  const direct = String(record.drilling ?? "").trim();
-  if (direct) {
-    if (/(불가|금지|불가능|없음|없다|no|false|아니오)/i.test(direct)) return "불가";
-    if (/(가능|허용|있음|있다|yes|true|예)/i.test(direct)) return "가능";
-    return direct;
-  }
-
-  const prohibited = String(record.drillingNotAllowed ?? "").trim();
-  if (/(불가|금지|불가능|yes|true|예)/i.test(prohibited)) return "불가";
-  if (/(가능|허용|no|false|아니오)/i.test(prohibited)) return "가능";
-  return prohibited;
-}
-
 async function getSheetId(sheets: SheetsClient, spreadsheetId: string, title: string): Promise<number> {
   const response = await sheets.spreadsheets.get({
     spreadsheetId,
@@ -135,42 +126,43 @@ async function getSheetGridProperties(sheets: SheetsClient, spreadsheetId: strin
   return { sheetId, columnCount };
 }
 
-/** 새 요금·부가세 열이 없는 기존 호스트 등록 공간 탭도 다음 동기화 때 확장한다. */
+/** 호스트 등록 완료본에 필요한 열만 보장한다. 접수 원본의 세부 열은 다시 만들지 않는다. */
 async function ensureHostRegisteredHeaders(sheets: SheetsClient) {
   const grid = await getSheetGridProperties(sheets, SPACE_REGISTRATION_SPREADSHEET_ID, HOST_REGISTERED_SPACES_TAB_NAME);
   const headers = await readValues(
     sheets,
     SPACE_REGISTRATION_SPREADSHEET_ID,
-    `'${HOST_REGISTERED_SPACES_TAB_NAME}'!A1:${columnName(Math.max(grid.columnCount, HOST_REGISTERED_COLUMN_COUNT) - 1)}`,
+    `'${HOST_REGISTERED_SPACES_TAB_NAME}'!A1:${columnName(Math.max(grid.columnCount, HOST_REGISTERED_HEADERS.length) - 1)}`,
   );
   const currentHeaders = headers[0] ?? [];
   const requests: Array<Record<string, unknown>> = [];
-  if (grid.columnCount < HOST_REGISTERED_COLUMN_COUNT) {
+  const existingHeaders = new Set(currentHeaders.map((header) => String(header ?? "").trim()).filter(Boolean));
+  let nextColumn = grid.columnCount;
+  for (const header of HOST_REGISTERED_HEADERS) {
+    if (existingHeaders.has(header)) continue;
     requests.push({
       appendDimension: {
         sheetId: grid.sheetId,
         dimension: "COLUMNS",
-        length: HOST_REGISTERED_COLUMN_COUNT - grid.columnCount,
+        length: 1,
       },
     });
-  }
-  HOST_REGISTERED_EXTRA_COLUMNS.forEach(({ header }, index) => {
-    const column = 40 + index;
-    if (String(currentHeaders[column] ?? "").trim()) return;
     requests.push({
       updateCells: {
         range: {
           sheetId: grid.sheetId,
           startRowIndex: 0,
           endRowIndex: 1,
-          startColumnIndex: column,
-          endColumnIndex: column + 1,
+          startColumnIndex: nextColumn,
+          endColumnIndex: nextColumn + 1,
         },
         rows: [{ values: [{ userEnteredValue: { stringValue: header } }] }],
         fields: "userEnteredValue",
       },
     });
-  });
+    existingHeaders.add(header);
+    nextColumn += 1;
+  }
   if (requests.length > 0) {
     await sheets.spreadsheets.batchUpdate({
       spreadsheetId: SPACE_REGISTRATION_SPREADSHEET_ID,
@@ -189,10 +181,6 @@ async function readValues(sheets: SheetsClient, spreadsheetId: string, range: st
   return (response.data.values ?? []) as SheetRows;
 }
 
-function setValue(row: unknown[], index: number, value: unknown) {
-  if (index >= 0) row[index] = value;
-}
-
 function parsedNumber(value: string): number | null {
   const normalized = value.replace(/[^0-9.-]/g, "");
   if (!normalized) return null;
@@ -204,6 +192,32 @@ function parsedNumberRange(value: string): { min: number | null; max: number | n
   const numbers = value.match(/\d+(?:\.\d+)?/g)?.map(Number).filter(Number.isFinite) ?? [];
   if (numbers.length === 0) return { min: null, max: null };
   return { min: numbers[0], max: numbers[numbers.length - 1] };
+}
+
+const SPACE_DETAIL_NOTE_FIELDS: ReadonlyArray<readonly [string, keyof SpaceRegistrationRecord]> = [
+  ["야외마당", "outdoorYard"],
+  ["주방", "kitchen"],
+  ["용도", "usage"],
+  ["창고/운영사무국", "storageOffice"],
+  ["룸 개수", "roomCount"],
+  ["화물승강기", "freightElevator"],
+  ["쓰레기 불출", "wasteDisposal"],
+  ["타공 여부", "drilling"],
+  ["개방/시간방법", "accessHours"],
+  ["인터넷 선", "wiredInternet"],
+  ["바닥마감", "floorFinish"],
+  ["관리비", "managementFee"],
+  ["답사 방법", "tourMethod"],
+];
+
+function spaceDetailNotes(record: SpaceRegistrationRecord, existing = ""): string {
+  const lines = existing.trim() ? [existing.trim()] : [];
+  if (!lines.some((line) => line.startsWith("등록출처:"))) lines.push("등록출처: 호스트 등록");
+  for (const [label, key] of SPACE_DETAIL_NOTE_FIELDS) {
+    const value = String(record[key] ?? "").trim();
+    if (value && !lines.some((line) => line.startsWith(`${label}:`))) lines.push(`${label}: ${value}`);
+  }
+  return lines.join("\n");
 }
 
 async function ensureSpaceDatabaseSchema(sheets: SheetsClient) {
@@ -280,43 +294,56 @@ async function ensureSpaceDatabaseSchema(sheets: SheetsClient) {
   return { sheetId: grid.sheetId, rows, headers, endColumn: columnName(finalColumnCount - 1) };
 }
 
-function hostRowValues(record: SpaceRegistrationRecord, timestamp: string, existing?: readonly unknown[]): unknown[] {
-  const row = Array.from({ length: 40 + HOST_REGISTERED_EXTRA_COLUMNS.length }, (_, index) => existing?.[index]);
-  setValue(row, 0, record.registrationId);
-  setValue(row, 1, record.receivedAt);
-  setValue(row, 2, "등록 완료");
-  setValue(row, 3, record.spaceName);
-  setValue(row, 4, record.desiredRegion);
-  setValue(row, 5, record.spaceType);
-  setValue(row, 6, record.address);
-  setValue(row, 7, record.contactName);
-  setValue(row, 8, record.phone);
-  setValue(row, 9, record.email);
-  setValue(row, 10, record.relationship);
-  setValue(row, 11, record.area);
-  setValue(row, 12, record.capacity);
-  setValue(row, 13, record.dailyRate);
-  setValue(row, 14, record.negotiable);
-  setValue(row, 15, record.description);
-  setValue(row, 16, record.conditions);
-  setValue(row, 17, record.photoCount);
-  setValue(row, 18, record.photoFolderUrl);
-  setValue(row, 21, timestamp);
-  setValue(row, 23, timestamp);
-  setValue(row, 29, record.cooling);
-  setValue(row, 30, record.restroom);
-  setValue(row, 31, record.wifi);
-  setValue(row, 32, record.parkingCount);
-  setValue(row, 33, record.fireNotAllowed);
-  setValue(row, 34, normalizeDrillingAvailability(record));
-  setValue(row, 35, record.noiseLimit);
-  setValue(row, 36, record.equipmentRental);
-  setValue(row, 37, record.nightWork);
-  setValue(row, 38, record.foodAllowed);
-  setValue(row, 39, record.extraConditions);
-  for (const [extraIndex, { key }] of HOST_REGISTERED_EXTRA_COLUMNS.entries()) {
-    setValue(row, 40 + extraIndex, record[key]);
-  }
+function hostRowValues(
+  record: SpaceRegistrationRecord,
+  timestamp: string,
+  headers: readonly string[],
+  existing?: readonly unknown[],
+): unknown[] {
+  const row = Array.from({ length: Math.max(headers.length, existing?.length ?? 0) }, (_, index) => existing?.[index]);
+  const headerIndexes = new Map<string, number[]>();
+  headers.forEach((header, index) => {
+    const key = header.trim();
+    if (!key) return;
+    headerIndexes.set(key, [...(headerIndexes.get(key) ?? []), index]);
+  });
+  const set = (header: string, value: unknown) => {
+    for (const index of headerIndexes.get(header) ?? []) row[index] = value;
+  };
+  set("등록번호", record.registrationId);
+  set("등록일시 (한국시간)", record.receivedAt);
+  set("등록 상태", "등록 완료");
+  set("공간명", record.spaceName);
+  set("지역", record.desiredRegion);
+  set("공간 유형", record.spaceType);
+  set("상세 주소", record.address);
+  set("담당자 이름", record.contactName);
+  set("연락처", record.phone);
+  set("이메일", record.email);
+  set("공간과의 관계", record.relationship);
+  set("면적 (㎡)", record.area);
+  set("수용 인원 (명)", record.capacity);
+  set("1일 대관료 (만원)", record.dailyRate);
+  set("요금 협의", record.negotiable);
+  set("공간 소개", record.description);
+  set("시설·대관 조건 원문", record.conditions);
+  set("사진 수", record.photoCount);
+  set("사진 링크 (Drive 권한 필요)", record.photoFolderUrl);
+  set("검토일시", timestamp);
+  set("최종 수정일시", timestamp);
+  set("냉난방", record.cooling);
+  set("화장실", record.restroom);
+  set("Wi-Fi", record.wifi);
+  set("주차 가능 대수", record.parkingCount);
+  set("화기 불가", record.fireNotAllowed);
+  set("소음 제한", record.noiseLimit);
+  set("집기 렌탈", record.equipmentRental);
+  set("야간 작업", record.nightWork);
+  set("음식 섭취 가능", record.foodAllowed);
+  set("추가 조건", record.extraConditions);
+  for (const { key, header } of HOST_REGISTERED_EXTRA_COLUMNS) set(header, record[key]);
+  const existingNote = String(row[headerIndexes.get("비고")?.[0] ?? -1] ?? "");
+  set("비고", spaceDetailNotes(record, existingNote));
   return row;
 }
 
@@ -359,10 +386,17 @@ async function upsertHostRegisteredSpace(
   timestamp: string,
 ) {
   await ensureHostRegisteredHeaders(sheets);
-  const rows = await readValues(sheets, SPACE_REGISTRATION_SPREADSHEET_ID, HOST_REGISTERED_RANGE);
+  const grid = await getSheetGridProperties(sheets, SPACE_REGISTRATION_SPREADSHEET_ID, HOST_REGISTERED_SPACES_TAB_NAME);
+  const range = `'${HOST_REGISTERED_SPACES_TAB_NAME}'!A1:${columnName(grid.columnCount - 1)}`;
+  const rows = await readValues(sheets, SPACE_REGISTRATION_SPREADSHEET_ID, range);
+  const headers = (rows[0] ?? []).map((header) => String(header ?? "").trim());
+  const headerIndex = new Map(headers.map((header, index) => [header, index]));
+  const registrationIdIndex = headerIndex.get("등록번호") ?? 0;
+  const spaceNameIndex = headerIndex.get("공간명") ?? 3;
+  const addressIndex = headerIndex.get("상세 주소") ?? 6;
   const existingIndex = rows.slice(1).findIndex((row) => {
-    const sameId = String(row[0] ?? "").trim() === record.registrationId.trim() && record.registrationId.trim() !== "";
-    const sameNameAndAddress = String(row[3] ?? "").trim() === record.spaceName.trim() && String(row[6] ?? "").trim() === record.address.trim();
+    const sameId = String(row[registrationIdIndex] ?? "").trim() === record.registrationId.trim() && record.registrationId.trim() !== "";
+    const sameNameAndAddress = String(row[spaceNameIndex] ?? "").trim() === record.spaceName.trim() && String(row[addressIndex] ?? "").trim() === record.address.trim();
     return sameId || (record.address.trim() && sameNameAndAddress);
   });
   const rowNumber = existingIndex >= 0 ? existingIndex + 2 : Math.max(rows.length + 1, 2);
@@ -376,8 +410,8 @@ async function upsertHostRegisteredSpace(
     rowNumber,
     sourceRowNumber,
     "A",
-    columnName(40 + HOST_REGISTERED_EXTRA_COLUMNS.length - 1),
-    hostRowValues(record, timestamp, existingValues),
+    columnName(headers.length - 1),
+    hostRowValues(record, timestamp, headers, existingValues),
   );
   return { rowNumber, registrationId: record.registrationId };
 }
@@ -468,7 +502,6 @@ function venueRowValues(headers: string[], rows: SheetRows, record: SpaceRegistr
   set("수용_근거", "호스트 등록 공간");
   set("근거출처", "호스트 등록 공간");
   set("검토메모", `호스트 등록 공간 자동 반영 · 접수번호 ${record.registrationId}`);
-  set("등록출처", "호스트 등록");
   set("최종확인일", timestamp);
   set("조건_근거", record.conditions);
   set("첨부파일경로", record.photoFolderUrl);
@@ -480,34 +513,23 @@ function venueRowValues(headers: string[], rows: SheetRows, record: SpaceRegistr
     "대관 가능 층수": record.rentableFloors,
     "대관 가능 총 면적": record.rentableTotalArea,
     "대관 가능 층별 면적": record.rentableFloorArea,
-    야외마당: record.outdoorYard,
-    주방: record.kitchen,
-    용도: record.usage,
-    "창고/운영사무국": record.storageOffice,
-    "룸 개수": record.roomCount,
     전력량: record.powerCapacity,
     "E/V": record.elevator,
-    화물승강기: record.freightElevator,
     OOH: record.ooh,
-    "쓰레기 불출": record.wasteDisposal,
-    "타공 유무": record.drilling,
-    "개방/시간방법": record.accessHours,
     "주차 유무": record.parkingAvailable,
     "주차 댓수": record.parkingSpaces ?? record.parkingCount,
     도면: record.floorPlan,
     층고: record.ceilingHeight,
     조명: record.lighting,
-    "인터넷 선": record.wiredInternet,
-    바닥마감: record.floorFinish,
     보증금: record.deposit,
-    관리비: record.managementFee,
-    "답사 방법": record.tourMethod,
     "평일 대관료": weekdayRateWon,
     "주말·공휴일 대관료": weekendHolidayRateWon,
     "최소 대관일": minimumRentalDays,
     "VAT 여부": record.vatIncluded,
   };
   for (const [header, value] of Object.entries(extraValues)) set(header, value);
+  const existingNotes = String(values[headerIndex.get("비고")?.[0] ?? -1] ?? "");
+  set("비고", spaceDetailNotes(record, existingNotes));
   return { rowNumber, values };
 }
 
