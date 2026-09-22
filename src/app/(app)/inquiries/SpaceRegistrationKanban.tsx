@@ -127,12 +127,17 @@ export function SpaceRegistrationKanban({ initialRegistrations, canEdit }: Props
 
     try {
       const result = await updateSpaceRegistrationStage(registration.identity, nextStage);
-      setRegistrations((current) => current.map((item) => (
-        item.id === registration.id
-          ? withStageTimestamp({ ...item, status: nextStage }, nextStage, result.timestamp)
-          : item
-      )));
-      toast.success(`‘${nextStage}’ 단계로 옮겼습니다.`);
+      if (result.deleted) {
+        setRegistrations((current) => current.filter((item) => item.id !== registration.id));
+        toast.success("호스트 등록 공간·공간DB 반영 후 접수 행을 정리했습니다.");
+      } else {
+        setRegistrations((current) => current.map((item) => (
+          item.id === registration.id
+            ? withStageTimestamp({ ...item, status: nextStage }, nextStage, result.timestamp)
+            : item
+        )));
+        toast.success(`‘${nextStage}’ 단계로 옮겼습니다.`);
+      }
     } catch (error) {
       setRegistrations((current) => current.map((item) => item.id === registration.id ? previous : item));
       toast.error(error instanceof Error ? `시트 저장 실패: ${error.message}` : "시트 저장 실패");

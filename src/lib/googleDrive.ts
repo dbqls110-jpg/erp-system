@@ -239,19 +239,54 @@ export async function moveMessengerFileToCategory(
   });
 }
 
-/** 공간등록 접수 사진을 별도 업무 폴더로 이동한다. */
+type SpaceRegistrationFolder = {
+  folderId: string;
+  folderPath: string;
+  folderUrl: string;
+};
+
+async function ensureSpaceRegistrationFolderWithDrive(
+  drive: ReturnType<typeof google.drive>,
+  spaceCode: string,
+  spaceName: string,
+): Promise<SpaceRegistrationFolder> {
+  const rootId = await findOrCreateFolder(drive, SPACE_REGISTRATION_ROOT_FOLDER_NAME);
+  const registrationRootId = await findOrCreateFolder(drive, SPACE_REGISTRATION_FOLDER_NAME, rootId);
+  const folderName = `${spaceCode} ${spaceName.trim()}`.trim();
+  const folderId = await findOrCreateFolder(drive, folderName, registrationRootId);
+
+  return {
+    folderId,
+    folderPath: `${SPACE_REGISTRATION_ROOT_FOLDER_NAME}/${SPACE_REGISTRATION_FOLDER_NAME}/${folderName}`,
+    folderUrl: `https://drive.google.com/drive/folders/${folderId}`,
+  };
+}
+
+/** 호스트 등록 공간 코드에 맞는 공간 등록 폴더를 만들고 링크를 반환한다. */
+export async function ensureSpaceRegistrationFolder(
+  spaceCode: string,
+  spaceName: string,
+): Promise<Omit<SpaceRegistrationFolder, "folderId">> {
+  return withOwnerDrive(async (drive) => {
+    const folder = await ensureSpaceRegistrationFolderWithDrive(drive, spaceCode, spaceName);
+    return { folderPath: folder.folderPath, folderUrl: folder.folderUrl };
+  });
+}
+
+/** 공간등록 접수 사진을 호스트 등록 공간 코드 폴더로 이동한다. */
 export async function moveMessengerFileToSpaceRegistration(
   driveFileId: string,
+  spaceCode: string,
+  spaceName: string,
 ): Promise<{ name: string; driveUrl: string; folderPath: string; folderUrl: string }> {
   return withOwnerDrive(async (drive) => {
-    const rootId = await findOrCreateFolder(drive, SPACE_REGISTRATION_ROOT_FOLDER_NAME);
-    const folderId = await findOrCreateFolder(drive, SPACE_REGISTRATION_FOLDER_NAME, rootId);
-    const moved = await moveDriveFileToFolder(drive, driveFileId, folderId);
+    const folder = await ensureSpaceRegistrationFolderWithDrive(drive, spaceCode, spaceName);
+    const moved = await moveDriveFileToFolder(drive, driveFileId, folder.folderId);
 
     return {
       ...moved,
-      folderPath: `${SPACE_REGISTRATION_ROOT_FOLDER_NAME}/${SPACE_REGISTRATION_FOLDER_NAME}`,
-      folderUrl: `https://drive.google.com/drive/folders/${folderId}`,
+      folderPath: folder.folderPath,
+      folderUrl: folder.folderUrl,
     };
   });
 }

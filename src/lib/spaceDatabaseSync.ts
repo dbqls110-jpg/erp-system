@@ -3,6 +3,7 @@ import { formatCurrentDateTime } from "@/lib/inquiries";
 import { SPACE_REGISTRATION_EXTRA_COLUMNS, type SpaceRegistrationRecord } from "@/lib/spaceRegistrations";
 import type { SpaceRegistrationSheetRowInput } from "@/lib/spaceRegistrationSheet";
 import { blockedReason } from "@/lib/venueBlocklist.mjs";
+import { ensureSpaceRegistrationFolder } from "@/lib/googleDrive";
 
 export const HOST_REGISTERED_SPACES_TAB_NAME = "호스트 등록 공간";
 export const SPACE_DATABASE_SPREADSHEET_ID = "1XFfEdhOwFMyZE7IuDcykDaRNQ8IXtPq6bvwA-StjII4";
@@ -420,6 +421,31 @@ async function upsertHostRegisteredSpace(
   return { rowNumber, registrationId: record.registrationId };
 }
 
+function spaceCodeForHostRow(rowNumber: number): string {
+  return `V${String(Math.max(rowNumber - 1, 1)).padStart(4, "0")}`;
+}
+
+/** 호스트 등록 공간의 행 번호를 기준으로 공간 코드(V0001 등)를 계산한다. */
+export async function getSpaceRegistrationCode(spaceName: string, address: string): Promise<string> {
+  const sheets = await makeSheetsClientAsOwner();
+  await ensureHostRegisteredHeaders(sheets);
+  const grid = await getSheetGridProperties(sheets, SPACE_REGISTRATION_SPREADSHEET_ID, HOST_REGISTERED_SPACES_TAB_NAME);
+  const range = `'${HOST_REGISTERED_SPACES_TAB_NAME}'!A1:${columnName(grid.columnCount - 1)}`;
+  const rows = await readValues(sheets, SPACE_REGISTRATION_SPREADSHEET_ID, range);
+  const headers = (rows[0] ?? []).map((header) => String(header ?? "").trim());
+  const headerIndex = new Map(headers.map((header, index) => [header, index]));
+  const spaceNameIndex = headerIndex.get("공간명") ?? 3;
+  const addressIndex = headerIndex.get("상세 주소") ?? 6;
+  const normalizedName = spaceName.trim();
+  const normalizedAddress = address.trim();
+  const existingIndex = rows.slice(1).findIndex((row) => (
+    String(row[spaceNameIndex] ?? "").trim() === normalizedName
+    && (!normalizedAddress || String(row[addressIndex] ?? "").trim() === normalizedAddress)
+  ));
+  const rowNumber = existingIndex >= 0 ? existingIndex + 2 : Math.max(rows.length + 1, 2);
+  return spaceCodeForHostRow(rowNumber);
+}
+
 function venueRowValues(headers: string[], rows: SheetRows, record: SpaceRegistrationRecord, timestamp: string): { rowNumber: number; values: unknown[] } {
   const headerIndex = new Map<string, number[]>();
   headers.forEach((header, index) => {
@@ -545,9 +571,19 @@ export async function syncCompletedSpaceRegistration(record: SpaceRegistrationRe
   const sheets = await makeSheetsClientAsOwner();
   const timestamp = formatCurrentDateTime(now);
   const host = await upsertHostRegisteredSpace(sheets, record, timestamp);
+  const spaceCode = spaceCodeForHostRow(host.rowNumber);
+  const folder = await ensureSpaceRegistrationFolder(spaceCode, record.spaceName);
+  const recordWithFolder = record.photoFolderUrl === folder.folderUrl
+    ? record
+    : { ...record, photoFolderUrl: folder.folderUrl };
+  // 첨부파일이 없던 접수도 이후 Drive 폴더에 자료를 올릴 수 있도록
+  // 완료 시점에 코드 폴더 링크를 호스트 등록 공간에 남긴다.
+  if (recordWithFolder !== record) {
+    await upsertHostRegisteredSpace(sheets, recordWithFolder, timestamp);
+  }
   const schema = await ensureSpaceDatabaseSchema(sheets);
   const { rows, headers, sheetId: venueSheetId, endColumn } = schema;
-  const venue = venueRowValues(headers, rows, record, timestamp);
+  const venue = venueRowValues(headers, rows, recordWithFolder, timestamp);
   const sourceRowNumber = rows.length >= 2 ? rows.length : 1;
   // Google Sheets grid rows are bounded. When the last existing row is
   // already occupied, extend the grid before writing the new venue row.
@@ -586,7 +622,14 @@ export async function syncCompletedSpaceRegistration(record: SpaceRegistrationRe
   });
   const saved = verify.data.values?.[0] ?? [];
   if (String(saved[0] ?? "") !== record.spaceName) throw new Error("공간DB 자동 반영 후 공간명 확인에 실패했습니다.");
-  return { hostRowNumber: host.rowNumber, venueRowNumber: venue.rowNumber, timestamp };
+  return {
+    hostRowNumber: host.rowNumber,
+    venueRowNumber: venue.rowNumber,
+    spaceCode,
+    folderPath: folder.folderPath,
+    folderUrl: folder.folderUrl,
+    timestamp,
+  };
 }
 
 /**

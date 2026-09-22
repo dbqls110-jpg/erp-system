@@ -53,7 +53,7 @@ import {
 } from "@/lib/googleDrive";
 import { createSpreadsheet, SheetCreationError } from "@/lib/sheetCreation";
 import { syncVenueSource, venueSourceKey } from "@/lib/venueSourceSync";
-import { syncSpaceRegistrationDirect } from "@/lib/spaceDatabaseSync";
+import { getSpaceRegistrationCode, syncSpaceRegistrationDirect } from "@/lib/spaceDatabaseSync";
 
 /**
  * 비서가 내놓은 변경 제안을 실제로 적용한다.
@@ -1056,9 +1056,10 @@ export async function POST(req: NextRequest) {
         ...(job.attachments ?? []).map((attachment) => attachment.driveFileId),
         ...(job.attachmentDriveFileId ? [job.attachmentDriveFileId] : []),
       ])];
+      const spaceCode = await getSpaceRegistrationCode(content.spaceName, String(content.address ?? ""));
       let photo: Awaited<ReturnType<typeof moveMessengerFileToSpaceRegistration>> | null = null;
       for (const driveFileId of photoFileIds) {
-        photo = await moveMessengerFileToSpaceRegistration(driveFileId);
+        photo = await moveMessengerFileToSpaceRegistration(driveFileId, spaceCode, content.spaceName);
       }
 
       const saved = await syncSpaceRegistrationDirect({
@@ -1127,8 +1128,11 @@ export async function POST(req: NextRequest) {
         registrationId: saved.registrationId,
         hostRowNumber: saved.hostRowNumber,
         venueRowNumber: saved.venueRowNumber,
+        spaceCode: saved.spaceCode,
+        folderPath: saved.folderPath,
+        folderUrl: saved.folderUrl,
         photoCount: photoFileIds.length,
-        ...(photo ? { folderPath: photo.folderPath, folderUrl: photo.folderUrl, driveUrl: photo.driveUrl } : {}),
+        ...(photo ? { driveUrl: photo.driveUrl } : {}),
       };
       await prisma.agentAuditLog.create({
         data: {

@@ -334,6 +334,24 @@ function rowRange(sheetId: number, rowNumber: number, startColumn: string, endCo
   };
 }
 
+async function deleteSpaceRegistrationRow(sheets: SheetsClient, sheetId: number, rowNumber: number) {
+  await sheets.spreadsheets.batchUpdate({
+    spreadsheetId: SPACE_REGISTRATIONS_SPREADSHEET_ID,
+    requestBody: {
+      requests: [{
+        deleteDimension: {
+          range: {
+            sheetId,
+            dimension: "ROWS",
+            startIndex: rowNumber - 1,
+            endIndex: rowNumber,
+          },
+        },
+      }],
+    },
+  });
+}
+
 export async function saveSpaceRegistrationStage(
   identity: SpaceRegistrationIdentity,
   nextStage: SpaceRegistrationStage,
@@ -404,7 +422,18 @@ export async function saveSpaceRegistrationStage(
     ? await syncCompletedSpaceRegistration({ ...matchedRecord, status: nextStage }, now)
     : null;
 
-  return { stage: nextStage, timestamp, ...(spaceDatabaseSync ? { spaceDatabaseSync } : {}) };
+  // 완료본이 호스트 등록 공간·공간DB에 모두 확인된 뒤 접수 행을 제거한다.
+  // 동기화가 실패하면 여기까지 오지 않으므로 원본 접수 자료가 남아 재시도할 수 있다.
+  if (nextStage === "등록 완료") {
+    await deleteSpaceRegistrationRow(sheets, sheetId, match.rowNumber);
+  }
+
+  return {
+    stage: nextStage,
+    timestamp,
+    ...(spaceDatabaseSync ? { spaceDatabaseSync } : {}),
+    ...(nextStage === "등록 완료" ? { deleted: true } : {}),
+  };
 }
 
 export async function saveSpaceRegistrationMemo(identity: SpaceRegistrationIdentity, memo: string) {
