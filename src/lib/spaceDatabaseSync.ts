@@ -32,11 +32,11 @@ const HOST_REGISTERED_HEADERS = [
   ...HOST_REGISTERED_EXTRA_COLUMNS.map(({ header }) => header),
   "비고",
 ];
-// 운영 공간DB는 현재 106열을 기본으로 하되, 호스트 상세 열은
+// 운영 공간DB는 현재 105열을 기본으로 하되, 호스트 상세 열은
 // 등록 완료 시 헤더를 보존하면서 오른쪽에 자동으로 확장한다.
-// 현재 운영 공간DB의 마지막 열은 비고(DB)까지 총 106열이다.
+// 현재 운영 공간DB의 마지막 열은 비고(DA)까지 총 105열이다.
 // 삭제한 원본 열을 다음 호스트 등록 때 빈 열로 되살리지 않도록 이 기준을 유지한다.
-const SPACE_DATABASE_MIN_COLUMN_COUNT = 106;
+const SPACE_DATABASE_MIN_COLUMN_COUNT = 105;
 const SPACE_DATABASE_REQUIRED_COLUMNS = [
   "공간명",
   "상세 주소",
