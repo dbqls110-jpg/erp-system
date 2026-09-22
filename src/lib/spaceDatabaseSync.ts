@@ -25,18 +25,18 @@ const HOST_REGISTERED_NOTE_KEYS = new Set([
 ]);
 // 호스트 등록 공간은 주차 대수와 타공 여부를 각각 한 칸으로 정리한다.
 const HOST_REGISTERED_EXTRA_COLUMNS = SPACE_REGISTRATION_EXTRA_COLUMNS.filter(
-  ({ key }) => key !== "drilling" && key !== "parkingSpaces" && !HOST_REGISTERED_NOTE_KEYS.has(key),
+  ({ key }) => key !== "drilling" && key !== "parkingSpaces" && key !== "parkingAvailable" && !HOST_REGISTERED_NOTE_KEYS.has(key),
 );
 const HOST_REGISTERED_HEADERS = [
   ...HOST_REGISTERED_BASE_HEADERS,
   ...HOST_REGISTERED_EXTRA_COLUMNS.map(({ header }) => header),
   "비고",
 ];
-// 운영 공간DB는 현재 120열을 기본으로 하되, 호스트 상세 열은
+// 운영 공간DB는 현재 106열을 기본으로 하되, 호스트 상세 열은
 // 등록 완료 시 헤더를 보존하면서 오른쪽에 자동으로 확장한다.
-// 현재 운영 공간DB의 마지막 열은 비고(DP)까지 총 120열이다.
+// 현재 운영 공간DB의 마지막 열은 비고(DB)까지 총 106열이다.
 // 삭제한 원본 열을 다음 호스트 등록 때 빈 열로 되살리지 않도록 이 기준을 유지한다.
-const SPACE_DATABASE_MIN_COLUMN_COUNT = 120;
+const SPACE_DATABASE_MIN_COLUMN_COUNT = 106;
 const SPACE_DATABASE_REQUIRED_COLUMNS = [
   "공간명",
   "상세 주소",
@@ -55,7 +55,6 @@ const SPACE_DATABASE_REQUIRED_COLUMNS = [
   "조명",
   "wifi",
   "화장실",
-  "보증금",
   "대관료",
   "담당자 연락처",
   "대기공간",
