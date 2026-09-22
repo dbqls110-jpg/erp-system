@@ -61,8 +61,19 @@ function composeSurcharge(v) {
   if (has(v.raw?.["할증_기타"])) parts.push(String(v.raw["할증_기타"]).trim());
   return parts.join(" · ");
 }
+/** 부속_냉난방비 + 부속사용료 + 부속_비고. 비고가 사용료 문장을 포함하면 긴 쪽만. */
+function composeExtras(v) {
+  const parts = [];
+  const h = v.raw?.["부속_냉난방비"];
+  if (has(h)) { const n = Number(String(h).replace(/[^0-9.]/g, "")); parts.push(`냉난방 ${/^[0-9.,\s원]+$/.test(String(h)) && Number.isFinite(n) ? won(n) : String(h).trim()}`); }
+  const f = String(v.raw?.["부속사용료"] ?? "").replace(/^부속사용료:\s*/, "").trim();
+  const m = String(v.raw?.["부속_비고"] ?? "").replace(/^부속사용료:\s*/, "").trim();
+  if (f && m) { if (m.includes(f)) parts.push(m); else if (f.includes(m)) parts.push(f); else parts.push(f, m); }
+  else if (f || m) parts.push(f || m);
+  return parts.join(" · ");
+}
 /** 시트에서 합쳐진 칸의 원래 raw 키. 뒤에 따로 나가면 다시 중복이 된다. */
-const MERGED_RAW_KEYS = new Set(["대관료_기준시간", "대관료_상업", "할증_야간_퍼센트", "할증_초과_퍼센트", "할증_기타"]);
+const MERGED_RAW_KEYS = new Set(["대관료_기준시간", "대관료_상업", "할증_야간_퍼센트", "할증_초과_퍼센트", "할증_기타", "부속_냉난방비", "부속사용료", "부속_비고"]);
 
 const LEAD = [
   ["이름", (v) => v.name],
@@ -93,10 +104,11 @@ const LEAD = [
   ["일요일", (v) => v.sunday],
   ["공휴일", (v) => v.holiday],
   // 요일별 시작/종료 6칸은 내보내지 않는다 — 이용가능시간 한 칸이 같은 내용을 문장으로 갖고 있다(9/22 사장님 지시).
-  // AC·AD·AE 합침(9/22). 예) "시간당 50%" · "시간당 50,000원"
-  ["초과요금", (v) => composeOver(v)],
-  // 할증 4칸 합침(9/22): 주말·야간·초과 퍼센트 + 기타. 예) "주말 30% · 초과 30% · 토·일 대관 불가"
-  ["할증", (v) => composeSurcharge(v)],
+  // 초과 단위·비율·금액 + 할증 주말·야간·초과 퍼센트 + 할증_기타 를 한 칸으로(9/22).
+  // 예) "초과 시간당 50% · 주말 30% · 토·일 대관 불가"
+  ["초과·할증", (v) => [composeOver(v) && `초과 ${composeOver(v)}`, composeSurcharge(v)].filter(Boolean).join(" · ")],
+  // 부속_냉난방비 + 부속사용료 + 부속_비고 를 한 칸으로(9/22).
+  ["부속사용료", (v) => composeExtras(v)],
   ["부가세_구분", (v) => v.vatType],
   ["빔", (v) => v.beam],
   ["음향", (v) => v.sound],
