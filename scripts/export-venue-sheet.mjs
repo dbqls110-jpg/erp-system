@@ -30,6 +30,40 @@ const TAB = "공간DB";
 const CHUNK = 400;
 
 /** 앞에 두는 열: 컬럼으로 옮긴 원본 칸(적재 스크립트의 MAPPED 와 같은 이름) + ERP 통화 기록. 나머지 원본 칸은 뒤에 붙는다. */
+const has = (x) => x !== null && x !== undefined && String(x).trim() !== "";
+const won = (n) => (Number(n) === 0 ? "무료" : `${Number(n).toLocaleString()}원`);
+const pct = (x) => { const v = String(x ?? "").replace(/%$/, "").trim(); if (!v) return ""; return /^[0-9.]+$/.test(v) ? `${v}%` : v; };
+/** W·X·Y: 최소 요금 / 기준시간 (상업 요율). 상업이 최소와 같으면 생략. */
+function composePrice(v) {
+  const basis = v.raw?.["대관료_기준시간"];
+  const commercial = v.raw?.["대관료_상업"];
+  let s = has(v.priceMin) ? won(v.priceMin) : "";
+  if (s && has(basis)) s += ` / ${basis}`; else if (!s && has(basis)) s = `기준 ${basis}`;
+  const c = has(commercial) ? Number(String(commercial).replace(/[^0-9.]/g, "")) : null;
+  if (c !== null && Number.isFinite(c) && c !== Number(v.priceMin)) s += s ? ` (상업 ${won(c)})` : `상업 ${won(c)}`;
+  return s;
+}
+/** 초과_단위 + 초과_비율 + 초과_금액. */
+function composeOver(v) {
+  const parts = [];
+  if (has(v.overRate)) parts.push(pct(v.overRate));
+  if (has(v.overAmount)) parts.push(won(v.overAmount));
+  const body = parts.join(" · ");
+  const u = has(v.overUnit) ? String(v.overUnit).trim() : "";
+  return u && body ? `${u} ${body}` : u || body;
+}
+/** 할증 주말·야간·초과 퍼센트 + 할증_기타. */
+function composeSurcharge(v) {
+  const parts = [];
+  if (has(v.weekendSurcharge)) parts.push(`주말 ${pct(v.weekendSurcharge)}`);
+  if (has(v.raw?.["할증_야간_퍼센트"])) parts.push(`야간 ${pct(v.raw["할증_야간_퍼센트"])}`);
+  if (has(v.raw?.["할증_초과_퍼센트"])) parts.push(`초과 ${pct(v.raw["할증_초과_퍼센트"])}`);
+  if (has(v.raw?.["할증_기타"])) parts.push(String(v.raw["할증_기타"]).trim());
+  return parts.join(" · ");
+}
+/** 시트에서 합쳐진 칸의 원래 raw 키. 뒤에 따로 나가면 다시 중복이 된다. */
+const MERGED_RAW_KEYS = new Set(["대관료_기준시간", "대관료_상업", "할증_야간_퍼센트", "할증_초과_퍼센트", "할증_기타"]);
+
 const LEAD = [
   ["이름", (v) => v.name],
   ["자치구", (v) => v.district],
@@ -42,7 +76,8 @@ const LEAD = [
   ["대관료_4시간환산", (v) => v.price4h],
   ["요금_신뢰도", (v) => v.priceConfidence],
   ["요금_출처", (v) => v.priceSource],
-  ["대관료_최소", (v) => v.priceMin],
+  // W·X·Y 합침(9/22): 최소 요금 + 기준시간 + (상업요율). 예) "100,000원 / 3시간 (상업 190,000원)"
+  ["대관료", (v) => composePrice(v)],
   ["대관료_최대", (v) => v.priceMax],
   ["요금_적용", (v) => v.price],
   ["요금_적용기준", (v) => v.priceBasis],
@@ -58,10 +93,10 @@ const LEAD = [
   ["일요일", (v) => v.sunday],
   ["공휴일", (v) => v.holiday],
   // 요일별 시작/종료 6칸은 내보내지 않는다 — 이용가능시간 한 칸이 같은 내용을 문장으로 갖고 있다(9/22 사장님 지시).
-  ["초과_단위", (v) => v.overUnit],
-  ["초과_비율", (v) => v.overRate],
-  ["초과_금액", (v) => v.overAmount],
-  ["할증_주말_퍼센트", (v) => v.weekendSurcharge],
+  // AC·AD·AE 합침(9/22). 예) "시간당 50%" · "시간당 50,000원"
+  ["초과요금", (v) => composeOver(v)],
+  // 할증 4칸 합침(9/22): 주말·야간·초과 퍼센트 + 기타. 예) "주말 30% · 초과 30% · 토·일 대관 불가"
+  ["할증", (v) => composeSurcharge(v)],
   ["부가세_구분", (v) => v.vatType],
   ["빔", (v) => v.beam],
   ["음향", (v) => v.sound],
@@ -92,7 +127,7 @@ try {
   for (const v of venues) {
     for (const k of Object.keys(v.raw ?? {})) {
       // 밑줄로 시작하는 키(_작업로그)는 DB팀 작업 이력이라 시트에 내보내지 않는다.
-      if (!seen.has(k) && !leadNames.has(k) && !isInternalRawKey(k)) { seen.add(k); rawCols.push(k); }
+      if (!seen.has(k) && !leadNames.has(k) && !isInternalRawKey(k) && !MERGED_RAW_KEYS.has(k)) { seen.add(k); rawCols.push(k); }
     }
   }
   const header = [...LEAD.map(([n]) => n), ...rawCols];
