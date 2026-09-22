@@ -81,6 +81,7 @@ const LEAD = [
   ["위치", (v) => v.address],
   ["유형", (v) => v.type],
   ["수용_적용min", (v) => v.capacityMin],
+  ["수용_min", (v) => v.capacityMin],
   ["수용_적용max", (v) => v.capacityMax],
   ["관람석", (v) => v.seats],
   ["실면적", (v) => v.areaM2],

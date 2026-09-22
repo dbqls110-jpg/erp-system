@@ -132,7 +132,7 @@ function sourceKey(row) {
 /** 컬럼으로 옮긴 칸. 나머지는 raw 에 담는다. */
 const MAPPED = new Set([
   "이름", "자치구", "위치", "유형",
-  "수용_적용min", "수용_적용max", "관람석", "실면적",
+  "수용_적용min", "수용_min", "수용_적용max", "관람석", "실면적",
   "요금_적용", "요금_적용기준", "요금_출처", "기본_시간",
   "대관료_4시간환산", "요금_신뢰도", "대관료_최소", "대관료_최대",
   "초과_단위", "초과_비율", "초과_금액", "할증_주말_퍼센트", "부가세_구분",
@@ -168,7 +168,7 @@ function toVenue(row, coord) {
     address,
     type: str(row["유형"]),
 
-    capacityMin: int(row["수용_적용min"]),
+    capacityMin: int(row["수용_적용min"] || row["수용_min"]),
     capacityMax: int(row["수용_적용max"]),
     seats: int(row["관람석"]),
     areaM2: num(row["실면적"]),

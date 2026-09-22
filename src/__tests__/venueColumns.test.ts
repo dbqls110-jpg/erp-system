@@ -11,8 +11,7 @@ describe("normalizeVenueRaw", () => {
   });
   it("값이 같은 열은 하나로 — 남는 쪽이 비어 있으면 옮겨 담는다", () => {
     const out = normalizeVenueRaw({ 수용_min: "100", 주말이용: "가능", 주말이용_표준: "가능", 근거출처: "http://a", 출처URL: "http://a", 공간명: "본관", 대표공간명: "" });
-    expect(out).toMatchObject({ 주말이용: "가능", 출처URL: "http://a", 대표공간명: "본관" });
-    expect(out).not.toHaveProperty("수용_min"); // 컬럼(capacityMin)으로 이미 들어간다
+    expect(out).toMatchObject({ 수용_min: "100", 주말이용: "가능", 출처URL: "http://a", 대표공간명: "본관" });
     expect(out).not.toHaveProperty("주말이용_표준");
     expect(out).not.toHaveProperty("근거출처");
     expect(out).not.toHaveProperty("공간명");
