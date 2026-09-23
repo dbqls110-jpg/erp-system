@@ -42,6 +42,8 @@ export function assertSpaceRegistrationAllowed(input: Pick<SpaceRegistrationShee
 
 /** ERP 비서의 공간등록 제안을 접수 시트 한 행으로 바꾸는 입력값. */
 export interface SpaceRegistrationSheetRowInput {
+  /** 지정할 호스트 등록 공간 데이터 번호(1부터). */
+  spaceNumber?: number;
   spaceName: string;
   contactName?: string;
   relationship?: string;

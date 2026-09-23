@@ -389,6 +389,7 @@ async function upsertHostRegisteredSpace(
   sheets: SheetsClient,
   record: SpaceRegistrationRecord,
   timestamp: string,
+  spaceNumber?: number,
 ) {
   await ensureHostRegisteredHeaders(sheets);
   const grid = await getSheetGridProperties(sheets, SPACE_REGISTRATION_SPREADSHEET_ID, HOST_REGISTERED_SPACES_TAB_NAME);
@@ -399,15 +400,55 @@ async function upsertHostRegisteredSpace(
   const registrationIdIndex = headerIndex.get("등록번호") ?? 0;
   const spaceNameIndex = headerIndex.get("공간명") ?? 3;
   const addressIndex = headerIndex.get("상세 주소") ?? 6;
-  const existingIndex = rows.slice(1).findIndex((row) => {
+  const existingIndexes = rows.slice(1).flatMap((row, index) => {
     const sameId = String(row[registrationIdIndex] ?? "").trim() === record.registrationId.trim() && record.registrationId.trim() !== "";
     const sameNameAndAddress = String(row[spaceNameIndex] ?? "").trim() === record.spaceName.trim() && String(row[addressIndex] ?? "").trim() === record.address.trim();
-    return sameId || (record.address.trim() && sameNameAndAddress);
+    return sameId || (record.address.trim() && sameNameAndAddress) ? [index] : [];
   });
-  const rowNumber = existingIndex >= 0 ? existingIndex + 2 : Math.max(rows.length + 1, 2);
+  if (existingIndexes.length > 1) {
+    throw new Error(`호스트 등록 공간에 ‘${record.spaceName}’과 일치하는 행이 여러 개라 자동 반영을 중단했습니다.`);
+  }
+  const existingIndex = existingIndexes[0] ?? -1;
+  let rowNumber: number;
+  if (spaceNumber !== undefined) {
+    if (!Number.isSafeInteger(spaceNumber) || spaceNumber < 1) {
+      throw new Error("공간등록 번호는 1 이상의 정수여야 합니다.");
+    }
+    rowNumber = spaceNumber + 1; // 시트 1행은 헤더이므로 데이터 번호 1은 물리 2행.
+    if (existingIndex >= 0 && existingIndex + 2 !== rowNumber) {
+      throw new Error(`같은 공간이 이미 호스트 등록 공간 ${existingIndex + 1}번(시트 ${existingIndex + 2}행)에 있습니다. 기존 행을 먼저 확인해 주세요.`);
+    }
+    const targetValues = rows[rowNumber - 1] ?? [];
+    const targetOccupied = targetValues.some((value) => String(value ?? "").trim() !== "");
+    const targetMatchesSpace = String(targetValues[spaceNameIndex] ?? "").trim() === record.spaceName.trim()
+      && String(targetValues[addressIndex] ?? "").trim() === record.address.trim();
+    if (targetOccupied && !targetMatchesSpace) {
+      throw new Error(`호스트 등록 공간 ${spaceNumber}번(시트 ${rowNumber}행)에 다른 공간이 있어 덮어쓰지 않았습니다.`);
+    }
+  } else {
+    rowNumber = existingIndex >= 0 ? existingIndex + 2 : Math.max(rows.length + 1, 2);
+  }
   const sourceRowNumber = rows.length >= 2 ? rows.length : 1;
   const sheetId = await getSheetId(sheets, SPACE_REGISTRATION_SPREADSHEET_ID, HOST_REGISTERED_SPACES_TAB_NAME);
-  const existingValues = existingIndex >= 0 ? rows[existingIndex + 1] : undefined;
+  const existingValues = rows[rowNumber - 1];
+  if (rowNumber > grid.rowCount) {
+    await sheets.spreadsheets.batchUpdate({
+      spreadsheetId: SPACE_REGISTRATION_SPREADSHEET_ID,
+      requestBody: {
+        requests: [{
+          insertDimension: {
+            range: {
+              sheetId,
+              dimension: "ROWS",
+              startIndex: grid.rowCount,
+              endIndex: rowNumber,
+            },
+            inheritFromBefore: true,
+          },
+        }],
+      },
+    });
+  }
   await writeNativeRow(
     sheets,
     SPACE_REGISTRATION_SPREADSHEET_ID,
@@ -426,7 +467,11 @@ function spaceCodeForHostRow(rowNumber: number): string {
 }
 
 /** 호스트 등록 공간의 행 번호를 기준으로 공간 코드(V0001 등)를 계산한다. */
-export async function getSpaceRegistrationCode(spaceName: string, address: string): Promise<string> {
+export async function getSpaceRegistrationCode(
+  spaceName: string,
+  address: string,
+  spaceNumber?: number,
+): Promise<string> {
   const sheets = await makeSheetsClientAsOwner();
   await ensureHostRegisteredHeaders(sheets);
   const grid = await getSheetGridProperties(sheets, SPACE_REGISTRATION_SPREADSHEET_ID, HOST_REGISTERED_SPACES_TAB_NAME);
@@ -438,11 +483,37 @@ export async function getSpaceRegistrationCode(spaceName: string, address: strin
   const addressIndex = headerIndex.get("상세 주소") ?? 6;
   const normalizedName = spaceName.trim();
   const normalizedAddress = address.trim();
-  const existingIndex = rows.slice(1).findIndex((row) => (
+  const existingIndexes = rows.slice(1).flatMap((row, index) => (
     String(row[spaceNameIndex] ?? "").trim() === normalizedName
-    && (!normalizedAddress || String(row[addressIndex] ?? "").trim() === normalizedAddress)
+    && Boolean(normalizedAddress)
+    && String(row[addressIndex] ?? "").trim() === normalizedAddress
+      ? [index]
+      : []
   ));
-  const rowNumber = existingIndex >= 0 ? existingIndex + 2 : Math.max(rows.length + 1, 2);
+  if (existingIndexes.length > 1) {
+    throw new Error(`호스트 등록 공간에 ‘${spaceName}’과 일치하는 행이 여러 개라 공간 번호를 정하지 못했습니다.`);
+  }
+  let rowNumber: number;
+  if (spaceNumber !== undefined) {
+    if (!Number.isSafeInteger(spaceNumber) || spaceNumber < 1) {
+      throw new Error("공간등록 번호는 1 이상의 정수여야 합니다.");
+    }
+    rowNumber = spaceNumber + 1;
+    const targetValues = rows[rowNumber - 1] ?? [];
+    const targetOccupied = targetValues.some((value) => String(value ?? "").trim() !== "");
+    const targetMatchesSpace = String(targetValues[spaceNameIndex] ?? "").trim() === normalizedName
+      && String(targetValues[addressIndex] ?? "").trim() === normalizedAddress;
+    const existingIndex = existingIndexes[0];
+    if (existingIndex !== undefined && existingIndex + 2 !== rowNumber) {
+      throw new Error(`같은 공간이 이미 호스트 등록 공간 ${existingIndex + 1}번에 있어 ${spaceNumber}번으로 중복 등록할 수 없습니다.`);
+    }
+    if (targetOccupied && !targetMatchesSpace) {
+      throw new Error(`호스트 등록 공간 ${spaceNumber}번에 다른 공간이 있어 사진을 이동하지 않았습니다.`);
+    }
+  } else {
+    const existingIndex = existingIndexes[0] ?? -1;
+    rowNumber = existingIndex >= 0 ? existingIndex + 2 : Math.max(rows.length + 1, 2);
+  }
   return spaceCodeForHostRow(rowNumber);
 }
 
@@ -564,13 +635,17 @@ function venueRowValues(headers: string[], rows: SheetRows, record: SpaceRegistr
 }
 
 /** 호스트 등록 공간의 등록 완료 행을 공간DB에 idempotent하게 반영한다. */
-export async function syncCompletedSpaceRegistration(record: SpaceRegistrationRecord, now = new Date()) {
+export async function syncCompletedSpaceRegistration(
+  record: SpaceRegistrationRecord,
+  now = new Date(),
+  options: { spaceNumber?: number } = {},
+) {
   if (record.status !== "등록 완료") throw new Error("등록 완료 상태의 공간만 공간DB로 보낼 수 있습니다.");
   const blocked = blockedReason({ name: record.spaceName, address: record.address });
   if (blocked) throw new Error(`절대 등록 금지 공간이라 공간DB에 반영하지 않았습니다. (${blocked})`);
   const sheets = await makeSheetsClientAsOwner();
   const timestamp = formatCurrentDateTime(now);
-  const host = await upsertHostRegisteredSpace(sheets, record, timestamp);
+  const host = await upsertHostRegisteredSpace(sheets, record, timestamp, options.spaceNumber);
   const spaceCode = spaceCodeForHostRow(host.rowNumber);
   const folder = await ensureSpaceRegistrationFolder(spaceCode, record.spaceName);
   const recordWithFolder = record.photoFolderUrl === folder.folderUrl
@@ -579,7 +654,7 @@ export async function syncCompletedSpaceRegistration(record: SpaceRegistrationRe
   // 첨부파일이 없던 접수도 이후 Drive 폴더에 자료를 올릴 수 있도록
   // 완료 시점에 코드 폴더 링크를 호스트 등록 공간에 남긴다.
   if (recordWithFolder !== record) {
-    await upsertHostRegisteredSpace(sheets, recordWithFolder, timestamp);
+    await upsertHostRegisteredSpace(sheets, recordWithFolder, timestamp, options.spaceNumber);
   }
   const schema = await ensureSpaceDatabaseSchema(sheets);
   const { rows, headers, sheetId: venueSheetId, endColumn } = schema;
@@ -737,6 +812,6 @@ export async function syncSpaceRegistrationDirect(
     vatIncluded: text(input.vatIncluded),
   } satisfies SpaceRegistrationRecord;
 
-  const synced = await syncCompletedSpaceRegistration(record, now);
+  const synced = await syncCompletedSpaceRegistration(record, now, { spaceNumber: input.spaceNumber });
   return { registrationId, ...synced };
 }

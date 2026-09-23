@@ -1056,13 +1056,18 @@ export async function POST(req: NextRequest) {
         ...(job.attachments ?? []).map((attachment) => attachment.driveFileId),
         ...(job.attachmentDriveFileId ? [job.attachmentDriveFileId] : []),
       ])];
-      const spaceCode = await getSpaceRegistrationCode(content.spaceName, String(content.address ?? ""));
+      const spaceCode = await getSpaceRegistrationCode(
+        content.spaceName,
+        String(content.address ?? ""),
+        content.spaceNumber,
+      );
       let photo: Awaited<ReturnType<typeof moveMessengerFileToSpaceRegistration>> | null = null;
       for (const driveFileId of photoFileIds) {
         photo = await moveMessengerFileToSpaceRegistration(driveFileId, spaceCode, content.spaceName);
       }
 
       const saved = await syncSpaceRegistrationDirect({
+        spaceNumber: content.spaceNumber,
         spaceName: content.spaceName,
         contactName: content.contactName,
         relationship: content.relationship,

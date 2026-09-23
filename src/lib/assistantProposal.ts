@@ -48,6 +48,7 @@ export const EDITABLE_FIELDS = {
     value: "추가 값",
   },
   space_registration_create: {
+    spaceNumber: "호스트 등록 공간의 데이터 번호 (1부터)",
     spaceName: "공간명",
     contactName: "담당자 이름",
     relationship: "공간과의 관계",
@@ -339,6 +340,8 @@ export interface VenueCreateContent {
 }
 
 export interface SpaceRegistrationCreateContent {
+  /** 호스트 등록 공간의 데이터 번호. 1이면 시트 2행, 30이면 시트 31행. */
+  spaceNumber?: number;
   spaceName: string;
   contactName?: string;
   relationship?: string;
@@ -700,6 +703,19 @@ function validateSpaceRegistrationCreateProposal(proposal: Proposal): ValidatedP
   const fields = asRecord(proposal.changes.fields) ?? proposal.changes;
   const allowed = new Set(Object.keys(EDITABLE_FIELDS.space_registration_create));
   rejectUnknownFields(fields, allowed, rejected);
+  const rawSpaceNumber = fields.spaceNumber;
+  if (rawSpaceNumber !== undefined) {
+    const spaceNumber = typeof rawSpaceNumber === "number"
+      ? rawSpaceNumber
+      : typeof rawSpaceNumber === "string" && /^\d+$/.test(rawSpaceNumber.trim())
+        ? Number(rawSpaceNumber.trim())
+        : NaN;
+    if (!Number.isSafeInteger(spaceNumber) || spaceNumber < 1) {
+      rejected.push({ field: "spaceNumber", reason: "공간등록 번호는 1 이상의 정수여야 합니다." });
+    } else {
+      accepted.spaceNumber = spaceNumber;
+    }
+  }
   addRegistrationValue(accepted, rejected, fields, "spaceName", { required: true });
   for (const field of [
     "contactName", "relationship", "phone", "email", "spaceType", "address", "desiredRegion",
