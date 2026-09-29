@@ -49,11 +49,10 @@ import {
 import {
   moveMessengerFileToCategory,
   moveMessengerFileToProject,
-  moveMessengerFileToSpaceRegistration,
 } from "@/lib/googleDrive";
 import { createSpreadsheet, SheetCreationError } from "@/lib/sheetCreation";
 import { syncVenueSource, venueSourceKey } from "@/lib/venueSourceSync";
-import { getSpaceRegistrationCode, syncSpaceRegistrationDirect } from "@/lib/spaceDatabaseSync";
+import { syncSpaceRegistrationDirect } from "@/lib/spaceDatabaseSync";
 
 /**
  * 비서가 내놓은 변경 제안을 실제로 적용한다.
@@ -1056,18 +1055,10 @@ export async function POST(req: NextRequest) {
         ...(job.attachments ?? []).map((attachment) => attachment.driveFileId),
         ...(job.attachmentDriveFileId ? [job.attachmentDriveFileId] : []),
       ])];
-      const spaceCode = await getSpaceRegistrationCode(
-        content.spaceName,
-        String(content.address ?? ""),
-        content.spaceNumber,
-      );
-      let photo: Awaited<ReturnType<typeof moveMessengerFileToSpaceRegistration>> | null = null;
-      for (const driveFileId of photoFileIds) {
-        photo = await moveMessengerFileToSpaceRegistration(driveFileId, spaceCode, content.spaceName);
-      }
 
       const saved = await syncSpaceRegistrationDirect({
         spaceNumber: content.spaceNumber,
+        photoDriveFileIds: photoFileIds,
         spaceName: content.spaceName,
         contactName: content.contactName,
         relationship: content.relationship,
@@ -1086,7 +1077,6 @@ export async function POST(req: NextRequest) {
         vatIncluded: content.vatIncluded,
         negotiable: content.negotiable,
         conditions: content.conditions,
-        photoFolderUrl: photo?.folderUrl,
         photoCount: photoFileIds.length,
         privacyConsentAt: content.privacyConsentAt,
         photoPermission: content.photoPermission,
@@ -1137,7 +1127,7 @@ export async function POST(req: NextRequest) {
         folderPath: saved.folderPath,
         folderUrl: saved.folderUrl,
         photoCount: photoFileIds.length,
-        ...(photo ? { driveUrl: photo.driveUrl } : {}),
+        ...(saved.photos[0] ? { driveUrl: saved.photos[0].driveUrl } : {}),
       };
       await prisma.agentAuditLog.create({
         data: {

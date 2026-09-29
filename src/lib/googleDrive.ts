@@ -279,14 +279,29 @@ export async function moveMessengerFileToSpaceRegistration(
   spaceCode: string,
   spaceName: string,
 ): Promise<{ name: string; driveUrl: string; folderPath: string; folderUrl: string }> {
+  const result = await moveMessengerFilesToSpaceRegistration([driveFileId], spaceCode, spaceName);
+  const moved = result.files[0];
+  if (!moved) throw new Error("공간 사진을 Drive 폴더로 이동하지 못했습니다.");
+  return { ...moved, folderPath: result.folderPath, folderUrl: result.folderUrl };
+}
+
+/** 같은 공간에 첨부된 파일은 폴더 탐색을 한 번만 한 뒤 함께 이동한다. */
+export async function moveMessengerFilesToSpaceRegistration(
+  driveFileIds: readonly string[],
+  spaceCode: string,
+  spaceName: string,
+): Promise<{
+  files: Array<{ name: string; driveUrl: string }>;
+  folderPath: string;
+  folderUrl: string;
+}> {
   return withOwnerDrive(async (drive) => {
     const folder = await ensureSpaceRegistrationFolderWithDrive(drive, spaceCode, spaceName);
-    const moved = await moveDriveFileToFolder(drive, driveFileId, folder.folderId);
-
-    return {
-      ...moved,
-      folderPath: folder.folderPath,
-      folderUrl: folder.folderUrl,
-    };
+    const files = await Promise.all(
+      [...new Set(driveFileIds.filter(Boolean))].map((driveFileId) =>
+        moveDriveFileToFolder(drive, driveFileId, folder.folderId),
+      ),
+    );
+    return { files, folderPath: folder.folderPath, folderUrl: folder.folderUrl };
   });
 }
