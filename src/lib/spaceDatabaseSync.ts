@@ -946,5 +946,6 @@ export async function syncSpaceRegistrationDirect(
     spaceNumber: input.spaceNumber,
     photoDriveFileIds: input.photoDriveFileIds,
   });
-  return { registrationId, ...synced };
+  // Return the canonical row-derived V-code, not the transient AI intake ID.
+  return synced;
 }
