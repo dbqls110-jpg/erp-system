@@ -44,6 +44,8 @@ export function assertSpaceRegistrationAllowed(input: Pick<SpaceRegistrationShee
 export interface SpaceRegistrationSheetRowInput {
   /** 지정할 호스트 등록 공간 데이터 번호(1부터). */
   spaceNumber?: number;
+  /** VenueDA 홈페이지에 노출할 이름. 비어 있으면 실제 공간명을 사용한다. */
+  displayName?: string;
   spaceName: string;
   contactName?: string;
   relationship?: string;
@@ -267,6 +269,7 @@ function registrationRowValues(input: SpaceRegistrationSheetRowInput, registrati
 export async function appendSpaceRegistrationRow(input: SpaceRegistrationSheetRowInput) {
   const spaceName = input.spaceName.trim();
   if (!spaceName) throw new Error("공간명이 필요합니다.");
+  const displayName = String(input.displayName ?? "").trim() || spaceName;
   assertSpaceRegistrationAllowed({ spaceName, address: input.address });
 
   const { sheets, rows } = await readSpaceRegistrationSheet();
@@ -275,7 +278,7 @@ export async function appendSpaceRegistrationRow(input: SpaceRegistrationSheetRo
   const rowNumber = Math.max(rows.length + 1, 2);
   const sourceRowNumber = rows.length >= 2 ? rows.length : 1;
   const sheetId = await getSheetId(sheets);
-  const values = registrationRowValues({ ...input, spaceName }, registrationId);
+  const values = registrationRowValues({ ...input, displayName, spaceName }, registrationId);
   const requests: object[] = [
     {
       copyPaste: {

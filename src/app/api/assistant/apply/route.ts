@@ -1060,6 +1060,7 @@ export async function POST(req: NextRequest) {
         spaceNumber: content.spaceNumber,
         photoDriveFileIds: photoFileIds,
         spaceName: content.spaceName,
+        displayName: content.name,
         contactName: content.contactName,
         relationship: content.relationship,
         phone: content.phone,
@@ -1119,7 +1120,7 @@ export async function POST(req: NextRequest) {
         tourMethod: content.tourMethod,
       });
       const result = {
-        name: content.spaceName,
+        name: content.name ?? content.spaceName,
         registrationId: saved.registrationId,
         hostRowNumber: saved.hostRowNumber,
         venueRowNumber: saved.venueRowNumber,

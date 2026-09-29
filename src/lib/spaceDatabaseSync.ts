@@ -44,6 +44,7 @@ const HOST_REGISTERED_HEADERS = [
 // 삭제한 원본 열을 다음 호스트 등록 때 빈 열로 되살리지 않도록 이 기준을 유지한다.
 const SPACE_DATABASE_MIN_COLUMN_COUNT = 81;
 const SPACE_DATABASE_REQUIRED_COLUMNS = [
+  "이름",
   "공간명",
   "수용_min",
   "상세 주소",
@@ -157,6 +158,25 @@ async function loadHostRegisteredSheet(sheets: SheetsClient): Promise<HostRegist
               length: missingHeaders.length,
             },
           },
+          ...missingHeaders.map((_, index) => ({
+            copyPaste: {
+              source: {
+                sheetId: grid.sheetId,
+                startRowIndex: 0,
+                endRowIndex: 1,
+                startColumnIndex: Math.max(grid.columnCount - 1, 0),
+                endColumnIndex: grid.columnCount,
+              },
+              destination: {
+                sheetId: grid.sheetId,
+                startRowIndex: 0,
+                endRowIndex: 1,
+                startColumnIndex: grid.columnCount + index,
+                endColumnIndex: grid.columnCount + index + 1,
+              },
+              pasteType: "PASTE_FORMAT",
+            },
+          })),
           {
             updateCells: {
               range: {
@@ -520,17 +540,21 @@ async function prepareSpaceDatabaseRow(
     if (!key) return;
     headerIndexes.set(key, [...(headerIndexes.get(key) ?? []), index]);
   });
-  const nameColumnIndex = headerIndexes.get("이름")?.[0]
-    ?? headerIndexes.get("공간명")?.[0]
-    ?? headerIndexes.get("대표공간명")?.[0];
-  if (nameColumnIndex === undefined) throw new Error("공간DB에서 공간명 열을 찾지 못했습니다.");
+  const displayNameColumnIndex = headerIndexes.get("이름")?.[0];
+  const spaceNameColumnIndex = headerIndexes.get("공간명")?.[0]
+    ?? headerIndexes.get("대표공간명")?.[0]
+    ?? displayNameColumnIndex;
+  if (spaceNameColumnIndex === undefined) throw new Error("공간DB에서 공간명 열을 찾지 못했습니다.");
   const addressColumnIndex = headerIndexes.get("위치")?.[0] ?? headerIndexes.get("상세 주소")?.[0];
-  const nameColumn = columnName(nameColumnIndex);
-  const ranges = [`'${SPACE_DATABASE_TAB_NAME}'!${nameColumn}2:${nameColumn}${schema.rowCount}`];
-  if (addressColumnIndex !== undefined && addressColumnIndex !== nameColumnIndex) {
-    const addressColumn = columnName(addressColumnIndex);
-    ranges.push(`'${SPACE_DATABASE_TAB_NAME}'!${addressColumn}2:${addressColumn}${schema.rowCount}`);
-  }
+  const scanColumnIndexes = [...new Set([
+    spaceNameColumnIndex,
+    ...(displayNameColumnIndex === undefined ? [] : [displayNameColumnIndex]),
+    ...(addressColumnIndex === undefined ? [] : [addressColumnIndex]),
+  ])];
+  const ranges = scanColumnIndexes.map((index) => {
+    const column = columnName(index);
+    return `'${SPACE_DATABASE_TAB_NAME}'!${column}2:${column}${schema.rowCount}`;
+  });
 
   const keyResponse = schema.rowCount > 1
     ? await sheets.spreadsheets.values.batchGet({
@@ -540,21 +564,31 @@ async function prepareSpaceDatabaseRow(
         valueRenderOption: "FORMATTED_VALUE",
       })
     : { data: { valueRanges: [] } };
-  const nameValues = (keyResponse.data.valueRanges?.[0]?.values ?? []).map((row) => String(row[0] ?? ""));
-  const addressValues = addressColumnIndex === undefined || addressColumnIndex === nameColumnIndex
-    ? []
-    : (keyResponse.data.valueRanges?.[1]?.values ?? []).map((row) => String(row[0] ?? ""));
-  const scanLength = Math.max(nameValues.length, addressValues.length);
+  const valuesByColumn = new Map(scanColumnIndexes.map((index, rangeIndex) => [
+    index,
+    (keyResponse.data.valueRanges?.[rangeIndex]?.values ?? []).map((row) => String(row[0] ?? "")),
+  ]));
+  const actualNameValues = valuesByColumn.get(spaceNameColumnIndex) ?? [];
+  const displayNameValues = displayNameColumnIndex === undefined
+    ? actualNameValues
+    : valuesByColumn.get(displayNameColumnIndex) ?? [];
+  const addressValues = addressColumnIndex === undefined ? [] : valuesByColumn.get(addressColumnIndex) ?? [];
+  const scanLength = Math.max(actualNameValues.length, displayNameValues.length, addressValues.length);
   let lastDataRow = 1;
   const matches: number[] = [];
   for (let index = 0; index < scanLength; index += 1) {
-    const name = (nameValues[index] ?? "").trim();
+    const actualName = (actualNameValues[index] ?? "").trim();
+    const displayName = (displayNameValues[index] ?? "").trim();
     const address = (addressValues[index] ?? "").trim();
     const rowNumber = index + 2;
-    if (name || address) lastDataRow = rowNumber;
-    if (name !== record.spaceName.trim()) continue;
+    if (actualName || displayName || address) lastDataRow = rowNumber;
     if (record.address.trim() && address && address !== record.address.trim()) continue;
-    matches.push(rowNumber);
+    const exactActualName = actualName === record.spaceName.trim();
+    const legacyDisplayNameMatch = displayName === (record.displayName || record.spaceName).trim()
+      && Boolean(record.address.trim())
+      && address === record.address.trim();
+    const blankActualNameFallback = !actualName && displayName === record.spaceName.trim();
+    if (exactActualName || legacyDisplayNameMatch || blankActualNameFallback) matches.push(rowNumber);
   }
   if (matches.length > 1) {
     throw new Error(`공간DB에서 ‘${record.spaceName}’과 일치하는 행이 여러 개라 자동 반영을 중단했습니다.`);
@@ -612,7 +646,7 @@ function venueRowValues(
   const weekendHolidayRateMan = parsedNumber(record.weekendHolidayRate);
   const weekendHolidayRateWon = weekendHolidayRateMan === null ? null : weekendHolidayRateMan * 10000;
   const minimumRentalDays = parsedNumber(record.minimumRentalDays);
-  set("이름", record.spaceName);
+  set("이름", record.displayName || record.spaceName);
   set("공간명", record.spaceName);
   set("대표공간명", record.spaceName);
   set("자치구", record.desiredRegion);
@@ -709,17 +743,27 @@ export async function syncCompletedSpaceRegistration(
   ]));
   const hostTarget = resolveHostRegisteredSpace(hostSheet, record, options.spaceNumber);
   const spaceCode = spaceCodeForHostRow(hostTarget.rowNumber);
+  const canonicalRecord: SpaceRegistrationRecord = {
+    ...record,
+    registrationId: spaceCode,
+    displayName: record.displayName.trim() || record.spaceName,
+    identity: {
+      ...record.identity,
+      registrationId: spaceCode,
+      spaceName: record.spaceName,
+    },
+  };
   const photoDriveFileIds = [...new Set((options.photoDriveFileIds ?? []).filter(Boolean))];
   const { venueTarget, moved, folder } = await measureSpaceRegistrationStage("drive_and_database_row_prepare", async () => {
     const [databaseResult, driveResult] = await Promise.allSettled([
-      measureSpaceRegistrationStage("database_row_lookup", () => prepareSpaceDatabaseRow(sheets, schema, record)),
+      measureSpaceRegistrationStage("database_row_lookup", () => prepareSpaceDatabaseRow(sheets, schema, canonicalRecord)),
       measureSpaceRegistrationStage("drive_folder_and_photos", async () => {
         const moved = photoDriveFileIds.length > 0
-          ? await moveMessengerFilesToSpaceRegistration(photoDriveFileIds, spaceCode, record.spaceName)
+          ? await moveMessengerFilesToSpaceRegistration(photoDriveFileIds, spaceCode, canonicalRecord.spaceName)
           : null;
         const folder = moved
           ? { folderPath: moved.folderPath, folderUrl: moved.folderUrl }
-          : await ensureSpaceRegistrationFolder(spaceCode, record.spaceName);
+          : await ensureSpaceRegistrationFolder(spaceCode, canonicalRecord.spaceName);
         return { moved, folder };
       }),
     ]);
@@ -728,7 +772,7 @@ export async function syncCompletedSpaceRegistration(
     return { venueTarget: databaseResult.value, ...driveResult.value };
   });
   const recordWithFolder = {
-    ...record,
+    ...canonicalRecord,
     photoFolderUrl: folder.folderUrl,
     ...(options.photoDriveFileIds ? { photoCount: String(photoDriveFileIds.length) } : {}),
   };
@@ -781,6 +825,7 @@ export async function syncCompletedSpaceRegistration(
   const host = hostWrite.value;
   return {
     hostRowNumber: host.rowNumber,
+    registrationId: spaceCode,
     venueRowNumber: venue.rowNumber,
     spaceCode,
     folderPath: folder.folderPath,
@@ -804,6 +849,7 @@ export async function syncSpaceRegistrationDirect(
 ) {
   const spaceName = input.spaceName.trim();
   if (!spaceName) throw new Error("공간명이 필요합니다.");
+  const displayName = String(input.displayName ?? "").trim() || spaceName;
   const address = String(input.address ?? "").trim();
   const blocked = blockedReason({ name: spaceName, address });
   if (blocked) throw new Error(`절대 등록 금지 공간이라 반영하지 않았습니다. (${blocked})`);
@@ -832,6 +878,7 @@ export async function syncSpaceRegistrationDirect(
     phone: text(input.phone),
     email: text(input.email),
     spaceName,
+    displayName,
     spaceType: text(input.spaceType),
     address,
     desiredRegion: text(input.desiredRegion),

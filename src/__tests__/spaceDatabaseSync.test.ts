@@ -37,6 +37,17 @@ import { syncSpaceRegistrationDirect } from "@/lib/spaceDatabaseSync";
 
 const HOST_SHEET_ID = "1A5xN_nii5AeAkM9JSF0morcetMCI3A7TDcvk3xRjd1M";
 const SPACE_DB_ID = "1XFfEdhOwFMyZE7IuDcykDaRNQ8IXtPq6bvwA-StjII4";
+type RowWriteCall = {
+  spreadsheetId: string;
+  requestBody: {
+    requests: Array<{
+      updateCells?: {
+        range: { startRowIndex: number };
+        rows: Array<{ values: Array<{ userEnteredValue?: { stringValue?: string } }> }>;
+      };
+    }>;
+  };
+};
 
 describe("공간 등록 Google Sheets/Drive 왕복 최적화", () => {
   const hostHeaders = ["등록번호", "등록일시 (한국시간)", "등록 상태"];
@@ -46,6 +57,7 @@ describe("공간 등록 Google Sheets/Drive 왕복 최적화", () => {
     vi.clearAllMocks();
     spaceDbHeaders[0] = "이름";
     spaceDbHeaders[1] = "위치";
+    spaceDbHeaders[60] = "";
     mocks.makeSheetsClientAsOwner.mockResolvedValue(mocks.spreadsheetClient);
     mocks.ensureSpaceRegistrationFolder.mockResolvedValue({
       folderPath: "천우영 프로젝트/공간 등록/V0001 샘플 공간",
@@ -171,6 +183,45 @@ describe("공간 등록 Google Sheets/Drive 왕복 최적화", () => {
     );
     expect(mocks.ensureSpaceRegistrationFolder).not.toHaveBeenCalled();
     expect(result.photos).toHaveLength(2);
+  });
+
+  it("V0009는 호스트 시트 10행에 저장하고 실제 공간명과 표시명을 분리한다", async () => {
+    spaceDbHeaders[60] = "공간명";
+    mocks.valuesGet.mockImplementation(async ({ spreadsheetId, range }: { spreadsheetId: string; range: string }) => {
+      if (spreadsheetId === HOST_SHEET_ID) return { data: { values: [hostHeaders] } };
+      if (range.endsWith("1")) return { data: { values: [spaceDbHeaders] } };
+      return { data: { values: [] } };
+    });
+    mocks.valuesBatchGet.mockResolvedValueOnce({
+      data: { valueRanges: [{ values: [] }, { values: [] }, { values: [] }] },
+    });
+
+    const result = await syncSpaceRegistrationDirect({
+      spaceNumber: 9,
+      spaceName: "홍대스퀘어",
+      displayName: "홍대 루프탑·미디어월 복합 팝업 공간",
+      address: "서울특별시 마포구 어울마당로 68",
+    }, new Date("2026-09-29T00:00:00.000Z"));
+
+    expect(result).toMatchObject({ hostRowNumber: 10, registrationId: "V0009", spaceCode: "V0009" });
+    expect(mocks.ensureSpaceRegistrationFolder).toHaveBeenCalledWith("V0009", "홍대스퀘어");
+
+    const hostWrite = mocks.batchUpdate.mock.calls
+      .map(([args]) => args as RowWriteCall)
+      .find((call) => call.spreadsheetId === HOST_SHEET_ID
+        && call.requestBody.requests.some((request) => request.updateCells?.range.startRowIndex === 9))!;
+    const hostCells = hostWrite.requestBody.requests.find((request) => request.updateCells?.range.startRowIndex === 9)!.updateCells!.rows[0].values;
+    expect(hostCells[0].userEnteredValue?.stringValue).toBe("V0009");
+    expect(hostCells[3].userEnteredValue?.stringValue).toBe("홍대스퀘어");
+    expect(hostCells[39].userEnteredValue?.stringValue).toBe("홍대 루프탑·미디어월 복합 팝업 공간");
+
+    const databaseWrite = mocks.batchUpdate.mock.calls
+      .map(([args]) => args as RowWriteCall)
+      .find((call) => call.spreadsheetId === SPACE_DB_ID
+        && call.requestBody.requests.some((request) => request.updateCells?.range.startRowIndex === 1))!;
+    const databaseCells = databaseWrite.requestBody.requests.find((request) => request.updateCells?.range.startRowIndex === 1)!.updateCells!.rows[0].values;
+    expect(databaseCells[0].userEnteredValue?.stringValue).toBe("홍대 루프탑·미디어월 복합 팝업 공간");
+    expect(databaseCells[60].userEnteredValue?.stringValue).toBe("홍대스퀘어");
   });
 
   it("공간DB에 같은 이름·주소가 여러 행이면 시트 행을 쓰지 않고 중단한다", async () => {

@@ -21,6 +21,7 @@ import {
   type ProjectCreateFields,
   validateProposal,
   type ProjectChecklistContent,
+  type SpaceRegistrationCreateContent,
   type SheetCreateContent,
   type Proposal,
 } from "@/lib/assistantProposal";
@@ -146,6 +147,9 @@ export function ProposalCard({
   const calendar = isCalendarCreate ? (accepted as unknown as Partial<CalendarCreateContent>) : null;
   const leave = isLeaveRequest ? (accepted as unknown as Partial<LeaveRequestContent>) : null;
   const message = isMessageSend ? (accepted as unknown as Partial<MessageSendContent>) : null;
+  const spaceRegistration = proposal.target === "space_registration_create"
+    ? (accepted as unknown as Partial<SpaceRegistrationCreateContent>)
+    : null;
   const sheetTabs = sheet && Array.isArray(sheet.tabs) ? sheet.tabs : [];
   const sheetData = sheet && sheet.data && typeof sheet.data === "object" ? sheet.data : {};
   const sheetRowCount = Object.values(sheetData).reduce(
@@ -543,6 +547,25 @@ export function ProposalCard({
             <li key={`${item}-${itemIndex}`}>{item}</li>
           ))}
         </ul>
+      ) : proposal.target === "space_registration_create" ? (
+        <dl className="mt-2 space-y-1 text-xs">
+          <div className="flex gap-2">
+            <dt className="w-24 shrink-0 text-muted-foreground">저장 위치</dt>
+            <dd className="font-medium text-foreground">
+              {typeof spaceRegistration?.spaceNumber === "number"
+                ? `${spaceRegistration.spaceNumber}번째 데이터 행 · 시트 ${spaceRegistration.spaceNumber + 1}행 · V${String(spaceRegistration.spaceNumber).padStart(4, "0")}`
+                : "다음 행 자동 배정 · 번호는 반영 후 확인"}
+            </dd>
+          </div>
+          {Object.entries(spaceRegistration ?? {})
+            .filter(([field]) => field !== "spaceNumber")
+            .map(([field, value]) => (
+              <div key={field} className="flex gap-2">
+                <dt className="w-24 shrink-0 text-muted-foreground">{fieldLabel(proposal.target, field)}</dt>
+                <dd className="text-foreground">{displayValue(value)}</dd>
+              </div>
+            ))}
+        </dl>
       ) : isSheetCreate ? (
         <>
           <dl className="mt-2 space-y-1 text-xs">

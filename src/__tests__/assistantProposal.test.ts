@@ -166,6 +166,50 @@ describe("validateProposal — 무엇을 받아들이고 무엇을 버리는가"
     expect(rejected).toEqual([]);
   });
 
+  it("V0009 등록번호를 9번째 데이터 행으로 정규화하고 실제명·표시명을 분리한다", () => {
+    const { accepted, rejected } = validateProposal({
+      target: "space_registration_create",
+      id: "",
+      changes: {
+        fields: {
+          registrationId: "V-0009",
+          spaceName: "홍대스퀘어",
+          name: "홍대 루프탑·미디어월 복합 팝업 공간",
+        },
+      },
+    });
+
+    expect(accepted.spaceNumber).toBe(9);
+    expect(accepted.spaceName).toBe("홍대스퀘어");
+    expect(accepted.name).toBe("홍대 루프탑·미디어월 복합 팝업 공간");
+    expect(rejected).toEqual([]);
+  });
+
+  it("등록번호 별칭이 서로 다르면 행 번호를 임의로 선택하지 않는다", () => {
+    const { accepted, rejected } = validateProposal({
+      target: "space_registration_create",
+      id: "",
+      changes: { spaceNumber: 9, registrationId: "V0008", spaceName: "공간" },
+    });
+
+    expect(accepted.spaceNumber).toBeUndefined();
+    expect(rejected).toContainEqual({
+      field: "spaceNumber",
+      reason: "지정한 등록번호가 서로 달라 반영을 중단했습니다.",
+    });
+  });
+
+  it("V0009 행 번호는 다른 선택 입력 오류가 있어도 미리보기에서 유지한다", () => {
+    const { accepted, rejected } = validateProposal({
+      target: "space_registration_create",
+      id: "",
+      changes: { spaceNumber: "V0009", spaceName: "공간", name: "가".repeat(501) },
+    });
+
+    expect(accepted.spaceNumber).toBe(9);
+    expect(rejected.some((issue) => issue.field === "name")).toBe(true);
+  });
+
   it("지나치게 긴 글은 버린다", () => {
     // 막지 않으면 AI 가 답변을 통째로 메모에 밀어 넣는 일이 생긴다.
     const { rejected } = validateProposal(make({ calledNote: "가".repeat(501) }));

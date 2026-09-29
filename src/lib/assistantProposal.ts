@@ -48,8 +48,11 @@ export const EDITABLE_FIELDS = {
     value: "추가 값",
   },
   space_registration_create: {
-    spaceNumber: "호스트 등록 공간의 데이터 번호 (1부터)",
-    spaceName: "공간명",
+    spaceNumber: "등록번호/데이터 번호 (예: V0009 = 9번째 데이터 행)",
+    registrationNumber: "등록번호 (V0009)",
+    registrationId: "등록번호 (V0009)",
+    spaceName: "공간명 (실제 공간명)",
+    name: "이름 (베뉴다 홈페이지 표시명)",
     contactName: "담당자 이름",
     relationship: "공간과의 관계",
     phone: "연락처",
@@ -340,9 +343,12 @@ export interface VenueCreateContent {
 }
 
 export interface SpaceRegistrationCreateContent {
-  /** 호스트 등록 공간의 데이터 번호. 1이면 시트 2행, 30이면 시트 31행. */
+  /** 1부터 세는 공간 데이터 순번. 9는 헤더 포함 시트 10행, 코드 V0009. */
   spaceNumber?: number;
+  /** 실제 공간명 또는 해당 공간의 공인 명칭. */
   spaceName: string;
+  /** VenueDA 홈페이지에 노출할 이름. 비어 있으면 실제 공간명을 사용한다. */
+  name?: string;
   contactName?: string;
   relationship?: string;
   phone?: string;
@@ -703,20 +709,37 @@ function validateSpaceRegistrationCreateProposal(proposal: Proposal): ValidatedP
   const fields = asRecord(proposal.changes.fields) ?? proposal.changes;
   const allowed = new Set(Object.keys(EDITABLE_FIELDS.space_registration_create));
   rejectUnknownFields(fields, allowed, rejected);
-  const rawSpaceNumber = fields.spaceNumber;
-  if (rawSpaceNumber !== undefined) {
-    const spaceNumber = typeof rawSpaceNumber === "number"
-      ? rawSpaceNumber
-      : typeof rawSpaceNumber === "string" && /^\d+$/.test(rawSpaceNumber.trim())
-        ? Number(rawSpaceNumber.trim())
-        : NaN;
-    if (!Number.isSafeInteger(spaceNumber) || spaceNumber < 1) {
-      rejected.push({ field: "spaceNumber", reason: "공간등록 번호는 1 이상의 정수여야 합니다." });
-    } else {
-      accepted.spaceNumber = spaceNumber;
+  const parseSpaceNumber = (value: unknown): number | null => {
+    if (typeof value === "number") return Number.isSafeInteger(value) && value >= 1 ? value : null;
+    if (typeof value !== "string") return null;
+    const match = value.trim().match(/^(?:V-?)?0*(\d+)$/i);
+    if (!match) return null;
+    const parsed = Number(match[1]);
+    return Number.isSafeInteger(parsed) && parsed >= 1 ? parsed : null;
+  };
+  const numberFields = ["spaceNumber", "registrationNumber", "registrationId"] as const;
+  const requestedNumbers = numberFields.flatMap((field) => {
+    const value = fields[field];
+    if (value === undefined) return [];
+    const parsed = parseSpaceNumber(value);
+    if (parsed === null) {
+      rejected.push({ field, reason: "V0009 또는 9처럼 1 이상의 공간 번호를 입력해야 합니다." });
+      return [];
     }
+    return [{ field, value: parsed }];
+  });
+  const distinctNumbers = [...new Set(requestedNumbers.map(({ value }) => value))];
+  if (distinctNumbers.length > 1) {
+    rejected.push({ field: "spaceNumber", reason: "지정한 등록번호가 서로 달라 반영을 중단했습니다." });
+    delete accepted.spaceNumber;
+  } else if (distinctNumbers.length === 1) {
+    accepted.spaceNumber = distinctNumbers[0];
   }
   addRegistrationValue(accepted, rejected, fields, "spaceName", { required: true });
+  addRegistrationValue(accepted, rejected, fields, "name");
+  if (accepted.name === undefined && typeof accepted.spaceName === "string") {
+    accepted.name = accepted.spaceName;
+  }
   for (const field of [
     "contactName", "relationship", "phone", "email", "spaceType", "address", "desiredRegion",
     "description", "negotiable", "conditions", "privacyConsentAt", "photoPermission", "cooling",

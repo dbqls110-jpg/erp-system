@@ -18,6 +18,7 @@ export type SpaceRegistrationStage = (typeof SPACE_REGISTRATION_STAGES)[number];
 
 /** 기존 접수 열과 중복되지 않는 호스트 상세 열. 접수·호스트·공간DB 동기화에 공통으로 쓴다. */
 export const SPACE_REGISTRATION_EXTRA_COLUMNS = [
+  { key: "displayName", header: "이름" },
   { key: "areaPyeong", header: "대관 규모(평)" },
   { key: "rentableFloors", header: "대관 가능 층수" },
   { key: "rentableTotalArea", header: "대관 가능 총 면적" },
@@ -75,6 +76,7 @@ export interface SpaceRegistrationRecord {
   phone: string;
   email: string;
   spaceName: string;
+  displayName: string;
   spaceType: string;
   address: string;
   desiredRegion: string;
@@ -292,6 +294,7 @@ export function parseSpaceRegistrationRows(
       foodAllowed: normalized[37],
       extraConditions: normalized[38],
       ...extraFields,
+      displayName: extraFields.displayName || normalized[7],
     }];
   });
 }
