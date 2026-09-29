@@ -1,3 +1,4 @@
+import type { sheets_v4 } from "googleapis";
 import { makeSheetsClientAsOwner } from "@/lib/googleClient";
 import { formatCurrentDateTime } from "@/lib/inquiries";
 import { SPACE_REGISTRATION_EXTRA_COLUMNS, type SpaceRegistrationRecord } from "@/lib/spaceRegistrations";
@@ -74,6 +75,7 @@ const HOST_SOURCE_URL = `https://docs.google.com/spreadsheets/d/${SPACE_REGISTRA
 
 type SheetRows = readonly (readonly unknown[])[];
 type SheetsClient = Awaited<ReturnType<typeof makeSheetsClientAsOwner>>;
+type SheetsBatchRequest = sheets_v4.Schema$Request;
 
 function columnIndex(column: string): number {
   return [...column].reduce((result, letter) => result * 26 + letter.charCodeAt(0) - 64, 0) - 1;
@@ -381,11 +383,13 @@ async function writeNativeRow(
   startColumn: string,
   endColumn: string,
   values: unknown[],
+  additionalRequests: SheetsBatchRequest[] = [],
 ) {
   await sheets.spreadsheets.batchUpdate({
     spreadsheetId,
     requestBody: {
       requests: [
+        ...additionalRequests,
         {
           copyPaste: {
             source: rowRange(sheetId, sourceRowNumber, startColumn, endColumn),
@@ -458,24 +462,17 @@ async function writeHostRegisteredSpace(
   record: SpaceRegistrationRecord,
   timestamp: string,
 ) {
-  if (target.rowNumber > hostSheet.rowCount) {
-    await sheets.spreadsheets.batchUpdate({
-      spreadsheetId: SPACE_REGISTRATION_SPREADSHEET_ID,
-      requestBody: {
-        requests: [{
-          insertDimension: {
-            range: {
-              sheetId: hostSheet.sheetId,
-              dimension: "ROWS",
-              startIndex: hostSheet.rowCount,
-              endIndex: target.rowNumber,
-            },
-            inheritFromBefore: true,
-          },
-        }],
+  const additionalRequests = target.rowNumber > hostSheet.rowCount ? [{
+    insertDimension: {
+      range: {
+        sheetId: hostSheet.sheetId,
+        dimension: "ROWS",
+        startIndex: hostSheet.rowCount,
+        endIndex: target.rowNumber,
       },
-    });
-  }
+      inheritFromBefore: true,
+    },
+  }] : [];
   await writeNativeRow(
     sheets,
     SPACE_REGISTRATION_SPREADSHEET_ID,
@@ -485,6 +482,7 @@ async function writeHostRegisteredSpace(
     "A",
     columnName(hostSheet.columnCount - 1),
     hostRowValues(record, timestamp, hostSheet.headers, target.existingValues),
+    additionalRequests,
   );
   return { rowNumber: target.rowNumber, registrationId: record.registrationId };
 }
@@ -734,44 +732,53 @@ export async function syncCompletedSpaceRegistration(
     photoFolderUrl: folder.folderUrl,
     ...(options.photoDriveFileIds ? { photoCount: String(photoDriveFileIds.length) } : {}),
   };
-  const host = await measureSpaceRegistrationStage("host_sheet_write", () =>
-    writeHostRegisteredSpace(sheets, hostSheet, hostTarget, recordWithFolder, timestamp));
   const { sheetId: venueSheetId, endColumn } = schema;
   const venue = venueRowValues(schema.headers, venueTarget, recordWithFolder, timestamp);
-  // Google Sheets grid rows are bounded. When the last existing row is
-  // already occupied, extend the grid before writing the new venue row.
-  // Without this, a valid registration can update the host sheet but fail
-  // when the matching 공간DB row is one past the current grid limit.
-  await measureSpaceRegistrationStage("space_database_write_verify", async () => {
-    if (venue.rowNumber > schema.rowCount) {
-      await sheets.spreadsheets.batchUpdate({
-        spreadsheetId: SPACE_DATABASE_SPREADSHEET_ID,
-        requestBody: {
-          requests: [
-            {
-              insertDimension: {
-                range: {
-                  sheetId: venueSheetId,
-                  dimension: "ROWS",
-                  startIndex: schema.rowCount,
-                  endIndex: venue.rowNumber,
-                },
-                inheritFromBefore: true,
-              },
-            },
-          ],
-        },
-      });
-    }
-    await writeNativeRow(sheets, SPACE_DATABASE_SPREADSHEET_ID, venueSheetId, venue.rowNumber, venueTarget.sourceRowNumber, "A", endColumn, venue.values);
-    const verify = await sheets.spreadsheets.values.get({
-      spreadsheetId: SPACE_DATABASE_SPREADSHEET_ID,
-      range: `'${SPACE_DATABASE_TAB_NAME}'!A${venue.rowNumber}:C${venue.rowNumber}`,
-      valueRenderOption: "FORMATTED_VALUE",
+  // 각 시트마다 확장·서식 복사·값 입력을 한 번의 batchUpdate로 묶고,
+  // 서로 다른 두 스프레드시트 쓰기는 동시에 실행해 왕복 대기 시간을 줄인다.
+  const databaseAdditionalRequests = venue.rowNumber > schema.rowCount ? [{
+    insertDimension: {
+      range: {
+        sheetId: venueSheetId,
+        dimension: "ROWS",
+        startIndex: schema.rowCount,
+        endIndex: venue.rowNumber,
+      },
+      inheritFromBefore: true,
+    },
+  }] : [];
+  const [hostWrite, databaseWrite] = await Promise.allSettled([
+    measureSpaceRegistrationStage("host_sheet_write", () =>
+      writeHostRegisteredSpace(sheets, hostSheet, hostTarget, recordWithFolder, timestamp)),
+    measureSpaceRegistrationStage("space_database_write", () =>
+      writeNativeRow(
+        sheets,
+        SPACE_DATABASE_SPREADSHEET_ID,
+        venueSheetId,
+        venue.rowNumber,
+        venueTarget.sourceRowNumber,
+        "A",
+        endColumn,
+        venue.values,
+        databaseAdditionalRequests,
+      )),
+  ]);
+  if (hostWrite.status === "rejected" && databaseWrite.status === "rejected") {
+    throw new Error("호스트 등록 공간과 공간DB 저장이 모두 실패했습니다. 시트 내용을 확인한 뒤 다시 시도해 주세요.", {
+      cause: hostWrite.reason,
     });
-    const saved = verify.data.values?.[0] ?? [];
-    if (String(saved[0] ?? "") !== record.spaceName) throw new Error("공간DB 자동 반영 후 공간명 확인에 실패했습니다.");
-  });
+  }
+  if (hostWrite.status === "rejected") {
+    throw new Error("공간DB에는 반영됐지만 호스트 등록 공간 저장이 실패했습니다. 중복 등록 전 두 시트의 해당 행을 확인해 주세요.", {
+      cause: hostWrite.reason,
+    });
+  }
+  if (databaseWrite.status === "rejected") {
+    throw new Error("호스트 등록 공간에는 반영됐지만 공간DB 저장이 실패했습니다. 재시도 전 두 시트의 해당 행을 확인해 주세요.", {
+      cause: databaseWrite.reason,
+    });
+  }
+  const host = hostWrite.value;
   return {
     hostRowNumber: host.rowNumber,
     venueRowNumber: venue.rowNumber,

@@ -95,7 +95,8 @@ describe("공간 등록 Google Sheets/Drive 왕복 최적화", () => {
     expect(reads.filter((read) => read.spreadsheetId === HOST_SHEET_ID)).toHaveLength(1);
     expect(reads.filter((read) => read.spreadsheetId === SPACE_DB_ID && read.range.includes("!A1:") && read.range.endsWith("1"))).toHaveLength(1);
     expect(reads.filter((read) => read.spreadsheetId === SPACE_DB_ID && read.range.includes("!A2:") && !read.range.endsWith(":C2"))).toHaveLength(1);
-    expect(reads.filter((read) => read.range.includes("!A2:C2"))).toHaveLength(1);
+    // 저장 성공 여부는 batchUpdate의 응답으로 확인하므로 추가 readback 왕복은 하지 않는다.
+    expect(reads.filter((read) => read.range.includes("!A2:C2"))).toHaveLength(0);
     expect(mocks.valuesBatchGet).toHaveBeenCalledTimes(1);
 
     const hostRowWrites = mocks.batchUpdate.mock.calls.filter(([args]) => {
@@ -104,8 +105,55 @@ describe("공간 등록 Google Sheets/Drive 왕복 최적화", () => {
         && call.requestBody.requests.some((request) => request.updateCells?.range.startRowIndex === 1);
     });
     expect(hostRowWrites).toHaveLength(1);
+    const databaseRowWrites = mocks.batchUpdate.mock.calls.filter(([args]) => {
+      const call = args as { spreadsheetId: string; requestBody: { requests: Array<{ updateCells?: { range: { startRowIndex: number } } }> } };
+      return call.spreadsheetId === SPACE_DB_ID
+        && call.requestBody.requests.some((request) => request.updateCells?.range.startRowIndex === 1);
+    });
+    expect(databaseRowWrites).toHaveLength(1);
     expect(mocks.ensureSpaceRegistrationFolder).toHaveBeenCalledTimes(1);
     expect(mocks.moveMessengerFilesToSpaceRegistration).not.toHaveBeenCalled();
+  });
+
+  it("호스트 시트와 공간DB 쓰기를 동시에 시작한다", async () => {
+    const writeResolvers: Array<(value: { data: Record<string, never> }) => void> = [];
+    mocks.batchUpdate.mockImplementation((args: {
+      spreadsheetId: string;
+      requestBody: { requests: Array<{ updateCells?: { range: { startRowIndex: number } } }> };
+    }) => {
+      const isRowWrite = args.requestBody.requests.some((request) => (request.updateCells?.range.startRowIndex ?? 0) > 0);
+      if (!isRowWrite) return Promise.resolve({ data: {} });
+      return new Promise((resolve) => writeResolvers.push(resolve));
+    });
+
+    const syncPromise = syncSpaceRegistrationDirect({
+      spaceName: "샘플 공간",
+      address: "서울시 중구 세종대로 1",
+    }, new Date("2026-09-29T00:00:00.000Z"));
+
+    await vi.waitFor(() => expect(writeResolvers).toHaveLength(2));
+    writeResolvers.forEach((resolve) => resolve({ data: {} }));
+    await expect(syncPromise).resolves.toMatchObject({ spaceCode: "V0001" });
+  });
+
+  it("두 시트 저장 중 한쪽만 실패하면 부분 반영 상태를 구분해 알린다", async () => {
+    mocks.batchUpdate.mockImplementation((args: {
+      spreadsheetId: string;
+      requestBody: {
+        requests: Array<{
+          updateCells?: { range: { startRowIndex: number } };
+        }>;
+      };
+    }) => {
+      const isRowWrite = args.requestBody.requests.some((request) => (request.updateCells?.range.startRowIndex ?? 0) > 0);
+      if (isRowWrite && args.spreadsheetId === SPACE_DB_ID) return Promise.reject(new Error("simulated write failure"));
+      return Promise.resolve({ data: {} });
+    });
+
+    await expect(syncSpaceRegistrationDirect({
+      spaceName: "샘플 공간",
+      address: "서울시 중구 세종대로 1",
+    }, new Date("2026-09-29T00:00:00.000Z"))).rejects.toThrow("호스트 등록 공간에는 반영됐지만 공간DB 저장이 실패했습니다");
   });
 
   it("첨부 여러 장은 공간 폴더 준비·이동 작업 한 번으로 묶는다", async () => {

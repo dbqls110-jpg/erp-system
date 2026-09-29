@@ -50,7 +50,7 @@ interface AssistantPollResponse {
 }
 
 const TERMINAL_STATUSES: AssistantStatus[] = ["completed", "error"];
-const POLLING_TIMEOUT_MS = 3 * 60 * 1000;
+const SLOW_RESPONSE_MS = 3 * 60 * 1000;
 
 // 뒤로가기 버튼은 MessengerDock 헤더에 있다. 같은 자리에 두 개를 두면 헷갈린다.
 export function AssistantPanel({ initialQuestion = "" }: { initialQuestion?: string }) {
@@ -91,19 +91,18 @@ export function AssistantPanel({ initialQuestion = "" }: { initialQuestion?: str
     pollingStartedAt.current = null;
   }, []);
 
-  const startPolling = useCallback((turnId: string) => {
-    pollingStartedAt.current = Date.now();
-    setTimedOut(false);
+  const startPolling = useCallback((turnId: string, createdAt?: string) => {
+    const createdAtMs = createdAt ? Date.parse(createdAt) : Number.NaN;
+    pollingStartedAt.current = Number.isFinite(createdAtMs) ? createdAtMs : Date.now();
+    setTimedOut(Date.now() - pollingStartedAt.current >= SLOW_RESPONSE_MS);
     setPollingId(turnId);
   }, []);
 
   const pollAssistant = useCallback(async () => {
     if (!pollingId) return;
     const startedAt = pollingStartedAt.current;
-    if (startedAt !== null && Date.now() - startedAt >= POLLING_TIMEOUT_MS) {
-      stopPolling();
+    if (startedAt !== null && Date.now() - startedAt >= SLOW_RESPONSE_MS) {
       setTimedOut(true);
-      return;
     }
 
     try {
@@ -129,16 +128,18 @@ export function AssistantPanel({ initialQuestion = "" }: { initialQuestion?: str
       const data = await fetchAssistant();
       const lastTurn = data?.turns[data.turns.length - 1];
       if (lastTurn && !TERMINAL_STATUSES.includes(lastTurn.status)) {
-        startPolling(lastTurn.id);
+        startPolling(lastTurn.id, lastTurn.createdAt);
       }
     })();
   }, [fetchAssistant, startPolling]);
 
+  // 오래 걸리는 작업도 결과 확인을 끊지 않는다. 3분 이후에는 안내를 바꾸고
+  // 폴링을 1초에서 5초로 완화해 기다리는 동안 DB 요청이 쌓이지 않게 한다.
   useVisiblePolling(
     () => {
       void pollAssistant();
     },
-    2000,
+    timedOut ? 5000 : 1000,
     { immediate: false, refreshKey: pollingId ?? "idle" },
   );
 
@@ -330,7 +331,9 @@ export function AssistantPanel({ initialQuestion = "" }: { initialQuestion?: str
               )}
               {isWaiting && (
                 <p className="px-1 text-[10px] text-muted-foreground">
-                  {timedOut && index === turns.length - 1 ? "응답이 너무 오래 걸립니다" : "생각하는 중…"}
+                  {timedOut && index === turns.length - 1
+                    ? "답변 생성이 평소보다 오래 걸립니다. 계속 확인 중입니다…"
+                    : "생각하는 중…"}
                 </p>
               )}
             </div>
