@@ -13,6 +13,7 @@ import { Calendar, User, FolderOpen, BarChart2 } from "lucide-react";
 import { toneBadgeClass } from "@/lib/badge-tone";
 import { getCalendarViewer } from "@/lib/calendarViewer";
 import { canViewLinkedProjects, projectWhereForViewer } from "@/lib/projectVisibility";
+import { getDisplayedProjectProgress } from "@/lib/projectProgress";
 
 const statusConfig: Record<string, { label: string; class: string }> = {
   active: { label: "진행 중", class: toneBadgeClass("blue") },
@@ -82,6 +83,7 @@ export default async function ProjectsPage({
         <div className="grid grid-cols-1 gap-[14px] md:grid-cols-2 xl:grid-cols-3">
           {projects.map((p) => {
             const s = statusConfig[p.status] ?? statusConfig.active;
+            const progress = getDisplayedProjectProgress(p.status, p.progress);
             return (
               <Link key={p.id} href={`/projects/${p.id}`}>
                 <Card className="h-full rounded-[12px] border border-border py-0 shadow-none transition-all hover:border-[#d8d4fb] hover:shadow-sm">
@@ -102,9 +104,9 @@ export default async function ProjectsPage({
                     <div>
                       <div className="mb-1 flex justify-between text-[12px] text-muted-foreground">
                         <span>진행률</span>
-                        <span>{p.progress}%</span>
+                        <span>{progress}%</span>
                       </div>
-                      <Progress value={p.progress} className="h-1.5" />
+                      <Progress value={progress} className="h-1.5" />
                     </div>
                     <div className="flex items-center gap-4 text-[11.5px] text-muted-foreground">
                       {p.deadline && (

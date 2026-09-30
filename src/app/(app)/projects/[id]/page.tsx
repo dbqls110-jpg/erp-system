@@ -19,6 +19,7 @@ import { calculateNetIncome, calculateOperatingProfit } from "@/lib/financeMetri
 import { toneBadgeClass } from "@/lib/badge-tone";
 import { getCalendarViewer } from "@/lib/calendarViewer";
 import { canViewLinkedProjects, projectWhereForViewer } from "@/lib/projectVisibility";
+import { getDisplayedProjectProgress } from "@/lib/projectProgress";
 
 const statusConfig: Record<string, { label: string; class: string }> = {
   active: { label: "진행 중", class: toneBadgeClass("blue") },
@@ -59,6 +60,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
     : [[], []];
 
   const s = statusConfig[project.status] ?? statusConfig.active;
+  const projectProgress = getDisplayedProjectProgress(project.status, project.progress);
   const operatingProfit = calculateOperatingProfit(project.revenue, project.cost);
   const netIncome = calculateNetIncome(project.revenue, project.cost);
 
@@ -121,9 +123,9 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
         <CardContent className="px-4 py-3.5">
           <div className="flex justify-between text-sm mb-2">
             <span className="font-medium text-foreground">전체 진행률</span>
-            <span className="font-bold text-primary">{project.progress}%</span>
+            <span className="font-bold text-primary">{projectProgress}%</span>
           </div>
-          <Progress value={project.progress} className="h-2" />
+          <Progress value={projectProgress} className="h-2" />
         </CardContent>
       </Card>
 

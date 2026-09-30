@@ -118,6 +118,10 @@ export async function updateProject(id: string, formData: FormData) {
   await requireEditAccess("projects");
 
   const company = parseOptionalCompany(formData.get("company"));
+  const status = formData.get("status");
+  if (typeof status !== "string" || !["active", "completed", "on_hold"].includes(status)) {
+    throw new Error("프로젝트 상태가 올바르지 않습니다.");
+  }
 
   await prisma.project.update({
     where: { id },
@@ -129,7 +133,8 @@ export async function updateProject(id: string, formData: FormData) {
       deadline: (formData.get("deadline") as string) || null,
       assignee: (formData.get("assignee") as string) || null,
       memo: (formData.get("memo") as string) || null,
-      status: formData.get("status") as string,
+      status,
+      ...(status === "completed" ? { progress: 100 } : {}),
     },
   });
   revalidatePath(`/projects/${id}`);
