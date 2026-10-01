@@ -3,6 +3,7 @@ import { makeSheetsClientAsOwner } from "@/lib/googleClient";
 import { formatCurrentDateTime } from "@/lib/inquiries";
 import { SPACE_REGISTRATION_EXTRA_COLUMNS, type SpaceRegistrationRecord } from "@/lib/spaceRegistrations";
 import type { SpaceRegistrationSheetRowInput } from "@/lib/spaceRegistrationSheet";
+import { parseHostRegisteredSpaceKpiRows, type HostRegisteredSpaceKpiRow } from "@/lib/venueKpi";
 import { blockedReason } from "@/lib/venueBlocklist.mjs";
 import {
   ensureSpaceRegistrationFolder,
@@ -207,6 +208,24 @@ async function readValues(sheets: SheetsClient, spreadsheetId: string, range: st
     valueRenderOption: "FORMATTED_VALUE",
   });
   return (response.data.values ?? []) as SheetRows;
+}
+
+/** Reads only this week's rows from the host sheet; this is intentionally read-only and does not backfill ERP venues. */
+export async function getHostRegisteredSpacesForWeek(
+  startDate: string,
+  endDate: string,
+): Promise<HostRegisteredSpaceKpiRow[]> {
+  const sheets = await makeSheetsClientAsOwner();
+  const rows = await readValues(
+    sheets,
+    SPACE_REGISTRATION_SPREADSHEET_ID,
+    `'${HOST_REGISTERED_SPACES_TAB_NAME}'!A:U`,
+  );
+  return parseHostRegisteredSpaceKpiRows(rows, startDate, endDate);
+}
+
+export function hostRegisteredSpaceSheetRowUrl(rowNumber: number): string {
+  return `${HOST_SOURCE_URL}&range=A${rowNumber}:U${rowNumber}`;
 }
 
 async function measureSpaceRegistrationStage<T>(stage: string, operation: () => Promise<T>): Promise<T> {

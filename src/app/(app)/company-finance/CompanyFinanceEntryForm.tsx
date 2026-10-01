@@ -77,6 +77,7 @@ export function CompanyFinanceEntryForm({ defaultDate }: { defaultDate: string }
                 >
                   <option value="revenue">매출</option>
                   <option value="cost">매입</option>
+                  <option value="card">카드값 (순이익에서만 차감)</option>
                 </select>
               </div>
             </div>
@@ -86,7 +87,7 @@ export function CompanyFinanceEntryForm({ defaultDate }: { defaultDate: string }
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="company-finance-title">항목명 *</Label>
-              <Input id="company-finance-title" name="title" required placeholder="예: 행사 운영 대금" />
+              <Input id="company-finance-title" name="title" required placeholder="예: 행사 운영 대금 / 9월 카드값" />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="company-finance-amount">금액 (원) *</Label>

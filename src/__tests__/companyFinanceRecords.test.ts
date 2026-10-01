@@ -6,14 +6,16 @@ describe("프로젝트 금액 회사 재무 집계", () => {
     const result = summarizeCompanyFinanceRecords([
       { company: "인포피아", type: "revenue", amount: 1_000_000, date: "2026-07-01T00:00:00Z" },
       { company: "인포피아", type: "cost", amount: 300_000, date: "2026-08-01T00:00:00Z" },
+      { company: "인포피아", type: "card", amount: 50_000, date: "2026-08-15T00:00:00Z" },
       { company: "노바웨이", type: "revenue", amount: 700_000, date: "2026-09-01T00:00:00Z" },
     ], 2026);
 
     expect(result.summaries[0].quarters[3]).toMatchObject({
       revenue: 1_000_000,
       cost: 300_000,
-      profit: 700_000,
-      projectCount: 2,
+      card: 50_000,
+      profit: 650_000,
+      projectCount: 3,
     });
     expect(result.summaries[1].quarters[3]).toMatchObject({ revenue: 700_000, cost: 0, projectCount: 1 });
   });
@@ -24,7 +26,7 @@ describe("프로젝트 금액 회사 재무 집계", () => {
       { company: null, type: "cost", amount: 80_000, date: "2026-09-11T00:00:00Z" },
     ], 2026);
 
-    expect(result.unassigned).toEqual({ revenue: 300_000, cost: 80_000, profit: 220_000, projectCount: 2 });
+    expect(result.unassigned).toEqual({ revenue: 300_000, cost: 80_000, card: 0, profit: 220_000, projectCount: 2 });
     expect(result.summaries.every((summary) => summary.projectCount === 0)).toBe(true);
   });
 

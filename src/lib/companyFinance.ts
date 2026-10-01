@@ -3,7 +3,7 @@ import { koreanDateKey } from "@/lib/dateFormat";
 export const COMPANY_NAMES = ["인포피아", "노바웨이", "클로원"] as const;
 
 export type CompanyName = (typeof COMPANY_NAMES)[number];
-export type CompanyFinanceEntryType = "revenue" | "cost";
+export type CompanyFinanceEntryType = "revenue" | "cost" | "card";
 
 export interface CompanyFinanceProject {
   company: string | null;
@@ -29,6 +29,7 @@ export interface CompanyFinanceRecord {
 export interface QuarterFinance {
   revenue: number;
   cost: number;
+  card: number;
   profit: number;
   projectCount: number;
 }
@@ -38,6 +39,7 @@ export interface CompanyFinanceSummary {
   quarters: Record<1 | 2 | 3 | 4, QuarterFinance>;
   revenue: number;
   cost: number;
+  card: number;
   profit: number;
   projectCount: number;
 }
@@ -45,6 +47,7 @@ export interface CompanyFinanceSummary {
 export interface UnassignedFinanceSummary {
   revenue: number;
   cost: number;
+  card: number;
   profit: number;
   projectCount: number;
 }
@@ -56,10 +59,11 @@ interface FinanceAggregateItem {
   date: Date | string;
   revenue: number | null;
   cost: number | null;
+  card: number | null;
 }
 
 function emptyQuarter(): QuarterFinance {
-  return { revenue: 0, cost: 0, profit: 0, projectCount: 0 };
+  return { revenue: 0, cost: 0, card: 0, profit: 0, projectCount: 0 };
 }
 
 function emptyQuarters(): Record<1 | 2 | 3 | 4, QuarterFinance> {
@@ -70,10 +74,11 @@ function isCompanyName(value: string | null): value is CompanyName {
   return value !== null && (COMPANY_NAMES as readonly string[]).includes(value);
 }
 
-function addAmounts(target: QuarterFinance, revenue: number | null, cost: number | null) {
+function addAmounts(target: QuarterFinance, revenue: number | null, cost: number | null, card: number | null) {
   target.revenue += revenue ?? 0;
   target.cost += cost ?? 0;
-  target.profit = target.revenue - target.cost;
+  target.card += card ?? 0;
+  target.profit = target.revenue - target.cost - target.card;
   target.projectCount += 1;
 }
 
@@ -83,13 +88,14 @@ function createSummaries() {
     quarters: emptyQuarters(),
     revenue: 0,
     cost: 0,
+    card: 0,
     profit: 0,
     projectCount: 0,
   } satisfies CompanyFinanceSummary));
   return {
     summaries,
     summaryByCompany: new Map(summaries.map((summary) => [summary.company, summary])),
-    unassigned: { revenue: 0, cost: 0, profit: 0, projectCount: 0 } satisfies UnassignedFinanceSummary,
+    unassigned: { revenue: 0, cost: 0, card: 0, profit: 0, projectCount: 0 } satisfies UnassignedFinanceSummary,
   };
 }
 
@@ -110,11 +116,13 @@ function addToSummary(
   quarter: 1 | 2 | 3 | 4,
   revenue: number | null,
   cost: number | null,
+  card: number | null,
 ) {
-  addAmounts(summary.quarters[quarter], revenue, cost);
+  addAmounts(summary.quarters[quarter], revenue, cost, card);
   summary.revenue += revenue ?? 0;
   summary.cost += cost ?? 0;
-  summary.profit = summary.revenue - summary.cost;
+  summary.card += card ?? 0;
+  summary.profit = summary.revenue - summary.cost - summary.card;
   summary.projectCount += 1;
 }
 
@@ -122,10 +130,12 @@ function addToUnassigned(
   unassigned: UnassignedFinanceSummary,
   revenue: number | null,
   cost: number | null,
+  card: number | null,
 ) {
   unassigned.revenue += revenue ?? 0;
   unassigned.cost += cost ?? 0;
-  unassigned.profit = unassigned.revenue - unassigned.cost;
+  unassigned.card += card ?? 0;
+  unassigned.profit = unassigned.revenue - unassigned.cost - unassigned.card;
   unassigned.projectCount += 1;
 }
 
@@ -138,9 +148,9 @@ function summarizeItems(items: FinanceAggregateItem[], year: number) {
 
     const summary = isCompanyName(item.company) ? summaryByCompany.get(item.company) : undefined;
     if (summary) {
-      addToSummary(summary, date.quarter, item.revenue, item.cost);
+      addToSummary(summary, date.quarter, item.revenue, item.cost, item.card);
     } else {
-      addToUnassigned(unassigned, item.revenue, item.cost);
+      addToUnassigned(unassigned, item.revenue, item.cost, item.card);
     }
   }
 
@@ -154,6 +164,7 @@ export function summarizeCompanyFinance(projects: CompanyFinanceProject[], year:
       date: project.createdAt,
       revenue: project.revenue,
       cost: project.cost,
+      card: null,
     })),
     year,
   );
@@ -166,6 +177,7 @@ export function summarizeCompanyFinanceEntries(entries: CompanyFinanceEntryRecor
       date: entry.date,
       revenue: entry.type === "revenue" ? entry.amount : null,
       cost: entry.type === "cost" ? entry.amount : null,
+      card: entry.type === "card" ? entry.amount : null,
     })),
     year,
   );
@@ -178,6 +190,7 @@ export function summarizeCompanyFinanceRecords(records: CompanyFinanceRecord[], 
       date: record.date,
       revenue: record.type === "revenue" ? record.amount : null,
       cost: record.type === "cost" ? record.amount : null,
+      card: record.type === "card" ? record.amount : null,
     })),
     year,
   );

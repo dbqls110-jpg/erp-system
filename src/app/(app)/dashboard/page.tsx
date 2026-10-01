@@ -13,6 +13,7 @@ import { getDashboardAudience } from "@/lib/dashboardVisibility";
 import { calculateBudgetMetrics } from "@/lib/financeMetrics";
 import { fixedExpenseMonthWhere, monthKey } from "@/lib/fixedExpenseMonths";
 import { getVenueWeekRange } from "@/lib/venueKpi";
+import { getHostRegisteredSpacesForWeek } from "@/lib/spaceDatabaseSync";
 
 export default async function DashboardPage() {
   const today = format(new Date(), "yyyy-MM-dd");
@@ -68,7 +69,7 @@ export default async function DashboardPage() {
 
   // 근태 쿼리 2개 → 1개로 통합 (today 포함 이번달 전체)
   const venueWeek = getVenueWeekRange(now);
-  const [monthlyAttendance, activeProjects, budget, expenses, upcomingEvents, leaveBalance, fixedExpenses, venueKpiOwner] = await Promise.all([
+  const [monthlyAttendance, activeProjects, budget, expenses, upcomingEvents, leaveBalance, fixedExpenses, venueKpiRows] = await Promise.all([
     prisma.attendance.findMany({
       where: { userId: viewer.id, date: { gte: monthStart, lte: today } },
       select: { date: true, clockIn: true, clockOut: true },
@@ -103,28 +104,9 @@ export default async function DashboardPage() {
         })
       : [],
     canSee("venues")
-      ? prisma.user.findFirst({
-          where: {
-            active: true,
-            role: { not: "pending" },
-            OR: [
-              { name: { contains: "박석영" } },
-              { email: "qkrtjrdud952@gmail.com" },
-            ],
-          },
-          select: { id: true, name: true },
-          orderBy: { createdAt: "asc" },
-        })
+      ? getHostRegisteredSpacesForWeek(venueWeek.startDate, venueWeek.endDate).catch(() => null)
       : null,
   ]);
-
-  const venueKpiRows = venueKpiOwner
-    ? await prisma.venue.findMany({
-        where: { createdById: venueKpiOwner.id, createdAt: { gte: venueWeek.start, lt: venueWeek.endExclusive } },
-        select: { id: true, name: true, address: true, reserveUrl: true, createdAt: true },
-        orderBy: { createdAt: "desc" },
-      })
-    : [];
 
   const attendance = monthlyAttendance.find((r) => r.date === today) ?? null;
   const attendanceSummary = summarizeAttendance(monthlyAttendance);
@@ -197,9 +179,11 @@ export default async function DashboardPage() {
       menuKey: "venues",
       title: "주간 공간 등록",
       icon: <MapPinned size={16} className="text-primary" />,
-      value: `${venueKpiRows.length}건`,
-      valueClassName: venueKpiRows.length <= 4 ? "text-destructive" : undefined,
-      sub: `${venueWeek.startDate.slice(5)} ~ ${venueWeek.endDate.slice(5)} · 공간명·주소·링크 보기`,
+      value: venueKpiRows ? `${venueKpiRows.length}건` : "확인 불가",
+      valueClassName: !venueKpiRows || venueKpiRows.length <= 4 ? "text-destructive" : undefined,
+      sub: venueKpiRows
+        ? `${venueWeek.startDate.slice(5)} ~ ${venueWeek.endDate.slice(5)} · 시트에 이번 주 추가한 행 보기`
+        : "호스트 등록 공간 시트를 읽지 못했습니다",
     },
   ];
 

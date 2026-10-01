@@ -31,7 +31,7 @@ describe("회사별 분기 매출·매입 집계", () => {
       { company: "기타", revenue: 200_000, cost: 50_000, createdAt: "2026-03-01T12:00:00Z" },
     ], 2026);
 
-    expect(result.unassigned).toEqual({ revenue: 500_000, cost: 130_000, profit: 370_000, projectCount: 2 });
+    expect(result.unassigned).toEqual({ revenue: 500_000, cost: 130_000, card: 0, profit: 370_000, projectCount: 2 });
     expect(result.summaries.every((summary) => summary.projectCount === 0)).toBe(true);
   });
 
@@ -45,11 +45,12 @@ describe("회사별 분기 매출·매입 집계", () => {
     const result = summarizeCompanyFinanceEntries([
       { company: "인포피아", type: "revenue", amount: 1_000_000, date: "2026-02-10" },
       { company: "인포피아", type: "cost", amount: 250_000, date: "2026-05-10" },
+      { company: "인포피아", type: "card", amount: 120_000, date: "2026-05-20" },
       { company: "노바웨이", type: "revenue", amount: 700_000, date: "2025-12-31" },
     ], 2026);
 
     expect(result.summaries[0].quarters[1]).toMatchObject({ revenue: 1_000_000, cost: 0, projectCount: 1 });
-    expect(result.summaries[0].quarters[2]).toMatchObject({ revenue: 0, cost: 250_000, profit: -250_000, projectCount: 1 });
+    expect(result.summaries[0].quarters[2]).toMatchObject({ revenue: 0, cost: 250_000, card: 120_000, profit: -370_000, projectCount: 2 });
     expect(result.summaries[1].revenue).toBe(0);
     expect(result.unassigned.projectCount).toBe(0);
   });

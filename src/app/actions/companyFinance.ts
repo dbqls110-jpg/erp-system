@@ -33,7 +33,7 @@ function readAmount(formData: FormData) {
 
 function readType(formData: FormData): CompanyFinanceEntryType {
   const type = formData.get("type");
-  if (type !== "revenue" && type !== "cost") throw new Error("구분을 선택해 주세요.");
+  if (type !== "revenue" && type !== "cost" && type !== "card") throw new Error("구분을 선택해 주세요.");
   return type;
 }
 

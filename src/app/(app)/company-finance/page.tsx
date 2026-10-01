@@ -64,7 +64,7 @@ export default async function CompanyFinancePage({
     }),
   ]);
   const summaryRecords: CompanyFinanceRecord[] = entries.flatMap((entry) => {
-    if (entry.type !== "revenue" && entry.type !== "cost") return [];
+    if (entry.type !== "revenue" && entry.type !== "cost" && entry.type !== "card") return [];
     return [{ company: entry.company, type: entry.type, amount: entry.amount, date: entry.date }];
   });
   for (const amount of projectAmounts) {
@@ -79,10 +79,11 @@ export default async function CompanyFinancePage({
   const { summaries, unassigned } = summarizeCompanyFinanceRecords(summaryRecords, year);
   const totalRevenue = summaries.reduce((sum, summary) => sum + summary.revenue, 0) + unassigned.revenue;
   const totalCost = summaries.reduce((sum, summary) => sum + summary.cost, 0) + unassigned.cost;
-  const totalProfit = totalRevenue - totalCost;
+  const totalCard = summaries.reduce((sum, summary) => sum + summary.card, 0) + unassigned.card;
+  const totalProfit = totalRevenue - totalCost - totalCard;
   const displayItems = [
     ...entries
-      .filter((entry) => entry.type === "revenue" || entry.type === "cost")
+      .filter((entry) => entry.type === "revenue" || entry.type === "cost" || entry.type === "card")
       .map((entry) => ({
         source: "entry" as const,
         id: entry.id,
@@ -116,8 +117,8 @@ export default async function CompanyFinancePage({
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-sm text-muted-foreground">인포피아·노바웨이·클로원의 분기별 매출과 매입을 비교합니다.</p>
-          <p className="mt-1 text-xs text-muted-foreground">프로젝트에 넣은 매출·매입은 자동으로 들어옵니다. 여기에 또 넣으면 두 번 셉니다.</p>
+          <p className="text-sm text-muted-foreground">인포피아·노바웨이·클로원의 분기별 매출·매입·카드값과 순이익을 비교합니다.</p>
+          <p className="mt-1 text-xs text-muted-foreground">프로젝트에 넣은 매출·매입은 자동으로 들어옵니다. 여기에 또 넣으면 두 번 셉니다. 카드값은 매입 합계에서 제외하고 순이익에서만 차감합니다.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <CompanyFinanceYearNav year={year} currentYear={currentYear} />
@@ -125,7 +126,7 @@ export default async function CompanyFinancePage({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <Card className="rounded-[12px] border border-border py-0 shadow-none">
           <CardHeader className="gap-[6px] px-[18px] py-4">
             <CardDescription className="text-[12px]">전체 매출</CardDescription>
@@ -140,7 +141,13 @@ export default async function CompanyFinancePage({
         </Card>
         <Card className="rounded-[12px] border border-border py-0 shadow-none">
           <CardHeader className="gap-[6px] px-[18px] py-4">
-            <CardDescription className="text-[12px]">전체 순이익</CardDescription>
+            <CardDescription className="text-[12px]">카드값 · 매입 미포함</CardDescription>
+            <CardTitle className="text-[26px] font-bold leading-tight tracking-[-0.01em] tabular-nums text-destructive" style={{ fontFamily: "var(--font-plus-jakarta-sans)" }}>{formatWon(totalCard)}</CardTitle>
+          </CardHeader>
+        </Card>
+        <Card className="rounded-[12px] border border-border py-0 shadow-none">
+          <CardHeader className="gap-[6px] px-[18px] py-4">
+            <CardDescription className="text-[12px]">순이익 (카드값 차감 후)</CardDescription>
             <CardTitle className={`text-[26px] font-bold leading-tight tracking-[-0.01em] tabular-nums ${metricClass(totalProfit)}`} style={{ fontFamily: "var(--font-plus-jakarta-sans)" }}>{formatWon(totalProfit)}</CardTitle>
           </CardHeader>
         </Card>
@@ -160,6 +167,7 @@ export default async function CompanyFinancePage({
               <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
                 <span className="flex items-center gap-1"><TrendingUp size={12} className="text-primary" />매출 {formatWon(summary.revenue)}</span>
                 <span className="flex items-center gap-1"><TrendingDown size={12} className="text-destructive" />매입 {formatWon(summary.cost)}</span>
+                <span className="flex items-center gap-1"><TrendingDown size={12} className="text-amber-600" />카드값 {formatWon(summary.card)}</span>
               </div>
             </CardHeader>
             <CardContent className="pt-3">
@@ -167,10 +175,11 @@ export default async function CompanyFinancePage({
                 {QUARTERS.map((quarter) => {
                   const data = summary.quarters[quarter];
                   return (
-                    <div key={quarter} className="grid grid-cols-[4rem_repeat(3,minmax(0,1fr))] items-center gap-1 rounded-md px-2 py-2 text-xs odd:bg-muted/40">
+                    <div key={quarter} className="grid grid-cols-[4rem_repeat(4,minmax(0,1fr))] items-center gap-1 rounded-md px-2 py-2 text-xs odd:bg-muted/40">
                       <span className="font-medium text-foreground">{quarter}분기</span>
                       <span className="truncate"><span className="text-muted-foreground">매출 </span><span className="tabular-nums text-primary">{formatWon(data.revenue)}</span></span>
                       <span className="truncate"><span className="text-muted-foreground">매입 </span><span className="tabular-nums text-destructive">{formatWon(data.cost)}</span></span>
+                      <span className="truncate"><span className="text-muted-foreground">카드 </span><span className="tabular-nums text-amber-700 dark:text-amber-300">{formatWon(data.card)}</span></span>
                       <span className={`truncate ${metricClass(data.profit)}`}><span className="text-muted-foreground">이익 </span><span className="tabular-nums">{formatWon(data.profit)}</span></span>
                     </div>
                   );
@@ -195,6 +204,7 @@ export default async function CompanyFinancePage({
               <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
                 <span>매출 {formatWon(unassigned.revenue)}</span>
                 <span>매입 {formatWon(unassigned.cost)}</span>
+                <span>카드값 {formatWon(unassigned.card)}</span>
               </div>
             </CardHeader>
             <CardContent className="px-4 py-3">
@@ -213,7 +223,7 @@ export default async function CompanyFinancePage({
           <div className="flex items-center justify-between gap-2">
             <div>
               <CardTitle className="text-base">{year}년 등록 내역</CardTitle>
-              <CardDescription className="mt-1">프로젝트와 분리된 회사 매출·매입 장부입니다.</CardDescription>
+              <CardDescription className="mt-1">프로젝트와 분리된 회사 매출·매입·카드값 장부입니다.</CardDescription>
             </div>
             <Badge variant="outline">{displayItems.length}건</Badge>
           </div>
@@ -225,12 +235,13 @@ export default async function CompanyFinancePage({
             <div className="divide-y divide-border">
               {displayItems.map((item) => {
                 const isRevenue = item.type === "revenue";
+                const isCard = item.type === "card";
                 return (
                   <div key={`${item.source}-${item.id}`} className="flex flex-wrap items-center justify-between gap-3 py-3 first:pt-0 last:pb-0">
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
-                        <Badge variant="outline" className={isRevenue ? toneBadgeClass("green") : toneBadgeClass("red")}>
-                          {isRevenue ? "매출" : "매입"}
+                        <Badge variant="outline" className={isRevenue ? toneBadgeClass("green") : isCard ? toneBadgeClass("amber") : toneBadgeClass("red")}>
+                          {isRevenue ? "매출" : isCard ? "카드값" : "매입"}
                         </Badge>
                         <span className="text-xs text-muted-foreground">{item.company ?? "미배정"}</span>
                         {item.source === "project" ? (
