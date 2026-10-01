@@ -50,10 +50,16 @@ export async function upsertQuoteAmounts(
   let changed = false;
 
   for (const { kind, amount } of values) {
-    if (amount === null) continue;
+    if (amount === null) {
+      const deleted = await db.projectAmount.deleteMany({
+        where: { projectId, kind, sourceFileName, label: "견적서" },
+      });
+      changed ||= deleted.count > 0;
+      continue;
+    }
 
     const existing = await db.projectAmount.findFirst({
-      where: { projectId, kind, sourceFileName },
+      where: { projectId, kind, sourceFileName, label: "견적서" },
       orderBy: { createdAt: "asc" },
       select: { id: true },
     });
@@ -72,6 +78,19 @@ export async function upsertQuoteAmounts(
   }
 
   return changed ? recalculateProjectTotals(projectId, db) : null;
+}
+
+/** 마지막 내부용 견적서 파일이 삭제될 때 그 파일에서 만든 금액도 함께 제거한다. */
+export async function deleteQuoteAmounts(
+  projectId: string,
+  sourceFileName: string,
+  db: ProjectAmountDb = prisma,
+) {
+  const deleted = await db.projectAmount.deleteMany({
+    where: { projectId, sourceFileName, label: "견적서" },
+  });
+
+  return deleted.count > 0 ? recalculateProjectTotals(projectId, db) : null;
 }
 
 /** 기존 API의 revenue/cost 입력을 호환용 "기본" 건으로 반영한다. */

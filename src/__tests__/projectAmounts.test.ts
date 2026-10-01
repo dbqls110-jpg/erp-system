@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { calculateNetIncome } from "@/lib/financeMetrics";
-import { recalculateProjectTotals, upsertQuoteAmounts } from "@/lib/projectAmounts";
+import { deleteQuoteAmounts, recalculateProjectTotals, upsertQuoteAmounts } from "@/lib/projectAmounts";
 
 vi.mock("@/lib/prisma", () => ({ prisma: {} }));
 
@@ -18,8 +18,14 @@ function makeDb(initial: StoredAmount[]) {
   const projectUpdate = vi.fn(async () => undefined);
   const projectAmount = {
     findMany: vi.fn(async () => rows.map(({ kind, amount }) => ({ kind, amount }))),
-    findFirst: vi.fn(async ({ where }: { where: { projectId: string; kind: string; sourceFileName: string } }) =>
-      rows.find((row) => row.projectId === where.projectId && row.kind === where.kind && row.sourceFileName === where.sourceFileName) ?? null),
+    findFirst: vi.fn(async ({ where }: { where: { projectId: string; kind: string; sourceFileName: string; label?: string } }) =>
+      rows.find((row) => row.projectId === where.projectId && row.kind === where.kind && row.sourceFileName === where.sourceFileName && (where.label === undefined || row.label === where.label)) ?? null),
+    deleteMany: vi.fn(async ({ where }: { where: { projectId: string; kind?: string; sourceFileName: string; label?: string } }) => {
+      const retained = rows.filter((row) => !(row.projectId === where.projectId && row.sourceFileName === where.sourceFileName && (where.kind === undefined || row.kind === where.kind) && (where.label === undefined || row.label === where.label)));
+      const count = rows.length - retained.length;
+      rows.splice(0, rows.length, ...retained);
+      return { count };
+    }),
     create: vi.fn(async ({ data }: { data: Omit<StoredAmount, "id"> }) => {
       const row = { id: `amount-${rows.length + 1}`, ...data };
       rows.push(row);
@@ -77,6 +83,42 @@ describe("프로젝트 매출·매입 건 집계", () => {
       expect.objectContaining({ kind: "revenue", amount: 12_000, label: "견적서", sourceFileName: "견적서.pdf" }),
       expect.objectContaining({ kind: "cost", amount: 7_000, label: "견적서", sourceFileName: "견적서.pdf" }),
     ]));
+  });
+
+  it("수정한 견적서에 한쪽 금액만 있으면 빠진 기존 금액을 제거하고 합계를 갱신한다", async () => {
+    const mock = makeDb([
+      { id: "quote-revenue", projectId: "p1", kind: "revenue", amount: 10_000, label: "견적서", sourceFileName: "내부용_견적서.xlsx" },
+      { id: "quote-cost", projectId: "p1", kind: "cost", amount: 6_000, label: "견적서", sourceFileName: "내부용_견적서.xlsx" },
+      { id: "manual-cost", projectId: "p1", kind: "cost", amount: 1_000, label: "추가 비용", sourceFileName: null },
+    ]);
+
+    await upsertQuoteAmounts("p1", "내부용_견적서.xlsx", { revenue: 12_000, cost: null }, mock.db as never);
+
+    expect(mock.rows).toEqual([
+      expect.objectContaining({ kind: "revenue", amount: 12_000, label: "견적서", sourceFileName: "내부용_견적서.xlsx" }),
+      expect.objectContaining({ id: "manual-cost", amount: 1_000 }),
+    ]);
+    expect(mock.projectUpdate).toHaveBeenLastCalledWith({
+      where: { id: "p1" },
+      data: { revenue: 12_000, cost: 1_000 },
+    });
+  });
+
+  it("견적서 삭제 시 해당 파일 금액만 제거하고 프로젝트 합계를 다시 계산한다", async () => {
+    const mock = makeDb([
+      { id: "quote-revenue", projectId: "p1", kind: "revenue", amount: 10_000, label: "견적서", sourceFileName: "내부용_견적서.xlsx" },
+      { id: "other-quote", projectId: "p1", kind: "revenue", amount: 5_000, label: "견적서", sourceFileName: "다른_내부용_견적서.xlsx" },
+    ]);
+
+    await deleteQuoteAmounts("p1", "내부용_견적서.xlsx", mock.db as never);
+
+    expect(mock.rows).toEqual([
+      expect.objectContaining({ id: "other-quote", amount: 5_000 }),
+    ]);
+    expect(mock.projectUpdate).toHaveBeenLastCalledWith({
+      where: { id: "p1" },
+      data: { revenue: 5_000, cost: null },
+    });
   });
 
   it("당기순이익은 영업이익의 79%를 원 미만 버림으로 계산한다", () => {

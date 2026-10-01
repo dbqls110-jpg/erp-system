@@ -85,6 +85,7 @@ export function ProjectFilesPanel({ projectId, files, canEdit }: Props) {
       try {
         await deleteProjectFile(file.id, projectId);
         toast.success(`"${file.name}" 삭제 완료`);
+        router.refresh();
       } catch (err) {
         toast.error(err instanceof Error ? err.message : "삭제 실패");
       } finally {

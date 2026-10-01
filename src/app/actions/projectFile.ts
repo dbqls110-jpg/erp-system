@@ -6,7 +6,7 @@ import { uploadFileToDrive, deleteFileFromDrive } from "@/lib/googleDrive";
 import { revalidatePath } from "next/cache";
 import { analyzeQuoteFile, type QuoteAnalysis } from "@/lib/quoteParser";
 import { isInternalQuoteFileName } from "@/lib/quotePolicy";
-import { upsertQuoteAmounts } from "@/lib/projectAmounts";
+import { deleteQuoteAmounts, upsertQuoteAmounts } from "@/lib/projectAmounts";
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
 
@@ -61,6 +61,7 @@ export async function uploadProjectFiles(projectId: string, formData: FormData):
 
   const uploadedFileNames: string[] = [];
   const failedFiles: Array<{ name: string; reason: string }> = [];
+  let uploadedInternalQuote = false;
 
   for (const file of files) {
     try {
@@ -85,6 +86,7 @@ export async function uploadProjectFiles(projectId: string, formData: FormData):
         },
       });
       uploadedFileNames.push(file.name);
+      if (file === internalQuoteFile) uploadedInternalQuote = true;
     } catch (error) {
       failedFiles.push({
         name: file.name,
@@ -93,7 +95,7 @@ export async function uploadProjectFiles(projectId: string, formData: FormData):
     }
   }
 
-  if (quoteAnalysis && (quoteAnalysis.revenue !== null || quoteAnalysis.cost !== null)) {
+  if (uploadedInternalQuote && quoteAnalysis) {
     await upsertQuoteAmounts(projectId, internalQuoteFile!.name, quoteAnalysis);
   }
 
@@ -123,9 +125,20 @@ export async function deleteProjectFile(fileId: string, projectId: string) {
 
   const file = await prisma.projectFile.findUnique({ where: { id: fileId } });
   if (!file) throw new Error("파일을 찾을 수 없습니다.");
+  if (file.projectId !== projectId) throw new Error("프로젝트 파일이 일치하지 않습니다.");
 
   await deleteFileFromDrive(file.driveFileId);
   await prisma.projectFile.delete({ where: { id: fileId } });
 
+  if (isInternalQuoteFileName(file.name)) {
+    const remainingQuote = await prisma.projectFile.findFirst({
+      where: { projectId, name: file.name },
+      select: { id: true },
+    });
+    if (!remainingQuote) await deleteQuoteAmounts(projectId, file.name);
+  }
+
   revalidatePath(`/projects/${projectId}`);
+  revalidatePath("/projects");
+  revalidatePath("/projects/stats");
 }
