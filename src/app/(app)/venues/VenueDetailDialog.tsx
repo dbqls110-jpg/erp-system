@@ -172,11 +172,11 @@ function InfoGrid({ rows }: { rows: Array<{ label: string; value: string | null 
   if (visibleRows.length === 0) return null;
 
   return (
-    <dl className="grid grid-cols-1 gap-2 rounded-lg border border-border p-3 sm:grid-cols-2">
+    <dl className="grid grid-cols-1 gap-x-6 gap-y-3 rounded-lg border border-border p-3 sm:grid-cols-2">
       {visibleRows.map((row) => (
-        <div key={row.label} className="grid grid-cols-[5rem_minmax(0,1fr)] gap-2 text-sm">
-          <dt className="text-muted-foreground">{row.label}</dt>
-          <dd className="min-w-0 break-words">{row.value}</dd>
+        <div key={row.label} className="grid min-w-0 grid-cols-[6rem_minmax(0,1fr)] gap-2 text-sm">
+          <dt className="whitespace-nowrap text-muted-foreground">{row.label}</dt>
+          <dd className="min-w-0 break-keep [overflow-wrap:anywhere]">{row.value}</dd>
         </div>
       ))}
     </dl>
@@ -287,7 +287,13 @@ export function VenueDetailDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) handleClose(); }}>
-      <DialogContent className="max-h-[92vh] w-[min(96vw,72rem)] max-w-none overflow-y-auto rounded-[16px] p-5 sm:p-6">
+      <DialogContent className="max-h-[92dvh] w-[min(calc(100vw-2rem),72rem)] max-w-none overflow-y-auto rounded-[16px] p-5 sm:max-w-none sm:p-6">
+        {!detail && (
+          <DialogHeader className="sr-only">
+            <DialogTitle>공간 상세 정보</DialogTitle>
+            <DialogDescription>선택한 공간의 요금과 시설 정보를 확인합니다.</DialogDescription>
+          </DialogHeader>
+        )}
         {isLoading && (
           <div className="space-y-2 py-8 text-center text-sm text-muted-foreground" role="status">
             <p>공간 정보를 불러오는 중입니다.</p>
@@ -328,9 +334,9 @@ function VenueDetailContent({ detail }: { detail: VenueDetailResponse }) {
 
   return (
     <div className="space-y-[14px]">
-      <DialogHeader>
-        <DialogTitle className="text-[16px]">{venue.name}</DialogTitle>
-        <DialogDescription>
+      <DialogHeader className="pr-7">
+        <DialogTitle className="break-keep text-xl leading-snug [overflow-wrap:anywhere]">{venue.name}</DialogTitle>
+        <DialogDescription className="break-keep [overflow-wrap:anywhere]">
           {[venue.district, venue.type, venue.address].filter(hasValue).join(" · ")}
         </DialogDescription>
         {(venue.phone || venue.reserveMethod || venue.reserveUrl) && (
@@ -343,12 +349,12 @@ function VenueDetailContent({ detail }: { detail: VenueDetailResponse }) {
 
       <section className="space-y-2 rounded-[10px] border border-border p-3.5">
         <div className="flex flex-wrap items-start justify-between gap-2">
-          <div className="space-y-1">
+          <div className="min-w-0 space-y-1">
             {venue.calledPrice !== null && (
               <p className="text-sm font-medium text-primary">전화 확인: {formatWon(venue.calledPrice)}</p>
             )}
             <h3 className="text-sm font-semibold">요금</h3>
-            <p className={`text-[26px] font-bold tracking-[-0.01em] ${priceTrustClass(price.trust)}`} style={{ fontFamily: "var(--font-plus-jakarta-sans)" }}>{price.label}</p>
+            <p className={`break-keep text-[22px] font-bold tracking-[-0.01em] [overflow-wrap:anywhere] sm:text-[26px] ${priceTrustClass(price.trust)}`} style={{ fontFamily: "var(--font-plus-jakarta-sans)" }}>{price.label}</p>
           </div>
           <Badge
             variant="outline"
@@ -407,11 +413,11 @@ function VenueDetailContent({ detail }: { detail: VenueDetailResponse }) {
 
       {facilities.length > 0 && (
         <Section title="시설">
-          <dl className="grid grid-cols-1 gap-2 rounded-lg border border-border p-3 sm:grid-cols-2">
+          <dl className="grid grid-cols-1 gap-x-6 gap-y-3 rounded-lg border border-border p-3 sm:grid-cols-2">
             {facilities.map((facility) => (
-              <div key={facility.name} className="grid grid-cols-[5rem_minmax(0,1fr)] gap-2 text-sm">
-                <dt className="text-muted-foreground">{facility.name}</dt>
-                <dd className={facility.available ? "text-foreground" : "text-muted-foreground"}>{facility.label}</dd>
+              <div key={facility.name} className="grid min-w-0 grid-cols-[6rem_minmax(0,1fr)] gap-2 text-sm">
+                <dt className="whitespace-nowrap text-muted-foreground">{facility.name}</dt>
+                <dd className={`min-w-0 break-keep [overflow-wrap:anywhere] ${facility.available ? "text-foreground" : "text-muted-foreground"}`}>{facility.label}</dd>
               </div>
             ))}
           </dl>
@@ -429,7 +435,7 @@ function VenueDetailContent({ detail }: { detail: VenueDetailResponse }) {
                   {group.rows.map((row, rowIndex) => (
                     <article key={`${row.label}-${rowIndex}`} className="rounded-lg border border-border p-3">
                       <p className="text-xs text-muted-foreground">{row.label}</p>
-                      <p className="mt-1 break-words text-sm">{row.value}</p>
+                      <p className="mt-1 break-keep text-sm [overflow-wrap:anywhere]">{row.value}</p>
                     </article>
                   ))}
                 </div>
@@ -444,8 +450,8 @@ function VenueDetailContent({ detail }: { detail: VenueDetailResponse }) {
                     <TableBody>
                       {group.rows.map((row, rowIndex) => (
                         <TableRow key={`${row.label}-${rowIndex}`}>
-                          <TableCell className="w-28 whitespace-nowrap text-muted-foreground">{row.label}</TableCell>
-                          <TableCell className="whitespace-normal break-words align-top leading-5">{row.value}</TableCell>
+                          <TableCell className="w-28 whitespace-normal break-keep align-top text-muted-foreground [overflow-wrap:anywhere]">{row.label}</TableCell>
+                          <TableCell className="whitespace-normal break-keep align-top leading-5 [overflow-wrap:anywhere]">{row.value}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>

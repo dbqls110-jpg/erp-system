@@ -1,6 +1,7 @@
 [CmdletBinding()]
 param(
     [string]$Message = "chore(sync): sync ERP changes",
+    [string[]]$Paths = @(),
     [switch]$Yes
 )
 
@@ -145,6 +146,21 @@ $candidatePaths = @(
         Sort-Object -Unique
 )
 
+# A scoped deploy must not include unrelated local edits or pre-staged files.
+if ($Paths.Count -gt 0) {
+    $selectedPaths = @($Paths | ForEach-Object { Normalize-GitPath $_ } | Sort-Object -Unique)
+    $unknownPaths = @($selectedPaths | Where-Object { $_ -notin $candidatePaths })
+    if ($unknownPaths.Count -gt 0) {
+        throw "Selected paths must be changed files in this repository: $($unknownPaths -join ', ')"
+    }
+    $alreadyStagedPaths = @(Invoke-Git @("diff", "--cached", "--name-only", "--") |
+        ForEach-Object { Normalize-GitPath $_ })
+    if (@($alreadyStagedPaths | Where-Object { $_ -notin $selectedPaths }).Count -gt 0) {
+        throw "Unrelated files are already staged. Stopping without changing the index."
+    }
+    $candidatePaths = @($candidatePaths | Where-Object { $_ -in $selectedPaths })
+}
+
 if ($candidatePaths.Count -eq 0) {
     Write-Host "There are no changes to synchronize."
     exit 0
@@ -157,7 +173,7 @@ if ($blockedPaths.Count -gt 0) {
     throw "Blocked files are never silently excluded. Stopping for safety; move or review them, then run again."
 }
 
-Assert-NoSecretInDiff @("diff", "HEAD", "--unified=0", "--")
+Assert-NoSecretInDiff (@("diff", "HEAD", "--unified=0", "--") + $candidatePaths)
 
 Write-Host "ERP files to commit:"
 $candidatePaths | ForEach-Object { Write-Host "- $_" }
@@ -170,7 +186,7 @@ if (-not $Yes) {
     }
 }
 
-Invoke-Git @("diff", "--check", "HEAD", "--") | Out-Host
+Invoke-Git (@("diff", "--check", "HEAD", "--") + $candidatePaths) | Out-Host
 Invoke-Git (@("add", "--") + $candidatePaths) | Out-Host
 
 $stagedPaths = @(
