@@ -36,7 +36,7 @@ export default function DotReportForm({ date }: { date: string }) {
       </select>
     </label>
     <label className="block space-y-1 text-sm">보고 실행 ID
-      <input value={runId} readOnly={kind === "daily"} disabled={pending || !!result} onChange={event => setAuditId(event.target.value)} required maxLength={100} pattern="[A-Za-z0-9][A-Za-z0-9_.:-]{0,99}" className="block w-full rounded-md border bg-background p-2" />
+      <input value={runId} readOnly={kind === "daily"} disabled={pending || !!result} onChange={event => setAuditId(event.target.value)} required maxLength={100} className="block w-full rounded-md border bg-background p-2" />
     </label>
     <label className="block space-y-1 text-sm">보고 내용
       <textarea value={body} disabled={pending || !!result} onChange={event => setBody(event.target.value)} required maxLength={12000} rows={14} className="block w-full rounded-md border bg-background p-2" />
