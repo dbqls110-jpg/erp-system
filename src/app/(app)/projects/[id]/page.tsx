@@ -43,6 +43,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
     include: {
       checklistItems: { orderBy: { order: "asc" } },
       files: { orderBy: { createdAt: "desc" } },
+      uploadRecoveries: canEdit ? { where: { status: { not: "completed" } }, select: { id: true, name: true, status: true, attempts: true }, orderBy: { createdAt: "desc" }, take: 20 } : false,
       amounts: { orderBy: [{ kind: "asc" }, { createdAt: "asc" }] },
       customers: { include: { customer: { select: { id: true, name: true } } } },
       partners: { include: { partner: { select: { id: true, name: true } } } },
@@ -185,7 +186,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
           </CardTitle>
         </CardHeader>
         <CardContent className="px-4 py-4">
-          <ProjectFilesPanel projectId={project.id} files={project.files} canEdit={canEdit} />
+          <ProjectFilesPanel projectId={project.id} files={project.files} canEdit={canEdit} recoveryTasks={project.uploadRecoveries ?? []} />
         </CardContent>
       </Card>
 

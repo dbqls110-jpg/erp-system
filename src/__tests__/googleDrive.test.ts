@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { Readable } from "node:stream";
 
 const { fakeDrive, makeDriveClientAsOwner, isInvalidGrantError } = vi.hoisted(() => {
   const fakeDrive = {
@@ -24,7 +25,7 @@ vi.mock("@/lib/googleClient", () => ({
   isInvalidGrantError,
 }));
 
-import { moveMessengerFilesToSpaceRegistration, uploadFileToDrive } from "@/lib/googleDrive";
+import { deleteFileFromDrive, moveMessengerFilesToSpaceRegistration, uploadFileToDrive, findProjectUploadInDrive, downloadProjectQuote } from "@/lib/googleDrive";
 
 function fileInput(name = "notes.bin") {
   return {
@@ -59,6 +60,35 @@ beforeEach(() => {
 });
 
 describe("프로젝트 Drive 파일 업로드", () => {
+  it("복구용 업로드는 비공개 appProperties에 작업 ID를 붙인다", async () => {
+    await uploadFileToDrive({ ...fileInput(), recoveryKey: "00000000-0000-4000-8000-000000000001" }, project);
+    expect(fakeDrive.files.create).toHaveBeenLastCalledWith(expect.objectContaining({ requestBody: expect.objectContaining({ appProperties: { erpUploadRecoveryId: "00000000-0000-4000-8000-000000000001" } }) }));
+  });
+  it("같은 복구 ID의 파일이 여러 개면 임의로 선택하지 않는다", async () => {
+    fakeDrive.files.list.mockResolvedValue({ data: { files: [{ id: "one" }, { id: "two" }] } });
+    await expect(findProjectUploadInDrive("00000000-0000-4000-8000-000000000001")).rejects.toThrow("RECOVERY_AMBIGUOUS");
+  });
+  it("큰 견적서는 다운로드하기 전에 거부한다", async () => {
+    fakeDrive.files.get.mockResolvedValue({ data: { size: String(11 * 1024 * 1024) } });
+    await expect(downloadProjectQuote("large")).rejects.toThrow("10MB"); expect(fakeDrive.files.get).toHaveBeenCalledTimes(1);
+  });
+  it("견적서 다운로드는 크기가 제한된 스트림으로 읽는다", async () => {
+    fakeDrive.files.get.mockResolvedValueOnce({ data: { size: "3" } }).mockResolvedValueOnce({ data: Readable.from([Buffer.from("abc")]) });
+    expect(await downloadProjectQuote("small")).toEqual(Buffer.from("abc"));
+  });
+  it("메타데이터 조회 뒤 원본이 커져도 스트림을 끊는다", async () => {
+    fakeDrive.files.get.mockResolvedValueOnce({ data: { size: "3" } }).mockResolvedValueOnce({ data: Readable.from([Buffer.alloc(10 * 1024 * 1024 + 1)]) });
+    await expect(downloadProjectQuote("changed")).rejects.toThrow("10MB");
+  });
+  it("이미 삭제된 Drive 파일은 삭제 완료로 처리하여 ERP 기록 정리를 막지 않는다", async () => {
+    fakeDrive.files.delete.mockRejectedValue({ response: { status: 404 } });
+    await expect(deleteFileFromDrive("already-deleted")).resolves.toBeUndefined();
+  });
+
+  it("Drive 삭제 권한 오류는 없는 파일로 오판하지 않는다", async () => {
+    fakeDrive.files.delete.mockRejectedValue(new Error("permission denied"));
+    await expect(deleteFileFromDrive("protected")).rejects.toThrow("permission denied");
+  });
   it("세션 토큰 없이 소유자 Drive 클라이언트로 업로드한다", async () => {
     const result = await uploadFileToDrive(fileInput(), project);
 

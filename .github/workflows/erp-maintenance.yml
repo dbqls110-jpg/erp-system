@@ -1,0 +1,34 @@
+name: ERP report monitor and upload recovery
+on:
+  workflow_dispatch:
+  schedule:
+    # Asia/Seoul 09:00–18:45. Scheduled runs can be delayed by GitHub.
+    - cron: '*/15 0-9 * * *'
+permissions: {}
+concurrency:
+  group: erp-maintenance
+  cancel-in-progress: false
+jobs:
+  maintain:
+    if: vars.ERP_MAINTENANCE_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - name: Check reports and recover uploads
+        env:
+          MAINTENANCE_SECRET: ${{ secrets.ERP_MAINTENANCE_SECRET }}
+        run: |
+          set -euo pipefail
+          if [ -z "$MAINTENANCE_SECRET" ]; then
+            echo "ERP maintenance credential is not configured."
+            exit 1
+          fi
+          for attempt in 1 2 3; do
+            status=$(printf 'Authorization: Bearer %s\n' "$MAINTENANCE_SECRET" | curl --silent --show-error --max-time 90 --output /dev/null --write-out '%{http_code}' \
+              --request POST --header @- \
+              https://erp-system-lojo.onrender.com/api/agent/maintenance) || status=000
+            if [ "$status" = "200" ]; then exit 0; fi
+            echo "ERP maintenance returned HTTP $status (attempt $attempt)."
+            if [ "$attempt" -lt 3 ]; then sleep 65; fi
+          done
+          exit 1

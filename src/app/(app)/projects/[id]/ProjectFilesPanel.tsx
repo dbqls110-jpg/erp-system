@@ -2,9 +2,12 @@
 
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { uploadProjectFiles, deleteProjectFile } from "@/app/actions/projectFile";
+import { uploadProjectFiles, deleteProjectFile, retryProjectUploads } from "@/app/actions/projectFile";
+import { previewProjectQuote, applyProjectQuote } from "@/app/actions/projectQuote";
+import { isInternalQuoteFileName } from "@/lib/quotePolicy";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Upload, Trash2, ExternalLink, FileText, Loader2, AlertCircle } from "lucide-react";
+import { Upload, Trash2, ExternalLink, FileText, Loader2, AlertCircle, RefreshCw } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { toneBadgeClass } from "@/lib/badge-tone";
 import { toast } from "sonner";
@@ -23,6 +26,7 @@ interface Props {
   projectId: string;
   files: ProjectFile[];
   canEdit: boolean;
+  recoveryTasks?: Array<{ id: string; name: string; status: string; attempts: number }>;
 }
 
 function formatBytes(bytes: number | null) {
@@ -32,12 +36,42 @@ function formatBytes(bytes: number | null) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-export function ProjectFilesPanel({ projectId, files, canEdit }: Props) {
+export function ProjectFilesPanel({ projectId, files, canEdit, recoveryTasks = [] }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [failedFiles, setFailedFiles] = useState<Array<{ name: string; reason: string }>>([]);
+  const [quotePreview, setQuotePreview] = useState<Awaited<ReturnType<typeof previewProjectQuote>> | null>(null);
+  const [recoveryNotice, setRecoveryNotice] = useState(false);
+
+  function handleQuotePreview(file: ProjectFile) {
+    startTransition(async () => {
+      try { setQuotePreview(await previewProjectQuote(file.id, projectId)); }
+      catch (error) { toast.error(error instanceof Error ? error.message : "재분석 실패"); }
+    });
+  }
+
+  function handleQuoteApply() {
+    if (!quotePreview) return;
+    startTransition(async () => {
+      try {
+        await applyProjectQuote(quotePreview.fileId, projectId, quotePreview.fileDigest, quotePreview.before.digest);
+        setQuotePreview(null); toast.success("견적서 금액을 다시 반영했습니다."); router.refresh();
+      } catch (error) { toast.error(error instanceof Error ? error.message : "반영 실패"); }
+    });
+  }
+
+  function handleRecovery() {
+    startTransition(async () => {
+      try {
+        const result = await retryProjectUploads(projectId);
+        if (result.recovered) { toast.success(`${result.recovered}개 파일 복구 완료`); setRecoveryNotice(false); }
+        else toast.info("복구 가능한 파일을 확인했습니다. 대기 작업은 다음 재시도에 확인합니다.");
+        router.refresh();
+      } catch { toast.error("업로드 복구를 완료하지 못했습니다. 원본 파일은 삭제하지 않았습니다."); }
+    });
+  }
 
   function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const selectedFiles = Array.from(e.target.files ?? []);
@@ -50,18 +84,19 @@ export function ProjectFilesPanel({ projectId, files, canEdit }: Props) {
     startTransition(async () => {
       try {
         const result = await uploadProjectFiles(projectId, formData);
+        if (result.pendingRecoveryNames.length) setRecoveryNotice(true);
         if (result.uploadedFileNames.length > 0) {
           toast.success(`업로드 완료: ${result.uploadedFileNames.join(", ")}`);
         }
         if (result.materialOnlyFileNames.length > 0) {
           toast.info(`자료용으로 저장했습니다 (금액 미반영): ${result.materialOnlyFileNames.join(", ")}`);
         }
-        if (result.internalQuoteFileCount > 1) {
+        if (result.internalQuoteFileCount > 1 && result.quoteAmountsApplied) {
           toast.info(`내부용 견적서 ${result.internalQuoteFileCount}개 중 첫 번째 파일로 금액을 반영했습니다.`);
         }
         if (result.quoteAnalysis?.source === "unsupported" || result.quoteAnalysis?.confidence === "none") {
           toast.info(result.quoteAnalysis.note);
-        } else if (result.quoteAnalysis && (result.quoteAnalysis.revenue !== null || result.quoteAnalysis.cost !== null)) {
+        } else if (result.quoteAmountsApplied) {
           toast.success("내부용 견적서 금액을 프로젝트에 반영했습니다.");
         }
         if (result.failedFiles.length > 0) {
@@ -131,9 +166,15 @@ export function ProjectFilesPanel({ projectId, files, canEdit }: Props) {
                 <ExternalLink size={15} />
               </a>
               {canEdit && (
+                <>
+                {isInternalQuoteFileName(file.name) && <button type="button" onClick={() => handleQuotePreview(file)} disabled={isPending}
+                  title="견적서 금액 재분석" aria-label={`${file.name} 금액 재분석`}
+                  className="shrink-0 rounded px-1 text-xs text-muted-foreground hover:text-primary disabled:opacity-50">
+                  <RefreshCw size={15} />
+                </button>}
                 <button
                   onClick={() => handleDelete(file)}
-                  disabled={isPending && deletingId === file.id}
+                  disabled={isPending}
                   className="shrink-0 text-muted-foreground transition-colors hover:text-destructive disabled:opacity-50"
                   title="삭제"
                 >
@@ -143,6 +184,7 @@ export function ProjectFilesPanel({ projectId, files, canEdit }: Props) {
                     <Trash2 size={15} />
                   )}
                 </button>
+                </>
               )}
             </li>
           ))}
@@ -164,6 +206,14 @@ export function ProjectFilesPanel({ projectId, files, canEdit }: Props) {
       )}
 
       {canEdit && (
+        <div className="space-y-2">
+        {(recoveryNotice || recoveryTasks.length > 0) && <div role="status" className="space-y-1 text-xs text-amber-700">
+          <p>복구 대기 작업이 있습니다. 중복 업로드 대신 ‘업로드 복구’를 이용해 주세요.</p>
+          {recoveryTasks.map(task => <p key={task.id}>{task.name} · {task.status === "needs_attention" ? "관리자 확인 필요" : "복구 대기"} · 시도 {task.attempts}회</p>)}
+        </div>}
+        <Button variant="outline" size="sm" onClick={handleRecovery} disabled={isPending} className="w-full text-xs">
+          <RefreshCw size={14} /> 업로드 복구
+        </Button>
         <Button
           variant="outline"
           size="sm"
@@ -178,7 +228,34 @@ export function ProjectFilesPanel({ projectId, files, canEdit }: Props) {
           )}
           파일 업로드
         </Button>
+        </div>
       )}
+
+      <Dialog open={quotePreview !== null} onOpenChange={open => { if (!open && !isPending) setQuotePreview(null); }}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>견적서 금액 재분석</DialogTitle>
+            <DialogDescription>{quotePreview?.fileName} · 원본 파일은 변경하지 않습니다.</DialogDescription>
+          </DialogHeader>
+          {quotePreview && <div className="space-y-3 text-sm">
+            <table className="w-full text-left"><thead><tr><th>구분</th><th>기존</th><th>반영 후</th></tr></thead>
+              <tbody>{(["revenue", "cost"] as const).map(kind => <tr key={kind}>
+                <th className="py-2">{kind === "revenue" ? "매출" : "매입"}</th>
+                <td>{quotePreview.before[kind]?.toLocaleString("ko-KR") ?? "미입력"}</td>
+                <td>{quotePreview.analysis[kind]?.toLocaleString("ko-KR") ?? "미입력"}</td>
+              </tr>)}</tbody>
+            </table>
+            <p className="text-xs text-muted-foreground">단위: 원. 이 파일에서 생성된 금액만 바뀌며, 별도 수동 등록한 건은 유지합니다. 미입력으로 표시된 항목은 이 파일의 기존 금액 기록을 제거합니다.</p>
+            <p className="text-xs">{quotePreview.analysis.note}</p>
+            {quotePreview.analysis.confidence !== "high" && <p className="text-xs text-amber-700">일부 값이 불확실합니다. 원본과 대조한 뒤 반영해 주세요.</p>}
+          </div>}
+          <DialogFooter><Button variant="outline" disabled={isPending} onClick={() => setQuotePreview(null)}>취소</Button>
+            <Button disabled={isPending || !quotePreview || quotePreview.analysis.confidence === "none"
+              || (quotePreview.analysis.revenue === null && quotePreview.analysis.cost === null)} onClick={handleQuoteApply}>
+              {isPending ? "처리 중…" : "금액 반영"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

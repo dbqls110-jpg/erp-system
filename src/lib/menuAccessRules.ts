@@ -1,4 +1,5 @@
 import { normalizeLevelKey } from "@/lib/menu-keys";
+import { DOT_READ_MENUS, isDotReadOnly } from "@/lib/dotPolicy";
 
 /**
  * 메뉴 권한 판정. prisma 를 import 하지 않는 순수 함수라 테스트에서 그대로 부를 수 있다.
@@ -24,6 +25,8 @@ export function resolveMenuAccess(
   menuKey: string,
   menuAccess: ReadonlyArray<AccessRow>,
 ): MenuPermission {
+  // Even an erroneous admin-configured canEdit row cannot expand the service account.
+  if (isDotReadOnly(role)) return { view: DOT_READ_MENUS.has(menuKey), edit: false };
   // 규칙 1: 관리자는 언제나 전부 허용한다. 설정을 어떻게 저장했든 관리자가
   // 자기 발등을 찍고 관리자 화면에서 잠기는 일이 없어야 한다.
   if (role === "admin") return { view: true, edit: true };

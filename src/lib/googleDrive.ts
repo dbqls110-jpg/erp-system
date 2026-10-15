@@ -71,7 +71,7 @@ function formatMonthFolder(date: Date): string {
 }
 
 export async function uploadFileToDrive(
-  file: { buffer: Buffer; name: string; mimeType: string; size: number },
+  file: { buffer: Buffer; name: string; mimeType: string; size: number; recoveryKey?: string },
   project: { id: string; name: string; createdAt: Date }
 ): Promise<{ driveFileId: string; driveUrl: string; category: string | null }> {
   return withOwnerDrive(async (drive) => {
@@ -90,6 +90,7 @@ export async function uploadFileToDrive(
       requestBody: {
         name: file.name,
         parents: [targetFolderId],
+        appProperties: file.recoveryKey ? { erpUploadRecoveryId: file.recoveryKey } : undefined,
       },
       media: {
         mimeType: file.mimeType,
@@ -98,18 +99,65 @@ export async function uploadFileToDrive(
       fields: "id, webViewLink",
     });
 
+    if (!res.data.id) throw new Error("Drive 업로드 응답에서 파일 ID를 확인하지 못했습니다.");
     return {
-      driveFileId: res.data.id!,
-      driveUrl: res.data.webViewLink!,
+      driveFileId: res.data.id,
+      driveUrl: res.data.webViewLink ?? `https://drive.google.com/file/d/${res.data.id}/view`,
       category,
     };
+  });
+}
+
+/** Only tagged uploads created by this application are eligible for recovery. */
+export async function findProjectUploadInDrive(recoveryKey: string) {
+  if (!/^[a-f0-9-]{36}$/i.test(recoveryKey)) throw new Error("잘못된 복구 식별자입니다.");
+  return withOwnerDrive(async drive => {
+    const result = await drive.files.list({
+      q: `trashed = false and appProperties has { key='erpUploadRecoveryId' and value='${recoveryKey}' }`,
+      fields: "files(id,name,mimeType,size,sha256Checksum,webViewLink)", pageSize: 2,
+    });
+    const files = result.data.files ?? [];
+    if (files.length > 1) throw new Error("RECOVERY_AMBIGUOUS");
+    const file = files[0];
+    if (!file?.id) return null;
+    return { driveFileId: file.id, driveUrl: file.webViewLink ?? `https://drive.google.com/file/d/${file.id}/view`,
+      name: file.name, size: Number(file.size), mimeType: file.mimeType, contentSha256: file.sha256Checksum };
+  });
+}
+
+export async function downloadProjectQuote(driveFileId: string): Promise<Buffer> {
+  return withOwnerDrive(async drive => {
+    const metadata = await drive.files.get({ fileId: driveFileId, fields: "size,mimeType,trashed" });
+    if (metadata.data.trashed || !metadata.data.size || Number(metadata.data.size) > 10 * 1024 * 1024) {
+      throw new Error("재분석은 10MB 이하의 원본 견적서만 지원합니다.");
+    }
+    const result = await drive.files.get({ fileId: driveFileId, alt: "media" }, { responseType: "stream" });
+    const stream = result.data as unknown as Readable;
+    const chunks: Buffer[] = [];
+    let size = 0;
+    for await (const chunk of stream) {
+      const bytes = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+      size += bytes.length;
+      if (size > 10 * 1024 * 1024) { stream.destroy(); throw new Error("견적서가 10MB를 초과합니다."); }
+      chunks.push(bytes);
+    }
+    return Buffer.concat(chunks);
   });
 }
 
 export async function deleteFileFromDrive(
   driveFileId: string
 ): Promise<void> {
-  await withOwnerDrive((drive) => drive.files.delete({ fileId: driveFileId }).then(() => undefined));
+  await withOwnerDrive(async (drive) => {
+    try { await drive.files.delete({ fileId: driveFileId }); }
+    catch (error) {
+      // A retry after successful deletion (or manual deletion in Drive) must still
+      // remove the ERP metadata. Authentication/permission errors remain failures.
+      const status = error && typeof error === "object"
+        ? (error as { response?: { status?: number } }).response?.status : undefined;
+      if (status !== 404) throw error;
+    }
+  });
 }
 
 type DriveUploadFile = {

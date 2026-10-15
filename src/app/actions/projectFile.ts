@@ -6,7 +6,9 @@ import { uploadFileToDrive, deleteFileFromDrive } from "@/lib/googleDrive";
 import { revalidatePath } from "next/cache";
 import { analyzeQuoteFile, type QuoteAnalysis } from "@/lib/quoteParser";
 import { isInternalQuoteFileName } from "@/lib/quotePolicy";
-import { deleteQuoteAmounts, upsertQuoteAmounts } from "@/lib/projectAmounts";
+import { deleteQuoteAmounts } from "@/lib/projectAmounts";
+import { beginProjectUpload, finishProjectUpload, markProjectUploadPending, recoverProjectUploads } from "@/lib/projectUploadRecovery";
+import { createHash } from "node:crypto";
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
 
@@ -14,8 +16,10 @@ export interface ProjectFileUploadResult {
   quoteAnalysis: QuoteAnalysis | null;
   internalQuoteFileName: string | null;
   internalQuoteFileCount: number;
+  quoteAmountsApplied: boolean;
   uploadedFileNames: string[];
   failedFiles: Array<{ name: string; reason: string }>;
+  pendingRecoveryNames: string[];
   materialOnlyFileNames: string[];
 }
 
@@ -40,7 +44,7 @@ function formatUploadFailure(failedFiles: Array<{ name: string; reason: string }
 
 /** 여러 파일을 독립적으로 처리해 한 파일의 실패가 나머지 업로드를 막지 않게 한다. */
 export async function uploadProjectFiles(projectId: string, formData: FormData): Promise<ProjectFileUploadResult> {
-  await requireEditAccess("projects");
+  const session = await requireEditAccess("projects");
 
   const files = filesFromFormData(formData);
   if (files.length === 0) throw new Error("파일을 선택해주세요.");
@@ -61,33 +65,30 @@ export async function uploadProjectFiles(projectId: string, formData: FormData):
 
   const uploadedFileNames: string[] = [];
   const failedFiles: Array<{ name: string; reason: string }> = [];
-  let uploadedInternalQuote = false;
+  let quoteAmountsApplied = false;
+  const pendingRecoveryNames: string[] = [];
 
   for (const file of files) {
+    let recoveryId: string | null = null;
     try {
       if (file.size === 0) throw new Error("빈 파일");
       if (file.size > MAX_FILE_SIZE) throw new Error("50MB 초과");
 
       const buffer = Buffer.from(await file.arrayBuffer());
+      const task = await beginProjectUpload({ projectId, createdById: session.user.id, name: file.name,
+        mimeType: file.type || "application/octet-stream", size: file.size,
+        contentSha256: createHash("sha256").update(buffer).digest("hex") }, file === internalQuoteFile ? quoteAnalysis : null);
+      recoveryId = task.id;
       const { driveFileId, driveUrl, category } = await uploadFileToDrive(
-        { buffer, name: file.name, mimeType: file.type || "application/octet-stream", size: file.size },
+        { buffer, name: file.name, mimeType: file.type || "application/octet-stream", size: file.size, recoveryKey: task.id },
         { id: project.id, name: project.name, createdAt: project.createdAt }
       );
 
-      await prisma.projectFile.create({
-        data: {
-          projectId,
-          driveFileId,
-          category,
-          name: file.name,
-          mimeType: file.type || "application/octet-stream",
-          driveUrl,
-          size: file.size,
-        },
-      });
+      const saved = await finishProjectUpload(task.id, { driveFileId, driveUrl, category });
+      if (saved.amountsApplied) quoteAmountsApplied = true;
       uploadedFileNames.push(file.name);
-      if (file === internalQuoteFile) uploadedInternalQuote = true;
     } catch (error) {
+      if (recoveryId) { await markProjectUploadPending(recoveryId); pendingRecoveryNames.push(file.name); }
       failedFiles.push({
         name: file.name,
         reason: error instanceof Error ? error.message : "알 수 없는 오류",
@@ -95,21 +96,35 @@ export async function uploadProjectFiles(projectId: string, formData: FormData):
     }
   }
 
-  if (uploadedInternalQuote && quoteAnalysis) {
-    await upsertQuoteAmounts(projectId, internalQuoteFile!.name, quoteAnalysis);
-  }
-
   revalidatePath(`/projects/${projectId}`);
   revalidatePath("/projects");
+  revalidatePath("/projects/stats");
+  revalidatePath("/company-finance");
+  revalidatePath("/finance");
 
   return {
     quoteAnalysis,
     internalQuoteFileName: internalQuoteFile?.name ?? null,
     internalQuoteFileCount: internalFiles.length,
+    quoteAmountsApplied,
     uploadedFileNames,
     failedFiles,
+    pendingRecoveryNames,
     materialOnlyFileNames: uploadedFileNames.filter((file) => !isInternalQuoteFileName(file)),
   };
+}
+
+export async function retryProjectUploads(projectId: string) {
+  await requireEditAccess("projects");
+  const now = new Date();
+  await prisma.projectUploadRecovery.updateMany({ where: { projectId, status: "pending",
+    OR: [{ leaseUntil: null }, { leaseUntil: { lte: now } }] }, data: { nextAttemptAt: now } });
+  const result = await recoverProjectUploads(projectId);
+  revalidatePath(`/projects/${projectId}`);
+  revalidatePath("/company-finance");
+  revalidatePath("/projects");
+  revalidatePath("/projects/stats");
+  return result;
 }
 
 export async function uploadProjectFile(projectId: string, formData: FormData) {
@@ -124,21 +139,24 @@ export async function deleteProjectFile(fileId: string, projectId: string) {
   await requireEditAccess("projects");
 
   const file = await prisma.projectFile.findUnique({ where: { id: fileId } });
-  if (!file) throw new Error("파일을 찾을 수 없습니다.");
+  if (!file) { revalidatePath(`/projects/${projectId}`); return; }
   if (file.projectId !== projectId) throw new Error("프로젝트 파일이 일치하지 않습니다.");
 
   await deleteFileFromDrive(file.driveFileId);
-  await prisma.projectFile.delete({ where: { id: fileId } });
-
-  if (isInternalQuoteFileName(file.name)) {
-    const remainingQuote = await prisma.projectFile.findFirst({
-      where: { projectId, name: file.name },
-      select: { id: true },
-    });
-    if (!remainingQuote) await deleteQuoteAmounts(projectId, file.name);
-  }
+  await prisma.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${projectId}))`;
+    const current = await tx.projectFile.findUnique({ where: { id: fileId } });
+    if (!current) return; // A simultaneous request already removed it.
+    await tx.projectFile.delete({ where: { id: fileId } });
+    if (isInternalQuoteFileName(file.name)) {
+      const remainingQuote = await tx.projectFile.findFirst({ where: { projectId, name: file.name }, select: { id: true } });
+      if (!remainingQuote) await deleteQuoteAmounts(projectId, file.name, tx);
+    }
+  }, { maxWait: 10_000, timeout: 30_000 });
 
   revalidatePath(`/projects/${projectId}`);
   revalidatePath("/projects");
   revalidatePath("/projects/stats");
+  revalidatePath("/company-finance");
+  revalidatePath("/finance");
 }

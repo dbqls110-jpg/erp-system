@@ -30,3 +30,12 @@ services:
         sync: false
       - key: VENUEDA_DEFAULT_ASSIGNEE_EMAIL
         value: qkrtjrdud952@gmail.com
+      # Dedicated DOT credential; never share the general ERP/bridge keys.
+      - key: DOT_INTEGRATION_SECRET
+        sync: false
+      - key: ERP_MAINTENANCE_SECRET
+        sync: false
+      - key: DOT_MONITOR_ENABLED
+        value: "false"
+      - key: DOT_MONITOR_START_DATE
+        sync: false

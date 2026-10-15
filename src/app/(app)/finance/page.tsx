@@ -47,7 +47,7 @@ export default async function FinancePage({
   // 그 뒤로는 같은 달 안에서 몇 번을 열어도 구글을 두드리지 않는다.
   //
   // after() 로 응답을 보낸 뒤에 돌린다. 여기서 기다리면 구글 왕복만큼 화면이 늦게 뜬다.
-  after(async () => {
+  if (session?.user.role !== "dot") after(async () => {
     try {
       await syncMissingMonthSheets();
     } catch (err) {

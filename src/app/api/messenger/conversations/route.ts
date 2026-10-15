@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { getConversationOther } from "@/lib/messenger-conversation";
 import { listVenueDaThreadsForUser } from "@/lib/venueDaMessenger";
 import { NextResponse } from "next/server";
+import { DOT_ACCOUNT_ID } from "@/lib/dotPolicy";
 
 export async function GET() {
   const session = await getServerSession(authOptions);
@@ -16,8 +17,8 @@ export async function GET() {
     // 목록에 남겨두면 "답 없는 유령 대화"가 된다. 데이터는 지우지 않는다.
     where: {
       OR: [{ participantA: uid }, { participantB: uid }],
-      userA: { isAgent: false },
-      userB: { isAgent: false },
+      userA: { OR: [{ isAgent: false }, { id: DOT_ACCOUNT_ID, agentType: "dot" }] },
+      userB: { OR: [{ isAgent: false }, { id: DOT_ACCOUNT_ID, agentType: "dot" }] },
     },
     include: {
       userA: { select: { id: true, name: true, image: true, isAgent: true } },

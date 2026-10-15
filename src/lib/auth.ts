@@ -1,5 +1,8 @@
 import { NextAuthOptions } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
+import CredentialsProvider from "next-auth/providers/credentials";
+import { dotCredentialFingerprint, getActiveDotAccount, verifyDotSecret } from "@/lib/dotAuth";
+import { DOT_ACCOUNT_ID, DOT_ROLE } from "@/lib/dotPolicy";
 import { prisma } from "@/lib/prisma";
 import { notifyAdminsOfSignup } from "@/lib/signupNotice";
 import { becameInternal, shouldAutoClockIn } from "@/lib/autoAttendance";
@@ -20,6 +23,16 @@ async function clockInToday(userId: string) {
 export const authOptions: NextAuthOptions = {
   secret: process.env.NEXTAUTH_SECRET ?? process.env.AUTH_SECRET,
   providers: [
+    CredentialsProvider({
+      id: "dot", name: "DOT 업무비서", credentials: { secret: { label: "전용 인증키", type: "password" } },
+      async authorize(credentials) {
+        if (!verifyDotSecret(credentials?.secret)) return null;
+        try {
+          const user = await getActiveDotAccount();
+          return { id: user.id, name: user.name, email: user.email, image: null };
+        } catch { return null; }
+      },
+    }),
     GoogleProvider({
       clientId: process.env.AUTH_GOOGLE_ID!,
       clientSecret: process.env.AUTH_GOOGLE_SECRET!,
@@ -30,6 +43,25 @@ export const authOptions: NextAuthOptions = {
   session: { strategy: "jwt" },
   callbacks: {
     async jwt({ token, account, profile }) {
+      if (account?.provider === "dot") {
+        token.id = DOT_ACCOUNT_ID;
+        token.role = DOT_ROLE;
+        token.active = true;
+        token.dotFingerprint = dotCredentialFingerprint();
+        token.partnerId = null;
+        token.customerId = null;
+        token.venueId = null;
+      }
+      if (token.id === DOT_ACCOUNT_ID) {
+        // Fail closed on revocation, disabled account, or changed identity; never elevate from DB.
+        try {
+          const user = await getActiveDotAccount();
+          token.active = !!token.dotFingerprint && token.dotFingerprint === dotCredentialFingerprint();
+          token.role = DOT_ROLE;
+          token.name = user.name;
+        } catch { token.active = false; token.role = DOT_ROLE; }
+        return token;
+      }
       if (account?.provider === "google" && account.access_token) {
         token.accessToken = account.access_token;
         token.refreshToken = account.refresh_token;
@@ -51,7 +83,7 @@ export const authOptions: NextAuthOptions = {
           let dbUser = users[0];
 
           if (!dbUser) {
-            const countResult = await prisma.$queryRaw<Array<{ count: bigint }>>`SELECT COUNT(*) as count FROM users`;
+            const countResult = await prisma.$queryRaw<Array<{ count: bigint }>>`SELECT COUNT(*) as count FROM users WHERE "isAgent" = false`;
             const count = Number(countResult[0].count);
             const newUsers = await prisma.$queryRaw<
               Array<{
