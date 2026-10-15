@@ -2,7 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DOT_ACCOUNT_ID, blocksDotWrite } from "@/lib/dotPolicy";
 import { resolveMenuAccess } from "@/lib/menuAccessRules";
 
-const db = vi.hoisted(() => ({ user: { findUnique: vi.fn() }, $transaction: vi.fn() }));
+const db = vi.hoisted(() => ({ user: { findUnique: vi.fn() }, $transaction: vi.fn(),
+  project: { count: vi.fn(), findMany: vi.fn() }, venueDaMessage: { count: vi.fn() }, agentBridgeHeartbeat: { findMany: vi.fn() } }));
 vi.mock("@/lib/prisma", () => ({ prisma: db }));
 vi.mock("next-auth", () => ({ getServerSession: vi.fn().mockResolvedValue(null) }));
 vi.mock("@/lib/auth", () => ({ authOptions: {} }));
@@ -10,6 +11,62 @@ import { verifyDotApiKey, verifyDotSecret, getActiveDotAccount } from "@/lib/dot
 import { parseDotReport, sendDotReport } from "@/lib/dotReports";
 import { POST } from "@/app/api/agent/dot/reports/route";
 import { GET } from "@/app/api/agent/dot/context/route";
+import { readFileSync } from "node:fs";
+import path from "node:path";
+import { getDotContext } from "@/lib/dotContext";
+
+describe("DOT 클라우드 브라우저 점검 화면", () => {
+  it("JSON 주소를 열지 않아도 인증된 HTML에서 점검 자료를 읽는다", () => {
+    const page = readFileSync(path.resolve(__dirname, "../app/dot-report/page.tsx"), "utf8");
+    expect(page).toContain("getDotContext(");
+    expect(page).toContain("프로젝트 점검 자료");
+    expect(page.indexOf("await getDotBrowserSession()")).toBeLessThan(page.indexOf("await getDotContext("));
+    expect(page).not.toContain('href="/api/agent/dot/context');
+    expect(page).not.toContain("dangerouslySetInnerHTML");
+  });
+  it("잘못된 페이지는 계정·업무 DB 조회 전에 거부한다", async () => {
+    for (const page of ["0", "-1", "1.2", "10001", "no", ["1", "2"]]) {
+      await expect(getDotContext(page)).rejects.toMatchObject({ status: 400 });
+    }
+    expect(db.user.findUnique).not.toHaveBeenCalled();
+    expect(db.project.findMany).not.toHaveBeenCalled();
+  });
+  it("HTML과 API가 같은 100건 단위 자료와 다음 페이지 여부를 사용한다", async () => {
+    db.user.findUnique.mockResolvedValue({ id: DOT_ACCOUNT_ID, role: "dot", active: true, isAgent: true, agentType: "dot" });
+    db.project.count.mockResolvedValue(201);
+    db.project.findMany.mockResolvedValue([{ id: "project", name: "검증 프로젝트", checklistItems: [], files: [], amounts: [] }]);
+    db.venueDaMessage.count.mockResolvedValue(2);
+    db.agentBridgeHeartbeat.findMany.mockResolvedValue([]);
+    const context = await getDotContext("2");
+    expect(context).toMatchObject({ page: 2, total: 201, hasMore: true, integration: { undeliveredVenueDaReplies: 2 } });
+    expect(db.project.findMany).toHaveBeenCalledWith(expect.objectContaining({ skip: 100, take: 100 }));
+    const response = await GET(new Request("https://erp.test/api/agent/dot/context?page=3", {
+      headers: { authorization: "Bearer test-only-dot-credential-32-characters" },
+    }));
+    expect(response.status).toBe(200);
+    expect(response.headers.get("Cache-Control")).toBe("no-store");
+    expect(await response.json()).toMatchObject({ page: 3, hasMore: false, projects: context.projects });
+  });
+  it("페이지와 API를 번갈아 읽어도 공유 조회 제한을 우회하지 못한다", async () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(Date.now() + 120_000);
+      db.user.findUnique.mockResolvedValue({ id: DOT_ACCOUNT_ID, role: "dot", active: true, isAgent: true, agentType: "dot" });
+      db.project.count.mockResolvedValue(0); db.project.findMany.mockResolvedValue([]);
+      db.venueDaMessage.count.mockResolvedValue(0); db.agentBridgeHeartbeat.findMany.mockResolvedValue([]);
+      for (let i = 0; i < 30; i++) await getDotContext("1");
+      const calls = db.project.count.mock.calls.length;
+      const response = await GET(new Request("https://erp.test/api/agent/dot/context", {
+        headers: { authorization: "Bearer test-only-dot-credential-32-characters" },
+      }));
+      expect(response.status).toBe(429);
+      expect(response.headers.get("Retry-After")).toBe("60");
+      expect(db.project.count).toHaveBeenCalledTimes(calls);
+      vi.advanceTimersByTime(60_001);
+      expect((await getDotContext("1")).page).toBe(1);
+    } finally { vi.useRealTimers(); }
+  });
+});
 
 beforeEach(() => { vi.clearAllMocks(); vi.stubEnv("DOT_INTEGRATION_SECRET", "test-only-dot-credential-32-characters"); });
 afterEach(() => vi.unstubAllEnvs());
