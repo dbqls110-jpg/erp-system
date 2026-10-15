@@ -1,9 +1,10 @@
-import { verifyDotApiKey, DotRequestError, dotErrorResponse } from "@/lib/dotAuth";
+import { DotRequestError, dotErrorResponse } from "@/lib/dotAuth";
+import { authorizeDotRequest } from "@/lib/dotRequestAuth";
 import { parseDotReport, sendDotReport } from "@/lib/dotReports";
 
 export async function POST(request: Request) {
-  if (!verifyDotApiKey(request)) return Response.json({ error: "Unauthorized" }, { status: 401 });
   try {
+    if (!(await authorizeDotRequest(request))) return Response.json({ error: "Unauthorized" }, { status: 401, headers: { "Cache-Control": "no-store" } });
     if (!request.headers.get("content-type")?.toLowerCase().startsWith("application/json")) throw new DotRequestError(415, "JSON 요청이 필요합니다.");
     // Bound the stream, not only Content-Length, before retaining/parsing it.
     const reader = request.body?.getReader();

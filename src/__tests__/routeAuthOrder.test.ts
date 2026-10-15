@@ -17,7 +17,7 @@ import path from "path";
 const ROOT = path.resolve(__dirname, "../..");
 const API_DIR = path.join(ROOT, "src/app/api");
 
-const AUTH_CALL = /\b(hasAnyBridgeCredential|verifyBridgeApiKey|verifyAgentApiKey|verifyDotApiKey|verifyMaintenanceApiKey|getServerSession|requireAdmin)\s*\(/;
+const AUTH_CALL = /\b(hasAnyBridgeCredential|verifyBridgeApiKey|verifyAgentApiKey|verifyDotApiKey|authorizeDotRequest|verifyMaintenanceApiKey|getServerSession|requireAdmin)\s*\(/;
 const PRISMA_CALL = /\bprisma\s*\.\s*[a-zA-Z$]/;
 const FIRST_HANDLER = /export\s+(?:async\s+)?function\s+(?:GET|POST|PUT|PATCH|DELETE)\b/;
 

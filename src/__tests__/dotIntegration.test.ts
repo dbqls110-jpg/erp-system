@@ -4,6 +4,8 @@ import { resolveMenuAccess } from "@/lib/menuAccessRules";
 
 const db = vi.hoisted(() => ({ user: { findUnique: vi.fn() }, $transaction: vi.fn() }));
 vi.mock("@/lib/prisma", () => ({ prisma: db }));
+vi.mock("next-auth", () => ({ getServerSession: vi.fn().mockResolvedValue(null) }));
+vi.mock("@/lib/auth", () => ({ authOptions: {} }));
 import { verifyDotApiKey, verifyDotSecret, getActiveDotAccount } from "@/lib/dotAuth";
 import { parseDotReport, sendDotReport } from "@/lib/dotReports";
 import { POST } from "@/app/api/agent/dot/reports/route";

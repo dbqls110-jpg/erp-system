@@ -21,6 +21,9 @@
 - 시스템 계정: erp-dot-assistant / DOT 업무비서 / role=dot, isAgent=true.
 - 내부 식별 주소 dot@agents.erp.invalid는 실제 이메일/Google 계정이 아니다.
 - 화면 로그인: /dot-login (NextAuth Credentials, 전용 인증키).
+- 로그인 후 /dot-report에서 같은 HTTP-only 세션으로 자료 조회·보고 전송을 한다.
+  DOT이 키를 채팅에 받거나 Bearer 값으로 추출할 필요가 없다.
+  브라우저 보고는 NEXTAUTH_URL과 일치하는 Origin/same-origin 요청만 허용한다.
 - 조회 메뉴: 대시보드, 프로젝트, 일정, 메신저, 공간, 문의, 거래처, 파트너, 재무, 시트.
 - ID/비밀번호 저장소, 관리자, 근태·휴가 개인정보 메뉴는 허용하지 않는다.
 - 관리자 메뉴 설정에 수정 권한을 잘못 켜도 DOT의 edit 권한은 항상 false.
@@ -32,6 +35,11 @@
 ## API
 
 HTTPS, Authorization: Bearer [private DOT credential].
+
+서버 간 호출의 Bearer 계약은 유지한다. DOT 브라우저는 전용 로그인 세션으로도
+아래 두 API만 사용할 수 있다. 다른 계정의 세션·일반 API 쓰기는 허용하지 않는다.
+화면 전송은 /dot-report에서 실행 ID·내용을 입력하고 전송하며, 같은 보고 재전송으로
+중복 없는 응답을 확인할 수 있다. 실제 최초 수신·메신저 표시는 별도로 확인한다.
 
 GET /api/agent/dot/context?page=1
 

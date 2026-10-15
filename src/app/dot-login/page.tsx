@@ -14,7 +14,7 @@ export default function DotLoginPage() {
       const data = new FormData(form);
       try {
         const result = await signIn("dot", { secret: data.get("secret"), redirect: false });
-        if (result?.ok) { form.reset(); window.location.assign("/dashboard"); }
+        if (result?.ok) { form.reset(); window.location.assign("/dot-report"); }
         else setError("인증키 또는 DOT 계정 설정을 확인해 주세요.");
       } catch { setError("로그인하지 못했습니다. 잠시 후 다시 시도해 주세요."); }
       finally { setPending(false); }
