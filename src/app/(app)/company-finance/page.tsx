@@ -11,6 +11,8 @@ import {
   summarizeCompanyFinanceRecords,
   type CompanyFinanceRecord,
 } from "@/lib/companyFinance";
+import { companyFinanceFilterLabel, companyFinanceWhere, parseCompanyFinanceFilters, type CompanyFinanceSearchParams } from "@/lib/companyFinanceFilters";
+import { CompanyFinanceFilters } from "./CompanyFinanceFilters";
 import { CompanyFinanceYearNav } from "./CompanyFinanceYearNav";
 import { CompanyFinanceEntryForm } from "./CompanyFinanceEntryForm";
 import { CompanyFinanceEntryDeleteButton } from "./CompanyFinanceEntryDeleteButton";
@@ -28,28 +30,27 @@ function metricClass(value: number) {
 export default async function CompanyFinancePage({
   searchParams,
 }: {
-  searchParams: Promise<{ year?: string }>;
+  searchParams: Promise<CompanyFinanceSearchParams>;
 }) {
   const params = await searchParams;
   const session = await getServerSession(authOptions);
 
   const currentYear = Number(currentKoreanDateKey().slice(0, 4));
-  const parsedYear = Number.parseInt(params.year ?? "", 10);
-  const year = Number.isInteger(parsedYear) && parsedYear >= 2000 && parsedYear <= 2100 ? parsedYear : currentYear;
-  const yearStartKst = new Date(`${year}-01-01T00:00:00+09:00`);
-  const nextYearStartKst = new Date(`${year + 1}-01-01T00:00:00+09:00`);
-  // 권한 검사가 실패하면 JSX를 반환하지 않으므로 장부 조회를 함께 시작해도 자료가 노출되지 않는다.
-  // requireMenuAccess 와 canEditMenu 는 같은 React.cache 결과를 공유한다.
-  const [, canEdit, entries, projectAmounts] = await Promise.all([
-    requireMenuAccess(session!.user.id, "companyFinance", session!.user.role),
+  const filters = parseCompanyFinanceFilters(params, currentYear);
+  const { year, month, company } = filters;
+  const where = companyFinanceWhere(filters);
+  const filterLabel = companyFinanceFilterLabel(filters);
+  // 조회 필터는 권한이 아니다. 재무 권한을 먼저 확인한 뒤 두 장부를 병렬 조회한다.
+  await requireMenuAccess(session!.user.id, "companyFinance", session!.user.role);
+  const [canEdit, entries, projectAmounts] = await Promise.all([
     canEditMenu(session!.user.id, "companyFinance", session!.user.role),
     prisma.companyFinanceEntry.findMany({
-      where: { date: { gte: `${year}-01-01`, lte: `${year}-12-31` } },
+      where: where.entries,
       orderBy: [{ date: "desc" }, { createdAt: "desc" }],
       select: { id: true, company: true, type: true, date: true, title: true, amount: true, memo: true },
     }),
     prisma.projectAmount.findMany({
-      where: { createdAt: { gte: yearStartKst, lt: nextYearStartKst } },
+      where: where.projectAmounts,
       orderBy: { createdAt: "desc" },
       select: {
         id: true,
@@ -63,24 +64,6 @@ export default async function CompanyFinancePage({
       },
     }),
   ]);
-  const summaryRecords: CompanyFinanceRecord[] = entries.flatMap((entry) => {
-    if (entry.type !== "revenue" && entry.type !== "cost" && entry.type !== "card") return [];
-    return [{ company: entry.company, type: entry.type, amount: entry.amount, date: entry.date }];
-  });
-  for (const amount of projectAmounts) {
-    if (amount.kind !== "revenue" && amount.kind !== "cost") continue;
-    summaryRecords.push({
-      company: amount.project.company,
-      type: amount.kind,
-      amount: amount.amount,
-      date: amount.createdAt,
-    });
-  }
-  const { summaries, unassigned } = summarizeCompanyFinanceRecords(summaryRecords, year);
-  const totalRevenue = summaries.reduce((sum, summary) => sum + summary.revenue, 0) + unassigned.revenue;
-  const totalCost = summaries.reduce((sum, summary) => sum + summary.cost, 0) + unassigned.cost;
-  const totalCard = summaries.reduce((sum, summary) => sum + summary.card, 0) + unassigned.card;
-  const totalProfit = totalRevenue - totalCost - totalCard;
   const displayItems = [
     ...entries
       .filter((entry) => entry.type === "revenue" || entry.type === "cost" || entry.type === "card")
@@ -109,6 +92,20 @@ export default async function CompanyFinancePage({
         memo: amount.memo,
       })),
   ].sort((a, b) => b.dateKey.localeCompare(a.dateKey));
+  // 카드 합계와 상세 내역이 서로 다른 자료를 집계하지 않도록 같은 목록에서 계산한다.
+  const summaryRecords: CompanyFinanceRecord[] = displayItems.map((item) => ({
+    company: item.company,
+    type: item.type as CompanyFinanceRecord["type"],
+    amount: item.amount,
+    date: item.dateKey,
+  }));
+  const { summaries: allSummaries, unassigned } = summarizeCompanyFinanceRecords(summaryRecords, year);
+  const summaries = allSummaries.filter((summary) => company === "all" || summary.company === company);
+  const totalRevenue = summaries.reduce((sum, summary) => sum + summary.revenue, 0) + unassigned.revenue;
+  const totalCost = summaries.reduce((sum, summary) => sum + summary.cost, 0) + unassigned.cost;
+  const totalCard = summaries.reduce((sum, summary) => sum + summary.card, 0) + unassigned.card;
+  const totalProfit = totalRevenue - totalCost - totalCard;
+  const visibleQuarters = month === null ? QUARTERS : QUARTERS.filter((quarter) => quarter === Math.ceil(month / 3));
   const defaultDate = year === currentYear
     ? currentKoreanDateKey()
     : `${year}-01-01`;
@@ -117,25 +114,29 @@ export default async function CompanyFinancePage({
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-sm text-muted-foreground">인포피아·노바웨이·클로원의 분기별 매출·매입·카드값과 순이익을 비교합니다.</p>
+          <p className="text-sm text-muted-foreground">회사별·월별 매출·매입·카드값과 순이익을 조회합니다.</p>
           <p className="mt-1 text-xs text-muted-foreground">프로젝트에 넣은 매출·매입은 자동으로 들어옵니다. 여기에 또 넣으면 두 번 셉니다. 카드값은 매입 합계에서 제외하고 순이익에서만 차감합니다.</p>
+          <p className="mt-1 text-xs text-muted-foreground">조회 날짜 기준: 회사 장부는 발생일, 프로젝트 금액은 금액 등록일(한국시간)입니다. 견적서 작성일·행사일 기준이 아닙니다.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <CompanyFinanceYearNav year={year} currentYear={currentYear} />
+          <CompanyFinanceYearNav filters={filters} currentYear={currentYear} />
           {canEdit && <CompanyFinanceEntryForm defaultDate={defaultDate} />}
         </div>
       </div>
 
+      <CompanyFinanceFilters filters={filters} currentYear={currentYear} />
+      <p className="text-sm font-medium" role="status">{filterLabel} · {displayItems.length}건</p>
+
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <Card className="rounded-[12px] border border-border py-0 shadow-none">
           <CardHeader className="gap-[6px] px-[18px] py-4">
-            <CardDescription className="text-[12px]">전체 매출</CardDescription>
+            <CardDescription className="text-[12px]">조회 매출 합계</CardDescription>
             <CardTitle className="text-[26px] font-bold leading-tight tracking-[-0.01em] tabular-nums text-primary" style={{ fontFamily: "var(--font-plus-jakarta-sans)" }}>{formatWon(totalRevenue)}</CardTitle>
           </CardHeader>
         </Card>
         <Card className="rounded-[12px] border border-border py-0 shadow-none">
           <CardHeader className="gap-[6px] px-[18px] py-4">
-            <CardDescription className="text-[12px]">전체 매입</CardDescription>
+            <CardDescription className="text-[12px]">조회 매입 합계</CardDescription>
             <CardTitle className="text-[26px] font-bold leading-tight tracking-[-0.01em] tabular-nums text-destructive" style={{ fontFamily: "var(--font-plus-jakarta-sans)" }}>{formatWon(totalCost)}</CardTitle>
           </CardHeader>
         </Card>
@@ -172,11 +173,11 @@ export default async function CompanyFinancePage({
             </CardHeader>
             <CardContent className="pt-3">
               <div className="space-y-1">
-                {QUARTERS.map((quarter) => {
+                {visibleQuarters.map((quarter) => {
                   const data = summary.quarters[quarter];
                   return (
                     <div key={quarter} className="grid grid-cols-[4rem_repeat(4,minmax(0,1fr))] items-center gap-1 rounded-md px-2 py-2 text-xs odd:bg-muted/40">
-                      <span className="font-medium text-foreground">{quarter}분기</span>
+                      <span className="font-medium text-foreground">{month === null ? `${quarter}분기` : `${month}월`}</span>
                       <span className="truncate"><span className="text-muted-foreground">매출 </span><span className="tabular-nums text-primary">{formatWon(data.revenue)}</span></span>
                       <span className="truncate"><span className="text-muted-foreground">매입 </span><span className="tabular-nums text-destructive">{formatWon(data.cost)}</span></span>
                       <span className="truncate"><span className="text-muted-foreground">카드 </span><span className="tabular-nums text-amber-700 dark:text-amber-300">{formatWon(data.card)}</span></span>
@@ -188,13 +189,13 @@ export default async function CompanyFinancePage({
               {/* 위 분기 행과 같은 좌우 여백(px-2)을 줘야 왼쪽 글자와 오른쪽 숫자 열이 맞는다.
                   글자 크기도 분기 행(12px)에 맞추고 금액만 굵게 — 줄 하나만 커지면 떠 보인다. */}
               <div className="mt-2 flex items-baseline justify-between border-t border-border px-2 pt-2.5 text-xs">
-                <span className="font-medium text-muted-foreground">연간 합계</span>
+                <span className="font-medium text-muted-foreground">{month === null ? "연간 합계" : `${month}월 합계`}</span>
                 <span className={`text-sm font-bold tabular-nums ${metricClass(summary.profit)}`} style={{ fontFamily: "var(--font-plus-jakarta-sans)" }}>{formatWon(summary.profit)}</span>
               </div>
             </CardContent>
           </Card>
         ))}
-        {unassigned.projectCount > 0 && (
+        {(unassigned.projectCount > 0 || company === "unassigned") && (
           <Card className="shadow-xs">
             <CardHeader className="border-b border-border pb-3">
               <div className="flex items-center justify-between gap-2">
@@ -222,15 +223,15 @@ export default async function CompanyFinancePage({
             <CardHeader className="border-b border-[#f0f0f0] px-4 py-3.5 dark:border-border">
           <div className="flex items-center justify-between gap-2">
             <div>
-              <CardTitle className="text-base">{year}년 등록 내역</CardTitle>
-              <CardDescription className="mt-1">프로젝트와 분리된 회사 매출·매입·카드값 장부입니다.</CardDescription>
+              <CardTitle className="text-base">{filterLabel} 등록 내역</CardTitle>
+              <CardDescription className="mt-1">선택한 조건의 회사 장부와 프로젝트 매출·매입을 함께 표시합니다.</CardDescription>
             </div>
             <Badge variant="outline">{displayItems.length}건</Badge>
           </div>
         </CardHeader>
             <CardContent className="px-4 py-3">
           {displayItems.length === 0 ? (
-            <p className="py-8 text-center text-sm text-muted-foreground">등록된 회사 매출·매입 내역이 없습니다.</p>
+            <p className="py-8 text-center text-sm text-muted-foreground">선택한 회사·기간에 등록된 내역이 없습니다.</p>
           ) : (
             <div className="divide-y divide-border">
               {displayItems.map((item) => {
