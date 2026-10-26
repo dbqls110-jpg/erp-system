@@ -12,8 +12,13 @@ import { ProjectFilter } from "./ProjectFilter";
 import { Calendar, User, FolderOpen, BarChart2 } from "lucide-react";
 import { toneBadgeClass } from "@/lib/badge-tone";
 import { getCalendarViewer } from "@/lib/calendarViewer";
-import { canViewLinkedProjects, projectWhereForViewer } from "@/lib/projectVisibility";
+import { canViewLinkedProjects, projectWhereForViewer, EXTERNAL_PROJECT_SELECT, externalProjectDto } from "@/lib/projectVisibility";
+import { isExternal } from "@/lib/calendarVisibility";
+import { ExternalProjectList } from "@/components/projects/ExternalProjects";
 import { getDisplayedProjectProgress } from "@/lib/projectProgress";
+import { parseProjectFilters, projectFiltersWhere, type ProjectSearchParams, type ProjectListFilters } from "@/lib/projectFilters";
+import { koreanCalendarParts } from "@/lib/dateFormat";
+import { ProjectSearchFilters } from "./ProjectSearchFilters";
 
 const statusConfig: Record<string, { label: string; class: string }> = {
   active: { label: "진행 중", class: toneBadgeClass("blue") },
@@ -24,10 +29,9 @@ const statusConfig: Record<string, { label: string; class: string }> = {
 export default async function ProjectsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string }>;
+  searchParams: Promise<ProjectSearchParams>;
 }) {
-  const { status } = await searchParams;
-  const currentFilter = ["active", "completed", "on_hold"].includes(status ?? "") ? status! : "all";
+  const params = await searchParams;
 
   const session = await getServerSession(authOptions);
   const isAdmin = session?.user?.role === "admin";
@@ -36,12 +40,22 @@ export default async function ProjectsPage({
   if (!linkedExternal) {
     await requireMenuAccess(session!.user.id, "projects", session!.user.role);
   }
+  const external = Boolean(viewer && isExternal(viewer));
+  const parsed = parseProjectFilters(params, koreanCalendarParts(new Date()).year);
+  const filters: ProjectListFilters = { ...parsed, company: external ? "all" : parsed.company };
+  const where = { AND: [projectWhereForViewer(viewer), projectFiltersWhere(filters)] };
+  if (external) {
+    const projects = await prisma.project.findMany({
+      where,
+      select: EXTERNAL_PROJECT_SELECT, orderBy: { createdAt: "desc" },
+    });
+    return <ExternalProjectList projects={projects.map(externalProjectDto)} filter={<ProjectFilter filters={filters} />} controls={<ProjectSearchFilters filters={filters} showCompany={false} />} />;
+  }
   // 외부 연결 계정은 연결된 프로젝트를 읽기 전용으로만 본다.
   const canEdit = linkedExternal ? false : await canEditMenu(session!.user.id, "projects", session!.user.role);
 
-  const whereStatus = currentFilter === "all" ? {} : { status: currentFilter };
   const projects = await prisma.project.findMany({
-      where: { ...whereStatus, AND: [projectWhereForViewer(viewer)] },
+      where,
       include: { _count: { select: { checklistItems: true } } },
       orderBy: { createdAt: "desc" },
     });
@@ -53,7 +67,7 @@ export default async function ProjectsPage({
           <p className="mt-1 text-sm text-muted-foreground">프로젝트 현황과 진행률을 확인하세요</p>
         </div>
         <div className="flex items-center gap-3 flex-wrap">
-          <ProjectFilter current={currentFilter} />
+          <ProjectFilter filters={filters} />
           {!linkedExternal && (
             <Link href="/projects/stats" className="flex h-9 items-center gap-1.5 rounded-[10px] border border-border px-3.5 text-[13px] font-semibold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
               <BarChart2 className="size-3.5" /> 통계
@@ -63,6 +77,9 @@ export default async function ProjectsPage({
         </div>
       </div>
 
+      <ProjectSearchFilters filters={filters} />
+      <p className="text-xs text-muted-foreground" role="status">조회 결과 {projects.length}개</p>
+
       {projects.length === 0 ? (
           <Card className="rounded-[12px] border border-border py-0 shadow-none">
           <CardContent className="px-4">
@@ -71,9 +88,7 @@ export default async function ProjectsPage({
               <p className="text-sm text-muted-foreground">
                 {linkedExternal
                   ? "연결된 파트너·거래처 프로젝트가 없습니다"
-                  : currentFilter === "all"
-                    ? "등록된 프로젝트가 없습니다"
-                    : `${({ active: "진행 중", completed: "완료", on_hold: "보류" } as Record<string, string>)[currentFilter]} 프로젝트가 없습니다`}
+                  : "선택한 조건에 맞는 프로젝트가 없습니다"}
               </p>
               {!linkedExternal && <p className="text-sm text-muted-foreground">새 프로젝트를 추가해 보세요</p>}
             </div>

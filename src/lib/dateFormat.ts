@@ -18,6 +18,8 @@ function kstParts(value: string | Date) {
 
 const pad = (value: number) => String(value).padStart(2, "0");
 
+export const koreanCalendarParts = kstParts;
+
 export function formatKoreanDateTime(value: string | Date) {
   const { year, month, day, hour, minute } = kstParts(value);
   return `${year}.${pad(month)}.${pad(day)} ${pad(hour)}:${pad(minute)}`;

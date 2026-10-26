@@ -4,6 +4,24 @@ import {
   type Viewer,
 } from "@/lib/calendarVisibility";
 
+/** 외부 프로젝트 조회는 허용 목록으로 제한한다. 내부 필드를 읽은 뒤 숨기지 않는다. */
+export const EXTERNAL_PROJECT_SELECT = {
+  id: true, name: true, status: true, progress: true, deadline: true, announceDate: true,
+} as const;
+
+export type ExternalProject = {
+  id: string; name: string; status: string; progress: number;
+  deadline: string | null; announceDate: string | null;
+};
+
+/** ORM 결과가 바뀌거나 과도한 fixture가 주입돼도 외부 DTO에는 허용 필드만 남긴다. */
+export function externalProjectDto(project: ExternalProject): ExternalProject {
+  return {
+    id: project.id, name: project.name, status: project.status, progress: project.progress,
+    deadline: project.deadline, announceDate: project.announceDate,
+  };
+}
+
 /**
  * 프로젝트를 외부 계정에 보여 줄 수 있는 연결 범위가 있는지 판정한다.
  *
