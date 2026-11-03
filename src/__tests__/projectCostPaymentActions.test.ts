@@ -1,12 +1,12 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const m = vi.hoisted(() => ({ session: vi.fn(), access: vi.fn(), transaction: vi.fn(), lock: vi.fn(), advisory: vi.fn(),
-  find: vi.fn(), many: vi.fn(), upsert: vi.fn(), remove: vi.fn(), count: vi.fn(), update: vi.fn(), refresh: vi.fn(), edit: vi.fn() }));
+  find: vi.fn(), many: vi.fn(), upsert: vi.fn(), create: vi.fn(), remove: vi.fn(), count: vi.fn(), update: vi.fn(), refresh: vi.fn(), edit: vi.fn() }));
 vi.mock("next-auth", () => ({ getServerSession: m.session }));
 vi.mock("@/lib/auth", () => ({ authOptions: {} }));
 vi.mock("@/lib/permissions", () => ({ canAccessMenu: m.access, requireMenuEdit: m.edit }));
 vi.mock("next/cache", () => ({ revalidatePath: m.refresh }));
 vi.mock("@/lib/prisma", () => ({ prisma: { $transaction: m.transaction } }));
-import { saveProjectCostPayment, deleteProjectCostPayment, setProjectCostSettled } from "@/app/actions/projectCostPayment";
+import { saveProjectCostPayment, deleteProjectCostPayment, setProjectCostSettled, payProjectCostToday } from "@/app/actions/projectCostPayment";
 import { deleteProjectAmount, updateProjectAmount } from "@/app/actions/projectAmount";
 
 const user = { id: "staff", role: "member", active: true, partnerId: null, customerId: null, venueId: null };
@@ -17,10 +17,11 @@ beforeEach(() => {
   m.lock.mockResolvedValue([{ id: "cost-1" }]); m.find.mockResolvedValue(null); m.many.mockResolvedValue([]);
   m.count.mockResolvedValue(1); m.remove.mockResolvedValue({ count: 1 });
   m.transaction.mockImplementation(callback => callback({ $executeRaw: m.advisory, $queryRaw: m.lock,
-    projectCostPayment: { findUnique: m.find, findMany: m.many, upsert: m.upsert, deleteMany: m.remove, count: m.count },
-    projectAmount: { findUnique: m.find, update: m.update, delete: m.remove },
+    projectCostPayment: { findUnique: m.find, findMany: m.many, upsert: m.upsert, create: m.create, deleteMany: m.remove, count: m.count },
+    projectAmount: { findUnique: m.find, findUniqueOrThrow: m.find, update: m.update, delete: m.remove },
   }));
 });
+afterEach(() => vi.useRealTimers());
 
 describe("지급 기록 저장 액션", () => {
   it("직원이 부분 지급을 저장해도 예정 매입과 매출 날짜는 바꾸지 않는다", async () => {
@@ -60,6 +61,7 @@ describe("지급 기록 저장 액션", () => {
     await expect(saveProjectCostPayment("p", "c", input)).rejects.toThrow();
     await expect(deleteProjectCostPayment("p", "c", "payment-1")).rejects.toThrow();
     await expect(setProjectCostSettled("p", "c", true)).rejects.toThrow();
+    await expect(payProjectCostToday("p", "c")).rejects.toThrow();
     expect(m.transaction).not.toHaveBeenCalled();
   });
   it("프로젝트 열람 권한이 없는 직원도 차단한다", async () => {
@@ -88,5 +90,37 @@ describe("지급 기록 저장 액션", () => {
     await expect(deleteProjectAmount("c", "p")).rejects.toThrow("지급 기록");
     await expect(updateProjectAmount("c", "p", { kind: "revenue", amount: 1000 })).rejects.toThrow("지급 기록");
     expect(m.remove).not.toHaveBeenCalled(); expect(m.update).not.toHaveBeenCalled();
+  });
+});
+
+describe("오늘 지급 완료 자동 기록", () => {
+  it("전액과 서버 한국시간 날짜를 자동 입력한다", async () => {
+    vi.useFakeTimers(); vi.setSystemTime(new Date("2026-11-03T15:01:00.000Z"));
+    m.find.mockResolvedValue({ amount: 930_000, costSettled: false, payments: [] });
+    await expect(payProjectCostToday("p", "c")).resolves.toEqual({ amount: 930_000, paidDate: "2026-11-04" });
+    expect(m.create).toHaveBeenCalledWith({ data: expect.objectContaining({ projectAmountId: "c", amount: 930_000, paidDate: "2026-11-04", createdById: "staff", updatedById: "staff" }) });
+    expect(m.update).toHaveBeenCalledWith({ where: { id: "c" }, data: { costSettled: true } });
+  });
+  it("이미 부분 지급한 금액은 제외한다", async () => {
+    m.find.mockResolvedValue({ amount: 930_000, costSettled: false, payments: [{ amount: 300_000 }] });
+    await payProjectCostToday("p", "c");
+    expect(m.create.mock.calls[0][0].data.amount).toBe(630_000);
+  });
+  it("이미 정산 완료면 재요청에도 지급을 만들거나 날짜를 바꾸지 않는다", async () => {
+    m.find.mockResolvedValue({ amount: 930_000, costSettled: true, payments: [{ amount: 900_000 }] });
+    await expect(payProjectCostToday("p", "c")).resolves.toEqual({ amount: 0, paidDate: null });
+    expect(m.create).not.toHaveBeenCalled(); expect(m.update).not.toHaveBeenCalled();
+  });
+  it("예정액 이상 이미 지급한 경우 추가 기록 없이 정산만 완료한다", async () => {
+    m.find.mockResolvedValue({ amount: 930_000, costSettled: false, payments: [{ amount: 950_000 }] });
+    await payProjectCostToday("p", "c");
+    expect(m.create).not.toHaveBeenCalled(); expect(m.update).toHaveBeenCalled();
+  });
+  it("매입액이 잘못됐거나 프로젝트가 다르면 쓰기 전에 거부한다", async () => {
+    m.find.mockResolvedValue({ amount: 0, costSettled: false, payments: [] });
+    await expect(payProjectCostToday("p", "c")).rejects.toThrow("확인");
+    m.lock.mockResolvedValue([]);
+    await expect(payProjectCostToday("other", "c")).rejects.toThrow("매입 건");
+    expect(m.create).not.toHaveBeenCalled(); expect(m.update).not.toHaveBeenCalled();
   });
 });

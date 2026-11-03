@@ -3,9 +3,11 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@prisma/client";
+import { randomUUID } from "node:crypto";
 import { requireSessionUser } from "@/lib/actionGuards";
 import { canAccessMenu } from "@/lib/permissions";
 import { canManageCostPayments, parseCostPayment, type CostPaymentInput } from "@/lib/projectCostPayments";
+import { currentKoreanDateKey } from "@/lib/dateFormat";
 
 async function requirePaymentStaff() {
   const session = await requireSessionUser();
@@ -27,6 +29,31 @@ function refresh(projectId: string) {
   revalidatePath(`/projects/${projectId}`);
   revalidatePath("/projects");
   revalidatePath("/company-finance");
+}
+
+export async function payProjectCostToday(projectId: string, amountId: string) {
+  const actorId = await requirePaymentStaff();
+  const paidDate = currentKoreanDateKey();
+  const result = await prisma.$transaction(async tx => {
+    await lockCost(tx, projectId, amountId);
+    const item = await tx.projectAmount.findUniqueOrThrow({ where: { id: amountId }, include: { payments: { select: { amount: true } } } });
+    if (item.costSettled) return { amount: 0, paidDate: null };
+    const alreadyPaid = item.payments.reduce((sum, p) => sum + p.amount, 0);
+    if (!Number.isSafeInteger(item.amount) || item.amount <= 0 || !Number.isSafeInteger(alreadyPaid) || alreadyPaid < 0) {
+      throw new Error("예정 매입액과 기존 지급액을 먼저 확인해 주세요.");
+    }
+    const remaining = Math.max(0, item.amount - alreadyPaid);
+    if (remaining > 0) {
+      await tx.projectCostPayment.create({ data: {
+        id: randomUUID(), projectAmountId: amountId, amount: remaining, paidDate,
+        memo: "오늘 지급 완료로 자동 기록", createdById: actorId, updatedById: actorId,
+      } });
+    }
+    await tx.projectAmount.update({ where: { id: amountId }, data: { costSettled: true } });
+    return { amount: remaining, paidDate: remaining > 0 ? paidDate : null };
+  });
+  refresh(projectId);
+  return result;
 }
 
 export async function saveProjectCostPayment(projectId: string, amountId: string, input: CostPaymentInput) {

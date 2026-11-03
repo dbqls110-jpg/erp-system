@@ -10,11 +10,12 @@ vi.mock("@/lib/permissions", () => ({ canAccessMenu: m.access, requireMenuEdit: 
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 
 import { prisma } from "@/lib/prisma";
-import { saveProjectCostPayment, deleteProjectCostPayment, setProjectCostSettled } from "@/app/actions/projectCostPayment";
+import { saveProjectCostPayment, deleteProjectCostPayment, setProjectCostSettled, payProjectCostToday } from "@/app/actions/projectCostPayment";
 import { deleteProjectAmount, updateProjectAmount } from "@/app/actions/projectAmount";
 import { deleteQuoteAmounts, upsertQuoteAmounts } from "@/lib/projectAmounts";
 import { costPaymentMetrics } from "@/lib/projectCostPayments";
 import { EXTERNAL_PROJECT_SELECT, projectWhereForViewer } from "@/lib/projectVisibility";
+import { currentKoreanDateKey } from "@/lib/dateFormat";
 
 const enabled = process.env.ERP_COST_DB_TEST === "1";
 const staff = { id: "fixture-staff", role: "member", active: true, partnerId: null, customerId: null, venueId: null };
@@ -136,6 +137,7 @@ describe.skipIf(!enabled)("실제 PostgreSQL 지급 저장 및 동시성", () =>
   it("외부 계정·다른 프로젝트·매출·잘못된 날짜는 실제 DB를 바꾸지 않는다", async () => {
     m.session.mockResolvedValue({ user: { ...staff, role: "partner", partnerId: "external-1" } });
     await expect(saveProjectCostPayment(projectId, costId, payment("reject-external"))).rejects.toThrow();
+    await expect(payProjectCostToday(projectId, costId)).rejects.toThrow();
     m.session.mockResolvedValue({ user: staff });
     await expect(saveProjectCostPayment(otherProjectId, costId, payment("reject-project"))).rejects.toThrow();
     await expect(saveProjectCostPayment(projectId, revenueId, payment("reject-revenue"))).rejects.toThrow();
@@ -172,5 +174,19 @@ describe.skipIf(!enabled)("실제 PostgreSQL 지급 저장 및 동시성", () =>
       await prisma.$executeRaw`REVOKE USAGE ON SCHEMA public FROM erp_cost_outsider_test`;
       await prisma.$executeRaw`DROP ROLE erp_cost_outsider_test`;
     }
+  });
+
+  it("오늘 지급 완료를 12번 동시에 체크해도 잔액 한 번만 오늘 날짜로 저장한다", async () => {
+    await saveProjectCostPayment(projectId, costId, payment("already-paid", 100_000));
+    const today = currentKoreanDateKey();
+    const results = await Promise.all(Array.from({ length: 12 }, () => payProjectCostToday(projectId, costId)));
+    const row = await prisma.projectAmount.findUniqueOrThrow({ where: { id: costId }, include: { payments: true } });
+    expect(row.amount).toBe(330_000); expect(row.costSettled).toBe(true);
+    expect(row.payments).toHaveLength(2);
+    expect(row.payments.find(p => p.id !== "already-paid")).toMatchObject({ amount: 230_000, paidDate: today, createdById: staff.id });
+    expect(results.filter(r => r.amount > 0)).toHaveLength(1);
+    await setProjectCostSettled(projectId, costId, false);
+    await payProjectCostToday(projectId, costId);
+    expect(await prisma.projectCostPayment.count({ where: { projectAmountId: costId } })).toBe(2);
   });
 });
