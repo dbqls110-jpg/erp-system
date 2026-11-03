@@ -2,7 +2,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { canEditMenu, requireMenuAccess } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,7 +18,10 @@ import Link from "next/link";
 import { calculateNetIncome, calculateOperatingProfit } from "@/lib/financeMetrics";
 import { toneBadgeClass } from "@/lib/badge-tone";
 import { getCalendarViewer } from "@/lib/calendarViewer";
-import { canViewLinkedProjects, projectWhereForViewer } from "@/lib/projectVisibility";
+import { canViewLinkedProjects, projectWhereForViewer, EXTERNAL_PROJECT_SELECT, externalProjectDto } from "@/lib/projectVisibility";
+import { isExternal } from "@/lib/calendarVisibility";
+import { ExternalProjectDetail } from "@/components/projects/ExternalProjects";
+import { canManageCostPayments } from "@/lib/projectCostPayments";
 import { getDisplayedProjectProgress } from "@/lib/projectProgress";
 import { canEditRevenueDates } from "@/lib/revenueDateAccess";
 
@@ -32,9 +35,18 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
   const { id } = await params;
   const session = await getServerSession(authOptions);
   const viewer = await getCalendarViewer();
+  if (!session?.user?.id || !viewer || session.user.active === false) redirect("/login");
   const linkedExternal = canViewLinkedProjects(viewer);
   if (!linkedExternal) {
-    await requireMenuAccess(session!.user.id, "projects", session!.user.role);
+    await requireMenuAccess(session.user.id, "projects", session.user.role);
+  }
+  if (isExternal(viewer)) {
+    const summary = await prisma.project.findUnique({
+      where: { id, AND: [projectWhereForViewer(viewer)] },
+      select: EXTERNAL_PROJECT_SELECT,
+    });
+    if (!summary) notFound();
+    return <ExternalProjectDetail project={externalProjectDto(summary)} />;
   }
   const canEdit = linkedExternal ? false : await canEditMenu(session!.user.id, "projects", session!.user.role);
   const isAdmin = session?.user?.role === "admin";
@@ -45,7 +57,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
       checklistItems: { orderBy: { order: "asc" } },
       files: { orderBy: { createdAt: "desc" } },
       uploadRecoveries: canEdit ? { where: { status: { not: "completed" } }, select: { id: true, name: true, status: true, attempts: true }, orderBy: { createdAt: "desc" }, take: 20 } : false,
-      amounts: { orderBy: [{ kind: "asc" }, { createdAt: "asc" }] },
+      amounts: { orderBy: [{ kind: "asc" }, { createdAt: "asc" }], include: { payments: { orderBy: [{ paidDate: "asc" }, { createdAt: "asc" }], select: { id: true, amount: true, paidDate: true, memo: true } } } },
       customers: { include: { customer: { select: { id: true, name: true } } } },
       partners: { include: { partner: { select: { id: true, name: true } } } },
     },
@@ -95,17 +107,17 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
             )}
             {project.cost != null && (
               <span className="flex items-center gap-1 text-destructive">
-                <TrendingDown size={13} />매입 {project.cost.toLocaleString()}원
+                <TrendingDown size={13} />예정 매입 {project.cost.toLocaleString()}원
               </span>
             )}
             {operatingProfit !== null && (
                 <span className={`flex items-center gap-1 font-medium ${operatingProfit >= 0 ? "text-primary" : "text-destructive"}`}>
-                영업이익 {operatingProfit.toLocaleString()}원
+                예상 영업이익 {operatingProfit.toLocaleString()}원
               </span>
             )}
             {netIncome !== null && (
               <span className={`flex items-center gap-1 font-medium ${netIncome >= 0 ? "text-primary" : "text-destructive"}`}>
-                당기순이익 {netIncome.toLocaleString()}원
+                예상 당기순이익 {netIncome.toLocaleString()}원
               </span>
             )}
           </div>
@@ -139,7 +151,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
           </CardTitle>
         </CardHeader>
         <CardContent className="px-4 py-4">
-          <ProjectAmountsPanel projectId={project.id} amounts={project.amounts} canEdit={canEdit} canEditRevenueDates={canEdit && canEditRevenueDates(session?.user)} />
+          <ProjectAmountsPanel projectId={project.id} amounts={project.amounts} canEdit={canEdit} canEditRevenueDates={canEdit && canEditRevenueDates(session?.user)} canManageCostPayments={canManageCostPayments(session.user)} />
         </CardContent>
       </Card>
 

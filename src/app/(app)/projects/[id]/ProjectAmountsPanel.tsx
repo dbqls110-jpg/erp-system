@@ -29,6 +29,8 @@ import {
 import type { ProjectAmountKind } from "@/lib/projectAmounts";
 import { RevenueDateFields } from "@/components/RevenueDateFields";
 import { resolveRevenueDate, revenueDatesFromForm, type RevenueDates } from "@/lib/revenueDates";
+import { totalCostPayments, type CostPayment } from "@/lib/projectCostPayments";
+import { CostPayments } from "@/components/projects/CostPayments";
 
 interface ProjectAmount extends Partial<RevenueDates> {
   id: string;
@@ -37,6 +39,8 @@ interface ProjectAmount extends Partial<RevenueDates> {
   label: string | null;
   memo: string | null;
   sourceFileName: string | null;
+  costSettled?: boolean;
+  payments?: CostPayment[];
 }
 
 interface Props {
@@ -44,6 +48,7 @@ interface Props {
   amounts: ProjectAmount[];
   canEdit: boolean;
   canEditRevenueDates: boolean;
+  canManageCostPayments?: boolean;
 }
 
 interface Draft extends RevenueDates {
@@ -66,7 +71,7 @@ function subtotal(amounts: ProjectAmount[], kind: ProjectAmountKind): number | n
   return matching.length === 0 ? null : matching.reduce((sum, amount) => sum + amount.amount, 0);
 }
 
-export function ProjectAmountsPanel({ projectId, amounts, canEdit, canEditRevenueDates }: Props) {
+export function ProjectAmountsPanel({ projectId, amounts, canEdit, canEditRevenueDates, canManageCostPayments = false }: Props) {
   const router = useRouter();
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -78,6 +83,7 @@ export function ProjectAmountsPanel({ projectId, amounts, canEdit, canEditRevenu
   const cost = subtotal(amounts, "cost");
   const operatingProfit = calculateOperatingProfit(revenue, cost);
   const netIncome = calculateNetIncome(revenue, cost);
+  const costs = totalCostPayments(amounts.filter(item => item.kind === "cost"));
 
   const openCreate = (kind: ProjectAmountKind) => {
     setEditingId(null);
@@ -161,9 +167,11 @@ export function ProjectAmountsPanel({ projectId, amounts, canEdit, canEditRevenu
           onCreate={openCreate}
           onEdit={openEdit}
           onDelete={setDeleteTarget}
+          projectId={projectId}
+          canManageCostPayments={false}
         />
         <AmountSection
-          title="매입"
+          title="예정 매입"
           kind="cost"
           amounts={amounts}
           total={cost}
@@ -172,15 +180,21 @@ export function ProjectAmountsPanel({ projectId, amounts, canEdit, canEditRevenu
           onCreate={openCreate}
           onEdit={openEdit}
           onDelete={setDeleteTarget}
+          projectId={projectId}
+          canManageCostPayments={canManageCostPayments}
         />
       </div>
 
       <div className="grid gap-3 rounded-[10px] bg-[#f5f6f8] px-3 py-3 sm:grid-cols-3 dark:bg-muted/40">
-        <Metric label="영업이익" value={operatingProfit} />
-        <Metric label="당기순이익" value={netIncome} />
+        <Metric label="예정 매입 합계" value={cost} />
+        <Metric label="실제 지급 합계" value={costs.paid} />
+        <Metric label="미지급 잔액" value={costs.remaining} />
+        <Metric label="예상 영업이익" value={operatingProfit} />
+        <Metric label="예상 당기순이익" value={netIncome} />
+        <Metric label="실제 지출 기준 차액" value={calculateOperatingProfit(revenue, costs.paid)} />
         <div className="rounded-[9px] px-3 py-2.5 text-[11.5px] text-muted-foreground">
           <p>집계 기준</p>
-          <p className="mt-1 font-medium text-foreground">매출 합계 − 매입 합계</p>
+          <p className="mt-1 font-medium text-foreground">예상 이익: 매출 − 예정 매입. 지출 기준 차액: 매출 − 실제 지급 (미지급 비용·매출 미수금 미반영, 확정 이익 아님).</p>
         </div>
       </div>
 
@@ -278,6 +292,8 @@ function AmountSection({
   onCreate,
   onEdit,
   onDelete,
+  projectId,
+  canManageCostPayments,
 }: {
   title: string;
   kind: ProjectAmountKind;
@@ -288,6 +304,8 @@ function AmountSection({
   onCreate: (kind: ProjectAmountKind) => void;
   onEdit: (amount: ProjectAmount) => void;
   onDelete: (amount: ProjectAmount) => void;
+  projectId: string;
+  canManageCostPayments: boolean;
 }) {
   const items = amounts.filter((amount) => amount.kind === kind);
 
@@ -332,6 +350,7 @@ function AmountSection({
                   </div>
                 )}
               </div>
+              {kind === "cost" && <CostPayments projectId={projectId} item={amount} canManage={canManageCostPayments} />}
             </article>
           ))}
         </div>
@@ -341,7 +360,7 @@ function AmountSection({
 }
 
 function Metric({ label, value }: { label: string; value: number | null }) {
-  const isNetIncome = label === "당기순이익";
+  const isNetIncome = label === "예상 당기순이익";
   return (
     <div className="rounded-[9px] px-3 py-2.5">
       <p className="text-[11.5px] text-muted-foreground">{label}</p>

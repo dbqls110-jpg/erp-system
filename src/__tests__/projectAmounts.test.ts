@@ -14,6 +14,7 @@ interface StoredAmount {
   invoiceDate?: string | null;
   paidDate?: string | null;
   expectedPaymentDate?: string | null;
+  payments?: Array<{ id: string }>;
 }
 
 function makeDb(initial: StoredAmount[]) {
@@ -24,7 +25,7 @@ function makeDb(initial: StoredAmount[]) {
     findFirst: vi.fn(async ({ where }: { where: { projectId: string; kind: string; sourceFileName: string; label?: string } }) =>
       rows.find((row) => row.projectId === where.projectId && row.kind === where.kind && row.sourceFileName === where.sourceFileName && (where.label === undefined || row.label === where.label)) ?? null),
     deleteMany: vi.fn(async ({ where }: { where: { projectId: string; kind?: string; sourceFileName: string; label?: string } }) => {
-      const retained = rows.filter((row) => !(row.projectId === where.projectId && row.sourceFileName === where.sourceFileName && (where.kind === undefined || row.kind === where.kind) && (where.label === undefined || row.label === where.label)));
+      const retained = rows.filter((row) => row.payments?.length || !(row.projectId === where.projectId && row.sourceFileName === where.sourceFileName && (where.kind === undefined || row.kind === where.kind) && (where.label === undefined || row.label === where.label)));
       const count = rows.length - retained.length;
       rows.splice(0, rows.length, ...retained);
       return { count };
@@ -137,5 +138,16 @@ describe("프로젝트 매출·매입 건 집계", () => {
 
   it("당기순이익은 영업이익의 79%를 원 미만 버림으로 계산한다", () => {
     expect(calculateNetIncome(1_700, 300)).toBe(1_106);
+  });
+
+  it("견적서 삭제 또는 매입 없는 재분석이 실제 지급 기록을 지우지 않는다", async () => {
+    const original = { id: "cost-paid", projectId: "p1", kind: "cost", amount: 1000, label: "견적서", sourceFileName: "견적서.xlsx", payments: [{ id: "payment-1" }] };
+    const mock = makeDb([original]);
+    await deleteQuoteAmounts("p1", "견적서.xlsx", mock.db as never);
+    expect(mock.db.projectAmount.deleteMany).toHaveBeenLastCalledWith({ where: { projectId: "p1", sourceFileName: "견적서.xlsx", label: "견적서", payments: { none: {} } } });
+    await upsertQuoteAmounts("p1", "견적서.xlsx", { revenue: null, cost: null }, mock.db as never);
+    expect(mock.rows).toEqual([original]);
+    await upsertQuoteAmounts("p1", "견적서.xlsx", { revenue: null, cost: 1200 }, mock.db as never);
+    expect(mock.rows).toEqual([{ ...original, amount: 1200 }]);
   });
 });

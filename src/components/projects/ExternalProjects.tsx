@@ -18,6 +18,10 @@ function ProjectSummary({ project }: { project: ExternalProject }) {
   </Card>;
 }
 
+export function ExternalProjectDetail({ project }: { project: ExternalProject }) {
+  return <div className="space-y-4"><Link href="/projects" className="text-sm text-muted-foreground">프로젝트 목록</Link><ProjectSummary project={project} /></div>;
+}
+
 export function ExternalProjectList({ projects, filter, controls }: { projects: ExternalProject[]; filter: React.ReactNode; controls?: React.ReactNode }) {
   return <div className="space-y-4">
     <div className="flex flex-wrap items-center justify-between gap-3"><p>참여 중인 프로젝트 현황</p>{filter}</div>

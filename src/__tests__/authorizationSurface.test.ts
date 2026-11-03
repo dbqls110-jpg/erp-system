@@ -35,7 +35,8 @@ describe("메뉴 권한 진입점", () => {
 
   it("프로젝트 상세 권한 검사는 프로젝트 조회보다 앞에 있다", () => {
     const source = read("src/app/(app)/projects/[id]/page.tsx");
-    expect(source.indexOf('requireMenuAccess(session!.user.id, "projects"')).toBeLessThan(
+    expect(source.indexOf('requireMenuAccess(session.user.id, "projects"')).toBeGreaterThan(-1);
+    expect(source.indexOf('requireMenuAccess(session.user.id, "projects"')).toBeLessThan(
       source.indexOf("prisma.project.findUnique"),
     );
   });

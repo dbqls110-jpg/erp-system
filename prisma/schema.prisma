@@ -221,11 +221,30 @@ model ProjectAmount {
   paidDate            String? // YYYY-MM-DD, 실제 입금일 (최우선 집계 기준)
   expectedPaymentDate String? // YYYY-MM-DD, 입금 예정일
 
+  costSettled Boolean @default(false)
+  payments ProjectCostPayment[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([projectId, kind])
   @@map("project_amounts")
+}
+
+model ProjectCostPayment {
+  id String @id
+  projectAmountId String
+  projectAmount ProjectAmount @relation(fields: [projectAmountId], references: [id], onDelete: Restrict)
+  amount Float
+  paidDate String
+  memo String?
+  createdById String
+  updatedById String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([projectAmountId, paidDate])
+  @@map("project_cost_payments")
 }
 
 model ProjectFile {

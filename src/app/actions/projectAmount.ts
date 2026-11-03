@@ -66,6 +66,7 @@ export async function createProjectAmount(projectId: string, input: ProjectAmoun
   const data = normalizeInput(input);
 
   const amount = await prisma.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${projectId}))`;
     const project = await tx.project.findUnique({ where: { id: projectId }, select: { id: true } });
     if (!project) throw new Error("프로젝트를 찾을 수 없습니다.");
 
@@ -88,11 +89,13 @@ export async function updateProjectAmount(
   const data = normalizeInput(input);
 
   const amount = await prisma.$transaction(async (tx) => {
-    const existing = await tx.projectAmount.findUnique({ where: { id: amountId } });
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${projectId}))`;
+    const existing = await tx.projectAmount.findUnique({ where: { id: amountId }, include: { payments: { select: { id: true }, take: 1 } } });
     if (!existing || existing.projectId !== projectId) {
       throw new Error("매출·매입 건을 찾을 수 없습니다.");
     }
 
+    if (existing.payments?.length && data.kind !== "cost") throw new Error("지급 기록이 있는 매입은 매출로 바꿀 수 없습니다.");
     const updated = await tx.projectAmount.update({ where: { id: amountId }, data });
     await recalculateProjectTotals(projectId, tx);
     return updated;
@@ -106,11 +109,13 @@ export async function deleteProjectAmount(amountId: string, projectId: string) {
   await requireEditAccess("projects");
 
   await prisma.$transaction(async (tx) => {
-    const existing = await tx.projectAmount.findUnique({ where: { id: amountId } });
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${projectId}))`;
+    const existing = await tx.projectAmount.findUnique({ where: { id: amountId }, include: { payments: { select: { id: true }, take: 1 } } });
     if (!existing || existing.projectId !== projectId) {
       throw new Error("매출·매입 건을 찾을 수 없습니다.");
     }
 
+    if (existing.payments?.length) throw new Error("지급 기록이 있는 매입은 삭제할 수 없습니다. 지급 기록을 먼저 확인해 주세요.");
     await tx.projectAmount.delete({ where: { id: amountId } });
     await recalculateProjectTotals(projectId, tx);
   });

@@ -52,7 +52,7 @@ export async function upsertQuoteAmounts(
   for (const { kind, amount } of values) {
     if (amount === null) {
       const deleted = await db.projectAmount.deleteMany({
-        where: { projectId, kind, sourceFileName, label: "견적서" },
+        where: { projectId, kind, sourceFileName, label: "견적서", payments: { none: {} } },
       });
       changed ||= deleted.count > 0;
       continue;
@@ -87,7 +87,7 @@ export async function deleteQuoteAmounts(
   db: ProjectAmountDb = prisma,
 ) {
   const deleted = await db.projectAmount.deleteMany({
-    where: { projectId, sourceFileName, label: "견적서" },
+    where: { projectId, sourceFileName, label: "견적서", payments: { none: {} } },
   });
 
   return deleted.count > 0 ? recalculateProjectTotals(projectId, db) : null;
@@ -107,7 +107,7 @@ export async function setDefaultProjectAmount(
   });
 
   if (amount === null) {
-    if (existing) await db.projectAmount.delete({ where: { id: existing.id } });
+    if (existing) await db.projectAmount.deleteMany({ where: { id: existing.id, payments: { none: {} } } });
   } else if (existing) {
     await db.projectAmount.update({ where: { id: existing.id }, data: { amount } });
   } else {

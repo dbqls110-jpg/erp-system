@@ -95,7 +95,7 @@ describe("매출 날짜 저장", () => {
     m.session.mockResolvedValue({ user: { id: "staff", email: "staff@example.com", role: "staff", active: true } });
     const existing = { id: "amount-1", projectId: "project-1", kind: "revenue", amount: 1000, paidDate: "2026-11-03", invoiceDate: "2026-10-31", expectedPaymentDate: "2026-10-30" };
     const update = vi.fn().mockResolvedValue(existing);
-    const tx = { projectAmount: { findUnique: vi.fn().mockResolvedValue(existing), update, findMany: vi.fn().mockResolvedValue([{ kind: "revenue", amount: 2000 }]) }, project: { update: vi.fn() } };
+    const tx = { $executeRaw: vi.fn(), projectAmount: { findUnique: vi.fn().mockResolvedValue(existing), update, findMany: vi.fn().mockResolvedValue([{ kind: "revenue", amount: 2000 }]) }, project: { update: vi.fn() } };
     m.transaction.mockImplementation(async callback => callback(tx));
     await updateProjectAmount("amount-1", "project-1", { kind: "revenue", amount: 2000 });
     const data = update.mock.calls[0][0].data;
