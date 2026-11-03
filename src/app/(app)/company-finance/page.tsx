@@ -18,6 +18,8 @@ import { CompanyFinanceEntryForm } from "./CompanyFinanceEntryForm";
 import { CompanyFinanceEntryDeleteButton } from "./CompanyFinanceEntryDeleteButton";
 import { currentKoreanDateKey, koreanDateKey } from "@/lib/dateFormat";
 import { toneBadgeClass } from "@/lib/badge-tone";
+import { resolveRevenueDate } from "@/lib/revenueDates";
+import { RevenueDatesButton } from "@/components/RevenueDatesButton";
 
 function formatWon(value: number) {
   return `${value.toLocaleString()}원`;
@@ -42,12 +44,13 @@ export default async function CompanyFinancePage({
   const filterLabel = companyFinanceFilterLabel(filters);
   // 조회 필터는 권한이 아니다. 재무 권한을 먼저 확인한 뒤 두 장부를 병렬 조회한다.
   await requireMenuAccess(session!.user.id, "companyFinance", session!.user.role);
-  const [canEdit, entries, projectAmounts] = await Promise.all([
+  const [canEdit, canEditProjects, entries, projectAmounts] = await Promise.all([
     canEditMenu(session!.user.id, "companyFinance", session!.user.role),
+    canEditMenu(session!.user.id, "projects", session!.user.role),
     prisma.companyFinanceEntry.findMany({
       where: where.entries,
       orderBy: [{ date: "desc" }, { createdAt: "desc" }],
-      select: { id: true, company: true, type: true, date: true, title: true, amount: true, memo: true },
+      select: { id: true, company: true, type: true, date: true, title: true, amount: true, memo: true, paidDate: true, invoiceDate: true, expectedPaymentDate: true },
     }),
     prisma.projectAmount.findMany({
       where: where.projectAmounts,
@@ -60,11 +63,12 @@ export default async function CompanyFinancePage({
         label: true,
         memo: true,
         createdAt: true,
+        paidDate: true, invoiceDate: true, expectedPaymentDate: true,
         project: { select: { name: true, company: true } },
       },
     }),
   ]);
-  const displayItems = [
+  const allItems = [
     ...entries
       .filter((entry) => entry.type === "revenue" || entry.type === "cost" || entry.type === "card")
       .map((entry) => ({
@@ -73,7 +77,9 @@ export default async function CompanyFinancePage({
         company: entry.company,
         type: entry.type,
         amount: entry.amount,
-        dateKey: entry.date,
+        dateKey: entry.type === "revenue" ? resolveRevenueDate(entry, entry.date).date : entry.date,
+        dateLabel: entry.type === "revenue" ? resolveRevenueDate(entry, entry.date).label : "발생일",
+        paidDate: entry.paidDate, invoiceDate: entry.invoiceDate, expectedPaymentDate: entry.expectedPaymentDate,
         title: entry.title,
         memo: entry.memo,
       })),
@@ -87,11 +93,16 @@ export default async function CompanyFinancePage({
         company: amount.project.company,
         type: amount.kind,
         amount: amount.amount,
-        dateKey: koreanDateKey(amount.createdAt),
+        dateKey: amount.kind === "revenue" ? resolveRevenueDate(amount).date : koreanDateKey(amount.createdAt),
+        dateLabel: amount.kind === "revenue" ? resolveRevenueDate(amount).label : "금액 등록일",
+        paidDate: amount.paidDate, invoiceDate: amount.invoiceDate, expectedPaymentDate: amount.expectedPaymentDate,
         title: amount.label,
         memo: amount.memo,
       })),
-  ].sort((a, b) => b.dateKey.localeCompare(a.dateKey));
+  ];
+  const undatedItems = allItems.filter(item => !item.dateKey);
+  const displayItems = allItems.flatMap(item => item.dateKey && item.dateKey.startsWith(`${year}-${month === null ? "" : `${String(month).padStart(2, "0")}-`}`)
+    ? [{ ...item, dateKey: item.dateKey }] : []).sort((a, b) => b.dateKey.localeCompare(a.dateKey));
   // 카드 합계와 상세 내역이 서로 다른 자료를 집계하지 않도록 같은 목록에서 계산한다.
   const summaryRecords: CompanyFinanceRecord[] = displayItems.map((item) => ({
     company: item.company,
@@ -116,7 +127,7 @@ export default async function CompanyFinancePage({
         <div className="min-w-0">
           <p className="text-sm text-muted-foreground">회사별·월별 매출·매입·카드값과 순이익을 조회합니다.</p>
           <p className="mt-1 text-xs text-muted-foreground">프로젝트에 넣은 매출·매입은 자동으로 들어옵니다. 여기에 또 넣으면 두 번 셉니다. 카드값은 매입 합계에서 제외하고 순이익에서만 차감합니다.</p>
-          <p className="mt-1 text-xs text-muted-foreground">조회 날짜 기준: 회사 장부는 발생일, 프로젝트 금액은 금액 등록일(한국시간)입니다. 견적서 작성일·행사일 기준이 아닙니다.</p>
+          <p className="mt-1 text-xs text-muted-foreground">조회 날짜 기준: 매출은 실제 입금일 → 계산서 발행일 → 입금 예정일 순입니다. 기존 회사 장부의 발생일은 날짜 수정 전까지 보존합니다. 매입·카드값의 기존 기준은 유지합니다.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <CompanyFinanceYearNav filters={filters} currentYear={currentYear} />
@@ -125,6 +136,13 @@ export default async function CompanyFinancePage({
       </div>
 
       <CompanyFinanceFilters filters={filters} currentYear={currentYear} />
+      {undatedItems.length > 0 && <Card className="border-amber-200">
+        <CardHeader><CardTitle>매출 날짜 미정 · {undatedItems.length}건</CardTitle><CardDescription>작성일로 임의 집계하지 않습니다. 아래 금액은 월별·분기별·연간 합계에서 제외됩니다. 날짜 미정 내역은 선택한 회사 기준으로 모든 기간에 표시됩니다.</CardDescription></CardHeader>
+        <CardContent className="space-y-3">{undatedItems.map(item => <div key={`${item.source}-${item.id}`} className="flex flex-wrap items-center justify-between gap-2">
+          <div><p className="text-sm">{item.source === "project" ? <Link href={`/projects/${item.projectId}`}>{item.projectName}</Link> : item.title} · {item.company ?? "미배정"}</p><p className="text-sm font-semibold">{formatWon(item.amount)}</p></div>
+          {(item.source === "entry" ? canEdit : canEditProjects) && <RevenueDatesButton source={item.source} id={item.id} dates={item} />}
+        </div>)}</CardContent>
+      </Card>}
       <p className="text-sm font-medium" role="status">{filterLabel} · {displayItems.length}건</p>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -256,10 +274,11 @@ export default async function CompanyFinancePage({
                           <span className="truncate text-sm font-medium text-foreground">{item.title}</span>
                         )}
                       </div>
-                      <p className="mt-1 truncate text-xs text-muted-foreground">{item.dateKey}{item.memo ? ` · ${item.memo}` : ""}</p>
+                      <p className="mt-1 truncate text-xs text-muted-foreground">{item.dateLabel} · {item.dateKey}{item.memo ? ` · ${item.memo}` : ""}</p>
                     </div>
                     <div className="flex items-center gap-2">
                       <span className={`font-semibold tabular-nums ${isRevenue ? "text-primary" : "text-destructive"}`}>{formatWon(item.amount)}</span>
+                      {isRevenue && (item.source === "entry" ? canEdit : canEditProjects) && <RevenueDatesButton source={item.source} id={item.id} dates={item} />}
                       {canEdit && item.source === "entry" && <CompanyFinanceEntryDeleteButton id={item.id} title={item.title} />}
                     </div>
                   </div>

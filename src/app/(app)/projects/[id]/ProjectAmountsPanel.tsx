@@ -27,8 +27,10 @@ import {
   calculateOperatingProfit,
 } from "@/lib/financeMetrics";
 import type { ProjectAmountKind } from "@/lib/projectAmounts";
+import { RevenueDateFields } from "@/components/RevenueDateFields";
+import { resolveRevenueDate, revenueDatesFromForm, type RevenueDates } from "@/lib/revenueDates";
 
-interface ProjectAmount {
+interface ProjectAmount extends Partial<RevenueDates> {
   id: string;
   kind: string;
   amount: number;
@@ -43,7 +45,7 @@ interface Props {
   canEdit: boolean;
 }
 
-interface Draft {
+interface Draft extends RevenueDates {
   kind: ProjectAmountKind;
   amount: string;
   label: string;
@@ -51,7 +53,7 @@ interface Draft {
 }
 
 function emptyDraft(kind: ProjectAmountKind = "revenue"): Draft {
-  return { kind, amount: "", label: "", memo: "" };
+  return { kind, amount: "", label: "", memo: "", paidDate: null, invoiceDate: null, expectedPaymentDate: null };
 }
 
 function formatAmount(value: number | null): string {
@@ -90,6 +92,9 @@ export function ProjectAmountsPanel({ projectId, amounts, canEdit }: Props) {
       amount: String(amount.amount),
       label: amount.label ?? "",
       memo: amount.memo ?? "",
+      paidDate: amount.paidDate ?? null,
+      invoiceDate: amount.invoiceDate ?? null,
+      expectedPaymentDate: amount.expectedPaymentDate ?? null,
     });
     setEditorOpen(true);
   };
@@ -101,11 +106,15 @@ export function ProjectAmountsPanel({ projectId, amounts, canEdit }: Props) {
       return;
     }
 
+    let dates: Partial<RevenueDates> = {};
+    try { if (draft.kind === "revenue") dates = revenueDatesFromForm(new FormData(event.currentTarget)); }
+    catch (error) { toast.error(error instanceof Error ? error.message : "날짜를 확인해 주세요."); return; }
     const input: ProjectAmountInput = {
       kind: draft.kind,
       amount: Number(draft.amount.replace(/,/g, "")),
       label: draft.label,
       memo: draft.memo,
+      ...dates,
     };
     startTransition(async () => {
       try {
@@ -219,6 +228,7 @@ export function ProjectAmountsPanel({ projectId, amounts, canEdit }: Props) {
                 disabled={isPending}
               />
             </div>
+            {draft.kind === "revenue" && <RevenueDateFields key={editingId ?? "new"} prefix="project-amount" dates={draft} disabled={isPending} />}
             <div className="space-y-1.5">
               <Label htmlFor="project-amount-memo">비고</Label>
               <Textarea
@@ -303,6 +313,7 @@ function AmountSection({
               <div className="flex items-start gap-3">
                 <div className="min-w-0 flex-1">
                   {amount.label && <p className="break-words text-[13px] font-medium text-foreground">{amount.label}</p>}
+                  {amount.kind === "revenue" && <p className="text-xs text-muted-foreground">{resolveRevenueDate(amount).label}{resolveRevenueDate(amount).date ? ` · ${resolveRevenueDate(amount).date}` : " · 월별 합계 미포함"}</p>}
                   <p className="mt-0.5 text-[15px] font-semibold tabular-nums text-foreground" style={{ fontFamily: "var(--font-plus-jakarta-sans)" }}>{formatAmount(amount.amount)}</p>
                   {amount.memo && <p className="mt-2 whitespace-pre-wrap break-words text-[11.5px] leading-5 text-muted-foreground">{amount.memo}</p>}
                   {amount.sourceFileName && (

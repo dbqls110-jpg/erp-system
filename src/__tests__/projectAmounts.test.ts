@@ -11,6 +11,9 @@ interface StoredAmount {
   amount: number;
   label: string | null;
   sourceFileName: string | null;
+  invoiceDate?: string | null;
+  paidDate?: string | null;
+  expectedPaymentDate?: string | null;
 }
 
 function makeDb(initial: StoredAmount[]) {
@@ -83,6 +86,17 @@ describe("프로젝트 매출·매입 건 집계", () => {
       expect.objectContaining({ kind: "revenue", amount: 12_000, label: "견적서", sourceFileName: "견적서.pdf" }),
       expect.objectContaining({ kind: "cost", amount: 7_000, label: "견적서", sourceFileName: "견적서.pdf" }),
     ]));
+  });
+
+  it("견적서 금액을 재분석해도 직접 지정한 매출 날짜를 유지한다", async () => {
+    const dates = { invoiceDate: "2026-10-20", paidDate: "2026-11-03", expectedPaymentDate: "2026-10-31" };
+    const mock = makeDb([
+      { id: "quote-revenue", projectId: "p1", kind: "revenue", amount: 10_000, label: "견적서", sourceFileName: "견적서.pdf", ...dates },
+    ]);
+    await upsertQuoteAmounts("p1", "견적서.pdf", { revenue: 12_000, cost: null }, mock.db as never);
+    expect(mock.rows).toEqual([
+      expect.objectContaining({ id: "quote-revenue", amount: 12_000, ...dates }),
+    ]);
   });
 
   it("수정한 견적서에 한쪽 금액만 있으면 빠진 기존 금액을 제거하고 합계를 갱신한다", async () => {

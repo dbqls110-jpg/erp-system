@@ -12,6 +12,7 @@ vi.mock("@/lib/prisma", () => ({ prisma: { companyFinanceEntry: { findMany: mock
 vi.mock("@/lib/dateFormat", async (original) => ({ ...await original<typeof import("@/lib/dateFormat")>(), currentKoreanDateKey: () => "2026-10-23" }));
 vi.mock("@/app/(app)/company-finance/CompanyFinanceEntryForm", () => ({ CompanyFinanceEntryForm: () => null }));
 vi.mock("@/app/(app)/company-finance/CompanyFinanceEntryDeleteButton", () => ({ CompanyFinanceEntryDeleteButton: () => null }));
+vi.mock("@/components/RevenueDatesButton", () => ({ RevenueDatesButton: () => null }));
 vi.mock("next/form", () => ({ default: ({ children, action, className, ...props }: ComponentProps<"form"> & { prefetch?: boolean; scroll?: boolean }) =>
   createElement("form", { action, className, "aria-label": props["aria-label"] }, children),
 }));
@@ -35,14 +36,12 @@ describe("회사 재무 필터 페이지", () => {
       { id: "c", company: "인포피아", type: "card", amount: 20000, date: "2026-09-05", title: "카드 사용", memo: null },
     ]);
     mocks.amounts.mockResolvedValue([
-      { id: "p1", projectId: "p", kind: "revenue", amount: 51000, label: "견적", memo: null, createdAt: new Date("2026-08-31T15:00:00Z"), project: { name: "테스트 프로젝트", company: "인포피아" } },
+      { id: "p1", projectId: "p", kind: "revenue", amount: 51000, label: "견적", memo: null, invoiceDate: "2026-09-01", createdAt: new Date("2026-08-31T15:00:00Z"), project: { name: "테스트 프로젝트", company: "인포피아" } },
       { id: "p2", projectId: "p", kind: "cost", amount: 50000, label: "견적 매입", memo: null, createdAt: new Date("2026-09-02T00:00:00Z"), project: { name: "테스트 프로젝트", company: "인포피아" } },
     ]);
     const html = renderToStaticMarkup(await Page({ searchParams: Promise.resolve({ year: "2026", month: "9", company: "인포피아" }) }));
-    expect(mocks.entries.mock.calls[0][0].where).toEqual({ company: "인포피아", date: { gte: "2026-09-01", lt: "2026-10-01" } });
-    expect(mocks.amounts.mock.calls[0][0].where).toEqual({ project: { company: "인포피아" }, createdAt: {
-      gte: new Date("2026-08-31T15:00:00Z"), lt: new Date("2026-09-30T15:00:00Z"),
-    } });
+    expect(mocks.entries.mock.calls[0][0].where).toMatchObject({ company: "인포피아", OR: expect.any(Array) });
+    expect(mocks.amounts.mock.calls[0][0].where).toMatchObject({ project: { company: "인포피아" }, OR: expect.any(Array) });
     expect(html).toContain("인포피아 · 2026년 9월 · 4건");
     for (const value of ["251,000원", "50,000원", "20,000원", "181,000원", "9월 합계", "2026-09-01"]) expect(html).toContain(value);
     expect(html).not.toContain("1분기");
@@ -67,6 +66,24 @@ describe("회사 재무 필터 페이지", () => {
     await expect(Page({ searchParams: Promise.resolve({ company: "인포피아", month: "10" }) })).rejects.toThrow("forbidden");
     expect(mocks.entries).not.toHaveBeenCalled();
     expect(mocks.amounts).not.toHaveBeenCalled();
+  });
+
+  it("등록월이 아니라 실제 입금월에만 매출을 포함한다", async () => {
+    mocks.amounts.mockResolvedValue([{ id: "r1", projectId: "p", kind: "revenue", amount: 1000, label: "매출", memo: null,
+      createdAt: new Date("2026-09-01T00:00:00Z"), expectedPaymentDate: "2026-10-20", invoiceDate: "2026-10-30", paidDate: "2026-11-02", project: { name: "이동 확인", company: "인포피아" } }]);
+    const october = renderToStaticMarkup(await Page({ searchParams: Promise.resolve({ year: "2026", month: "10" }) }));
+    const november = renderToStaticMarkup(await Page({ searchParams: Promise.resolve({ year: "2026", month: "11" }) }));
+    expect(october).toContain("2026년 10월 · 0건"); expect(october).not.toContain("이동 확인");
+    expect(november).toContain("2026년 11월 · 1건"); expect(november).toContain("실제 입금일 · 2026-11-02");
+    expect(november.replace(/<[^>]+>/g, "").replace(/\s+/g, "")).toContain("조회매출합계1,000원");
+  });
+
+  it("날짜 없는 프로젝트 매출은 별도 목록에 남기되 기간 합계에서 제외한다", async () => {
+    mocks.amounts.mockResolvedValue([{ id: "r1", projectId: "p", kind: "revenue", amount: 1000, label: "매출", memo: null,
+      createdAt: new Date("2026-10-01T00:00:00Z"), paidDate: null, invoiceDate: null, expectedPaymentDate: null, project: { name: "날짜 없는 매출", company: "인포피아" } }]);
+    const html = renderToStaticMarkup(await Page({ searchParams: Promise.resolve({ year: "2026", month: "10" }) }));
+    expect(html).toContain("매출 날짜 미정"); expect(html).toContain("날짜 없는 매출"); expect(html).toContain("2026년 10월 · 0건");
+    expect(html.replace(/<[^>]+>/g, "").replace(/\s+/g, "")).toContain("조회매출합계0원");
   });
 
   it("연도 이동은 회사·월을 보존하고 허용 연도 범위를 넘지 않는다", () => {

@@ -6,6 +6,8 @@ import { requireMenuEdit } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import { normalizeCompany, type CompanyFinanceEntryType } from "@/lib/companyFinance";
 import { revalidatePath } from "next/cache";
+import { revenueDatesFromForm } from "@/lib/revenueDates";
+import { requireEditAccess } from "@/lib/actionGuards";
 
 function readText(formData: FormData, field: string, label: string) {
   const value = formData.get(field);
@@ -38,18 +40,18 @@ function readType(formData: FormData): CompanyFinanceEntryType {
 }
 
 export async function addCompanyFinanceEntry(formData: FormData) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id) throw new Error("로그인이 필요합니다.");
-  await requireMenuEdit(session.user.id, "companyFinance", session.user.role);
+  const session = await requireEditAccess("companyFinance");
 
   const company = normalizeCompany(readText(formData, "company", "회사"));
   if (!company) throw new Error("회사 목록에서 선택해 주세요.");
 
+  const type = readType(formData);
   await prisma.companyFinanceEntry.create({
     data: {
       company,
-      type: readType(formData),
-      date: readDate(formData),
+      type,
+      date: type === "revenue" ? "" : readDate(formData),
+      ...(type === "revenue" ? revenueDatesFromForm(formData) : {}),
       title: readText(formData, "title", "항목명"),
       amount: readAmount(formData),
       memo: (formData.get("memo") as string | null)?.trim() || null,

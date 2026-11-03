@@ -24,17 +24,22 @@ describe("회사 재무 조회 필터", () => {
 
   it("두 장부에 같은 회사·월의 조건을 적용한다", () => {
     const where = companyFinanceWhere({ year: 2026, month: 9, company: "노바웨이" });
-    expect(where.entries).toEqual({ company: "노바웨이", date: { gte: "2026-09-01", lt: "2026-10-01" } });
-    expect(where.projectAmounts).toEqual({
+    expect(where.entries).toMatchObject({ company: "노바웨이", OR: [{ type: { not: "revenue" }, date: { gte: "2026-09-01", lt: "2026-10-01" } }, { type: "revenue" }] });
+    expect(where.projectAmounts).toMatchObject({
       project: { company: "노바웨이" },
-      createdAt: { gte: new Date("2026-08-31T15:00:00Z"), lt: new Date("2026-09-30T15:00:00Z") },
+      OR: [{ kind: "revenue", OR: [
+        { paidDate: { gte: "2026-09-01", lt: "2026-10-01" } },
+        { paidDate: null, invoiceDate: { gte: "2026-09-01", lt: "2026-10-01" } },
+        { paidDate: null, invoiceDate: null, expectedPaymentDate: { gte: "2026-09-01", lt: "2026-10-01" } },
+        { paidDate: null, invoiceDate: null, expectedPaymentDate: null },
+      ] }, { kind: { not: "revenue" }, createdAt: { gte: new Date("2026-08-31T15:00:00Z"), lt: new Date("2026-09-30T15:00:00Z") } }],
     });
   });
 
   it("윤년 2월·12월·전체 연도의 끝은 다음 기간 시작으로 계산한다", () => {
-    expect(companyFinanceWhere({ year: 2024, month: 2, company: "all" }).entries.date).toEqual({ gte: "2024-02-01", lt: "2024-03-01" });
-    expect(companyFinanceWhere({ year: 2026, month: 12, company: "all" }).entries.date).toEqual({ gte: "2026-12-01", lt: "2027-01-01" });
-    expect(companyFinanceWhere({ year: 2026, month: null, company: "all" }).projectAmounts).toEqual({ createdAt: {
+    expect(companyFinanceWhere({ year: 2024, month: 2, company: "all" }).entries.OR[0].date).toEqual({ gte: "2024-02-01", lt: "2024-03-01" });
+    expect(companyFinanceWhere({ year: 2026, month: 12, company: "all" }).entries.OR[0].date).toEqual({ gte: "2026-12-01", lt: "2027-01-01" });
+    expect(companyFinanceWhere({ year: 2026, month: null, company: "all" }).projectAmounts.OR[1]).toMatchObject({ createdAt: {
       gte: new Date("2025-12-31T15:00:00Z"), lt: new Date("2026-12-31T15:00:00Z"),
     } });
   });

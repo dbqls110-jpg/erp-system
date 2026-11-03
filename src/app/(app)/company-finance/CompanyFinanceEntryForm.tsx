@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import { Plus } from "lucide-react";
 import { toast } from "sonner";
 import { addCompanyFinanceEntry } from "@/app/actions/companyFinance";
-import { COMPANY_NAMES } from "@/lib/companyFinance";
+import { COMPANY_NAMES, type CompanyFinanceEntryType } from "@/lib/companyFinance";
+import { RevenueDateFields } from "@/components/RevenueDateFields";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -17,8 +18,9 @@ export function CompanyFinanceEntryForm({ defaultDate }: { defaultDate: string }
   const formRef = useRef<HTMLFormElement>(null);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [type, setType] = useState<CompanyFinanceEntryType>("revenue");
 
-  const reset = () => formRef.current?.reset();
+  const reset = () => { formRef.current?.reset(); setType("revenue"); };
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -72,7 +74,8 @@ export function CompanyFinanceEntryForm({ defaultDate }: { defaultDate: string }
                   id="company-finance-type"
                   name="type"
                   required
-                  defaultValue="revenue"
+                  value={type}
+                  onChange={event => { const next = event.target.value; if (next === "revenue" || next === "cost" || next === "card") setType(next); }}
                   className="h-9 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
                 >
                   <option value="revenue">매출</option>
@@ -81,10 +84,10 @@ export function CompanyFinanceEntryForm({ defaultDate }: { defaultDate: string }
                 </select>
               </div>
             </div>
-            <div className="space-y-1.5">
+            {type === "revenue" ? <RevenueDateFields prefix="company-finance" disabled={loading} /> : <div className="space-y-1.5">
               <Label htmlFor="company-finance-date">발생일 *</Label>
               <Input id="company-finance-date" type="date" name="date" defaultValue={defaultDate} required />
-            </div>
+            </div>}
             <div className="space-y-1.5">
               <Label htmlFor="company-finance-title">항목명 *</Label>
               <Input id="company-finance-title" name="title" required placeholder="예: 행사 운영 대금 / 9월 카드값" />

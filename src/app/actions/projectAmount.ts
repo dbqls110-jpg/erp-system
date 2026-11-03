@@ -3,12 +3,13 @@
 import { revalidatePath } from "next/cache";
 import { requireEditAccess } from "@/lib/actionGuards";
 import { prisma } from "@/lib/prisma";
+import { parseRevenueDates, type RevenueDates } from "@/lib/revenueDates";
 import {
   recalculateProjectTotals,
   type ProjectAmountKind,
 } from "@/lib/projectAmounts";
 
-export interface ProjectAmountInput {
+export interface ProjectAmountInput extends Partial<RevenueDates> {
   kind: ProjectAmountKind;
   amount: number;
   label?: string;
@@ -40,11 +41,13 @@ function normalizeText(value: unknown): string | null {
 }
 
 function normalizeInput(input: ProjectAmountInput) {
+  const hasDates = "paidDate" in input || "invoiceDate" in input || "expectedPaymentDate" in input;
   return {
     kind: parseKind(input.kind),
     amount: parseAmount(input.amount),
     label: normalizeText(input.label),
     memo: normalizeText(input.memo),
+    ...(hasDates ? parseRevenueDates(input) : {}),
   };
 }
 
@@ -53,6 +56,7 @@ function revalidateProject(projectId: string) {
   revalidatePath("/projects");
   revalidatePath("/finance");
   revalidatePath("/projects/stats");
+  revalidatePath("/company-finance");
 }
 
 export async function createProjectAmount(projectId: string, input: ProjectAmountInput) {

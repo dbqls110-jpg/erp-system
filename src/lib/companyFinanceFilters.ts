@@ -1,4 +1,5 @@
 import { COMPANY_NAMES, normalizeCompany, type CompanyName } from "@/lib/companyFinance";
+import { REVENUE_DATES_MISSING, revenueDateWhere } from "@/lib/revenueDates";
 
 type SearchValue = string | string[] | undefined;
 export type CompanyFinanceSearchParams = { year?: SearchValue; month?: SearchValue; company?: SearchValue };
@@ -39,9 +40,22 @@ export function companyFinanceWhere(filters: CompanyFinanceFilters) {
   const company = filters.company === "all" ? undefined
     : filters.company === "unassigned" ? { notIn: [...COMPANY_NAMES] } : filters.company;
   return {
-    entries: { date: { gte: start, lt: end }, ...(company === undefined ? {} : { company }) },
+    entries: {
+      ...(company === undefined ? {} : { company }),
+      OR: [
+        { type: { not: "revenue" }, date: { gte: start, lt: end } },
+        { type: "revenue", OR: [
+          ...revenueDateWhere({ gte: start, lt: end }),
+          { ...REVENUE_DATES_MISSING, date: { gte: start, lt: end } },
+          { ...REVENUE_DATES_MISSING, date: "" },
+        ] },
+      ],
+    },
     projectAmounts: {
-      createdAt: { gte: new Date(`${start}T00:00:00+09:00`), lt: new Date(`${end}T00:00:00+09:00`) },
+      OR: [
+        { kind: "revenue", OR: [...revenueDateWhere({ gte: start, lt: end }), REVENUE_DATES_MISSING] },
+        { kind: { not: "revenue" }, createdAt: { gte: new Date(`${start}T00:00:00+09:00`), lt: new Date(`${end}T00:00:00+09:00`) } },
+      ],
       ...(filters.company === "all" ? {} : {
         project: filters.company === "unassigned"
           ? { OR: [{ company: null }, { company: { notIn: [...COMPANY_NAMES] } }] }

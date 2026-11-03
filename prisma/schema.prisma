@@ -217,6 +217,10 @@ model ProjectAmount {
   /// 견적서에서 자동으로 만들어진 건이면 그 파일. 사람이 넣은 건이면 비어 있다.
   sourceFileName String?
 
+  invoiceDate         String? // YYYY-MM-DD, 매출 계산서 발행일
+  paidDate            String? // YYYY-MM-DD, 실제 입금일 (최우선 집계 기준)
+  expectedPaymentDate String? // YYYY-MM-DD, 입금 예정일
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -370,6 +374,9 @@ model CompanyFinanceEntry {
   company     String   // "인포피아" | "노바웨이" | "클로원"
   type        String   // "revenue" | "cost"
   date        String   // "YYYY-MM-DD"
+  invoiceDate         String?
+  paidDate            String?
+  expectedPaymentDate String?
   title       String
   amount      Float
   memo        String?
