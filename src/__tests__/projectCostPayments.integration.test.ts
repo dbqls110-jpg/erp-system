@@ -152,4 +152,25 @@ describe.skipIf(!enabled)("실제 PostgreSQL 지급 저장 및 동시성", () =>
     expect(summary).not.toHaveProperty("amounts"); expect(summary).not.toHaveProperty("revenue"); expect(summary).not.toHaveProperty("cost");
     expect(await prisma.project.findUnique({ where: { id: otherProjectId, AND: [projectWhereForViewer(viewer)] }, select: EXTERNAL_PROJECT_SELECT })).toBeNull();
   });
+
+  it("지급 테이블은 RLS가 켜져 있으며 ERP 서버 소유자 이외의 직접 조회를 차단한다", async () => {
+    await saveProjectCostPayment(projectId, costId, payment("rls-private-payment"));
+    const tables = await prisma.$queryRaw<Array<{ relrowsecurity: boolean }>>`SELECT relrowsecurity FROM pg_class WHERE oid = 'public.project_cost_payments'::regclass`;
+    expect(tables[0].relrowsecurity).toBe(true);
+    await prisma.$executeRaw`CREATE ROLE erp_cost_outsider_test NOLOGIN`;
+    try {
+      await prisma.$executeRaw`GRANT USAGE ON SCHEMA public TO erp_cost_outsider_test`;
+      await prisma.$executeRaw`GRANT SELECT ON project_cost_payments TO erp_cost_outsider_test`;
+      const rows = await prisma.$transaction(async tx => {
+        await tx.$executeRaw`SET LOCAL ROLE erp_cost_outsider_test`;
+        return tx.$queryRaw<Array<{ id: string }>>`SELECT id FROM project_cost_payments`;
+      });
+      expect(rows).toEqual([]);
+      expect(await prisma.projectCostPayment.count({ where: { id: "rls-private-payment" } })).toBe(1);
+    } finally {
+      await prisma.$executeRaw`REVOKE SELECT ON project_cost_payments FROM erp_cost_outsider_test`;
+      await prisma.$executeRaw`REVOKE USAGE ON SCHEMA public FROM erp_cost_outsider_test`;
+      await prisma.$executeRaw`DROP ROLE erp_cost_outsider_test`;
+    }
+  });
 });
