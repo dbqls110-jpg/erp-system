@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 
-export function CompanyFinanceEntryForm({ defaultDate }: { defaultDate: string }) {
+export function CompanyFinanceEntryForm({ defaultDate, canEditRevenueDates }: { defaultDate: string; canEditRevenueDates: boolean }) {
   const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
   const [open, setOpen] = useState(false);
@@ -84,7 +84,7 @@ export function CompanyFinanceEntryForm({ defaultDate }: { defaultDate: string }
                 </select>
               </div>
             </div>
-            {type === "revenue" ? <RevenueDateFields prefix="company-finance" disabled={loading} /> : <div className="space-y-1.5">
+            {type === "revenue" ? (canEditRevenueDates ? <RevenueDateFields prefix="company-finance" disabled={loading} /> : <p className="text-xs text-muted-foreground">매출 날짜는 지정된 본인 계정에서 입력합니다. 날짜 지정 전까지 월별 합계에서 제외됩니다.</p>) : <div className="space-y-1.5">
               <Label htmlFor="company-finance-date">발생일 *</Label>
               <Input id="company-finance-date" type="date" name="date" defaultValue={defaultDate} required />
             </div>}

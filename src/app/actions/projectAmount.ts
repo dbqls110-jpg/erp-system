@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { requireEditAccess } from "@/lib/actionGuards";
 import { prisma } from "@/lib/prisma";
-import { parseRevenueDates, type RevenueDates } from "@/lib/revenueDates";
+import { hasRevenueDateInput, parseRevenueDates, type RevenueDates } from "@/lib/revenueDates";
+import { assertCanEditRevenueDates } from "@/lib/revenueDateAccess";
 import {
   recalculateProjectTotals,
   type ProjectAmountKind,
@@ -41,7 +42,7 @@ function normalizeText(value: unknown): string | null {
 }
 
 function normalizeInput(input: ProjectAmountInput) {
-  const hasDates = "paidDate" in input || "invoiceDate" in input || "expectedPaymentDate" in input;
+  const hasDates = hasRevenueDateInput(input);
   return {
     kind: parseKind(input.kind),
     amount: parseAmount(input.amount),
@@ -60,7 +61,8 @@ function revalidateProject(projectId: string) {
 }
 
 export async function createProjectAmount(projectId: string, input: ProjectAmountInput) {
-  await requireEditAccess("projects");
+  const session = await requireEditAccess("projects");
+  if (hasRevenueDateInput(input)) assertCanEditRevenueDates(session.user);
   const data = normalizeInput(input);
 
   const amount = await prisma.$transaction(async (tx) => {
@@ -81,7 +83,8 @@ export async function updateProjectAmount(
   projectId: string,
   input: ProjectAmountInput,
 ) {
-  await requireEditAccess("projects");
+  const session = await requireEditAccess("projects");
+  if (hasRevenueDateInput(input)) assertCanEditRevenueDates(session.user);
   const data = normalizeInput(input);
 
   const amount = await prisma.$transaction(async (tx) => {

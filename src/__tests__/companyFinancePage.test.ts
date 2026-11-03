@@ -12,7 +12,7 @@ vi.mock("@/lib/prisma", () => ({ prisma: { companyFinanceEntry: { findMany: mock
 vi.mock("@/lib/dateFormat", async (original) => ({ ...await original<typeof import("@/lib/dateFormat")>(), currentKoreanDateKey: () => "2026-10-23" }));
 vi.mock("@/app/(app)/company-finance/CompanyFinanceEntryForm", () => ({ CompanyFinanceEntryForm: () => null }));
 vi.mock("@/app/(app)/company-finance/CompanyFinanceEntryDeleteButton", () => ({ CompanyFinanceEntryDeleteButton: () => null }));
-vi.mock("@/components/RevenueDatesButton", () => ({ RevenueDatesButton: () => null }));
+vi.mock("@/components/RevenueDatesButton", () => ({ RevenueDatesButton: () => createElement("button", null, "날짜 수정") }));
 vi.mock("next/form", () => ({ default: ({ children, action, className, ...props }: ComponentProps<"form"> & { prefetch?: boolean; scroll?: boolean }) =>
   createElement("form", { action, className, "aria-label": props["aria-label"] }, children),
 }));
@@ -30,6 +30,19 @@ beforeEach(() => {
 });
 
 describe("회사 재무 필터 페이지", () => {
+  it.each([
+    ["dbqls110@gmail.com", "admin", true, 2],
+    ["other@example.com", "admin", true, 0],
+    ["qkrtjrdud952@gmail.com", "manager", true, 0],
+    ["dbqls110@gmail.com", "admin", false, 0],
+  ])("메뉴 수정 권한이 있어도 본인 계정만 날짜 수정 버튼을 본다: %s", async (email, role, active, count) => {
+    mocks.session.mockResolvedValue({ user: { id: "user-1", email, role, active } });
+    mocks.edit.mockResolvedValue(true);
+    mocks.entries.mockResolvedValue([{ id: "entry-1", company: "인포피아", type: "revenue", amount: 1000, date: "2026-10-01", title: "직접 매출", memo: null }]);
+    mocks.amounts.mockResolvedValue([{ id: "amount-1", projectId: "p1", kind: "revenue", amount: 2000, createdAt: new Date("2026-10-01"), project: { name: "날짜 미정 프로젝트", company: "인포피아" } }]);
+    const html = renderToStaticMarkup(await Page({ searchParams: Promise.resolve({ year: "2026" }) }));
+    expect(html.match(/날짜 수정<\/button>/g) ?? []).toHaveLength(count);
+  });
   it("합계·상세 내역·월 표시가 같은 필터 자료를 사용한다", async () => {
     mocks.entries.mockResolvedValue([
       { id: "r", company: "인포피아", type: "revenue", amount: 200000, date: "2026-09-01", title: "직접 매출", memo: null },

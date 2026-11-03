@@ -6,8 +6,9 @@ import { requireMenuEdit } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import { normalizeCompany, type CompanyFinanceEntryType } from "@/lib/companyFinance";
 import { revalidatePath } from "next/cache";
-import { revenueDatesFromForm } from "@/lib/revenueDates";
+import { REVENUE_DATE_FIELDS, revenueDatesFromForm } from "@/lib/revenueDates";
 import { requireEditAccess } from "@/lib/actionGuards";
+import { assertCanEditRevenueDates } from "@/lib/revenueDateAccess";
 
 function readText(formData: FormData, field: string, label: string) {
   const value = formData.get(field);
@@ -46,6 +47,9 @@ export async function addCompanyFinanceEntry(formData: FormData) {
   if (!company) throw new Error("회사 목록에서 선택해 주세요.");
 
   const type = readType(formData);
+  if (type === "revenue" && REVENUE_DATE_FIELDS.some(field => formData.has(field))) {
+    assertCanEditRevenueDates(session.user);
+  }
   await prisma.companyFinanceEntry.create({
     data: {
       company,

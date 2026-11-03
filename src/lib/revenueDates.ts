@@ -4,6 +4,12 @@ export interface RevenueDates {
   expectedPaymentDate: string | null;
 }
 
+export const REVENUE_DATE_FIELDS = ["paidDate", "invoiceDate", "expectedPaymentDate"] as const;
+
+export function hasRevenueDateInput(input: Partial<RevenueDates>) {
+  return REVENUE_DATE_FIELDS.some(field => field in input);
+}
+
 export function parseRevenueDates(input: Partial<Record<keyof RevenueDates, unknown>>): RevenueDates {
   function date(value: unknown, label: string): string | null {
     if (value === undefined || value === null || value === "") return null;

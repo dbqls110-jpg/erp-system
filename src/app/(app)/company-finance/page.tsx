@@ -20,6 +20,7 @@ import { currentKoreanDateKey, koreanDateKey } from "@/lib/dateFormat";
 import { toneBadgeClass } from "@/lib/badge-tone";
 import { resolveRevenueDate } from "@/lib/revenueDates";
 import { RevenueDatesButton } from "@/components/RevenueDatesButton";
+import { canEditRevenueDates } from "@/lib/revenueDateAccess";
 
 function formatWon(value: number) {
   return `${value.toLocaleString()}원`;
@@ -36,6 +37,7 @@ export default async function CompanyFinancePage({
 }) {
   const params = await searchParams;
   const session = await getServerSession(authOptions);
+  const canEditDates = canEditRevenueDates(session?.user);
 
   const currentYear = Number(currentKoreanDateKey().slice(0, 4));
   const filters = parseCompanyFinanceFilters(params, currentYear);
@@ -131,7 +133,7 @@ export default async function CompanyFinancePage({
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <CompanyFinanceYearNav filters={filters} currentYear={currentYear} />
-          {canEdit && <CompanyFinanceEntryForm defaultDate={defaultDate} />}
+          {canEdit && <CompanyFinanceEntryForm defaultDate={defaultDate} canEditRevenueDates={canEditDates} />}
         </div>
       </div>
 
@@ -140,7 +142,7 @@ export default async function CompanyFinancePage({
         <CardHeader><CardTitle>매출 날짜 미정 · {undatedItems.length}건</CardTitle><CardDescription>작성일로 임의 집계하지 않습니다. 아래 금액은 월별·분기별·연간 합계에서 제외됩니다. 날짜 미정 내역은 선택한 회사 기준으로 모든 기간에 표시됩니다.</CardDescription></CardHeader>
         <CardContent className="space-y-3">{undatedItems.map(item => <div key={`${item.source}-${item.id}`} className="flex flex-wrap items-center justify-between gap-2">
           <div><p className="text-sm">{item.source === "project" ? <Link href={`/projects/${item.projectId}`}>{item.projectName}</Link> : item.title} · {item.company ?? "미배정"}</p><p className="text-sm font-semibold">{formatWon(item.amount)}</p></div>
-          {(item.source === "entry" ? canEdit : canEditProjects) && <RevenueDatesButton source={item.source} id={item.id} dates={item} />}
+          {canEditDates && (item.source === "entry" ? canEdit : canEditProjects) && <RevenueDatesButton source={item.source} id={item.id} dates={item} />}
         </div>)}</CardContent>
       </Card>}
       <p className="text-sm font-medium" role="status">{filterLabel} · {displayItems.length}건</p>
@@ -278,7 +280,7 @@ export default async function CompanyFinancePage({
                     </div>
                     <div className="flex items-center gap-2">
                       <span className={`font-semibold tabular-nums ${isRevenue ? "text-primary" : "text-destructive"}`}>{formatWon(item.amount)}</span>
-                      {isRevenue && (item.source === "entry" ? canEdit : canEditProjects) && <RevenueDatesButton source={item.source} id={item.id} dates={item} />}
+                      {isRevenue && canEditDates && (item.source === "entry" ? canEdit : canEditProjects) && <RevenueDatesButton source={item.source} id={item.id} dates={item} />}
                       {canEdit && item.source === "entry" && <CompanyFinanceEntryDeleteButton id={item.id} title={item.title} />}
                     </div>
                   </div>

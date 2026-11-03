@@ -20,6 +20,7 @@ import { toneBadgeClass } from "@/lib/badge-tone";
 import { getCalendarViewer } from "@/lib/calendarViewer";
 import { canViewLinkedProjects, projectWhereForViewer } from "@/lib/projectVisibility";
 import { getDisplayedProjectProgress } from "@/lib/projectProgress";
+import { canEditRevenueDates } from "@/lib/revenueDateAccess";
 
 const statusConfig: Record<string, { label: string; class: string }> = {
   active: { label: "진행 중", class: toneBadgeClass("blue") },
@@ -138,7 +139,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
           </CardTitle>
         </CardHeader>
         <CardContent className="px-4 py-4">
-          <ProjectAmountsPanel projectId={project.id} amounts={project.amounts} canEdit={canEdit} />
+          <ProjectAmountsPanel projectId={project.id} amounts={project.amounts} canEdit={canEdit} canEditRevenueDates={canEdit && canEditRevenueDates(session?.user)} />
         </CardContent>
       </Card>
 

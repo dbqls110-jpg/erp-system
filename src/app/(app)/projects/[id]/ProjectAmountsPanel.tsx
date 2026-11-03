@@ -43,6 +43,7 @@ interface Props {
   projectId: string;
   amounts: ProjectAmount[];
   canEdit: boolean;
+  canEditRevenueDates: boolean;
 }
 
 interface Draft extends RevenueDates {
@@ -65,7 +66,7 @@ function subtotal(amounts: ProjectAmount[], kind: ProjectAmountKind): number | n
   return matching.length === 0 ? null : matching.reduce((sum, amount) => sum + amount.amount, 0);
 }
 
-export function ProjectAmountsPanel({ projectId, amounts, canEdit }: Props) {
+export function ProjectAmountsPanel({ projectId, amounts, canEdit, canEditRevenueDates }: Props) {
   const router = useRouter();
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -107,7 +108,7 @@ export function ProjectAmountsPanel({ projectId, amounts, canEdit }: Props) {
     }
 
     let dates: Partial<RevenueDates> = {};
-    try { if (draft.kind === "revenue") dates = revenueDatesFromForm(new FormData(event.currentTarget)); }
+    try { if (draft.kind === "revenue" && canEditRevenueDates) dates = revenueDatesFromForm(new FormData(event.currentTarget)); }
     catch (error) { toast.error(error instanceof Error ? error.message : "날짜를 확인해 주세요."); return; }
     const input: ProjectAmountInput = {
       kind: draft.kind,
@@ -228,7 +229,7 @@ export function ProjectAmountsPanel({ projectId, amounts, canEdit }: Props) {
                 disabled={isPending}
               />
             </div>
-            {draft.kind === "revenue" && <RevenueDateFields key={editingId ?? "new"} prefix="project-amount" dates={draft} disabled={isPending} />}
+            {draft.kind === "revenue" && canEditRevenueDates && <RevenueDateFields key={editingId ?? "new"} prefix="project-amount" dates={draft} disabled={isPending} />}
             <div className="space-y-1.5">
               <Label htmlFor="project-amount-memo">비고</Label>
               <Textarea

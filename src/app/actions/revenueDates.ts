@@ -4,10 +4,12 @@ import { revalidatePath } from "next/cache";
 import { requireEditAccess } from "@/lib/actionGuards";
 import { prisma } from "@/lib/prisma";
 import { revenueDatesFromForm } from "@/lib/revenueDates";
+import { assertCanEditRevenueDates } from "@/lib/revenueDateAccess";
 
 export async function updateRevenueDates(source: "entry" | "project", id: string, form: FormData) {
   if (source !== "entry" && source !== "project") throw new Error("매출 구분이 올바르지 않습니다.");
-  await requireEditAccess(source === "entry" ? "companyFinance" : "projects");
+  const session = await requireEditAccess(source === "entry" ? "companyFinance" : "projects");
+  assertCanEditRevenueDates(session.user);
   if (typeof id !== "string" || !/^[A-Za-z0-9_-]{1,128}$/.test(id)) throw new Error("매출 항목이 올바르지 않습니다.");
   const dates = revenueDatesFromForm(form);
   if (source === "entry") {
