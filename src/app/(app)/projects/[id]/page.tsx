@@ -57,7 +57,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
       checklistItems: { orderBy: { order: "asc" } },
       files: { orderBy: { createdAt: "desc" } },
       uploadRecoveries: canEdit ? { where: { status: { not: "completed" } }, select: { id: true, name: true, status: true, attempts: true }, orderBy: { createdAt: "desc" }, take: 20 } : false,
-      amounts: { orderBy: [{ kind: "asc" }, { createdAt: "asc" }], include: { payments: { orderBy: [{ paidDate: "asc" }, { createdAt: "asc" }], select: { id: true, amount: true, paidDate: true, memo: true } } } },
+      amounts: { orderBy: [{ kind: "asc" }, { createdAt: "desc" }, { id: "desc" }], include: { payments: { orderBy: [{ paidDate: "asc" }, { createdAt: "asc" }], select: { id: true, amount: true, paidDate: true, memo: true } } } },
       customers: { include: { customer: { select: { id: true, name: true } } } },
       partners: { include: { partner: { select: { id: true, name: true } } } },
     },

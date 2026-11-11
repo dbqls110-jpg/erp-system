@@ -51,7 +51,7 @@ function PayTodayCheckbox({ projectId, item, pending, startTransition, onSaved }
         } catch (error) { toast.error(error instanceof Error ? error.message : "지급 완료 기록에 실패했습니다."); }
       });
     }} />
-    {pending ? "처리 중..." : item.costSettled ? "지급 완료" : "오늘 지급 완료"}
+    {pending ? "처리 중..." : "지급 완료"}
   </label>;
 }
 

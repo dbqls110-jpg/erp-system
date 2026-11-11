@@ -27,6 +27,17 @@ beforeEach(() => {
   vi.resetAllMocks(); m.session.mockResolvedValue({ user: outsider }); m.viewer.mockResolvedValue(outsider); m.find.mockResolvedValue(record);
 });
 describe("외부 프로젝트 상세 최소 공개", () => {
+  it("내부 매출·매입은 생성일 최신순으로 조회하고 지급 기록은 기존 시간순을 유지한다", async () => {
+    const staff = { ...outsider, role: "member", partnerId: null };
+    m.session.mockResolvedValue({ user: staff }); m.viewer.mockResolvedValue(staff); m.edit.mockResolvedValue(false);
+    m.find.mockResolvedValue({ ...record, checklistItems: [], customers: [], partners: [], files: [], uploadRecoveries: [], amounts: [] });
+    await Page({ params: Promise.resolve({ id: "p" }) });
+    expect(m.find).toHaveBeenCalledOnce();
+    expect(m.find.mock.calls[0][0].include.amounts).toEqual({
+      orderBy: [{ kind: "asc" }, { createdAt: "desc" }, { id: "desc" }],
+      include: { payments: { orderBy: [{ paidDate: "asc" }, { createdAt: "asc" }], select: { id: true, amount: true, paidDate: true, memo: true } } },
+    });
+  });
   it.each([
     outsider, { ...outsider, role: "admin" }, { ...outsider, role: "member", partnerId: null, customerId: "customer-1" },
   ])("외부 계정은 연결 범위 내 최소 정보만 조회한다: %j", async viewer => {
