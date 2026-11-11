@@ -1,4 +1,5 @@
 "use server";
+import { invalidateInquiryNotificationSnapshot } from "@/lib/inquiryNotifications";
 
 import { revalidatePath } from "next/cache";
 import { requireEditAccess } from "@/lib/actionGuards";
@@ -197,6 +198,7 @@ async function createProjectFromSource(input: ProjectConversionInput): Promise<C
     const sourceSheetResult = await input.saveSourceProject(project.name, projectUrl(project.id));
     state.sourceSheet = sourceSheetResult.alreadyLinked ? "기존 연결 확인" : "프로젝트명 기록 완료";
 
+    invalidateInquiryNotificationSnapshot();
     revalidatePath("/inquiries");
     revalidatePath("/customers");
     revalidatePath("/projects");
@@ -215,6 +217,7 @@ async function createProjectFromSource(input: ProjectConversionInput): Promise<C
 export async function updateInquiryStage(identity: InquiryIdentity, nextStage: InquiryStage) {
   await requireEditAccess("inquiries");
   const result = await saveInquiryStage(identity, nextStage);
+  invalidateInquiryNotificationSnapshot();
   revalidatePath("/inquiries");
   return result;
 }
@@ -222,6 +225,7 @@ export async function updateInquiryStage(identity: InquiryIdentity, nextStage: I
 export async function updateInquiryMemo(identity: InquiryIdentity, memo: string) {
   await requireEditAccess("inquiries");
   const result = await saveInquiryMemo(identity, memo);
+  invalidateInquiryNotificationSnapshot();
   revalidatePath("/inquiries");
   return result;
 }
@@ -232,6 +236,7 @@ export async function updateSpaceRegistrationStage(
 ) {
   await requireEditAccess("inquiries");
   const result = await saveSpaceRegistrationStage(identity, nextStage);
+  invalidateInquiryNotificationSnapshot();
   revalidatePath("/inquiries");
   return result;
 }
@@ -239,6 +244,7 @@ export async function updateSpaceRegistrationStage(
 export async function updateSpaceRegistrationMemo(identity: SpaceRegistrationIdentity, memo: string) {
   await requireEditAccess("inquiries");
   const result = await saveSpaceRegistrationMemo(identity, memo);
+  invalidateInquiryNotificationSnapshot();
   revalidatePath("/inquiries");
   return result;
 }
@@ -246,6 +252,7 @@ export async function updateSpaceRegistrationMemo(identity: SpaceRegistrationIde
 export async function updateSpaceRentalStage(identity: SpaceRentalIdentity, nextStage: SpaceRentalStage) {
   await requireEditAccess("inquiries");
   const result = await saveSpaceRentalStage(identity, nextStage);
+  invalidateInquiryNotificationSnapshot();
   revalidatePath("/inquiries");
   return result;
 }

@@ -55,7 +55,7 @@ async function ensureSpaceRentalHeaders(
   }
 }
 
-async function readSpaceRentalSheet() {
+async function readSpaceRentalSheet(ensureHeaders = true) {
   const sheets = await makeSheetsClientAsOwner();
   const response = await sheets.spreadsheets.values.get({
     spreadsheetId: SPACE_RENTALS_SPREADSHEET_ID,
@@ -64,12 +64,12 @@ async function readSpaceRentalSheet() {
     valueRenderOption: "FORMATTED_VALUE",
   });
   const rows = (response.data.values ?? []) as SheetRows;
-  await ensureSpaceRentalHeaders(sheets, rows);
+  if (ensureHeaders) await ensureSpaceRentalHeaders(sheets, rows);
   return { sheets, rows };
 }
 
-export async function getSpaceRentals(): Promise<SpaceRentalRecord[]> {
-  const { rows } = await readSpaceRentalSheet();
+export async function getSpaceRentals(options: { ensureHeaders?: boolean } = {}): Promise<SpaceRentalRecord[]> {
+  const { rows } = await readSpaceRentalSheet(options.ensureHeaders ?? true);
   return parseSpaceRentalRows(rows);
 }
 

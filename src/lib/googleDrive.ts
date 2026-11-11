@@ -145,6 +145,77 @@ export async function downloadProjectQuote(driveFileId: string): Promise<Buffer>
   });
 }
 
+type PartyQuoteDriveInput = { id: string; driveFileId: string; name: string; mimeType: string; size: number; contentSha256: string };
+
+async function privateQuoteFolder(drive: ReturnType<typeof google.drive>, key: string, name: string, parentId?: string) {
+  const escaped = key.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+  const found = await drive.files.list({
+    q: `trashed = false and mimeType = 'application/vnd.google-apps.folder' and appProperties has { key='erpPartyQuotes' and value='${escaped}' }${parentId ? ` and '${parentId}' in parents` : " and 'root' in parents"}`,
+    fields: "files(id)", pageSize: 2,
+  }, { timeout: 30_000 });
+  if ((found.data.files?.length ?? 0) > 1) throw Error("비공개 견적서 폴더가 중복되어 관리자 확인이 필요합니다.");
+  let id = found.data.files?.[0]?.id;
+  if (!id) {
+    const created = await drive.files.create({ requestBody: { name, mimeType: "application/vnd.google-apps.folder", parents: parentId ? [parentId] : undefined,
+      appProperties: { erpPartyQuotes: key } }, fields: "id" }, { timeout: 30_000 });
+    id = created.data.id;
+  }
+  if (!id) throw Error("견적서 폴더를 확인하지 못했습니다.");
+  const permissions = await drive.permissions.list({ fileId: id, fields: "permissions(role)", pageSize: 100 }, { timeout: 30_000 });
+  if (!permissions.data.permissions?.length || permissions.data.permissions.some(permission => permission.role !== "owner")) {
+    throw Error("견적서 폴더에 외부 공유가 설정되어 저장을 중단했습니다.");
+  }
+  return id;
+}
+
+/** Drive가 발급한 ID를 DB에 먼저 보관해야 업로드 결과가 유실돼도 같은 파일을 복구할 수 있다. */
+export async function reservePartyQuoteDriveId() {
+  return withOwnerDrive(async drive => {
+    const result = await drive.files.generateIds({ count: 1, space: "drive", type: "files" }, { timeout: 30_000 });
+    const id = result.data.ids?.[0];
+    if (!id) throw Error("견적서 저장 공간을 준비하지 못했습니다.");
+    return id;
+  });
+}
+
+export async function verifyPartyQuoteInDrive(file: PartyQuoteDriveInput): Promise<boolean> {
+  return withOwnerDrive(async drive => {
+    try {
+      const result = await drive.files.get({ fileId: file.driveFileId, fields: "id,size,mimeType,trashed,appProperties,sha256Checksum" }, { timeout: 30_000 });
+      const saved = result.data;
+      if (saved.trashed || Number(saved.size) !== file.size || saved.mimeType !== file.mimeType
+        || saved.appProperties?.erpPartyQuoteId !== file.id || saved.sha256Checksum !== file.contentSha256) {
+        throw Error("저장된 견적서 원본이 달라 관리자 확인이 필요합니다.");
+      }
+      return true;
+    } catch (error) {
+      if (error && typeof error === "object" && "response" in error && error.response && typeof error.response === "object"
+        && "status" in error.response && error.response.status === 404) return false;
+      throw error;
+    }
+  });
+}
+
+export async function preparePartyQuoteFolder(party: { kind: "customer" | "partner"; id: string; name: string }) {
+  return withOwnerDrive(async drive => {
+    const root = await privateQuoteFolder(drive, "root", "ERP 비공개 견적서");
+    return privateQuoteFolder(drive, `${party.kind}:${party.id}`, `${party.kind === "customer" ? "거래처" : "파트너"} ${party.name} (${party.id})`, root);
+  });
+}
+
+export async function uploadPartyQuoteToDrive(file: PartyQuoteDriveInput & { buffer: Buffer }, parentId: string) {
+  return withOwnerDrive(async drive => {
+    try {
+      await drive.files.create({ requestBody: { id: file.driveFileId, name: file.name, parents: [parentId], appProperties: { erpPartyQuoteId: file.id } },
+        media: { mimeType: file.mimeType, body: Readable.from(file.buffer) }, fields: "id" }, { timeout: 30_000 });
+    } catch (error) {
+      // 이미 저장된 ID는 재업로드로 덮어쓰지 않는다. 아래 checksum 확인이 동일 원본임을 보장한다.
+      if (!(error && typeof error === "object" && "response" in error && error.response && typeof error.response === "object"
+        && "status" in error.response && error.response.status === 409)) throw error;
+    }
+  });
+}
+
 export async function deleteFileFromDrive(
   driveFileId: string
 ): Promise<void> {

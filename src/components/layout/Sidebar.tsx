@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { useInquiryNotifications } from "@/lib/inquiry-notifications-store";
 import {
   Building2,
   Handshake,
@@ -89,6 +90,7 @@ interface SidebarProps {
 
 export function Sidebar({ role, onClose, allowedMenus }: SidebarProps) {
   const pathname = usePathname();
+  const inquiryAlerts = useInquiryNotifications();
 
   const allowed = allowedMenus ? new Set(allowedMenus) : null;
   const visible = (item: NavItem) => {
@@ -102,12 +104,14 @@ export function Sidebar({ role, onClose, allowedMenus }: SidebarProps) {
   const renderItem = (item: NavItem) => {
     const Icon = item.icon;
     const active = isActive(item.href);
+    const inquiryUnread = item.menuKey === "inquiries" && inquiryAlerts.enabled ? inquiryAlerts.counts.total : 0;
     return (
       <Link
         key={item.href}
         href={item.href}
         onClick={onClose}
         aria-current={active ? "page" : undefined}
+        aria-label={inquiryUnread > 0 ? `문의, 미확인 ${inquiryUnread}건` : undefined}
         className={cn(
           "flex h-9 w-full items-center gap-[10px] overflow-hidden rounded-[12px] px-3 text-left text-[14px] whitespace-nowrap transition-colors",
           "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
@@ -118,6 +122,8 @@ export function Sidebar({ role, onClose, allowedMenus }: SidebarProps) {
       >
         <Icon className="size-5 shrink-0" />
         <span className="truncate">{item.label}</span>
+        {inquiryUnread > 0 && <span role="status" aria-label={`미확인 문의 ${inquiryUnread}건`} className="ml-auto inline-flex min-w-5 shrink-0 items-center justify-center rounded-full bg-red-600 px-1 text-[11px] font-semibold text-white motion-safe:animate-pulse">{inquiryUnread > 99 ? "99+" : inquiryUnread}</span>}
+        {item.menuKey === "inquiries" && inquiryAlerts.enabled && inquiryAlerts.failed && <span className="sr-only">문의 알림 갱신 지연</span>}
       </Link>
     );
   };

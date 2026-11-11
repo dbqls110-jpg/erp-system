@@ -3,9 +3,7 @@ import { redirect } from "next/navigation";
 import { authOptions } from "@/lib/auth";
 import { canEditMenu, requireMenuAccess } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
-import { getInquiries } from "@/lib/inquirySheet";
-import { getSpaceRegistrations } from "@/lib/spaceRegistrationSheet";
-import { getSpaceRentals } from "@/lib/spaceRentalSheet";
+import { getInquiryNotificationSnapshot } from "@/lib/inquiryNotifications";
 import { InquiriesWorkspace } from "./InquiriesWorkspace";
 
 export default async function InquiriesPage() {
@@ -13,12 +11,11 @@ export default async function InquiriesPage() {
   if (!session?.user?.id) redirect("/login");
   await requireMenuAccess(session.user.id, "inquiries", session.user.role);
 
-  const [inquiries, spaceRegistrations, spaceRentals, canEdit] = await Promise.all([
-    getInquiries(),
-    getSpaceRegistrations(),
-    getSpaceRentals(),
+  const [snapshot, canEdit] = await Promise.all([
+    getInquiryNotificationSnapshot(),
     canEditMenu(session.user.id, "inquiries", session.user.role),
   ]);
+  const { inquiries, registrations: spaceRegistrations, rentals: spaceRentals, keys } = snapshot;
   const projectNames = [...new Set([
     ...inquiries.map((inquiry) => inquiry.projectName),
     ...spaceRentals.map((rental) => rental.projectName),
@@ -57,6 +54,7 @@ export default async function InquiriesPage() {
         initialSpaceRegistrations={spaceRegistrations}
         initialSpaceRentals={spaceRentalsWithProjectIds}
         canEdit={canEdit}
+        notificationKeys={keys}
       />
     </div>
   );

@@ -16,6 +16,9 @@ import { toneBadgeClass } from "@/lib/badge-tone";
 import { prisma } from "@/lib/prisma";
 import { CustomerCreateButton } from "./CustomerCreateButton";
 import { CustomerEditButton } from "./CustomerEditButton";
+import { PartyQuotesDialog } from "@/components/PartyQuotesDialog";
+import { isExternal } from "@/lib/calendarVisibility";
+import { redirect } from "next/navigation";
 
 type CustomerSearchParams = Promise<Record<string, string | string[] | undefined>>;
 
@@ -24,6 +27,9 @@ const STATUS_BY_QUERY = { active: "거래중", pending: "보류", closed: "종�
 
 export default async function CustomersPage({ searchParams }: { searchParams?: CustomerSearchParams }) {
   const session = await getServerSession(authOptions);
+  if (!session?.user?.id || session.user.active === false) redirect("/login");
+  if (isExternal(session.user)) redirect("/dashboard");
+  await requireMenuAccess(session.user.id, "customers", session.user.role);
 
   const params = await searchParams;
   const categoryParam = typeof params?.category === "string" ? params.category : "all";
@@ -45,15 +51,13 @@ export default async function CustomersPage({ searchParams }: { searchParams?: C
     ];
   }
 
-  // 권한 검사가 실패하면 예외가 전파되어 JSX를 반환하지 않으므로 목록 조회를 함께 시작해도
-  // 권한 없는 자료가 응답에 포함되지 않는다. 권한 자료는 React.cache 로 한 번만 읽는다.
-  const [, canEdit, rows, industryRows] = await Promise.all([
-    requireMenuAccess(session!.user.id, "customers", session!.user.role),
+  // 권한 확인 후 독립적인 목록·수정 권한 조회만 병렬로 실행한다.
+  const [canEdit, rows, industryRows] = await Promise.all([
     canEditMenu(session!.user.id, "customers", session!.user.role),
     prisma.customer.findMany({
       where,
       orderBy: { updatedAt: "desc" },
-      include: { projects: { include: { project: { select: { id: true, name: true } } } } },
+      include: { _count: { select: { quotes: true } }, projects: { include: { project: { select: { id: true, name: true } } } } },
     }),
     prisma.customer.findMany({
       where: { industry: { not: null }, NOT: { industry: "" } },
@@ -145,7 +149,7 @@ export default async function CustomersPage({ searchParams }: { searchParams?: C
                   <div><dt className="inline">프로젝트 </dt><dd className="inline text-foreground">{customer.projects.length === 0 ? "-" : `${customer.projects.length}건`}</dd></div>
                   <div className="col-span-2 truncate"><dt className="inline">이메일 </dt><dd className="inline text-foreground">{customer.email ?? "-"}</dd></div>
                 </dl>
-                {canEdit && <div className="mt-3 flex justify-end border-t border-border pt-2"><CustomerEditButton customer={customer} industries={industries} /></div>}
+                <div className="mt-3 flex justify-end gap-2 border-t border-border pt-2"><PartyQuotesDialog target={{ kind: "customer", id: customer.id }} name={customer.name} count={customer._count.quotes} canEdit={canEdit} />{canEdit && <CustomerEditButton customer={customer} industries={industries} />}</div>
               </article>
             ))}
           </div>
@@ -157,7 +161,7 @@ export default async function CustomersPage({ searchParams }: { searchParams?: C
                 {rows.length === 0 ? (
                    <TableRow><TableCell colSpan={canEdit ? 9 : 8} className="text-center"><EmptyState icon={<Building2 className="size-5" />}>{hasFilters ? "검색 결과가 없습니다." : "아직 등록된 거래처가 없습니다."}{hasFilters && <a href="/customers" className="mt-1 block text-xs text-primary underline underline-offset-2">검색 조건 초기화</a>}</EmptyState></TableCell></TableRow>
                 ) : rows.map((customer) => (
-                  <TableRow key={customer.id} className="group transition-colors hover:bg-muted/30"><TableCell className="font-medium">{customer.name}</TableCell><TableCell className="text-muted-foreground">{customer.industry ?? "-"}</TableCell><TableCell className="text-muted-foreground">{customer.manager ?? "-"}</TableCell><TableCell className="text-muted-foreground">{customer.phone ?? "-"}</TableCell><TableCell className="text-muted-foreground">{customer.email ?? "-"}</TableCell><TableCell className="text-muted-foreground">{customer.category ?? "-"}</TableCell><TableCell><Badge variant="outline" className={toneBadgeClass(customer.status === "거래중" ? "green" : customer.status === "보류" ? "amber" : "gray")}>{customer.status}</Badge></TableCell><TableCell className="text-right tabular-nums text-muted-foreground">{customer.projects.length === 0 ? "-" : `프로젝트 ${customer.projects.length}건`}</TableCell>{canEdit && <TableCell><CustomerEditButton customer={customer} industries={industries} iconOnly /></TableCell>}</TableRow>
+                  <TableRow key={customer.id} className="group transition-colors hover:bg-muted/30"><TableCell className="font-medium"><div className="flex flex-col items-start gap-2">{customer.name}<PartyQuotesDialog target={{ kind: "customer", id: customer.id }} name={customer.name} count={customer._count.quotes} canEdit={canEdit} /></div></TableCell><TableCell className="text-muted-foreground">{customer.industry ?? "-"}</TableCell><TableCell className="text-muted-foreground">{customer.manager ?? "-"}</TableCell><TableCell className="text-muted-foreground">{customer.phone ?? "-"}</TableCell><TableCell className="text-muted-foreground">{customer.email ?? "-"}</TableCell><TableCell className="text-muted-foreground">{customer.category ?? "-"}</TableCell><TableCell><Badge variant="outline" className={toneBadgeClass(customer.status === "거래중" ? "green" : customer.status === "보류" ? "amber" : "gray")}>{customer.status}</Badge></TableCell><TableCell className="text-right tabular-nums text-muted-foreground">{customer.projects.length === 0 ? "-" : `프로젝트 ${customer.projects.length}건`}</TableCell>{canEdit && <TableCell><CustomerEditButton customer={customer} industries={industries} iconOnly /></TableCell>}</TableRow>
                 ))}
               </TableBody>
             </Table>

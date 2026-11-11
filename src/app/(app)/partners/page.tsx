@@ -4,18 +4,23 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { canEditMenu, requireMenuAccess } from "@/lib/permissions";
 import { PartnerTable } from "./PartnerTable";
+import { isExternal } from "@/lib/calendarVisibility";
+import { redirect } from "next/navigation";
 
 export default async function PartnersPage() {
   // 사이드바에서 메뉴를 숨기는 것만으로는 못 막는다. 주소를 직접 치면 그냥 열린다.
   const session = await getServerSession(authOptions);
+  if (!session?.user?.id || session.user.active === false) redirect("/login");
+  if (isExternal(session.user)) redirect("/dashboard");
+  await requireMenuAccess(session.user.id, "partners", session.user.role);
 
-  // 권한 검사가 실패하면 JSX를 반환하지 않으므로 목록 조회를 함께 시작해도 권한 없는 자료가 노출되지 않는다.
-  const [, rows, projects, canEdit] = await Promise.all([
-    requireMenuAccess(session!.user.id, "partners", session!.user.role),
+  // 권한 확인 후 독립적인 목록 조회만 병렬로 실행한다.
+  const [rows, projects, canEdit] = await Promise.all([
     prisma.partner.findMany({
       orderBy: { updatedAt: "desc" },
       select: {
         id: true,
+        _count: { select: { quotes: true } },
         name: true,
         job: true,
         phone: true,
@@ -56,6 +61,7 @@ export default async function PartnersPage() {
   // 쓰지도 않는 필드까지 실어 나른다.
   const partners = rows.map((p) => ({
     id: p.id,
+    quoteCount: p._count.quotes,
     name: p.name,
     job: p.job,
     phone: p.phone,

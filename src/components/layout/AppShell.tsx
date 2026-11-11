@@ -6,6 +6,7 @@ import { Sidebar } from "./Sidebar";
 import { Header } from "./Header";
 import { MessengerProvider } from "@/lib/messenger-store";
 import { MessengerDock } from "@/components/messenger/MessengerDock";
+import { InquiryNotificationsProvider } from "@/lib/inquiry-notifications-store";
 
 interface AppShellProps {
   user: {
@@ -33,6 +34,7 @@ export function AppShell({ user, userId, children, allowedMenus }: AppShellProps
     // Provider 가 대화 목록을 한 번만 폴링하고 헤더 배지 · 위젯 · 메신저 페이지가
     // 그 결과를 나눠 쓴다. 각자 폴링하면 요청이 화면 수만큼 늘어난다.
     <MessengerProvider>
+    <InquiryNotificationsProvider enabled={allowedMenus?.includes("inquiries") === true}>
       <div className="flex h-screen overflow-hidden bg-background">
         {/* 데스크톱 사이드바 */}
         <div className="hidden lg:block shrink-0">
@@ -68,6 +70,7 @@ export function AppShell({ user, userId, children, allowedMenus }: AppShellProps
           }}
         />
       )}
+    </InquiryNotificationsProvider>
     </MessengerProvider>
   );
 }

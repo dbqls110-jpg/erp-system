@@ -49,6 +49,8 @@ model User {
   dotReportsReceived DotReport[]
   venueDaThreads   VenueDaThread[] @relation("VenueDaAssignee")
   createdVenues    Venue[] @relation("VenueCreatedBy")
+  partyQuotes      PartyQuote[]
+  inquiryReads     InquiryReadReceipt[]
 
   partner  Partner?  @relation(fields: [partnerId], references: [id], onDelete: SetNull)
   customer Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
@@ -878,6 +880,7 @@ model Customer {
 
   projects ProjectCustomer[]
   users    User[]
+  quotes   PartyQuote[]
 
   @@index([status])
   @@map("customers")
@@ -924,9 +927,47 @@ model Partner {
   rates    PartnerRate[]
   payments PartnerPayment[]
   users    User[]
+  quotes   PartyQuote[]
 
   @@index([contractStatus])
   @@map("partners")
+}
+
+/// 내부 직원용 거래처·파트너 견적서. 프로젝트 금액과 자동 연결하지 않는다.
+model PartyQuote {
+  id String @id
+  customerId String?
+  partnerId String?
+  customer Customer? @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  partner Partner? @relation(fields: [partnerId], references: [id], onDelete: Restrict)
+  name String
+  mimeType String
+  size Int
+  contentSha256 String
+  driveFileId String? @unique
+  status String @default("pending")
+  leaseToken String?
+  leaseUntil DateTime?
+  createdById String
+  createdBy User @relation(fields: [createdById], references: [id], onDelete: Restrict)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([customerId, contentSha256])
+  @@unique([partnerId, contentSha256])
+  @@index([customerId, createdAt])
+  @@index([partnerId, createdAt])
+  @@map("party_quotes")
+}
+
+/// 목록 확인은 계정별로 독립적이다. 시트 행 번호 대신 내용 식별자의 해시를 보관한다.
+model InquiryReadReceipt {
+  userId String
+  itemKey String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  readAt DateTime @default(now())
+  @@id([userId, itemKey])
+  @@map("inquiry_read_receipts")
 }
 
 /**

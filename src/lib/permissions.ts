@@ -3,6 +3,7 @@ import { cache } from "react";
 import { prisma } from "@/lib/prisma";
 import { DEFAULT_ACCESS_LEVELS, DEFAULT_MENU_RULES, MENU_KEYS } from "@/lib/menu-keys";
 import { resolveMenuAccess, type AccessRow } from "@/lib/menuAccessRules";
+import { canReviewInquiries } from "@/lib/inquiryAccess";
 
 export { DEFAULT_ACCESS_LEVELS, DEFAULT_MENU_RULES, MENU_KEYS };
 
@@ -56,19 +57,26 @@ const getUserAndMenuAccess = cache(async (userId: string, role?: string) => {
   return { role: resolvedRole, menuAccess };
 });
 
+const hasInquiryIdentity = cache(async (userId: string) => canReviewInquiries(await prisma.user.findUnique({
+  where: { id: userId }, select: { id: true, email: true, role: true, active: true, isAgent: true, partnerId: true, customerId: true, venueId: true },
+})));
+
 /** 사이드바에 보여줄 메뉴 목록. */
 export async function getAccessibleMenus(userId: string, role?: string): Promise<Set<string>> {
   const { role: resolved, menuAccess } = await getUserAndMenuAccess(userId, role);
   if (resolved === undefined) return new Set();
 
-  return new Set(
+  const menus = new Set(
     MENU_KEYS.map((menu) => menu.key).filter(
       (menuKey) => resolveMenuAccess(resolved, menuKey, menuAccess).view,
     ),
   );
+  if (menus.has("inquiries") && !await hasInquiryIdentity(userId)) menus.delete("inquiries");
+  return menus;
 }
 
 export async function canAccessMenu(userId: string, menuKey: string): Promise<boolean> {
+  if (menuKey === "inquiries" && !await hasInquiryIdentity(userId)) return false;
   const { role, menuAccess } = await getUserAndMenuAccess(userId);
   if (role === undefined) return false;
   return resolveMenuAccess(role, menuKey, menuAccess).view;
@@ -86,6 +94,7 @@ export async function canEditMenu(
   menuKey: string,
   role?: string,
 ): Promise<boolean> {
+  if (menuKey === "inquiries" && !await hasInquiryIdentity(userId)) return false;
   const { role: resolved, menuAccess } = await getUserAndMenuAccess(userId, role);
   if (resolved === undefined) return false;
   return resolveMenuAccess(resolved, menuKey, menuAccess).edit;
@@ -108,6 +117,9 @@ export async function requireMenuEdit(userId: string, menuKey: string, role?: st
  * 잘못이 아니라 정상 상태다.
  */
 export async function requireMenuAccess(userId: string, menuKey: string, role?: string) {
+  if (menuKey === "inquiries" && !await hasInquiryIdentity(userId)) {
+    const { redirect } = await import("next/navigation"); redirect("/dashboard");
+  }
   const { role: resolved, menuAccess } = await getUserAndMenuAccess(userId, role);
   if (resolved === undefined || !resolveMenuAccess(resolved, menuKey, menuAccess).view) {
     const { redirect } = await import("next/navigation");

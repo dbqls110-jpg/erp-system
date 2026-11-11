@@ -24,6 +24,7 @@ import type { SpaceRentalStage } from "@/lib/spaceRentals";
 import { PROPOSAL_CANCEL_ACTION } from "@/lib/proposalStates";
 import { prisma } from "@/lib/prisma";
 import { canAccessMenu, canEditMenu } from "@/lib/permissions";
+import { invalidateInquiryNotificationSnapshot } from "@/lib/inquiryNotifications";
 import { isExternal } from "@/lib/calendarVisibility";
 import { calculateNetIncome } from "@/lib/financeMetrics";
 import {
@@ -816,6 +817,7 @@ export async function POST(req: NextRequest) {
         result = await saveSpaceRentalStage(rental.identity, content.stage as SpaceRentalStage);
       }
 
+      invalidateInquiryNotificationSnapshot();
       await prisma.agentAuditLog.create({
         data: {
           method: "POST",
@@ -854,6 +856,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "공간대관에는 메모를 저장할 수 있는 기존 함수가 없습니다." }, { status: 400 });
       }
 
+      invalidateInquiryNotificationSnapshot();
       await prisma.agentAuditLog.create({
         data: {
           method: "POST",

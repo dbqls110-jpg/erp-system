@@ -32,6 +32,7 @@ import {
 } from "@/app/actions/partnerCustomer";
 import { PartnerPaymentsDialog } from "./PartnerPaymentsDialog";
 import type { PartnerPaymentRow, ProjectOption } from "./PartnerPaymentsDialog";
+import { PartyQuotesDialog } from "@/components/PartyQuotesDialog";
 
 export interface PartnerRow {
   id: string;
@@ -46,6 +47,7 @@ export interface PartnerRow {
   projectNames: string[];
   rates: { id: string; item: string; amount: number; unit: string; memo: string | null }[];
   payments: PartnerPaymentRow[];
+  quoteCount?: number;
 }
 
 // 계약 만기가 아니라 "요즘도 같이 일하나" 를 나타낸다. 건별로 부르는
@@ -684,6 +686,7 @@ export function PartnerTable({
                     </dd>
                   </div>
                 </dl>
+                <div className="mt-3"><PartyQuotesDialog target={{ kind: "partner", id: p.id }} name={p.name} count={p.quoteCount ?? 0} canEdit={canEdit} /></div>
                 {canEdit && (
                   <div className="mt-3 flex justify-end gap-2 border-t border-border pt-2">
                     <button type="button" onClick={() => setPaymentDialog({ partner: p, key: Date.now() })} className="rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-muted hover:text-primary" aria-label={`${p.name} 실제 지급 이력`}><ReceiptText className="mr-1 inline size-3.5" />지급 이력</button>
@@ -748,6 +751,7 @@ export function PartnerTable({
                             </button>
                           )}
                         </div>
+                        <div className="mt-2"><PartyQuotesDialog target={{ kind: "partner", id: p.id }} name={p.name} count={p.quoteCount ?? 0} canEdit={canEdit} /></div>
                       </TableCell>
                       <TableCell className="whitespace-nowrap text-muted-foreground">{p.job ?? "-"}</TableCell>
                       <TableCell>
