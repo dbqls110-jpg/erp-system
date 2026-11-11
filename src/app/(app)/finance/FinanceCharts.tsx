@@ -49,7 +49,7 @@ export function FinanceCharts({ categoryData, dailyData, budget, plannedExpense,
                   <span>예산 사용률 · 고정비 포함</span><span>{usagePercent}%</span>
                 </div>
                 <div className="h-2 rounded-full bg-muted overflow-hidden">
-                  <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${usagePercent}%` }} />
+                  <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${Math.min(100, Math.max(0, usagePercent))}%` }} />
                 </div>
                 <p className="mt-1 text-[10px] text-muted-foreground">기준 지출 {plannedExpense.toLocaleString()}원</p>
               </div>

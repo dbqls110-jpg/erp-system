@@ -4,8 +4,8 @@ export interface BudgetMetrics {
   usagePercent: number;
 }
 
-/** 영업이익에서 당기순이익으로 남는 비율. 표본 엑셀의 "영업이익 -21%"와 같다. */
-export const NET_INCOME_RATE = 0.79;
+/** 사용자 지정 내부 관리 기준: 영업이익에서 19% 차감. 법정 세액 계산이 아니다. */
+export const NET_INCOME_RATE = 0.81;
 
 export function calculateOperatingProfit(revenue: number | null, cost: number | null): number | null {
   if (revenue === null || cost === null) return null;
@@ -14,7 +14,7 @@ export function calculateOperatingProfit(revenue: number | null, cost: number | 
 
 /**
  * 당기순이익은 원 미만을 버린다.
- * 표본의 613,850 × 0.79가 표시되는 방식(484,941원)에 맞춘다.
+ * 원본 견적서의 과거 세율 수식은 수정하지 않고 ERP 공통 정책을 적용한다.
  */
 export function calculateNetIncome(revenue: number | null, cost: number | null): number | null {
   const operatingProfit = calculateOperatingProfit(revenue, cost);
@@ -34,6 +34,6 @@ export function calculateBudgetMetrics(
   return {
     plannedExpense,
     remaining: budget - plannedExpense,
-    usagePercent: Math.min(Math.round((plannedExpense / budget) * 100), 100),
+    usagePercent: Math.round((plannedExpense / budget) * 100),
   };
 }

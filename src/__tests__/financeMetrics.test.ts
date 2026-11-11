@@ -2,6 +2,11 @@ import { describe, expect, it } from "vitest";
 import { calculateBudgetMetrics } from "@/lib/financeMetrics";
 
 describe("재무 예산 지표", () => {
+  it("초과 사용률은 숫자에서 숨기지 않는다", () => {
+    expect(calculateBudgetMetrics(1_300_000, 1_297_000, 141_000)).toEqual({
+      plannedExpense: 1_438_000, remaining: -138_000, usagePercent: 111,
+    });
+  });
   it("고정비와 기타 지출을 카드·차트 공통 기준으로 합산한다", () => {
     expect(calculateBudgetMetrics(100_000, 80_000, 12_000)).toEqual({
       plannedExpense: 92_000,

@@ -36,7 +36,7 @@ export function RevenueCharts({ monthlyData, quarterlyData, yearlyData }: Props)
               <Legend />
               <Bar dataKey="revenue" name="매출" fill="#22c55e" radius={[3, 3, 0, 0]} />
               <Bar dataKey="cost" name="매입" fill="#ff5b36" radius={[3, 3, 0, 0]} />
-              <Bar dataKey="profit" name="순이익" fill="#7b68ee" radius={[3, 3, 0, 0]} />
+              <Bar dataKey="profit" name="매출·매입 차액" fill="#7b68ee" radius={[3, 3, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </CardContent>
@@ -58,7 +58,7 @@ export function RevenueCharts({ monthlyData, quarterlyData, yearlyData }: Props)
                       <span className="text-green-600">매출 {q.revenue.toLocaleString()}원</span>
                       <span className="text-destructive">매입 {q.cost.toLocaleString()}원</span>
                       <span className={q.profit >= 0 ? "text-primary" : "text-destructive"}>
-                        순이익 {q.profit.toLocaleString()}원
+                        차액 {q.profit.toLocaleString()}원
                       </span>
                     </div>
                   </div>
@@ -86,7 +86,7 @@ export function RevenueCharts({ monthlyData, quarterlyData, yearlyData }: Props)
                         <span className="text-green-600">매출 {y.revenue.toLocaleString()}원</span>
                         <span className="text-destructive">매입 {y.cost.toLocaleString()}원</span>
                         <span className={y.profit >= 0 ? "text-primary" : "text-destructive"}>
-                          순이익 {y.profit.toLocaleString()}원
+                          차액 {y.profit.toLocaleString()}원
                         </span>
                       </div>
                     </div>

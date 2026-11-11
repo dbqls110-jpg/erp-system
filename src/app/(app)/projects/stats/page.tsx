@@ -7,83 +7,24 @@ import { RevenueCharts } from "./RevenueChartsWrapper";
 import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
 import { getCalendarViewer } from "@/lib/calendarViewer";
-import { canViewLinkedProjects } from "@/lib/projectVisibility";
+import { isExternal } from "@/lib/calendarVisibility";
+import { currentKoreanDateKey } from "@/lib/dateFormat";
+import { projectFinanceStats } from "@/lib/projectFinanceStats";
 import { redirect } from "next/navigation";
-
-const now = new Date();
-
-function getQuarter(month: number) {
-  return Math.ceil(month / 3);
-}
 
 export default async function ProjectStatsPage() {
   const session = await getServerSession(authOptions);
   const viewer = await getCalendarViewer();
   // 외부 계정은 연결된 프로젝트 상세만 볼 수 있고, 회사 전체 매출·매입 통계는 볼 수 없다.
-  if (canViewLinkedProjects(viewer)) redirect("/projects");
-  await requireMenuAccess(session!.user.id, "projects", session!.user.role);
-  const year = now.getFullYear();
-
-  const projects = await prisma.project.findMany({
-    where: { revenue: { not: null } },
-    select: { id: true, name: true, revenue: true, cost: true, createdAt: true },
-    orderBy: { createdAt: "asc" },
+  if (!session?.user?.id || !viewer || session.user.active === false) redirect("/login");
+  if (isExternal(viewer)) redirect("/projects");
+  await requireMenuAccess(session.user.id, "projects", session.user.role);
+  const year = Number(currentKoreanDateKey().slice(0, 4));
+  const amounts = await prisma.projectAmount.findMany({
+    where: { kind: { in: ["revenue", "cost"] } },
+    select: { kind: true, amount: true, createdAt: true, paidDate: true, invoiceDate: true, expectedPaymentDate: true },
   });
-
-  // 월별 집계
-  const monthly: Record<number, { revenue: number; cost: number }> = {};
-  for (let m = 1; m <= 12; m++) monthly[m] = { revenue: 0, cost: 0 };
-
-  // 연도별 집계
-  const yearly: Record<number, { revenue: number; cost: number }> = {};
-
-  // 분기별 집계 (이번 연도)
-  const quarterly: Record<number, { revenue: number; cost: number }> = { 1: { revenue: 0, cost: 0 }, 2: { revenue: 0, cost: 0 }, 3: { revenue: 0, cost: 0 }, 4: { revenue: 0, cost: 0 } };
-
-  for (const p of projects) {
-    const d = new Date(p.createdAt);
-    const y = d.getFullYear();
-    const m = d.getMonth() + 1;
-    const q = getQuarter(m);
-    const rev = p.revenue ?? 0;
-    const cost = p.cost ?? 0;
-
-    if (y === year) {
-      monthly[m].revenue += rev;
-      monthly[m].cost += cost;
-      quarterly[q].revenue += rev;
-      quarterly[q].cost += cost;
-    }
-
-    if (!yearly[y]) yearly[y] = { revenue: 0, cost: 0 };
-    yearly[y].revenue += rev;
-    yearly[y].cost += cost;
-  }
-
-  const monthlyData = Array.from({ length: 12 }, (_, i) => ({
-    label: `${i + 1}월`,
-    revenue: monthly[i + 1].revenue,
-    cost: monthly[i + 1].cost,
-    profit: monthly[i + 1].revenue - monthly[i + 1].cost,
-  }));
-
-  const quarterlyData = [1, 2, 3, 4].map(q => ({
-    label: `${q}분기`,
-    revenue: quarterly[q].revenue,
-    cost: quarterly[q].cost,
-    profit: quarterly[q].revenue - quarterly[q].cost,
-  }));
-
-  const yearlyData = Object.entries(yearly).sort(([a], [b]) => Number(a) - Number(b)).map(([y, v]) => ({
-    label: `${y}년`,
-    revenue: v.revenue,
-    cost: v.cost,
-    profit: v.revenue - v.cost,
-  }));
-
-  const totalRevenue = yearly[year]?.revenue ?? 0;
-  const totalCost = yearly[year]?.cost ?? 0;
-  const totalProfit = totalRevenue - totalCost;
+  const { monthlyData, quarterlyData, yearlyData, totalRevenue, totalCost, totalProfit, undatedRevenueCount, undatedRevenueAmount } = projectFinanceStats(amounts, year);
 
   return (
     <div className="space-y-4 max-w-4xl">
@@ -92,10 +33,12 @@ export default async function ProjectStatsPage() {
           <ChevronLeft className="size-5" />
         </Link>
         <div>
-          <p className="mt-1 text-sm text-muted-foreground">매출과 매입, 순이익을 연도별로 확인할 수 있습니다.</p>
+          <p className="mt-1 text-sm text-muted-foreground">프로젝트 매출·매입을 연도별로 확인합니다. 별도 회사 장부·카드값은 포함하지 않습니다.</p>
+          <p className="mt-1 text-xs text-muted-foreground">매출: 실제 입금일 → 계산서 발행일 → 입금 예정일 · 매입: 금액 등록일(한국시간) · 차액은 매출 − 매입이며 당기순이익과 다릅니다.</p>
         </div>
       </div>
 
+      {undatedRevenueCount > 0 && <p role="status" className="rounded-lg border p-3 text-sm text-amber-700">매출 날짜 미정 {undatedRevenueCount}건 · {undatedRevenueAmount.toLocaleString()}원. 날짜를 임의로 넣지 않고 모든 기간 합계에서 제외했습니다.</p>}
       {/* 연간 요약 */}
       <div className="grid grid-cols-1 gap-4 @xl/main:grid-cols-3">
         <Card className="@container/card h-full shadow-xs">
@@ -112,7 +55,7 @@ export default async function ProjectStatsPage() {
         </Card>
         <Card className="@container/card h-full shadow-xs">
           <CardHeader>
-            <CardDescription>연 순이익</CardDescription>
+            <CardDescription>연 매출·매입 차액</CardDescription>
             <CardTitle className={`text-2xl font-semibold tabular-nums @[250px]/card:text-3xl ${totalProfit >= 0 ? "text-primary" : "text-destructive"}`}>
               {totalProfit.toLocaleString()}원
             </CardTitle>

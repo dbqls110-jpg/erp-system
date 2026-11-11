@@ -26,6 +26,7 @@ interface Props {
   projectId: string;
   files: ProjectFile[];
   canEdit: boolean;
+  appliedQuoteFileNames: string[];
   recoveryTasks?: Array<{ id: string; name: string; status: string; attempts: number }>;
 }
 
@@ -36,7 +37,7 @@ function formatBytes(bytes: number | null) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-export function ProjectFilesPanel({ projectId, files, canEdit, recoveryTasks = [] }: Props) {
+export function ProjectFilesPanel({ projectId, files, canEdit, appliedQuoteFileNames, recoveryTasks = [] }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -155,6 +156,9 @@ export function ProjectFilesPanel({ projectId, files, canEdit, recoveryTasks = [
                   )}
                   {formatBytes(file.size)}
                 </p>
+                {isInternalQuoteFileName(file.name) && !appliedQuoteFileNames.includes(file.name) && (
+                  <p role="status" className="mt-1 text-xs text-amber-700">금액 미반영 · 금액 재분석으로 원본을 확인해 주세요.</p>
+                )}
               </div>
               <a
                 href={file.driveUrl}
@@ -170,7 +174,7 @@ export function ProjectFilesPanel({ projectId, files, canEdit, recoveryTasks = [
                 {isInternalQuoteFileName(file.name) && <button type="button" onClick={() => handleQuotePreview(file)} disabled={isPending}
                   title="견적서 금액 재분석" aria-label={`${file.name} 금액 재분석`}
                   className="shrink-0 rounded px-1 text-xs text-muted-foreground hover:text-primary disabled:opacity-50">
-                  <RefreshCw size={15} />
+                  <span className="inline-flex items-center gap-1"><RefreshCw size={15} /> 재분석</span>
                 </button>}
                 <button
                   onClick={() => handleDelete(file)}

@@ -134,6 +134,22 @@ describe.skipIf(!enabled)("실제 PostgreSQL 지급 저장 및 동시성", () =>
     await expect(prisma.projectAmount.delete({ where: { id: costId } })).rejects.toMatchObject({ code: "P2003" });
   });
 
+  it("첨부만 남은 견적서 금액 복구는 중복·임의 날짜·지급 기록 없이 저장된다", async () => {
+    const fileName = "내부용 견적서.xlsx";
+    await prisma.projectFile.create({ data: { projectId: otherProjectId, driveFileId: "isolated-fixture", name: fileName, mimeType: "application/xlsx", driveUrl: "https://example.com/fixture" } });
+    expect(await prisma.projectAmount.count({ where: { projectId: otherProjectId } })).toBe(0);
+    const apply = () => prisma.$transaction(async tx => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${otherProjectId}))`;
+      return upsertQuoteAmounts(otherProjectId, fileName, { revenue: 2_244_000, cost: 1_384_328 }, tx);
+    });
+    await Promise.all([apply(), apply()]);
+    const rows = await prisma.projectAmount.findMany({ where: { projectId: otherProjectId }, include: { payments: true } });
+    expect(rows).toHaveLength(2);
+    expect(rows.find(row => row.kind === "revenue")).toMatchObject({ amount: 2_244_000, paidDate: null, invoiceDate: null, expectedPaymentDate: null });
+    expect(rows.find(row => row.kind === "cost")).toMatchObject({ amount: 1_384_328, costSettled: false, payments: [] });
+    expect(await prisma.project.findUniqueOrThrow({ where: { id: otherProjectId } })).toMatchObject({ revenue: 2_244_000, cost: 1_384_328 });
+  });
+
   it("외부 계정·다른 프로젝트·매출·잘못된 날짜는 실제 DB를 바꾸지 않는다", async () => {
     m.session.mockResolvedValue({ user: { ...staff, role: "partner", partnerId: "external-1" } });
     await expect(saveProjectCostPayment(projectId, costId, payment("reject-external"))).rejects.toThrow();

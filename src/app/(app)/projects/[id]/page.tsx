@@ -199,7 +199,9 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
           </CardTitle>
         </CardHeader>
         <CardContent className="px-4 py-4">
-          <ProjectFilesPanel projectId={project.id} files={project.files} canEdit={canEdit} recoveryTasks={project.uploadRecoveries ?? []} />
+          <ProjectFilesPanel projectId={project.id} files={project.files} canEdit={canEdit}
+            appliedQuoteFileNames={project.amounts.filter(amount => amount.label === "견적서" && amount.sourceFileName !== null).map(amount => amount.sourceFileName!)}
+            recoveryTasks={project.uploadRecoveries ?? []} />
         </CardContent>
       </Card>
 
