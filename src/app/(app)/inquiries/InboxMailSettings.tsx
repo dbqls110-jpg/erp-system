@@ -36,7 +36,11 @@ export function InboxMailSettings({ data, onChange }: { data: PrivateInboxView; 
         form.querySelector<HTMLInputElement>('input[name="password"]')?.setAttribute("value", "");
         const passwordField = form.elements.namedItem("password");
         if (passwordField instanceof HTMLInputElement) passwordField.value = "";
-        run(async () => { onChange(await connectNaverInboxAction(input)); setMessage("네이버 연결 완료. 수신 버튼으로 메일을 불러오세요."); });
+        run(async () => {
+          const result = await connectNaverInboxAction(input);
+          if (!result.ok) { setMessage(result.message); return; }
+          onChange(result.data); setMessage("네이버 연결 완료. 수신 버튼으로 메일을 불러오세요.");
+        });
       }}>
         <label className="text-xs font-medium">메일 서비스<select value={provider} onChange={event => setProvider(event.target.value)} className="mt-1 block h-10 w-full rounded-lg border border-input bg-background px-3 text-sm"><option value="gmail">Gmail</option><option value="naver">네이버</option></select></label>
         <label className="text-xs font-medium">가져올 {provider === "gmail" ? "라벨" : "메일함"}<input key={provider} name="folder" required maxLength={100} defaultValue={provider === "gmail" ? "ERP문의" : "INBOX"} className="mt-1 h-10 w-full rounded-lg border border-input bg-background px-3 text-sm" /></label>
