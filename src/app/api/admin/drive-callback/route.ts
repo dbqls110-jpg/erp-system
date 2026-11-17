@@ -4,6 +4,8 @@ import { authOptions } from "@/lib/auth";
 import { google } from "googleapis";
 import { prisma } from "@/lib/prisma";
 import { encryptForStorage, clearDriveTokenCache } from "@/lib/googleClient";
+import { isInquiryEmailCallback, completeInquiryEmailOAuth } from "@/lib/inquiryEmailOAuth";
+import { isMailboxCallback, completeMailboxOAuth } from "@/lib/privateInboxOAuth";
 
 const CALLBACK_URL = "https://erp-system-lojo.onrender.com/api/admin/drive-callback";
 
@@ -12,6 +14,8 @@ const CALLBACK_URL = "https://erp-system-lojo.onrender.com/api/admin/drive-callb
 // refresh_token을 암호화해 DB에 영구 저장.
 // 토큰 원문은 응답·URL·로그 어디에도 노출하지 않는다.
 export async function GET(req: NextRequest) {
+  if (isMailboxCallback(req)) return completeMailboxOAuth(req);
+  if (isInquiryEmailCallback(req)) return completeInquiryEmailOAuth(req);
   const session = await getServerSession(authOptions);
   if (session?.user?.role !== "admin") {
     return NextResponse.json({ error: "Unauthorized" }, { status: 403 });

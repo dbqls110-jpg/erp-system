@@ -13,7 +13,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { LogOut, Menu, Mail, ExternalLink, LayoutDashboard, MessageCircle } from "lucide-react";
 import { clockOut } from "@/app/actions/attendance";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type Ref } from "react";
 import { useMessenger } from "@/lib/messenger-store";
 
 const pageTitle: Record<string, string> = {
@@ -44,6 +44,8 @@ interface HeaderProps {
     role: string;
   };
   onMobileMenuOpen?: () => void;
+  mobileMenuOpen?: boolean;
+  mobileMenuTriggerRef?: Ref<HTMLButtonElement>;
 }
 
 const roleLabel: Record<string, { label: string }> = {
@@ -57,7 +59,7 @@ const roleLabel: Record<string, { label: string }> = {
   pending: { label: "승인 대기" },
 };
 
-export function Header({ user, onMobileMenuOpen }: HeaderProps) {
+export function Header({ user, onMobileMenuOpen, mobileMenuOpen = false, mobileMenuTriggerRef }: HeaderProps) {
   const pathname = usePathname();
   const router = useRouter();
   // 미읽음 수는 MessengerProvider 가 이미 가져오는 대화 목록에서 나온다.
@@ -151,9 +153,14 @@ export function Header({ user, onMobileMenuOpen }: HeaderProps) {
       <div className="flex items-center gap-3">
         {onMobileMenuOpen && (
           <button
+            type="button"
+            ref={mobileMenuTriggerRef}
             onClick={onMobileMenuOpen}
             aria-label="메뉴 열기"
-            className="lg:hidden text-muted-foreground hover:text-foreground p-1"
+            aria-expanded={mobileMenuOpen}
+            aria-controls={mobileMenuOpen ? "mobile-navigation" : undefined}
+            aria-haspopup="dialog"
+            className="inline-flex size-10 items-center justify-center rounded-md text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring lg:hidden"
           >
             <Menu size={20} />
           </button>

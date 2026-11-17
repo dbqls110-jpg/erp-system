@@ -1,0 +1,31 @@
+name: Inquiry email notifications
+on:
+  workflow_dispatch:
+  schedule:
+    # Cloud-only, every five minutes. GitHub may delay scheduled runs.
+    - cron: '*/5 * * * *'
+permissions: {}
+concurrency:
+  group: inquiry-email-notifications
+  cancel-in-progress: false
+jobs:
+  notify:
+    if: vars.ERP_MAINTENANCE_ENABLED == 'true' && vars.INQUIRY_EMAIL_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - name: Check new inquiries without client polling
+        env:
+          MAINTENANCE_SECRET: ${{ secrets.ERP_MAINTENANCE_SECRET }}
+        run: |
+          set -euo pipefail
+          if [ -z "$MAINTENANCE_SECRET" ]; then
+            echo "Maintenance credential is not configured."
+            exit 1
+          fi
+          status=$(printf 'Authorization: Bearer %s\n' "$MAINTENANCE_SECRET" | curl --silent --show-error --max-time 180 --output /dev/null --write-out '%{http_code}' \
+            --request POST --header @- https://erp-system-lojo.onrender.com/api/agent/inquiries/email) || status=000
+          if [ "$status" != "200" ]; then
+            echo "Inquiry notification check returned HTTP $status."
+            exit 1
+          fi

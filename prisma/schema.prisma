@@ -51,6 +51,10 @@ model User {
   createdVenues    Venue[] @relation("VenueCreatedBy")
   partyQuotes      PartyQuote[]
   inquiryReads     InquiryReadReceipt[]
+  inquiryEmail     InquiryEmailConfig?
+  mailboxes        InboxMailbox[]
+  mailboxOAuth     InboxOAuthAttempt[]
+  inquiryFollowUps InboxFollowUp[]
 
   partner  Partner?  @relation(fields: [partnerId], references: [id], onDelete: SetNull)
   customer Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
@@ -63,6 +67,97 @@ model User {
   @@index([venueId])
   @@index([staffUserId])
   @@map("users")
+}
+
+model InboxMailbox {
+  id                  String   @id @default(cuid())
+  ownerId             String
+  owner               User     @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  provider            String
+  email               String
+  folder              String
+  encryptedCredential String
+  lastSyncedAt        DateTime?
+  lastErrorCode       String?
+  leaseToken          String?
+  leaseUntil          DateTime?
+  createdAt           DateTime @default(now())
+  messages            InboxMail[]
+  @@unique([ownerId, provider, email])
+  @@map("inbox_mailboxes")
+}
+
+model InboxMail {
+  id                String @id @default(cuid())
+  mailboxId         String
+  mailbox           InboxMailbox @relation(fields: [mailboxId], references: [id], onDelete: Cascade)
+  providerMessageId String
+  subject           String
+  senderName        String
+  senderEmail       String
+  body              String
+  receivedAt        DateTime
+  @@unique([mailboxId, providerMessageId])
+  @@index([mailboxId, receivedAt])
+  @@map("inbox_mail")
+}
+
+model InboxOAuthAttempt {
+  stateHash String @id
+  ownerId   String
+  owner     User @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  folder    String
+  expiresAt DateTime
+  @@index([expiresAt])
+  @@map("inbox_oauth_attempts")
+}
+
+model InboxFollowUp {
+  id        String @id @default(cuid())
+  ownerId   String
+  owner     User @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  itemKey   String
+  dueAt     DateTime?
+  note      String @default("")
+  version   Int @default(1)
+  @@unique([ownerId, itemKey])
+  @@map("inbox_follow_ups")
+}
+
+model InquiryEmailConfig {
+  id                    String    @id @default("owner")
+  userId                String    @unique
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Restrict)
+  encryptedRefreshToken String?
+  enabled               Boolean   @default(false)
+  initializedAt         DateTime?
+  connectedAt           DateTime?
+  lastCheckedAt         DateTime?
+  lastSentAt            DateTime?
+  lastErrorCode         String?
+  oauthStateHash        String?
+  oauthExpiresAt        DateTime?
+  leaseToken            String?
+  leaseUntil            DateTime?
+  deliveries            InquiryEmailDelivery[]
+  @@map("inquiry_email_config")
+}
+
+model InquiryEmailDelivery {
+  configId       String
+  config         InquiryEmailConfig @relation(fields: [configId], references: [id], onDelete: Restrict)
+  itemKey        String
+  status         String    @default("pending")
+  attempts       Int       @default(0)
+  attemptToken   String?
+  attemptedAt    DateTime?
+  nextAttemptAt  DateTime  @default(now())
+  sentAt         DateTime?
+  gmailMessageId String?
+  createdAt      DateTime  @default(now())
+  @@id([configId, itemKey])
+  @@index([configId, status, nextAttemptAt])
+  @@map("inquiry_email_deliveries")
 }
 
 // ─── NextAuth ─────────────────────────────────────────────

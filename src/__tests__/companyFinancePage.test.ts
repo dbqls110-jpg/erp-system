@@ -56,7 +56,9 @@ describe("회사 재무 필터 페이지", () => {
     expect(mocks.entries.mock.calls[0][0].where).toMatchObject({ company: "인포피아", OR: expect.any(Array) });
     expect(mocks.amounts.mock.calls[0][0].where).toMatchObject({ project: { company: "인포피아" }, OR: expect.any(Array) });
     expect(html).toContain("인포피아 · 2026년 9월 · 4건");
-    for (const value of ["251,000원", "50,000원", "20,000원", "181,000원", "9월 합계", "2026-09-01"]) expect(html).toContain(value);
+    for (const value of ["251,000원", "50,000원", "20,000원", "181,000원", "142,810원", "9월 합계", "2026-09-01"]) expect(html).toContain(value);
+    expect(html).toContain("관리상 순이익 · 19% 차감");
+    expect(html).not.toContain("순이익 (카드값 차감 후)");
     expect(html).not.toContain("1분기");
     expect(html).not.toContain("연간 합계");
     expect(html).toContain('value="인포피아" selected=""');
@@ -96,6 +98,8 @@ describe("회사 재무 필터 페이지", () => {
       createdAt: new Date("2026-10-01T00:00:00Z"), paidDate: null, invoiceDate: null, expectedPaymentDate: null, project: { name: "날짜 없는 매출", company: "인포피아" } }]);
     const html = renderToStaticMarkup(await Page({ searchParams: Promise.resolve({ year: "2026", month: "10" }) }));
     expect(html).toContain("매출 날짜 미정"); expect(html).toContain("날짜 없는 매출"); expect(html).toContain("2026년 10월 · 0건");
+    expect(html).toMatch(/<details[^>]+data-testid="undated-revenues"/);
+    expect(html.match(/<details[^>]*>/)?.[0]).not.toContain("open=");
     expect(html.replace(/<[^>]+>/g, "").replace(/\s+/g, "")).toContain("조회매출합계0원");
   });
 

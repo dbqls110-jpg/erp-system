@@ -265,12 +265,12 @@ export function SpaceRegistrationKanban({ initialRegistrations, canEdit }: Props
           </div>
           <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-[12px] text-[#6b7280] dark:text-muted-foreground">
             <span>표시 <span className="font-semibold tabular-nums text-foreground">{filteredRegistrations.length}</span>건 · 전체 {registrations.length}건</span>
-            <span>{canEdit ? "카드를 끌어 단계에 놓으세요" : "카드를 더블클릭하면 상세 내용을 볼 수 있습니다"}</span>
+            <span>{canEdit ? "제목을 눌러 상세 보기 · 카드를 끌어 단계에 놓으세요" : "카드 제목을 눌러 상세 내용을 확인하세요"}</span>
           </div>
         </div>
 
         {registrations.length === 0 && (
-          <div className="mb-3 flex items-center gap-3 rounded-[10px] border border-dashed border-[#d1d5db] bg-transparent px-4 py-3 text-[13px] text-[#9ca3af] dark:border-muted dark:text-muted-foreground">
+          <div className="mb-3 flex items-center gap-3 rounded-[10px] border border-dashed border-[#d1d5db] bg-transparent px-4 py-3 text-[13px] text-muted-foreground dark:border-muted">
             <Inbox className="size-5 shrink-0 text-primary" />
             <div>
               <p className="font-medium text-foreground">아직 등록된 공간이 없습니다.</p>
@@ -280,7 +280,7 @@ export function SpaceRegistrationKanban({ initialRegistrations, canEdit }: Props
         )}
 
         {registrations.length > 0 && filteredRegistrations.length === 0 && (
-          <div className="mb-3 flex items-center gap-3 rounded-[10px] border border-dashed border-[#d1d5db] bg-transparent px-4 py-3 text-[13px] text-[#9ca3af] dark:border-muted dark:text-muted-foreground">
+          <div className="mb-3 flex items-center gap-3 rounded-[10px] border border-dashed border-[#d1d5db] bg-transparent px-4 py-3 text-[13px] text-muted-foreground dark:border-muted">
             <Search className="size-5 shrink-0 text-primary" />
             <div>
               <p className="font-medium text-foreground">조건에 맞는 공간 등록이 없습니다.</p>
@@ -314,7 +314,7 @@ export function SpaceRegistrationKanban({ initialRegistrations, canEdit }: Props
                   </div>
                   <div className="flex flex-1 flex-col gap-2">
                     {items.length === 0 ? (
-                      <div className="flex min-h-[120px] flex-1 items-center justify-center rounded-[10px] border border-dashed border-[#d1d5db] bg-transparent px-3 text-center text-[12px] text-[#9ca3af] dark:border-muted dark:text-muted-foreground">
+                      <div className="flex min-h-[120px] flex-1 items-center justify-center rounded-[10px] border border-dashed border-[#d1d5db] bg-transparent px-3 text-center text-[12px] text-muted-foreground dark:border-muted">
                         이 단계의 공간 등록이 없습니다.
                       </div>
                     ) : items.map((registration) => {
@@ -339,7 +339,6 @@ export function SpaceRegistrationKanban({ initialRegistrations, canEdit }: Props
                             draggedId === registration.id && "opacity-50",
                             saving && "cursor-wait opacity-70",
                           )}
-                          title="더블클릭하여 상세 보기"
                         >
                           {age.overdue && (
                             <span className="inline-flex w-fit items-center self-start rounded-[6px] bg-[#fee2e2] px-2 py-[3px] text-[11px] font-semibold text-[#dc2626] dark:bg-red-950/60 dark:text-red-300">
@@ -347,8 +346,8 @@ export function SpaceRegistrationKanban({ initialRegistrations, canEdit }: Props
                             </span>
                           )}
                           <div className="flex items-baseline justify-between gap-2">
-                            <p className="min-w-0 truncate text-[14px] font-semibold text-foreground">{displayValue(registration.spaceName)}</p>
-                            <p className="shrink-0 text-[11px] text-[#9ca3af] dark:text-muted-foreground">접수 {displayDate(registration.receivedAt)}</p>
+                            <button type="button" onClick={() => openDetail(registration)} aria-label={`${displayValue(registration.spaceName)} 공간 등록 상세 보기`} className="min-h-9 min-w-0 truncate rounded-sm text-left text-[14px] font-semibold text-foreground underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">{displayValue(registration.spaceName)}</button>
+                            <p className="shrink-0 text-[11px] text-muted-foreground">접수 {displayDate(registration.receivedAt)}</p>
                           </div>
                           <p className="line-clamp-3 whitespace-pre-wrap text-[13px] leading-[1.5] text-foreground">
                             {displayValue(registration.description)}

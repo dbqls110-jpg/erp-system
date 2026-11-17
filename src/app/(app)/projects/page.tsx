@@ -100,16 +100,15 @@ export default async function ProjectsPage({
             const s = statusConfig[p.status] ?? statusConfig.active;
             const progress = getDisplayedProjectProgress(p.status, p.progress);
             return (
-              <Link key={p.id} href={`/projects/${p.id}`}>
-                <Card className="h-full rounded-[12px] border border-border py-0 shadow-none transition-all hover:border-[#d8d4fb] hover:shadow-sm">
+                <Card key={p.id} className="group relative h-full rounded-[12px] border border-border py-0 shadow-none transition-[border-color,box-shadow] hover:border-[#d8d4fb] hover:shadow-sm focus-within:ring-2 focus-within:ring-ring">
                   <CardHeader className="gap-[6px] px-[18px] pb-3 pt-4">
                     <div className="flex items-start justify-between gap-2">
                       <CardTitle className="line-clamp-1 text-[14px] font-semibold text-foreground">
-                        {p.name}
+                        <Link href={`/projects/${p.id}`} className="after:absolute after:inset-0 focus-visible:outline-none">{p.name}</Link>
                       </CardTitle>
                       <div className="flex items-center gap-1 shrink-0">
                         <Badge variant="outline" className={s.class}>{s.label}</Badge>
-                        {isAdmin && <ProjectDeleteButton id={p.id} name={p.name} />}
+                        {isAdmin && <span className="relative z-10"><ProjectDeleteButton id={p.id} name={p.name} /></span>}
                       </div>
                     </div>
                     {p.client && <p className="text-[12px] text-muted-foreground">{p.client}</p>}
@@ -137,7 +136,6 @@ export default async function ProjectsPage({
                     </div>
                   </CardContent>
                 </Card>
-              </Link>
             );
           })}
         </div>

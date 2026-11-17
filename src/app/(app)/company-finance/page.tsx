@@ -21,6 +21,7 @@ import { toneBadgeClass } from "@/lib/badge-tone";
 import { resolveRevenueDate } from "@/lib/revenueDates";
 import { RevenueDatesButton } from "@/components/RevenueDatesButton";
 import { canEditRevenueDates } from "@/lib/revenueDateAccess";
+import { calculateCompanyNetIncome } from "@/lib/financeMetrics";
 
 function formatWon(value: number) {
   return `${value.toLocaleString()}원`;
@@ -118,6 +119,7 @@ export default async function CompanyFinancePage({
   const totalCost = summaries.reduce((sum, summary) => sum + summary.cost, 0) + unassigned.cost;
   const totalCard = summaries.reduce((sum, summary) => sum + summary.card, 0) + unassigned.card;
   const totalProfit = totalRevenue - totalCost - totalCard;
+  const totalNetIncome = calculateCompanyNetIncome({ revenue: totalRevenue, cost: totalCost, card: totalCard });
   const visibleQuarters = month === null ? QUARTERS : QUARTERS.filter((quarter) => quarter === Math.ceil(month / 3));
   const defaultDate = year === currentYear
     ? currentKoreanDateKey()
@@ -128,7 +130,7 @@ export default async function CompanyFinancePage({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="min-w-0">
           <p className="text-sm text-muted-foreground">회사별·월별 매출·매입·카드값과 순이익을 조회합니다.</p>
-          <p className="mt-1 text-xs text-muted-foreground">프로젝트에 넣은 매출·매입은 자동으로 들어옵니다. 여기에 또 넣으면 두 번 셉니다. 카드값은 매입 합계에서 제외하고 순이익에서만 차감합니다.</p>
+          <p className="mt-1 text-xs text-muted-foreground">프로젝트에 넣은 매출·매입은 자동으로 들어옵니다. 여기에 또 넣으면 두 번 셉니다. 카드값은 매입 합계에 포함하지 않습니다.</p>
           <p className="mt-1 text-xs text-muted-foreground">조회 날짜 기준: 매출은 실제 입금일 → 계산서 발행일 → 입금 예정일 순입니다. 기존 회사 장부의 발생일은 날짜 수정 전까지 보존합니다. 매입·카드값의 기존 기준은 유지합니다.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -138,16 +140,18 @@ export default async function CompanyFinancePage({
       </div>
 
       <CompanyFinanceFilters filters={filters} currentYear={currentYear} />
-      {undatedItems.length > 0 && <Card className="border-amber-200">
-        <CardHeader><CardTitle>매출 날짜 미정 · {undatedItems.length}건</CardTitle><CardDescription>작성일로 임의 집계하지 않습니다. 아래 금액은 월별·분기별·연간 합계에서 제외됩니다. 날짜 미정 내역은 선택한 회사 기준으로 모든 기간에 표시됩니다.</CardDescription></CardHeader>
-        <CardContent className="space-y-3">{undatedItems.map(item => <div key={`${item.source}-${item.id}`} className="flex flex-wrap items-center justify-between gap-2">
+      {undatedItems.length > 0 && <details className="rounded-xl border border-amber-300 bg-amber-50/40" data-testid="undated-revenues">
+        <summary className="cursor-pointer rounded-xl px-4 py-3 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">매출 날짜 미정 · {undatedItems.length}건 · 기간 합계 제외 <span className="ml-2 font-normal text-muted-foreground">내역 펼치기</span></summary>
+        <div className="space-y-3 border-t border-amber-200 p-4">
+          <p className="text-sm text-muted-foreground">작성일로 임의 집계하지 않습니다. 아래 금액은 월별·분기별·연간 합계에서 제외됩니다. 날짜 미정 내역은 선택한 회사 기준으로 모든 기간에 표시됩니다.</p>
+          {undatedItems.map(item => <div key={`${item.source}-${item.id}`} className="flex flex-wrap items-center justify-between gap-2">
           <div><p className="text-sm">{item.source === "project" ? <Link href={`/projects/${item.projectId}`}>{item.projectName}</Link> : item.title} · {item.company ?? "미배정"}</p><p className="text-sm font-semibold">{formatWon(item.amount)}</p></div>
           {canEditDates && (item.source === "entry" ? canEdit : canEditProjects) && <RevenueDatesButton source={item.source} id={item.id} dates={item} />}
-        </div>)}</CardContent>
-      </Card>}
+        </div>)}</div>
+      </details>}
       <p className="text-sm font-medium" role="status">{filterLabel} · {displayItems.length}건</p>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
         <Card className="rounded-[12px] border border-border py-0 shadow-none">
           <CardHeader className="gap-[6px] px-[18px] py-4">
             <CardDescription className="text-[12px]">조회 매출 합계</CardDescription>
@@ -168,11 +172,18 @@ export default async function CompanyFinancePage({
         </Card>
         <Card className="rounded-[12px] border border-border py-0 shadow-none">
           <CardHeader className="gap-[6px] px-[18px] py-4">
-            <CardDescription className="text-[12px]">순이익 (카드값 차감 후)</CardDescription>
+            <CardDescription className="text-[12px]">조회 차액 · 카드값 차감 후</CardDescription>
             <CardTitle className={`text-[26px] font-bold leading-tight tracking-[-0.01em] tabular-nums ${metricClass(totalProfit)}`} style={{ fontFamily: "var(--font-plus-jakarta-sans)" }}>{formatWon(totalProfit)}</CardTitle>
           </CardHeader>
         </Card>
+        <Card className="rounded-[12px] border border-border py-0 shadow-none">
+          <CardHeader className="gap-[6px] px-[18px] py-4">
+            <CardDescription className="text-[12px]">관리상 순이익 · 19% 차감</CardDescription>
+            <CardTitle className={`text-[26px] font-bold leading-tight tracking-[-0.01em] tabular-nums ${metricClass(totalNetIncome)}`}>{formatWon(totalNetIncome)}</CardTitle>
+          </CardHeader>
+        </Card>
       </div>
+      <p className="text-xs leading-relaxed text-muted-foreground">조회 차액 = 매출 − 매입 − 카드값. 관리상 순이익 = (매출 − 매입) × 81%에서 원 미만 버림 − 카드값. 프로젝트의 19% 차감 기준을 사용하며 법정 세액 계산이 아닙니다. 날짜 미정 매출은 제외되므로 프로젝트 전체 금액과는 다를 수 있습니다.</p>
 
       <div className="grid grid-cols-1 gap-3 xl:grid-cols-3">
         {summaries.map((summary) => (
@@ -201,7 +212,7 @@ export default async function CompanyFinancePage({
                       <span className="truncate"><span className="text-muted-foreground">매출 </span><span className="tabular-nums text-primary">{formatWon(data.revenue)}</span></span>
                       <span className="truncate"><span className="text-muted-foreground">매입 </span><span className="tabular-nums text-destructive">{formatWon(data.cost)}</span></span>
                       <span className="truncate"><span className="text-muted-foreground">카드 </span><span className="tabular-nums text-amber-700 dark:text-amber-300">{formatWon(data.card)}</span></span>
-                      <span className={`truncate ${metricClass(data.profit)}`}><span className="text-muted-foreground">이익 </span><span className="tabular-nums">{formatWon(data.profit)}</span></span>
+                      <span className={`truncate ${metricClass(calculateCompanyNetIncome(data))}`} title="(매출 − 매입) × 81%에서 원 미만 버림 − 카드값"><span className="text-muted-foreground">순이익 </span><span className="tabular-nums">{formatWon(calculateCompanyNetIncome(data))}</span></span>
                     </div>
                   );
                 })}
@@ -209,8 +220,8 @@ export default async function CompanyFinancePage({
               {/* 위 분기 행과 같은 좌우 여백(px-2)을 줘야 왼쪽 글자와 오른쪽 숫자 열이 맞는다.
                   글자 크기도 분기 행(12px)에 맞추고 금액만 굵게 — 줄 하나만 커지면 떠 보인다. */}
               <div className="mt-2 flex items-baseline justify-between border-t border-border px-2 pt-2.5 text-xs">
-                <span className="font-medium text-muted-foreground">{month === null ? "연간 합계" : `${month}월 합계`}</span>
-                <span className={`text-sm font-bold tabular-nums ${metricClass(summary.profit)}`} style={{ fontFamily: "var(--font-plus-jakarta-sans)" }}>{formatWon(summary.profit)}</span>
+                <span className="font-medium text-muted-foreground">{month === null ? "연간 합계" : `${month}월 합계`} · 관리상 순이익</span>
+                <span className={`text-sm font-bold tabular-nums ${metricClass(calculateCompanyNetIncome(summary))}`} style={{ fontFamily: "var(--font-plus-jakarta-sans)" }}>{formatWon(calculateCompanyNetIncome(summary))}</span>
               </div>
             </CardContent>
           </Card>
@@ -231,8 +242,8 @@ export default async function CompanyFinancePage({
             <CardContent className="px-4 py-3">
               {/* 회사 카드의 "연간 합계" 줄과 같은 모양. 카드마다 합계 줄이 다르게 생기면 눈이 헤맨다. */}
               <div className="flex items-baseline justify-between text-xs">
-                <span className="font-medium text-muted-foreground">이익</span>
-                <span className={`text-sm font-bold tabular-nums ${metricClass(unassigned.profit)}`} style={{ fontFamily: "var(--font-plus-jakarta-sans)" }}>{formatWon(unassigned.profit)}</span>
+                <span className="font-medium text-muted-foreground">관리상 순이익</span>
+                <span className={`text-sm font-bold tabular-nums ${metricClass(calculateCompanyNetIncome(unassigned))}`} style={{ fontFamily: "var(--font-plus-jakarta-sans)" }}>{formatWon(calculateCompanyNetIncome(unassigned))}</span>
               </div>
             </CardContent>
           </Card>

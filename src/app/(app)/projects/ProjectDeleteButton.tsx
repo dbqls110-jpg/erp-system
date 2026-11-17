@@ -26,12 +26,14 @@ export function ProjectDeleteButton({ id, name }: { id: string; name: string }) 
   return (
     <>
       <Button
+        type="button"
+        aria-label={`${name} 프로젝트 삭제`}
         variant="ghost"
         size="icon"
         className="size-8 text-muted-foreground hover:text-red-500 hover:bg-red-50 shrink-0"
         onClick={(e) => { e.preventDefault(); e.stopPropagation(); setOpen(true); }}
       >
-        <Trash2 size={13} />
+        <Trash2 size={13} aria-hidden="true" />
       </Button>
 
       <Dialog open={open} onOpenChange={setOpen}>

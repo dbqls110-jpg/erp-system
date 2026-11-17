@@ -8,6 +8,8 @@ import type { InquiryKeyGroups } from "@/lib/inquiryNotificationKeys";
 import { InquiriesKanban } from "./InquiriesKanban";
 import { SpaceRegistrationKanban } from "./SpaceRegistrationKanban";
 import { SpaceRentalKanban } from "./SpaceRentalKanban";
+import { UnifiedInquiryInbox } from "./UnifiedInquiryInbox";
+import type { InquiryBranch } from "@/lib/inquiryInbox";
 import type { InquiryRecord } from "@/lib/inquiries";
 import type { SpaceRegistrationRecord } from "@/lib/spaceRegistrations";
 import type { SpaceRentalRecord } from "@/lib/spaceRentals";
@@ -20,18 +22,24 @@ interface Props {
   notificationKeys: InquiryKeyGroups;
 }
 
-type Branch = "customer" | "space-registration" | "space-rental";
+type View = "unified" | InquiryBranch;
+const views: ReadonlyArray<{ value: View; label: string }> = [
+  { value: "unified", label: "통합 보기" },
+  { value: "customer", label: "고객 문의" },
+  { value: "space-registration", label: "공간 등록" },
+  { value: "space-rental", label: "공간대관" },
+];
 
 export function InquiriesWorkspace({ initialInquiries, initialSpaceRegistrations, initialSpaceRentals, canEdit, notificationKeys }: Props) {
-  const [branch, setBranch] = useState<Branch>("customer");
+  const [view, setView] = useState<View>("unified");
   const notifications = useInquiryNotifications();
   const router = useRouter();
   const acknowledged = useRef(new Set<string>());
-  const key = `${branch}:${notificationKeys[branch].join("|")}`;
+  const key = view === "unified" ? "unified" : `${view}:${notificationKeys[view].join("|")}`;
   useVisiblePolling(async () => {
-    if (!notifications.enabled || document.visibilityState !== "visible" || acknowledged.current.has(key)) return;
+    if (view === "unified" || !notifications.enabled || document.visibilityState !== "visible" || acknowledged.current.has(key)) return;
     acknowledged.current.add(key);
-    try { await notifications.markRead(notificationKeys[branch]); }
+    try { await notifications.markRead(notificationKeys[view]); }
     catch { acknowledged.current.delete(key); }
   }, 30_000, { refreshKey: key });
   const unreadBadge = (value: number) => value > 0 ? <span className="ml-1.5 rounded-full bg-red-600 px-1.5 text-[11px] text-white" aria-label={`미확인 ${value}건`}>{value}</span> : null;
@@ -39,52 +47,23 @@ export function InquiriesWorkspace({ initialInquiries, initialSpaceRegistrations
 
   return (
     <div className="space-y-4">
-      <div className="inline-flex gap-0.5 rounded-[10px] bg-[#e9ebf0] p-[3px] dark:bg-muted/50" role="tablist" aria-label="문의 갈래">
-        <button
-          type="button"
-          role="tab"
-          aria-selected={branch === "customer"}
-          className={`rounded-[8px] px-3.5 py-1.5 text-[13px] transition ${branch === "customer" ? "bg-white font-semibold text-foreground shadow-[0_1px_2px_rgba(0,0,0,0.06)] dark:bg-card" : "font-normal text-[#6b7280] hover:text-foreground dark:text-muted-foreground"}`}
-          onClick={() => setBranch("customer")}
-        >
-          고객 문의{unreadBadge(notifications.counts.customer)}
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={branch === "space-registration"}
-          className={`rounded-[8px] px-3.5 py-1.5 text-[13px] transition ${branch === "space-registration" ? "bg-white font-semibold text-foreground shadow-[0_1px_2px_rgba(0,0,0,0.06)] dark:bg-card" : "font-normal text-[#6b7280] hover:text-foreground dark:text-muted-foreground"}`}
-          onClick={() => setBranch("space-registration")}
-        >
-          <span>공간 등록</span>
-          {unreadBadge(notifications.counts["space-registration"])}
-          {newSpaceRegistrationCount > 0 && (
-            <span className="ml-1.5 inline-flex min-w-4 items-center justify-center rounded-full bg-primary px-1.5 text-[10px] font-semibold leading-4 text-primary-foreground">
-              {newSpaceRegistrationCount}
-            </span>
-          )}
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={branch === "space-rental"}
-          className={`rounded-[8px] px-3.5 py-1.5 text-[13px] transition ${branch === "space-rental" ? "bg-white font-semibold text-foreground shadow-[0_1px_2px_rgba(0,0,0,0.06)] dark:bg-card" : "font-normal text-[#6b7280] hover:text-foreground dark:text-muted-foreground"}`}
-          onClick={() => setBranch("space-rental")}
-        >
-          공간대관{unreadBadge(notifications.counts["space-rental"])}
-        </button>
+      <div className="inline-flex flex-wrap gap-0.5 rounded-[10px] bg-muted p-[3px]" role="group" aria-label="문의 보기 선택">
+        {views.map(item => <button key={item.value} type="button" aria-pressed={view === item.value} onClick={() => setView(item.value)} className={`min-h-10 rounded-lg px-3.5 py-1.5 text-[13px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${view === item.value ? "bg-background font-semibold text-foreground shadow-xs" : "text-muted-foreground hover:text-foreground"}`}>
+          {item.label}{item.value !== "unified" && unreadBadge(notifications.counts[item.value])}
+          {item.value === "space-registration" && newSpaceRegistrationCount > 0 && <span className="ml-1.5 rounded-full bg-primary px-1.5 text-[10px] text-primary-foreground" aria-label={`신규 접수 ${newSpaceRegistrationCount}건`}>{newSpaceRegistrationCount}</span>}
+        </button>)}
       </div>
-      <p className="text-xs text-muted-foreground">현재 갈래의 목록을 열면 내 계정에서만 확인 처리합니다. 다른 담당자의 미확인 상태는 유지됩니다.</p>
       {notifications.failed && <p role="alert" className="text-sm text-amber-700">문의 알림 확인이 지연되고 있습니다. 기존 미확인 알림은 유지됩니다.</p>}
-      {notifications.counts[branch] > 0 && <button type="button" onClick={() => router.refresh()} className="text-sm text-primary underline">새 문의 목록 불러오기</button>}
+      {Object.values(notifications.counts).some(count => count > 0) && <button type="button" onClick={() => router.refresh()} className="min-h-9 rounded-sm text-sm text-primary underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">새 문의 목록 불러오기</button>}
 
-      {branch === "customer" ? (
+      {view === "unified" ? <UnifiedInquiryInbox inquiries={initialInquiries} registrations={initialSpaceRegistrations} rentals={initialSpaceRentals} onOpenBoard={setView} /> : view === "customer" ? (
         <InquiriesKanban initialInquiries={initialInquiries} canEdit={canEdit} />
-      ) : branch === "space-registration" ? (
+      ) : view === "space-registration" ? (
         <SpaceRegistrationKanban initialRegistrations={initialSpaceRegistrations} canEdit={canEdit} />
       ) : (
         <SpaceRentalKanban initialRentals={initialSpaceRentals} canEdit={canEdit} />
       )}
+      <p className="text-xs text-muted-foreground">통합 조회는 미확인 상태를 유지합니다. 개별 보드를 열면 그 갈래만 내 계정에서 확인 처리합니다. 다른 담당자의 미확인 상태와 메일함의 읽음 상태는 바꾸지 않습니다.</p>
     </div>
   );
 }

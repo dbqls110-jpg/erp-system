@@ -1,5 +1,7 @@
 "use client";
 
+import { Dialog } from "@base-ui/react/dialog";
+
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -144,13 +146,13 @@ export function Sidebar({ role, onClose, allowedMenus }: SidebarProps) {
           <span className="truncate">천우영 시스템</span>
         </Link>
         {onClose && (
-          <button
+          <Dialog.Close
             onClick={onClose}
             aria-label="사이드바 닫기"
-            className="text-muted-foreground hover:text-foreground lg:hidden"
+            className="inline-flex size-9 items-center justify-center rounded-md text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
-            <X className="size-4" />
-          </button>
+            <X className="size-4" aria-hidden="true" />
+          </Dialog.Close>
         )}
       </div>
 
@@ -164,7 +166,7 @@ export function Sidebar({ role, onClose, allowedMenus }: SidebarProps) {
             return (
               <div key={group.label ?? `g${gi}`} className="py-1">
                 {group.label && (
-                  <div className="flex h-7 shrink-0 items-center rounded-[12px] px-3 text-[11px] font-semibold tracking-[0.04em] text-[#b3b3b3] dark:text-[#b3b3b3]">
+                  <div className="flex h-7 shrink-0 items-center rounded-[12px] px-3 text-[11px] font-semibold tracking-[0.04em] text-muted-foreground">
                     {group.label}
                   </div>
                 )}

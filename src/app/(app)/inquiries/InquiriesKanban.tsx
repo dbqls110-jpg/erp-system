@@ -243,12 +243,12 @@ export function InquiriesKanban({ initialInquiries, canEdit }: Props) {
             전체 <span className="font-semibold tabular-nums text-foreground">{visibleInquiries.length}</span>건
           </div>
           <div className="text-[12px] text-[#6b7280] dark:text-muted-foreground">
-            {canEdit ? "카드를 끌거나 카드의 단계 변경에서 선택하세요" : "상세 내용을 보려면 카드를 더블클릭하세요"}
+            {canEdit ? "제목을 눌러 상세 보기 · 카드를 끌거나 단계 변경에서 선택하세요" : "카드 제목을 눌러 상세 내용을 확인하세요"}
           </div>
         </div>
 
         {visibleInquiries.length === 0 && (
-          <div className="mb-3 flex items-center gap-3 rounded-[10px] border border-dashed border-[#d1d5db] bg-transparent px-4 py-3 text-[13px] text-[#9ca3af] dark:border-muted dark:text-muted-foreground">
+          <div className="mb-3 flex items-center gap-3 rounded-[10px] border border-dashed border-[#d1d5db] bg-transparent px-4 py-3 text-[13px] text-muted-foreground dark:border-muted">
             <Inbox className="size-5 shrink-0 text-primary" />
             <div>
               <p className="font-medium text-foreground">
@@ -288,7 +288,7 @@ export function InquiriesKanban({ initialInquiries, canEdit }: Props) {
                   </div>
                   <div className="flex flex-1 flex-col gap-2">
                     {items.length === 0 ? (
-                      <div className="flex min-h-[120px] flex-1 flex-col items-center justify-center gap-2 rounded-[10px] border border-dashed border-[#d1d5db] bg-transparent px-3 py-6 text-center text-[12px] text-[#9ca3af] dark:border-muted dark:text-muted-foreground">
+                      <div className="flex min-h-[120px] flex-1 flex-col items-center justify-center gap-2 rounded-[10px] border border-dashed border-[#d1d5db] bg-transparent px-3 py-6 text-center text-[12px] text-muted-foreground dark:border-muted">
                         <Inbox className="size-5 text-[#9ca3af] dark:text-muted-foreground/70" />
                         <span>이 단계의 문의가 없습니다.</span>
                         <span className="text-[11px]">카드를 이곳에 놓거나 단계 변경에서 선택하세요.</span>
@@ -312,12 +312,11 @@ export function InquiriesKanban({ initialInquiries, canEdit }: Props) {
                             age.overdue
                               ? "border-[#fca5a5] dark:border-red-300/70"
                               : inquiry.status === "종료"
-                                ? "border-[#ececec] bg-[#fafafa] text-[#9ca3af] dark:border-muted dark:bg-[#202023] dark:text-muted-foreground"
+                                ? "border-[#ececec] bg-[#fafafa] text-muted-foreground dark:border-muted dark:bg-[#202023]"
                               : "border-border",
                             draggedId === inquiry.id && "opacity-50",
                             saving && "cursor-wait opacity-70",
                           )}
-                          title="더블클릭하여 상세 보기"
                         >
                           {age.overdue && (
                             <span className="inline-flex w-fit items-center self-start rounded-[6px] bg-[#fee2e2] px-2 py-[3px] text-[11px] font-semibold text-[#dc2626] dark:bg-red-950/60 dark:text-red-300">
@@ -325,8 +324,8 @@ export function InquiriesKanban({ initialInquiries, canEdit }: Props) {
                             </span>
                           )}
                           <div className="flex items-baseline justify-between gap-2">
-                            <p className="min-w-0 truncate text-[14px] font-semibold text-inherit">{displayValue(inquiry.name)}</p>
-                            <p className="shrink-0 text-[11px] text-[#9ca3af] dark:text-muted-foreground">접수 {displayDate(inquiry.submittedAt)}</p>
+                            <button type="button" onClick={() => openDetail(inquiry)} aria-label={`${displayValue(inquiry.name)} 문의 상세 보기`} className="min-h-9 min-w-0 truncate rounded-sm text-left text-[14px] font-semibold text-inherit underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">{displayValue(inquiry.name)}</button>
+                            <p className="shrink-0 text-[11px] text-muted-foreground">접수 {displayDate(inquiry.submittedAt)}</p>
                           </div>
                           <p className="line-clamp-3 whitespace-pre-wrap text-[13px] leading-[1.5] text-inherit">
                             {displayValue(inquiry.content)}

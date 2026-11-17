@@ -20,6 +20,11 @@ export function calculateNetIncome(revenue: number | null, cost: number | null):
   const operatingProfit = calculateOperatingProfit(revenue, cost);
   return operatingProfit === null ? null : Math.trunc(operatingProfit * NET_INCOME_RATE);
 }
+
+/** 프로젝트와 같은 19% 관리 차감 후, 카드값은 순이익에서 별도 차감한다. */
+export function calculateCompanyNetIncome({ revenue, cost, card }: { revenue: number; cost: number; card: number }): number {
+  return Math.trunc((revenue - cost) * NET_INCOME_RATE) - card;
+}
 /** 카드·차트가 같은 기간과 같은 고정비 포함 기준을 사용하도록 계산을 한 곳에 둔다. */
 export function calculateBudgetMetrics(
   budget: number | null,
