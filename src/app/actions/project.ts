@@ -10,6 +10,9 @@ import { analyzeQuoteFile, type QuoteAnalysis } from "@/lib/quoteParser";
 import { isInternalQuoteFileName } from "@/lib/quotePolicy";
 import { normalizeCompany } from "@/lib/companyFinance";
 import { upsertQuoteAmounts } from "@/lib/projectAmounts";
+import { randomUUID } from "node:crypto";
+import { createProjectTask, editProjectTask, completeProjectTask, removeProjectTask, PROJECT_TASK_SELECT } from "@/lib/projectTasks";
+import { parseTaskDraft } from "@/lib/projectTaskPolicy";
 
 export interface CreateProjectResult {
   projectId: string;
@@ -150,17 +153,8 @@ export async function deleteProject(id: string) {
 
 export async function addChecklistItem(projectId: string, content: string) {
   await requireEditAccess("projects");
-
-  const normalizedContent = content.trim();
-  if (!normalizedContent) throw new Error("체크리스트 항목 내용을 입력해 주세요.");
-
-  const count = await prisma.checklistItem.count({ where: { projectId } });
-  const item = await prisma.checklistItem.create({
-    data: { projectId, content: normalizedContent, order: count },
-    select: { id: true, content: true, isDone: true, completedAt: true },
-  });
-  await updateProgress(projectId);
-  revalidatePath(`/projects/${projectId}`);
+  const item = await createProjectTask(parseTaskDraft({ projectId, content, taskStatus: "todo" }), randomUUID());
+  revalidateChecklist(projectId);
   return item;
 }
 
@@ -170,15 +164,11 @@ export async function updateChecklistItem(itemId: string, projectId: string, con
   const normalizedContent = content.trim();
   if (!normalizedContent) throw new Error("체크리스트 항목 내용을 입력해 주세요.");
 
-  const item = await prisma.checklistItem.findUnique({ where: { id: itemId } });
+  const item = await prisma.checklistItem.findUnique({ where: { id: itemId }, select: PROJECT_TASK_SELECT });
   if (!item || item.projectId !== projectId) throw new Error("체크리스트 항목을 찾을 수 없습니다.");
 
-  const updated = await prisma.checklistItem.update({
-    where: { id: itemId },
-    data: { content: normalizedContent },
-    select: { id: true, content: true, isDone: true, completedAt: true },
-  });
-  revalidatePath(`/projects/${projectId}`);
+  const updated = await editProjectTask(itemId, parseTaskDraft({ ...item, content: normalizedContent }), item.version);
+  revalidateChecklist(projectId);
   return updated;
 }
 
@@ -190,32 +180,16 @@ export async function toggleChecklistItem(itemId: string, projectId: string) {
 }
 
 export async function setChecklistDone(itemId: string, projectId: string, done: boolean) {
-  await requireEditAccess("projects");
-
-  const item = await prisma.checklistItem.findUnique({ where: { id: itemId } });
-  if (!item || item.projectId !== projectId) throw new Error("체크리스트 항목을 찾을 수 없습니다.");
-
-  const updated = await prisma.checklistItem.update({
-    where: { id: itemId },
-    data: {
-      isDone: done,
-      // 체크한 시점을 남긴다. 해제하면 지워서 "언제 완료했는지"가 항상 현재 상태와 맞게 유지된다.
-      completedAt: done ? new Date() : null,
-    },
-    select: { id: true, content: true, isDone: true, completedAt: true },
-  });
-  await updateProgress(projectId);
-  revalidatePath(`/projects/${projectId}`);
+  const updated = await completeProjectTask(itemId, projectId, done);
+  revalidateChecklist(projectId);
   return updated;
 }
 
 export async function deleteChecklistItem(itemId: string, projectId: string) {
   await requireEditAccess("projects");
-
-  await prisma.checklistItem.delete({ where: { id: itemId } });
-  await updateProgress(projectId);
-  revalidatePath(`/projects/${projectId}`);
-  return { id: itemId };
+  const deleted = await removeProjectTask(itemId, projectId);
+  revalidateChecklist(projectId);
+  return deleted;
 }
 
 export async function updateProjectMemo(id: string, memo: string) {
@@ -225,10 +199,6 @@ export async function updateProjectMemo(id: string, memo: string) {
   revalidatePath(`/projects/${id}`);
 }
 
-async function updateProgress(projectId: string) {
-  const items = await prisma.checklistItem.findMany({ where: { projectId } });
-  const total = items.length;
-  const done = items.filter((i) => i.isDone).length;
-  const progress = total === 0 ? 0 : Math.round((done / total) * 100);
-  await prisma.project.update({ where: { id: projectId }, data: { progress } });
+function revalidateChecklist(projectId: string) {
+  for (const path of ["/projects", `/projects/${projectId}`, "/calendar", "/dashboard"]) revalidatePath(path);
 }

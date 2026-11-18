@@ -7,7 +7,7 @@ export type InquiryBranch = "customer" | "space-registration" | "space-rental";
 
 export interface InquiryInboxItem {
   key: string;
-  branch: InquiryBranch | "mail";
+  branch: InquiryBranch | "mail" | "project";
   category: string;
   title: string;
   name: string;
@@ -57,7 +57,7 @@ export function buildInquiryInbox({ inquiries, registrations, rentals }: Inquiry
 export function mailToInboxItem(item: InboxMailView): InquiryInboxItem {
   return { key: `mail:${item.id}`, branch: "mail", category: item.provider === "naver" ? "네이버" : "Gmail", title: item.subject,
     name: item.senderName || item.senderEmail, email: item.senderEmail, phone: "", receivedAt: item.receivedAt,
-    receivedTime: new Date(item.receivedAt).getTime(), body: item.body, status: "수신", assignee: "나만 보기", waitingForContact: false, completed: false };
+    receivedTime: new Date(item.receivedAt).getTime(), body: item.body.replace(/<!--[\s\S]*?-->/g, "").replace(/\n[\t ]*\n(?:[\t ]*\n)+/g, "\n\n").trim(), status: "수신", assignee: "나만 보기", waitingForContact: false, completed: false };
 }
 
 export function summarizeInquiryInbox(items: readonly InquiryInboxItem[], now: Date) {

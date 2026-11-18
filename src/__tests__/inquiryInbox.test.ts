@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { parseInquiryRows } from "@/lib/inquiries";
 import { parseSpaceRegistrationRows } from "@/lib/spaceRegistrations";
 import { parseSpaceRentalRows } from "@/lib/spaceRentals";
-import { buildInquiryInbox, maskInquiryBody, maskInquiryContact, summarizeInquiryInbox } from "@/lib/inquiryInbox";
+import { buildInquiryInbox, mailToInboxItem, maskInquiryBody, maskInquiryContact, summarizeInquiryInbox } from "@/lib/inquiryInbox";
 
 const inquiries = parseInquiryRows([
   ["접수일시", "이름", "이메일", "연락처", "대관 유형", "지역", "문의 내용", "처리 상태"],
@@ -23,6 +23,17 @@ const registrations = parseSpaceRegistrationRows([[], registrationRow]);
 const rentals = parseSpaceRentalRows([[], rentalRow]);
 
 describe("통합 문의함", () => {
+  it("기존 저장 메일의 HTML 주석만 표시에서 제외하고 내용과 원본은 보존한다", () => {
+    const mail = { id: "mail-1", mailboxId: "account-1", provider: "naver", accountEmail: "owner@example.invalid", subject: "행사 문의", senderName: "고객", senderEmail: "guest@example.invalid", receivedAt: "2026-11-17T07:00:00.000Z", body: '<!-- Header --><!--[if mso]><table><tr>조건부 레이아웃</tr></table><![endif]-->안녕하세요.\n\n\n대관료는 100만원입니다.\n<script>alert("실행 금지")</script>' };
+    const displayed = mailToInboxItem({ ...mail, readAt: null });
+    expect(displayed.body).toBe('안녕하세요.\n\n대관료는 100만원입니다.\n<script>alert("실행 금지")</script>');
+    expect(mail.body).toContain("<!-- Header -->");
+    expect(displayed).toMatchObject({ key: "mail:mail-1", category: "네이버", status: "수신", completed: false });
+  });
+  it("주석이 없는 일반 메일의 줄바꿈과 본문은 그대로 표시한다", () => {
+    const mail = { id: "mail-2", mailboxId: "account-1", provider: "gmail", accountEmail: "owner@example.invalid", subject: "확인 요청", senderName: "", senderEmail: "guest@example.invalid", receivedAt: "2026-11-17T07:00:00.000Z", body: "확인 부탁드립니다.\n2 < 3\n\n감사합니다." };
+    expect(mailToInboxItem({ ...mail, readAt: null }).body).toBe(mail.body);
+  });
   it("원본을 수정하지 않고 세 종류를 같은 최신순 목록으로 만든다", () => {
     const before = JSON.stringify({ inquiries, registrations, rentals });
     const items = buildInquiryInbox({ inquiries, registrations, rentals });

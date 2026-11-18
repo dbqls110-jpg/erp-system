@@ -2,12 +2,13 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const m = vi.hoisted(() => ({ session: vi.fn(), viewer: vi.fn(), find: vi.fn(), guard: vi.fn(), edit: vi.fn() }));
+const m = vi.hoisted(() => ({ session: vi.fn(), viewer: vi.fn(), find: vi.fn(), guard: vi.fn(), edit: vi.fn(), contact: vi.fn() }));
 vi.mock("next-auth", () => ({ getServerSession: m.session }));
 vi.mock("@/lib/auth", () => ({ authOptions: {} }));
 vi.mock("@/lib/calendarViewer", () => ({ getCalendarViewer: m.viewer }));
 vi.mock("@/lib/permissions", () => ({ requireMenuAccess: m.guard, canEditMenu: m.edit }));
 vi.mock("@/lib/prisma", () => ({ prisma: { project: { findUnique: m.find } } }));
+vi.mock("@/lib/projectContacts", () => ({ getProjectContact: m.contact }));
 vi.mock("next/navigation", () => ({ notFound: () => { throw Error("NOT_FOUND"); }, redirect: () => { throw Error("REDIRECT"); } }));
 vi.mock("next/link", () => ({ default: ({ href, children }: { href: string; children: React.ReactNode }) => createElement("a", { href }, children) }));
 vi.mock("@/app/(app)/projects/[id]/ChecklistPanel", () => ({ ChecklistPanel: () => null }));
@@ -24,7 +25,7 @@ const outsider = { id: "external", role: "partner", active: true, partnerId: "pa
 const record = { id: "p", name: "외부 공개 행사", status: "active", progress: 25, deadline: "2026-11-07", announceDate: null,
   cost: 987654321, revenue: 876543210, memo: "PRIVATE_MEMO", files: [{ name: "PRIVATE_QUOTE" }], amounts: [{ payments: [{ memo: "PRIVATE_PAYMENT" }] }] };
 beforeEach(() => {
-  vi.resetAllMocks(); m.session.mockResolvedValue({ user: outsider }); m.viewer.mockResolvedValue(outsider); m.find.mockResolvedValue(record);
+  vi.resetAllMocks(); m.session.mockResolvedValue({ user: outsider }); m.viewer.mockResolvedValue(outsider); m.find.mockResolvedValue(record); m.contact.mockResolvedValue(null);
 });
 describe("외부 프로젝트 상세 최소 공개", () => {
   it("내부 매출·매입은 생성일 최신순으로 조회하고 지급 기록은 기존 시간순을 유지한다", async () => {
@@ -47,6 +48,7 @@ describe("외부 프로젝트 상세 최소 공개", () => {
     const query = m.find.mock.calls[0][0];
     expect(query.select).toEqual(EXTERNAL_PROJECT_SELECT); expect(query.include).toBeUndefined();
     expect(query.where.AND).not.toEqual([{}]); expect(m.edit).not.toHaveBeenCalled();
+    expect(m.contact).not.toHaveBeenCalled();
     expect(html).toContain("외부 공개 행사"); expect(html).toContain("25%"); expect(html).toContain("2026-11-07");
     for (const value of ["PRIVATE_", "987654321", "876543210", "지급", "매출", "매입", "메모", "파일"]) expect(html).not.toContain(value);
   });

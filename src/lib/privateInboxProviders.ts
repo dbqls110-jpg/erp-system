@@ -3,6 +3,7 @@ import { ImapFlow } from "imapflow";
 import { simpleParser } from "mailparser";
 import { decryptFromStorage } from "@/lib/googleClient";
 import { MAILBOX_CALLBACK, MAIL_BODY_LIMIT, MAIL_IMPORT_LIMIT } from "@/lib/privateInboxPolicy";
+import { MailboxError, mailboxErrorCode } from "@/lib/mailboxErrors";
 
 export function mailboxOAuthClient() {
   return new google.auth.OAuth2({ clientId: process.env.AUTH_GOOGLE_ID, clientSecret: process.env.AUTH_GOOGLE_SECRET,
@@ -27,7 +28,7 @@ export async function verifyNaverMailbox(email: string, password: string, folder
     await client.connect();
     const lock = await client.getMailboxLock(folder, { readOnly: true });
     lock.release();
-  } catch { throw Error("네이버 연결에 실패했습니다. IMAP 사용 설정·앱 비밀번호·메일함 이름을 확인해 주세요."); }
+  } catch (error) { throw new MailboxError(mailboxErrorCode(error)); }
   finally { clearTimeout(timer); client.close(); }
 }
 

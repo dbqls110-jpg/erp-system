@@ -1,11 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({ connect: vi.fn(), load: vi.fn(), revalidate: vi.fn() }));
+const mocks = vi.hoisted(() => ({ connect: vi.fn(), sync: vi.fn(), load: vi.fn(), revalidate: vi.fn() }));
 vi.mock("next/cache", () => ({ revalidatePath: mocks.revalidate }));
 vi.mock("@/lib/privateInboxOAuth", () => ({ beginMailboxOAuth: vi.fn() }));
 vi.mock("@/lib/privateInbox", () => ({ connectNaverMailbox: mocks.connect, getPrivateInbox: mocks.load,
-  disconnectMailbox: vi.fn(), saveInboxFollowUp: vi.fn(), syncPrivateMailbox: vi.fn() }));
-import { connectNaverInboxAction } from "@/app/actions/privateInbox";
+  disconnectMailbox: vi.fn(), saveInboxFollowUp: vi.fn(), syncPrivateMailbox: mocks.sync }));
+import { connectNaverInboxAction, syncMailboxAction } from "@/app/actions/privateInbox";
+import { MailboxError } from "@/lib/mailboxErrors";
 
 const input = { email: "test@naver.com", password: "", folder: "INBOX" };
 const data = { mailboxes: [], messages: [], followUps: [] };
@@ -34,5 +35,15 @@ describe("네이버 연결 결과는 예상 실패를 React 예외로 보내지 
   it("연결 저장 후 조회 실패는 연결 실패와 구분해 안내한다", async () => {
     mocks.load.mockRejectedValue(Error("internal database detail"));
     expect(await connectNaverInboxAction(input)).toEqual({ ok: false, message: expect.stringContaining("연결은 저장") });
+  });
+  it("수신 실패도 React #441 예외 대신 원인별 안내와 안전한 목록을 반환한다", async () => {
+    mocks.sync.mockRejectedValue(new MailboxError("label_missing"));
+    expect(await syncMailboxAction("mine")).toEqual({ ok: false, data, message: expect.stringContaining("라벨을 찾지") });
+  });
+  it("수신 성공은 개인 목록을 반환하고 재조회 실패의 원문은 숨긴다", async () => {
+    expect(await syncMailboxAction("mine")).toEqual({ ok: true, data });
+    mocks.sync.mockRejectedValue(Error("credential-secret")); mocks.load.mockRejectedValue(Error("db-secret"));
+    const result = await syncMailboxAction("mine");
+    expect(result).toMatchObject({ ok: false, data: null }); expect(JSON.stringify(result)).not.toContain("secret");
   });
 });

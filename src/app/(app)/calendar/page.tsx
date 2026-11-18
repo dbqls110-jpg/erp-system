@@ -5,6 +5,8 @@ import { prisma } from "@/lib/prisma";
 import { getNotionEvents } from "@/lib/notion";
 import { CalendarView } from "./CalendarView";
 import { PageIntro } from "@/components/ui/page-intro";
+import { listTaskCalendarEvents } from "@/lib/projectTasks";
+import { koreanCalendarParts, currentKoreanDateKey } from "@/lib/dateFormat";
 
 import { getCalendarViewer } from "@/lib/calendarViewer";
 import {
@@ -30,11 +32,12 @@ export default async function CalendarPage() {
   const viewerShowsLeaves = showLeaves(viewer);
   const viewerShowsNotionEvents = showNotionEvents(viewer);
   const now = new Date();
-  const year = now.getFullYear();
-  const month = now.getMonth() + 1;
+  const { year, month } = koreanCalendarParts(now);
   const monthStr = String(month).padStart(2, "0");
+  const start = `${year}-${monthStr}-01`;
+  const end = `${year}-${monthStr}-${String(new Date(Date.UTC(year, month, 0)).getUTCDate()).padStart(2, "0")}`;
 
-  const [projects, projectOptions, leaves, customEvents, notionEvents] = await Promise.all([
+  const [projects, projectOptions, leaves, customEvents, notionEvents, taskEvents] = await Promise.all([
     prisma.project.findMany({
       where: {
         status: "active",
@@ -50,11 +53,11 @@ export default async function CalendarPage() {
       },
       select: { id: true, name: true, announceDate: true, deadline: true },
     }),
-    prisma.project.findMany({
+    viewerCanEditCalendar ? prisma.project.findMany({
       where: { status: "active" },
       orderBy: { name: "asc" },
       select: { id: true, name: true },
-    }),
+    }) : [],
     viewerShowsLeaves
       ? prisma.leaveRequest.findMany({
           where: {
@@ -64,11 +67,12 @@ export default async function CalendarPage() {
           include: { user: { select: { name: true } } },
         })
       : [],
-    prisma.calendarEvent.findMany({
+    !viewerIsExternal ? prisma.calendarEvent.findMany({
       where: { AND: [{ date: { gte: `${year}-${monthStr}-01` } }, calendarWhereFor(viewer)] },
       select: { id: true, title: true, date: true, endDate: true, color: true, notionPageId: true, projectId: true },
-    }),
+    }) : [],
     viewerShowsNotionEvents ? getNotionEvents(year, month).catch(() => []) : [],
+    listTaskCalendarEvents(viewer, start, end),
   ]);
 
   const linkedNotionIds = new Set([
@@ -77,6 +81,7 @@ export default async function CalendarPage() {
   ].filter(Boolean) as string[]);
 
   const events = [
+    ...taskEvents,
     ...projects.flatMap((p) => {
       const evts = [];
       if (p.deadline) evts.push({ date: p.deadline, title: `🎯 ${p.name} 마감`, type: "deadline" as const, id: p.id });
@@ -121,7 +126,7 @@ export default async function CalendarPage() {
         initialEvents={events}
         currentYear={year}
         currentMonth={month}
-        todayDate={`${year}-${monthStr}-${String(now.getDate()).padStart(2, "0")}`}
+        todayDate={currentKoreanDateKey()}
         projectOptions={projectOptions}
         showLeaves={viewerShowsLeaves}
         showNotionEvents={viewerShowsNotionEvents}

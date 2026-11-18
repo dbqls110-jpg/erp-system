@@ -4,7 +4,8 @@ import { requireInquiryReviewer, getInquiryNotificationSnapshot } from "@/lib/in
 import { inquiryKey } from "@/lib/inquiryNotificationKeys";
 import { encryptForStorage } from "@/lib/googleClient";
 import { readMailboxMessages, verifyNaverMailbox } from "@/lib/privateInboxProviders";
-import { parseFollowUpDate, parseMailboxFolder, parseNaverEmail, type PrivateInboxView } from "@/lib/privateInboxPolicy";
+import { parseFollowUpDate, parseMailboxFolder, parseNaverEmail, parseMailReadIds, type PrivateInboxView } from "@/lib/privateInboxPolicy";
+import { MailboxError, mailboxErrorCode } from "@/lib/mailboxErrors";
 
 const mailboxSelect = { id: true, provider: true, email: true, folder: true, lastSyncedAt: true, lastErrorCode: true };
 
@@ -27,14 +28,20 @@ export async function getPrivateInbox(): Promise<PrivateInboxView> {
   const [mailboxes, messages, followUps] = await Promise.all([
     prisma.inboxMailbox.findMany({ where: { ownerId: user.id }, select: mailboxSelect, orderBy: { createdAt: "asc" } }),
     prisma.inboxMail.findMany({ where: { mailbox: { ownerId: user.id } }, take: 200, orderBy: [{ receivedAt: "desc" }, { id: "asc" }],
-      select: { id: true, mailboxId: true, subject: true, senderName: true, senderEmail: true, body: true, receivedAt: true, mailbox: { select: { provider: true, email: true } } } }),
+      select: { id: true, mailboxId: true, subject: true, senderName: true, senderEmail: true, body: true, receivedAt: true, readAt: true, mailbox: { select: { provider: true, email: true } } } }),
     prisma.inboxFollowUp.findMany({ where: { ownerId: user.id }, select: { itemKey: true, dueAt: true, note: true, version: true } }),
   ]);
   return {
     mailboxes: mailboxes.map(row => ({ ...row, lastSyncedAt: row.lastSyncedAt?.toISOString() ?? null })),
-    messages: messages.map(({ mailbox, ...row }) => ({ ...row, provider: mailbox.provider, accountEmail: mailbox.email, receivedAt: row.receivedAt.toISOString() })),
+    messages: messages.map(({ mailbox, ...row }) => ({ ...row, provider: mailbox.provider, accountEmail: mailbox.email, receivedAt: row.receivedAt.toISOString(), readAt: row.readAt?.toISOString() ?? null })),
     followUps: followUps.map(row => ({ ...row, dueAt: row.dueAt?.toISOString() ?? null })),
   };
+}
+
+export async function markPrivateMailRead(input: unknown) {
+  const user = await requireInquiryReviewer();
+  const ids = parseMailReadIds(input);
+  await prisma.inboxMail.updateMany({ where: { id: { in: ids }, readAt: null, mailbox: { ownerId: user.id } }, data: { readAt: new Date() } });
 }
 
 export async function connectNaverMailbox(input: { email: unknown; folder: unknown; password: unknown }) {
@@ -84,9 +91,10 @@ export async function syncPrivateMailbox(id: string) {
       await tx.inboxFollowUp.deleteMany({ where: { ownerId: user.id, itemKey: { in: expired.map(row => `mail:${row.id}`) } } });
       await tx.inboxMail.deleteMany({ where: expiredWhere });
     });
-  } catch {
-    await prisma.inboxMailbox.updateMany({ where: { id, ownerId: user.id, leaseToken }, data: { leaseToken: null, leaseUntil: null, lastSyncedAt: new Date(), lastErrorCode: "connection_failed" } });
-    throw Error("메일 동기화에 실패했습니다. 라벨·메일함 이름과 연결 권한을 확인한 뒤 다시 시도해 주세요.");
+  } catch (error) {
+    const code = mailboxErrorCode(error);
+    await prisma.inboxMailbox.updateMany({ where: { id, ownerId: user.id, leaseToken }, data: { leaseToken: null, leaseUntil: null, lastSyncedAt: new Date(), lastErrorCode: code } });
+    throw new MailboxError(code);
   }
 }
 

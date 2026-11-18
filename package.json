@@ -11,7 +11,7 @@
     "sheet:create": "node scripts/create-erp-sheet.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
-    "render-build": "prisma generate && prisma migrate deploy && npx tsc --noEmit && next build --webpack"
+    "render-build": "prisma generate && node scripts/check-workspace-migrations.mjs before && prisma migrate deploy && node scripts/check-workspace-migrations.mjs after && npx tsc --noEmit && next build --webpack"
   },
   "dependencies": {
     "@base-ui/react": "^1.5.0",

@@ -24,6 +24,11 @@ import { ExternalProjectDetail } from "@/components/projects/ExternalProjects";
 import { canManageCostPayments } from "@/lib/projectCostPayments";
 import { getDisplayedProjectProgress } from "@/lib/projectProgress";
 import { canEditRevenueDates } from "@/lib/revenueDateAccess";
+import { PROJECT_TASK_SELECT, projectTaskDto, listTaskPeople } from "@/lib/projectTasks";
+import { ProjectCompletionButton } from "@/components/projects/ProjectCompletionButton";
+import { ProjectContactPanel } from "@/components/projects/ProjectContactPanel";
+import { canViewProjectContacts } from "@/lib/projectContactPolicy";
+import { getProjectContact } from "@/lib/projectContacts";
 
 const statusConfig: Record<string, { label: string; class: string }> = {
   active: { label: "진행 중", class: toneBadgeClass("blue") },
@@ -54,7 +59,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
   const project = await prisma.project.findUnique({
     where: { id, AND: [projectWhereForViewer(viewer)] },
     include: {
-      checklistItems: { orderBy: { order: "asc" } },
+      checklistItems: { select: PROJECT_TASK_SELECT, orderBy: [{ order: "asc" }, { id: "asc" }] },
       files: { orderBy: { createdAt: "desc" } },
       uploadRecoveries: canEdit ? { where: { status: { not: "completed" } }, select: { id: true, name: true, status: true, attempts: true }, orderBy: { createdAt: "desc" }, take: 20 } : false,
       amounts: { orderBy: [{ kind: "asc" }, { createdAt: "desc" }, { id: "desc" }], include: { payments: { orderBy: [{ paidDate: "asc" }, { createdAt: "asc" }], select: { id: true, amount: true, paidDate: true, memo: true } } } },
@@ -64,14 +69,16 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
   });
 
   if (!project) notFound();
+  const projectContact = canViewProjectContacts(session.user) ? await getProjectContact(project.id) : null;
 
   // 연결 후보 목록. 목록이 커지면 검색형으로 바꾼다.
-  const [allCustomers, allPartners] = canEdit
+  const [allCustomers, allPartners, taskPeople] = canEdit
     ? await Promise.all([
         prisma.customer.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
         prisma.partner.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
+        listTaskPeople(),
       ])
-    : [[], []];
+    : [[], [], []];
 
   const s = statusConfig[project.status] ?? statusConfig.active;
   const projectProgress = getDisplayedProjectProgress(project.status, project.progress);
@@ -122,7 +129,8 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
             )}
           </div>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex flex-wrap items-center justify-end gap-2 shrink-0">
+          {canEdit && <ProjectCompletionButton projectId={project.id} name={project.name} status={project.status} />}
           {canEdit && <ProjectEditButton project={project} />}
           {isAdmin && <ProjectDeleteButton id={project.id} name={project.name} />}
         </div>
@@ -185,7 +193,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
           </div>
         </CardHeader>
         <CardContent className="px-4 py-4">
-          <ChecklistPanel projectId={project.id} items={project.checklistItems} canEdit={canEdit} />
+          <ChecklistPanel projectId={project.id} projectName={project.name} projectStatus={project.status} items={project.checklistItems.map(projectTaskDto)} people={taskPeople} canEdit={canEdit} viewerId={viewer.id} />
         </CardContent>
       </Card>
 
@@ -204,6 +212,8 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
             recoveryTasks={project.uploadRecoveries ?? []} />
         </CardContent>
       </Card>
+
+      {projectContact && <Card className="rounded-[12px] border border-border py-0 shadow-none"><CardHeader className="border-b border-border px-4 py-3.5"><CardTitle className="text-sm font-semibold">연락 · 후속 상태</CardTitle></CardHeader><CardContent className="px-4 py-4"><ProjectContactPanel key={projectContact.id} project={projectContact} canEdit={canEdit} /></CardContent></Card>}
 
       {/* 메모 */}
       <Card className="rounded-[12px] border border-border py-0 shadow-none">

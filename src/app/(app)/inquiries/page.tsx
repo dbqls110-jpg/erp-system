@@ -51,7 +51,6 @@ export default async function InquiriesPage({ searchParams }: { searchParams: Pr
   return (
     <div className="space-y-5">
       {inboxResult === "connection-failed" && <p role="alert" className="text-sm text-red-700">내 메일 연결을 완료하지 못했습니다. Google 승인·Gmail API 설정을 확인하고 ‘내 메일 연결’에서 다시 시도해 주세요.</p>}
-      {inboxResult === "connected" && <p role="status" className="text-sm text-emerald-700">내 Gmail 연결 완료. ‘내 메일 연결’의 수신 버튼으로 지정한 라벨을 불러오세요.</p>}
       <div className="sr-only">
         <h1 className="text-xl font-semibold tracking-tight">문의</h1>
         <p className="mt-1 text-sm text-muted-foreground">

@@ -8,19 +8,26 @@ import {
   projectWhereFor,
   showLeaves,
   showNotionEvents,
+  isExternal,
 } from "@/lib/calendarVisibility";
 import { NextRequest, NextResponse } from "next/server";
+import { listTaskCalendarEvents } from "@/lib/projectTasks";
+import { koreanCalendarParts } from "@/lib/dateFormat";
+import { canAccessMenu } from "@/lib/permissions";
 
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions);
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!session?.user?.id || session.user.active === false) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!await canAccessMenu(session.user.id, "calendar")) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   // 화면과 같은 규칙을 쓴다. 여기만 빠뜨리면 주소를 직접 불러 전부 볼 수 있다.
   const viewer = (await getCalendarViewer())!;
 
   const { searchParams } = req.nextUrl;
-  const year = parseInt(searchParams.get("year") ?? String(new Date().getFullYear()));
-  const month = parseInt(searchParams.get("month") ?? String(new Date().getMonth() + 1));
+  const current = koreanCalendarParts(new Date());
+  const year = Number(searchParams.get("year") ?? current.year);
+  const month = Number(searchParams.get("month") ?? current.month);
+  if (!Number.isInteger(year) || !Number.isInteger(month) || year < 2000 || year > 2100 || month < 1 || month > 12) return NextResponse.json({ error: "Invalid calendar month" }, { status: 400 });
   const monthStr = String(month).padStart(2, "0");
   const start = `${year}-${monthStr}-01`;
   const lastDay = new Date(year, month, 0).getDate();
@@ -33,7 +40,7 @@ export async function GET(req: NextRequest) {
     hourly: "시간차",
   };
 
-  const [projects, leaves, customEvents, notionEvents] = await Promise.all([
+  const [projects, leaves, customEvents, notionEvents, taskEvents] = await Promise.all([
     prisma.project.findMany({
       where: {
         AND: [
@@ -54,11 +61,12 @@ export async function GET(req: NextRequest) {
           include: { user: { select: { name: true } } },
         })
       : [],
-    prisma.calendarEvent.findMany({
+    !isExternal(viewer) ? prisma.calendarEvent.findMany({
       where: { AND: [{ date: { gte: start, lte: end } }, calendarWhereFor(viewer)] },
       select: { id: true, title: true, date: true, endDate: true, color: true, notionPageId: true },
-    }),
+    }) : [],
     showNotionEvents(viewer) ? getNotionEvents(year, month).catch(() => []) : [],
+    listTaskCalendarEvents(viewer, start, end),
   ]);
 
   // ERP에서 이미 Notion과 연결된 페이지 ID 목록 (중복 방지)
@@ -68,6 +76,7 @@ export async function GET(req: NextRequest) {
   ].filter(Boolean) as string[]);
 
   const events = [
+    ...taskEvents,
     ...projects.flatMap((p) => {
       const evts = [];
       if (p.deadline) evts.push({ date: p.deadline, title: `🎯 ${p.name} 마감`, type: "deadline", id: p.id });

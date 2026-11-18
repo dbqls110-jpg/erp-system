@@ -30,11 +30,25 @@ export interface InboxMailboxView {
 }
 export interface InboxMailView {
   id: string; mailboxId: string; provider: string; accountEmail: string;
-  subject: string; senderName: string; senderEmail: string; body: string; receivedAt: string;
+  subject: string; senderName: string; senderEmail: string; body: string; receivedAt: string; readAt: string | null;
+}
+export function parseMailReadIds(value: unknown): string[] {
+  if (!Array.isArray(value) || value.length === 0 || value.length > 200) throw Error("확인할 메일을 1~200개 선택해 주세요.");
+  const ids: string[] = [];
+  for (const id of value) {
+    if (typeof id !== "string" || !/^[A-Za-z0-9_-]{1,100}$/.test(id)) throw Error("확인할 메일을 1~200개 선택해 주세요.");
+    ids.push(id);
+  }
+  return [...new Set(ids)];
 }
 export interface FollowUpView {
   itemKey: string; dueAt: string | null; note: string; version: number;
 }
 export interface PrivateInboxView {
   mailboxes: InboxMailboxView[]; messages: InboxMailView[]; followUps: FollowUpView[];
+}
+
+export function preserveMailReadState(previous: PrivateInboxView, incoming: PrivateInboxView): PrivateInboxView {
+  const readAtById = new Map(previous.messages.map(mail => [mail.id, mail.readAt]));
+  return { ...incoming, messages: incoming.messages.map(mail => ({ ...mail, readAt: mail.readAt ?? readAtById.get(mail.id) ?? null })) };
 }

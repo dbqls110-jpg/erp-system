@@ -12,15 +12,18 @@ import { ChevronLeft, ChevronRight, Plus, Trash2, Pencil } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { createCalendarEvent, updateCalendarEvent, deleteCalendarEvent } from "@/app/actions/calendar";
 import { toast } from "sonner";
+import { useVisiblePolling } from "@/lib/useVisiblePolling";
 
 interface CalEvent {
   date: string;
   title: string;
-  type: "announce" | "deadline" | "leave" | "custom" | "notion";
+  type: "announce" | "deadline" | "leave" | "custom" | "notion" | "task";
   id: string;
   endDate?: string;
   color?: string;
   projectId?: string | null;
+  taskId?: string;
+  isDone?: boolean;
 }
 
 const COLOR_OPTIONS = [
@@ -36,6 +39,7 @@ const TYPE_COLORS: Record<string, string> = {
   announce: "border border-blue-500/40 bg-blue-500/10 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300",
   deadline: "border border-destructive/40 bg-destructive/15 text-destructive dark:bg-destructive/25",
   leave: "border border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:bg-emerald-500/25 dark:text-emerald-300",
+  task: "border border-violet-500/30 bg-violet-500/10 text-violet-800 dark:text-violet-200",
 };
 
 const CUSTOM_COLORS: Record<string, string> = {
@@ -59,6 +63,7 @@ function eventSourceLabel(type: CalEvent["type"]) {
   if (type === "notion") return "Notion";
   if (type === "leave") return "휴가";
   if (type === "announce" || type === "deadline") return "프로젝트";
+  if (type === "task") return "프로젝트 할 일";
   return "ERP 직접 등록";
 }
 
@@ -123,14 +128,16 @@ export function CalendarView({
     setLoading(true);
     try {
       const res = await fetch(`/api/calendar?year=${y}&month=${m}`);
+      if (!res.ok) throw Error("calendar_fetch_failed");
       const data = await res.json();
-      setEvents(data);
+      if (Array.isArray(data)) setEvents(data);
     } catch {
       // keep existing events
     } finally {
       setLoading(false);
     }
   }, []);
+  useVisiblePolling(() => { if (modal.mode === "closed") void fetchEvents(year, month); }, 60_000, { immediate: false });
 
   const prevMonth = () => {
     const newYear = month === 1 ? year - 1 : year;
@@ -276,12 +283,12 @@ export function CalendarView({
                   onClick={canEditCalendar ? () => openDay(day) : undefined}
                 >
                   <div className="flex items-center justify-between mb-1">
-                    <span className={cn(
+                    <button type="button" aria-label={`${dateStr} 일정 열기`} disabled={!canEditCalendar && dayEvents.length === 0} onClick={event => { event.stopPropagation(); openDay(day); }} className={cn(
                       "inline-flex w-6 h-6 items-center justify-center rounded-full text-xs font-medium",
                       isToday ? "bg-primary text-primary-foreground" : dow === 0 ? "text-destructive" : dow === 6 ? "text-primary" : "text-foreground"
                     )}>
                       {day}
-                    </span>
+                    </button>
                     {canEditCalendar && <Plus className="size-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />}
                   </div>
                   <div className="space-y-0.5">
@@ -296,6 +303,7 @@ export function CalendarView({
                       const cls = e.type === "custom"
                         ? CUSTOM_COLORS[e.color ?? "gray"]
                         : TYPE_COLORS[e.type];
+                      if (e.type === "task" && e.projectId) return <Link key={e.id} href={`/projects/${e.projectId}#task-${e.taskId}`} onClick={event => event.stopPropagation()} className={cn("block truncate rounded px-1 text-[11px] hover:underline focus-visible:outline-2 focus-visible:outline-ring", cls)} title={e.title}>{e.title}</Link>;
                       if (e.type === "leave" || e.type === "announce" || e.type === "deadline") {
                         return (
                           <Link
@@ -337,6 +345,7 @@ export function CalendarView({
 
           <div className="flex flex-wrap gap-4 mt-4 text-xs text-muted-foreground">
             <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-destructive inline-block" />마감일</span>
+            {!isExternalViewer && <span className="flex items-center gap-1"><span className="inline-block size-2 rounded-full bg-violet-500" />할 일 확인·마감</span>}
             {showLeaves && <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500 dark:bg-emerald-400 inline-block" />휴가</span>}
             {!isExternalViewer && <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-500 dark:bg-blue-400 inline-block" />직접 등록</span>}
             {showNotionEvents && <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-violet-500 dark:bg-violet-400 inline-block" />Notion</span>}
@@ -369,6 +378,7 @@ export function CalendarView({
                       {eventTitle(e)}
                     </span>
                     <span className="ml-2 shrink-0 text-[10px] opacity-70">{eventSourceLabel(e.type)}</span>
+                    {e.type === "task" && e.projectId && <Link href={`/projects/${e.projectId}#task-${e.taskId}`} className="ml-2 shrink-0 rounded border border-current px-2 py-1 text-xs underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2">업무 열기</Link>}
                     {e.type === "custom" && (
                       <div className="flex items-center gap-1.5 ml-2 shrink-0">
                         <button

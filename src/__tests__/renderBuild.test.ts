@@ -29,6 +29,11 @@ describe("package.json render-build 스크립트", () => {
     expect(pkg.scripts["render-build"]).toContain("prisma migrate deploy");
   });
 
+  it("운영 스키마 검사는 migration 전후에 실행하고 실패하면 중단한다", () => {
+    pkg = pkg ?? JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf8"));
+    expect(pkg.scripts["render-build"]).toContain("node scripts/check-workspace-migrations.mjs before && prisma migrate deploy && node scripts/check-workspace-migrations.mjs after &&");
+  });
+
   it("render-build에 prisma db push 없음", () => {
     pkg = pkg ?? JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf8"));
     expect(pkg.scripts["render-build"]).not.toContain("prisma db push");

@@ -55,6 +55,7 @@ model User {
   mailboxes        InboxMailbox[]
   mailboxOAuth     InboxOAuthAttempt[]
   inquiryFollowUps InboxFollowUp[]
+  assignedProjectTasks ChecklistItem[] @relation("ProjectTaskAssignee")
 
   partner  Partner?  @relation(fields: [partnerId], references: [id], onDelete: SetNull)
   customer Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
@@ -97,6 +98,7 @@ model InboxMail {
   senderEmail       String
   body              String
   receivedAt        DateTime
+  readAt            DateTime?
   @@unique([mailboxId, providerMessageId])
   @@index([mailboxId, receivedAt])
   @@map("inbox_mail")
@@ -272,6 +274,10 @@ model Project {
   progress     Float    @default(0)
   assignee     String?
   memo         String?
+  workScope    String?
+  eventType    String   @default("general")
+  eventDate    String?
+  workspaceVersion Int  @default(0)
   revenue      Float? // 매출
   cost         Float? // 매입
   createdAt    DateTime @default(now())
@@ -286,8 +292,34 @@ model Project {
   partnerPayments PartnerPayment[]
   amounts         ProjectAmount[]
   uploadRecoveries ProjectUploadRecovery[]
+  contactState     ProjectContactState?
+  contactLogs      ProjectContactLog[]
 
   @@map("projects")
+}
+
+model ProjectContactState {
+  projectId     String @id
+  project       Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  status        String @default("unrecorded")
+  note          String @default("")
+  nextContactAt DateTime?
+  version       Int @default(1)
+  updatedAt     DateTime @updatedAt
+  @@map("project_contact_states")
+}
+
+model ProjectContactLog {
+  id            String @id
+  projectId     String
+  project       Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  status        String
+  note          String
+  nextContactAt DateTime?
+  recordedBy    String
+  recordedAt    DateTime @default(now())
+  @@index([projectId, recordedAt])
+  @@map("project_contact_logs")
 }
 
 /**
@@ -411,12 +443,21 @@ model ChecklistItem {
    * 체크한 시각. 체크 해제하면 null 로 되돌린다.
    */
   completedAt DateTime?
+  assigneeId  String?
+  taskStatus  String   @default("todo")
+  nextCheckDate String?
+  dueDate     String?
+  waitingOn   String?
+  version     Int      @default(0)
   order       Int       @default(0)
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  assignee User? @relation("ProjectTaskAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
 
+  @@index([assigneeId, isDone, nextCheckDate])
+  @@index([projectId, isDone, order])
   @@map("checklist_items")
 }
 
