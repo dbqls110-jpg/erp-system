@@ -35,6 +35,8 @@ services:
         sync: false
       - key: ERP_MAINTENANCE_SECRET
         sync: false
+      - key: ERP_PRIVATE_INBOX_CRON_SECRET
+        sync: false
       - key: DOT_MONITOR_ENABLED
         value: "false"
       - key: DOT_MONITOR_START_DATE
