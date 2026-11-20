@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChecklistPanel } from "./ChecklistPanel";
 import { ProjectLinksPanel } from "./ProjectLinksPanel";
 import { ProjectEditButton } from "./ProjectEditButton";
+import { ProjectScopePanel } from "@/components/projects/ProjectScopePanel";
 import { ProjectDeleteButton } from "../ProjectDeleteButton";
 import { MemoEditor } from "./MemoEditor";
 import { ProjectFilesPanel } from "./ProjectFilesPanel";
@@ -151,6 +152,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
         </CardContent>
       </Card>
 
+      <ProjectScopePanel project={project} hasTasks={project.checklistItems.some(task => !task.id.startsWith("reminder-"))} canEdit={canEdit} />
       {/* 매출 · 매입 건별 관리 */}
       <Card className="rounded-[12px] border border-border py-0 shadow-none">
         <CardHeader className="border-b border-[#f0f0f0] px-4 py-3.5 dark:border-border">

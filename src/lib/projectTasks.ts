@@ -70,6 +70,7 @@ export async function setProjectCompleted(projectIdInput: string, completed: boo
 export async function createProjectTask(draft: TaskDraft, requestId: string) {
   await requireEditAccess("projects");
   const id = parseTaskId(requestId);
+  if (id.startsWith("reminder-")) throw new TaskInputError("자동 리마인드 ID로 새 업무를 만들 수 없습니다.");
   return prisma.$transaction(async tx => {
     await lockProject(tx, draft.projectId);
     const existing = await tx.checklistItem.findUnique({ where: { id }, select: PROJECT_TASK_SELECT });
@@ -89,6 +90,10 @@ export async function editProjectTask(idInput: string, draft: TaskDraft, expecte
   const id = parseTaskId(idInput), version = parseTaskVersion(expectedVersion);
   return prisma.$transaction(async tx => {
     await lockProject(tx, draft.projectId);
+    if (id.startsWith("reminder-")) {
+      const project = await tx.project.findUniqueOrThrow({ where: { id: draft.projectId }, select: { eventDate: true } });
+      if (draft.dueDate !== project.eventDate) throw new TaskInputError("실제 일정은 프로젝트의 과업·실제 일정에서 수정해 주세요.");
+    }
     await checkAssignee(tx, draft.assigneeId);
     const changed = await tx.checklistItem.updateMany({ where: { id, projectId: draft.projectId, version }, data: { ...draft, version: { increment: 1 } } });
     if (changed.count !== 1) throw conflict();
@@ -117,6 +122,7 @@ export async function completeProjectTask(idInput: string, projectIdInput: strin
 export async function removeProjectTask(idInput: string, projectIdInput: string, expectedVersion?: number) {
   await requireEditAccess("projects");
   const id = parseTaskId(idInput), projectId = parseTaskId(projectIdInput);
+  if (id.startsWith("reminder-")) throw new TaskInputError("자동 리마인드는 프로젝트의 과업·실제 일정에서 변경해 주세요.");
   if (expectedVersion !== undefined) parseTaskVersion(expectedVersion);
   return prisma.$transaction(async tx => {
     await lockProject(tx, projectId);

@@ -13,6 +13,9 @@ import { upsertQuoteAmounts } from "@/lib/projectAmounts";
 import { randomUUID } from "node:crypto";
 import { createProjectTask, editProjectTask, completeProjectTask, removeProjectTask, PROJECT_TASK_SELECT } from "@/lib/projectTasks";
 import { parseTaskDraft } from "@/lib/projectTaskPolicy";
+import { parseProjectWorkspace } from "@/lib/projectReminderPolicy";
+import { appendInitialTasks, syncEventReminder } from "@/lib/projectWorkspace";
+import { currentKoreanDateKey } from "@/lib/dateFormat";
 
 export interface CreateProjectResult {
   projectId: string;
@@ -33,7 +36,8 @@ function parseOptionalCompany(rawValue: FormDataEntryValue | null): string | nul
 }
 
 export async function createProject(formData: FormData): Promise<CreateProjectResult> {
-  await requireEditAccess("projects");
+  const session = await requireEditAccess("projects");
+  const { initialTasks, ...workspace } = parseProjectWorkspace(Object.fromEntries(formData));
 
   const quoteFiles = formData.getAll("quoteFile").filter((entry): entry is File => entry instanceof File);
   const internalQuoteFiles = quoteFiles.filter((file) => isInternalQuoteFileName(file.name));
@@ -69,9 +73,12 @@ export async function createProject(formData: FormData): Promise<CreateProjectRe
         assignee: (formData.get("assignee") as string) || null,
         memo: (formData.get("memo") as string) || null,
         status: "active",
+        ...workspace,
       },
     });
 
+    await appendInitialTasks(tx, created.id, initialTasks, session.user.id);
+    if (created.eventDate) await syncEventReminder(tx, created, session.user.id, currentKoreanDateKey());
     if (internalQuoteFile && quoteAnalysis) {
       await upsertQuoteAmounts(created.id, internalQuoteFile.name, quoteAnalysis, tx);
     }

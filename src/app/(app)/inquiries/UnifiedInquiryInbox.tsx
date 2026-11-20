@@ -8,7 +8,8 @@ import { loadPrivateInboxAction, markMailboxReadAction } from "@/app/actions/pri
 import { loadUnifiedInboxAction } from "@/app/actions/inquiryWorkspace";
 import { projectContactToInboxItem, type ProjectContactView } from "@/lib/projectContactPolicy";
 import { ProjectContactPanel } from "@/components/projects/ProjectContactPanel";
-import { preserveMailReadState, type PrivateInboxView } from "@/lib/privateInboxPolicy";
+import { type PrivateInboxView } from "@/lib/privateInboxPolicy";
+import { receiveInbox, failInbox, type PrivateInboxLoad } from "@/lib/privateInboxLoad";
 import { useVisiblePolling } from "@/lib/useVisiblePolling";
 import { InboxMailSettings } from "./InboxMailSettings";
 import { InboxFollowUpForm } from "./InboxFollowUpForm";
@@ -23,10 +24,12 @@ function dateText(value: number | null) {
 
 export function UnifiedInquiryInbox({ inquiries, registrations, rentals, onOpenBoard }: InquiryInboxSources & { onOpenBoard: (branch: InquiryBranch) => void }) {
   const website = useMemo(() => buildInquiryInbox({ inquiries, registrations, rentals }), [inquiries, registrations, rentals]);
-  const [privateInbox, setPrivateInbox] = useState(EMPTY_INBOX);
+  const [mailLoad, setMailLoad] = useState<PrivateInboxLoad>({ kind: "loading" });
+  const privateInbox = (mailLoad.kind === "loading" ? null : mailLoad.data) ?? EMPTY_INBOX;
+  const mailKnown = mailLoad.kind !== "loading" && mailLoad.data !== null;
   const [projectContacts, setProjectContacts] = useState<{ items: ProjectContactView[]; canEdit: boolean } | null>(null);
   const [projectError, setProjectError] = useState("");
-  const [mailError, setMailError] = useState("");
+  const mailError = mailLoad.kind === "failed" ? mailLoad.message : "";
   const [now, setNow] = useState(() => new Date());
   const [masked, setMasked] = useState(false), [query, setQuery] = useState(""), [channel, setChannel] = useState("all"), [page, setPage] = useState(0);
   const [checkedMails, setCheckedMails] = useState<Set<string>>(() => new Set());
@@ -36,15 +39,15 @@ export function UnifiedInquiryInbox({ inquiries, registrations, rentals, onOpenB
   const listRef = useRef<HTMLDivElement>(null);
   const pendingReads = useRef(new Set<string>());
   const reading = useRef(false);
-  function receivePrivateInbox(data: PrivateInboxView) { setPrivateInbox(previous => preserveMailReadState(previous, data)); }
+  function receivePrivateInbox(data: PrivateInboxView) { setMailLoad(previous => receiveInbox(previous, data)); }
   useVisiblePolling(async () => {
     setNow(new Date());
     try {
       const result = await loadUnifiedInboxAction();
-      if (result.mail.ok) { receivePrivateInbox(result.mail.data); setMailError(""); } else setMailError(result.mail.message);
+      if (result.mail.ok) receivePrivateInbox(result.mail.data); else setMailLoad(previous => failInbox(previous, result.mail.message ?? "메일 연결을 불러오지 못했습니다. 다시 시도해 주세요."));
       if (result.projects.ok) { setProjectContacts(result.projects.data); setProjectError(""); } else setProjectError(result.projects.message);
     }
-    catch { setMailError("내 메일·연락 일정을 불러오지 못했습니다. 다시 불러오거나 관리자에게 문의해 주세요. 홈페이지 문의는 계속 확인할 수 있습니다."); }
+    catch { setMailLoad(previous => failInbox(previous, "내 메일·연락 일정을 불러오지 못했습니다. 다시 불러오거나 관리자에게 문의해 주세요. 홈페이지 문의는 계속 확인할 수 있습니다.")); }
   }, 60_000);
   const items = useMemo(() => [...website, ...privateInbox.messages.map(mailToInboxItem), ...(projectContacts?.items ?? []).map(projectContactToInboxItem)].sort((a, b) => (b.receivedTime ?? -Infinity) - (a.receivedTime ?? -Infinity) || a.key.localeCompare(b.key)), [website, privateInbox.messages, projectContacts]);
   const followUps = new Map(privateInbox.followUps.map(item => [item.itemKey, item]));
@@ -96,11 +99,16 @@ export function UnifiedInquiryInbox({ inquiries, registrations, rentals, onOpenB
       detailRef.current?.scrollIntoView({ block: "start" });
     }
   };
+  const mailConnection = (provider: "gmail" | "naver", filter: string): InquiryFlowChannel["connection"] => !mailKnown
+    ? { kind: mailLoad.kind === "loading" ? "loading" : "unavailable" }
+    : privateInbox.mailboxes.some(item => item.provider === provider)
+      ? { kind: "connected", filter, count: privateInbox.messages.filter(item => item.provider === provider).length }
+      : { kind: "disconnected" };
   const channels: InquiryFlowChannel[] = [
     { name: "홈페이지", icon: Globe, connection: { kind: "connected", filter: "website", count: website.length } },
-    { name: "Gmail", icon: Mail, connection: privateInbox.mailboxes.some(item => item.provider === "gmail") ? { kind: "connected", filter: "Gmail", count: privateInbox.messages.filter(item => item.provider === "gmail").length } : { kind: "disconnected" } },
-    { name: "네이버", icon: Mail, connection: privateInbox.mailboxes.some(item => item.provider === "naver") ? { kind: "connected", filter: "네이버", count: privateInbox.messages.filter(item => item.provider === "naver").length } : { kind: "disconnected" } },
-    { name: "프로젝트", icon: FolderKanban, connection: projectContacts ? { kind: "connected", filter: "project", count: projectContacts.items.length } : { kind: "disconnected" } },
+    { name: "Gmail", icon: Mail, connection: mailConnection("gmail", "Gmail") },
+    { name: "네이버", icon: Mail, connection: mailConnection("naver", "네이버") },
+    { name: "프로젝트", icon: FolderKanban, connection: projectContacts ? { kind: "connected", filter: "project", count: projectContacts.items.length } : { kind: projectError ? "unavailable" : "loading" } },
     { name: "카카오톡", icon: MessageCircle, connection: { kind: "disconnected" } },
     { name: "문자", icon: Smartphone, connection: { kind: "disconnected" } },
     { name: "전화", icon: Phone, connection: { kind: "disconnected" } },
@@ -110,13 +118,13 @@ export function UnifiedInquiryInbox({ inquiries, registrations, rentals, onOpenB
       <div><h2>문의 통합</h2><p>홈페이지·내 메일·프로젝트의 연락 상태와 다음 연락을 확인합니다.</p></div>
       <label className={styles.privacy}><ShieldCheck size={15} aria-hidden="true" /><span>이름·번호 가리기</span><input type="checkbox" role="switch" checked={masked} onChange={event => setMasked(event.target.checked)} aria-label="이름·연락처 가리기" /></label>
     </header>
-    <InboxMailSettings data={privateInbox} onChange={receivePrivateInbox} />
-    {mailError && <p role="alert" className={styles.error}>{mailError} <button type="button" className="underline" onClick={async () => { try { receivePrivateInbox(await loadPrivateInboxAction()); setMailError(""); } catch { /* 기존 오류 안내 유지 */ } }}>다시 불러오기</button></p>}
+    <InboxMailSettings data={mailKnown ? privateInbox : null} loadState={mailLoad.kind} onChange={receivePrivateInbox} />
+    {mailError && <p role="alert" className={styles.error}>{mailError} <button type="button" className="underline" onClick={async () => { try { receivePrivateInbox(await loadPrivateInboxAction()); } catch { /* 기존 오류 안내 유지 */ } }}>다시 불러오기</button></p>}
     {projectError && <p role="status" className={styles.error}>{projectError}</p>}
     <div className={styles.workspace}>
       <div className={styles.main}>
         <dl className={styles.metrics}>
-          {[{ label: "최근 10일 등록·연락", value: summary.recent, hint: "홈페이지 + 내 메일 + 프로젝트" }, { label: "초기 처리 대기", value: summary.waiting, hint: "홈페이지 문의·프로젝트" }, { label: "다음 연락 미정", value: missing, hint: "홈페이지 미종료 문의", alert: missing > 0 }, { label: "미확인 메일", value: privateInbox.messages.filter(mail => !mail.readAt).length, hint: "답변 없이 확인 처리 가능" }].map(item => <div key={item.label} className={item.alert ? styles.attention : undefined}><dt>{item.label}</dt><dd>{item.value}<span>건</span></dd><p>{item.hint}</p></div>)}
+          {[{ label: "최근 10일 등록·연락", value: summary.recent, hint: "홈페이지 + 내 메일 + 프로젝트" }, { label: "초기 처리 대기", value: summary.waiting, hint: "홈페이지 문의·프로젝트" }, { label: "다음 연락 미정", value: missing, hint: "홈페이지 미종료 문의", alert: missing > 0 }, { label: "미확인 메일", value: mailKnown ? privateInbox.messages.filter(mail => !mail.readAt).length : "—", hint: mailKnown ? "답변 없이 확인 처리 가능" : mailLoad.kind === "loading" ? "메일 조회 중" : "메일 조회 실패" }].map(item => <div key={item.label} className={item.alert ? styles.attention : undefined}><dt>{item.label}</dt><dd>{item.value}<span>건</span></dd><p>{item.hint}</p></div>)}
         </dl>
         <InquiryChannelFlow channels={channels} selectedFilter={channel} total={items.length} preview={items.slice(0, 4).map(item => ({ key: item.key, name: contact(item.name) }))} onSelect={setFilter} onPreview={key => { setFilter("all"); selectItem(key); }} />
         <div ref={listRef} tabIndex={-1} className={styles.list}>
@@ -125,7 +133,7 @@ export function UnifiedInquiryInbox({ inquiries, registrations, rentals, onOpenB
             <select aria-label="문의 채널" value={channel} onChange={event => setFilter(event.target.value)}><option value="all">전체 채널</option><option value="website">홈페이지</option><option value="Gmail">Gmail</option><option value="네이버">네이버</option><option value="project">프로젝트</option></select>
             <span role="status">{filtered.length}건 · 최신순</span>
           </div>
-          <div className={styles.mailActions}><label><input type="checkbox" checked={unreadOnly} onChange={event => { setUnreadOnly(event.target.checked); setPage(0); setCheckedMails(new Set()); }} />미확인 메일만</label><span>전체 {privateInbox.messages.length}건 · 미확인 {privateInbox.messages.filter(mail => !mail.readAt).length}건</span><Button type="button" size="sm" variant="outline" disabled={readBusy || selectedMails.length === 0} onClick={() => void markRead(selectedMails.map(mail => mail.id))}><CheckCheck size={14} />선택 {selectedMails.length}건 확인 처리</Button></div>
+          <div className={styles.mailActions}><label><input type="checkbox" disabled={!mailKnown} checked={unreadOnly} onChange={event => { setUnreadOnly(event.target.checked); setPage(0); setCheckedMails(new Set()); }} />미확인 메일만</label><span>{mailKnown ? `전체 ${privateInbox.messages.length}건 · 미확인 ${privateInbox.messages.filter(mail => !mail.readAt).length}건` : mailLoad.kind === "loading" ? "메일 확인 중…" : "메일 조회 실패"}</span><Button type="button" size="sm" variant="outline" disabled={readBusy || selectedMails.length === 0} onClick={() => void markRead(selectedMails.map(mail => mail.id))}><CheckCheck size={14} />선택 {selectedMails.length}건 확인 처리</Button></div>
           {readMessage && <p role="status" className={styles.readMessage}>{readMessage}</p>}
           <div className={styles.tableWrap}><table><caption className="sr-only">통합 문의 목록. 상대를 누르면 오른쪽에서 원문과 연락 일정을 확인합니다.</caption><thead><tr><th scope="col"><input type="checkbox" aria-label="현재 페이지 메일 모두 선택" disabled={pageMailIds.length === 0 || readBusy} checked={pageMailIds.length > 0 && pageMailIds.every(id => checkedMails.has(id))} onChange={event => setCheckedMails(event.target.checked ? new Set(pageMailIds) : new Set())} /></th><th scope="col">시각</th><th scope="col">채널</th><th scope="col">상대 · 제목</th><th scope="col">내용 미리보기</th><th scope="col">상태</th><th scope="col">다음 연락</th></tr></thead><tbody>{rows.map(item => {
             const due = nextContactAt(item.key);

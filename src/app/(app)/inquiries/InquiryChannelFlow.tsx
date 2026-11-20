@@ -7,7 +7,7 @@ import styles from "./inbox.module.css";
 export type InquiryFlowChannel = {
   name: string;
   icon: LucideIcon;
-  connection: { kind: "connected"; filter: string; count: number } | { kind: "disconnected" };
+  connection: { kind: "connected"; filter: string; count: number } | { kind: "disconnected" | "loading" | "unavailable" };
 };
 
 export function InquiryChannelFlow({ channels, selectedFilter, total, preview, onSelect, onPreview }: {
@@ -32,7 +32,7 @@ export function InquiryChannelFlow({ channels, selectedFilter, total, preview, o
     setMotion(previous => ({ lane, sequence: (previous?.sequence ?? 0) + 1 }));
   }
   return <figure className={styles.flow} aria-label="실제 문의 채널 연결 상태">
-    <figcaption>채널별 조회 목록 <span>{channels.filter(item => item.connection.kind === "connected").length}개 채널 연결 · 읽어도 목록 건수는 유지됩니다</span></figcaption>
+    <figcaption>채널별 조회 목록 <span>{channels.some(item => item.connection.kind === "loading") ? "연결 상태 확인 중" : `${channels.filter(item => item.connection.kind === "connected").length}개 채널 연결`} · 읽어도 목록 건수는 유지됩니다</span></figcaption>
     <div className={styles.diagram} style={diagramStyle}>
       <svg className={styles.wires} viewBox={`0 0 1000 ${height}`} preserveAspectRatio="none" aria-hidden="true">
         <g fill="none" stroke="currentColor" strokeWidth="1.2">
@@ -46,8 +46,8 @@ export function InquiryChannelFlow({ channels, selectedFilter, total, preview, o
       </svg>
       <div className={styles.channels}>{channels.map((item, lane) => {
         const connection = item.connection;
-        return <button key={item.name} type="button" aria-pressed={connection.kind === "connected" ? selectedFilter === connection.filter : undefined} disabled={connection.kind === "disconnected"} onClick={() => { if (connection.kind === "connected") selectChannel(connection.filter, lane); }} className={connection.kind === "disconnected" ? styles.disconnected : undefined}>
-          <item.icon size={14} aria-hidden="true" /><span>{item.name}</span><small>{connection.kind === "connected" ? `전체 ${connection.count}건` : "미연결"}</small><i aria-hidden="true" />
+        return <button key={item.name} type="button" aria-pressed={connection.kind === "connected" ? selectedFilter === connection.filter : undefined} disabled={connection.kind !== "connected"} onClick={() => { if (connection.kind === "connected") selectChannel(connection.filter, lane); }} className={connection.kind !== "connected" ? styles.disconnected : undefined}>
+          <item.icon size={14} aria-hidden="true" /><span>{item.name}</span><small>{connection.kind === "connected" ? `전체 ${connection.count}건` : connection.kind === "loading" ? "연결 확인 중" : connection.kind === "unavailable" ? "조회 실패" : "미연결"}</small><i aria-hidden="true" />
         </button>;
       })}</div>
       <button type="button" className={styles.hub} onClick={() => { setMotion(null); onSelect("all"); }} aria-label="전체 채널 문의 보기"><strong>ERP</strong><span>문의 통합</span></button>

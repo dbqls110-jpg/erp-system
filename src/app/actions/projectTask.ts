@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createProjectTask, editProjectTask, completeProjectTask, removeProjectTask, setProjectCompleted } from "@/lib/projectTasks";
 import { parseTaskDraft, TaskConflictError, TaskInputError, type ProjectTask, type TaskResult } from "@/lib/projectTaskPolicy";
+import { saveProjectWorkspace } from "@/lib/projectWorkspace";
 
 function revalidateTask(projectId: string) {
   for (const path of ["/projects", `/projects/${projectId}`, "/calendar", "/dashboard"]) revalidatePath(path);
@@ -18,6 +19,13 @@ export async function setProjectCompletionAction(input: { projectId: string; com
   return mutation(async () => {
     const result = await setProjectCompleted(input.projectId, input.completed, input.expectedStatus);
     revalidateTask(result.projectId);
+    return result;
+  });
+}
+export async function saveProjectWorkspaceAction(projectId: string, input: unknown, version: number) {
+  return mutation(async () => {
+    const result = await saveProjectWorkspace(projectId, input, version);
+    revalidateTask(result.id);
     return result;
   });
 }

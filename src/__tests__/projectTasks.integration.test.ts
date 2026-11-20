@@ -11,6 +11,7 @@ import { prisma } from "@/lib/prisma";
 import { createProjectTask, editProjectTask, completeProjectTask, removeProjectTask, listTaskCalendarEvents, projectTaskDto, PROJECT_TASK_SELECT, setProjectCompleted } from "@/lib/projectTasks";
 import { saveProjectTaskAction } from "@/app/actions/projectTask";
 import { nextProjectTask, todayProjectTasks, type TaskDraft } from "@/lib/projectTaskPolicy";
+import { saveProjectWorkspace, reminderId } from "@/lib/projectWorkspace";
 
 const enabled = process.env.ERP_TASK_DB_TEST === "1";
 const prefix = `task-test-${randomUUID()}`;
@@ -60,6 +61,43 @@ describe.skipIf(!enabled)("할 일 실제 PostgreSQL 저장 · 한 원본 · 동
     expect(todayProjectTasks([edited], "2026-11-17", ownerId)).toEqual([]);
     expect((await listTaskCalendarEvents(viewer, "2026-11-01", "2026-11-30")).some(e => e.taskId === id)).toBe(false);
     expect((await listTaskCalendarEvents(viewer, "2026-12-01", "2026-12-31")).some(e => e.taskId === id)).toBe(true);
+  });
+  it("공연 일정·과업은 한 리마인드와 날짜 미정 할 일을 저장하고 재시도로 복제하지 않는다", async () => {
+    const id = `${prefix}-reminder`;
+    await prisma.project.create({ data: { id, name: "리마인드 격리 검증" } });
+    try {
+      await saveProjectWorkspace(id, { workScope: "무대 운영", eventType: "performance", eventDate: "2027-04-21", initialTasks: "장비 확인" }, 0);
+      const tasks = await prisma.checklistItem.findMany({ where: { projectId: id }, select: PROJECT_TASK_SELECT });
+      expect(tasks).toHaveLength(2);
+      expect(tasks.find(task => task.id === reminderId(id))).toMatchObject({ nextCheckDate: "2027-03-21", dueDate: "2027-04-21", assigneeId: ownerId });
+      expect(tasks.find(task => task.content === "장비 확인")).toMatchObject({ nextCheckDate: null, dueDate: null });
+      await expect(saveProjectWorkspace(id, { initialTasks: "장비 확인" }, 0)).rejects.toThrow("다른 화면");
+      const reminder = tasks.find(task => task.id === reminderId(id))!;
+      await expect(editProjectTask(reminder.id, { ...draft, projectId: id, dueDate: "2027-05-01" }, reminder.version)).rejects.toThrow("실제 일정");
+      await expect(removeProjectTask(reminder.id, id, reminder.version)).rejects.toThrow("실제 일정");
+      await completeProjectTask(reminder.id, id, true, reminder.version);
+      await saveProjectWorkspace(id, { workScope: "무대 운영 보완", eventType: "performance", eventDate: "2027-04-21" }, 1);
+      expect((await prisma.checklistItem.findUniqueOrThrow({ where: { id: reminder.id } })).isDone).toBe(true);
+      await saveProjectWorkspace(id, { workScope: "무대 운영", eventType: "performance", eventDate: "2027-04-22" }, 2);
+      expect(await prisma.checklistItem.findUniqueOrThrow({ where: { id: reminder.id } })).toMatchObject({ isDone: false, nextCheckDate: "2027-03-22" });
+      expect(await prisma.checklistItem.count({ where: { projectId: id } })).toBe(2);
+      const events = await listTaskCalendarEvents(viewer, "2027-03-01", "2027-04-30");
+      expect(events.filter(event => event.taskId === reminder.id)).toHaveLength(2);
+      const races = await Promise.allSettled([saveProjectWorkspace(id, { workScope: "A", eventType: "performance", eventDate: "2027-04-22" }, 3), saveProjectWorkspace(id, { workScope: "B", eventType: "performance", eventDate: "2027-04-22" }, 3)]);
+      expect(races.filter(result => result.status === "fulfilled")).toHaveLength(1);
+      const currentReminder = await prisma.checklistItem.findUniqueOrThrow({ where: { id: reminder.id } });
+      await completeProjectTask(reminder.id, id, true, currentReminder.version);
+      await saveProjectWorkspace(id, { workScope: "공연 취소", eventType: "general", eventDate: null }, 4);
+      expect(await prisma.checklistItem.findUniqueOrThrow({ where: { id: reminder.id } })).toMatchObject({ isDone: true, dueDate: null });
+    } finally { await prisma.project.delete({ where: { id } }); }
+  });
+  it("할 일 추가 후 진행률을 다시 계산하고 금액·파일을 건드리지 않는다", async () => {
+    const id = `${prefix}-scope-progress`;
+    await prisma.project.create({ data: { id, name: "과업 진행률 격리", revenue: 1000, checklistItems: { create: { content: "완료 업무", isDone: true } } } });
+    try {
+      await saveProjectWorkspace(id, { workScope: "추가 과업", initialTasks: "새 업무" }, 0);
+      expect(await prisma.project.findUniqueOrThrow({ where: { id } })).toMatchObject({ revenue: 1000, progress: 50, eventDate: null });
+    } finally { await prisma.project.delete({ where: { id } }); }
   });
   it("등록 요청 8개 재전송은 한 행만 저장한다", async () => {
     const id = `${prefix}-duplicate`;

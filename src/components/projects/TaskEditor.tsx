@@ -19,6 +19,7 @@ export function TaskEditor({ state, projects, people, defaultAssigneeId, onClose
 }) {
   const router = useRouter();
   const task = state.kind === "edit" ? state.task : null;
+  const autoReminder = task?.id.startsWith("reminder-") ?? false;
   const [projectId, setProjectId] = useState(task?.projectId ?? (state.kind === "create" ? state.projectId : ""));
   const [content, setContent] = useState(task?.content ?? "");
   const [assigneeId, setAssigneeId] = useState(task ? task.assigneeId ?? "" : people.some(p => p.id === defaultAssigneeId) ? defaultAssigneeId ?? "" : "");
@@ -85,14 +86,15 @@ export function TaskEditor({ state, projects, people, defaultAssigneeId, onClose
           <div className="space-y-1.5"><Label htmlFor="task-check">다음 확인일 <span className="text-muted-foreground">(선택)</span></Label>
             <Input id="task-check" name="nextCheckDate" type="date" min="2000-01-01" max="2100-12-31" value={nextCheckDate} onInput={e => setNextCheckDate(e.currentTarget.value)} onChange={e => setNextCheckDate(e.target.value)} disabled={pending} />
           </div>
-          <div className="space-y-1.5"><Label htmlFor="task-due">업무 마감일 <span className="text-muted-foreground">(선택)</span></Label>
-            <Input id="task-due" name="dueDate" type="date" min="2000-01-01" max="2100-12-31" value={dueDate} onInput={e => setDueDate(e.currentTarget.value)} onChange={e => setDueDate(e.target.value)} disabled={pending} />
+          <div className="space-y-1.5"><Label htmlFor="task-due">{autoReminder ? "실제 공연·행사일" : "업무 마감일 (선택)"}</Label>
+            <Input id="task-due" name="dueDate" type="date" min="2000-01-01" max="2100-12-31" value={dueDate} onInput={e => setDueDate(e.currentTarget.value)} onChange={e => setDueDate(e.target.value)} disabled={pending || autoReminder} />
           </div>
         </div>
         <p className="text-xs leading-relaxed text-muted-foreground">날짜를 지정하면 ERP 캘린더에도 표시됩니다. 모르는 날짜는 비워 두세요. 같은 날의 확인·마감은 한 일정으로 표시됩니다.</p>
+        {autoReminder && <p className="text-xs leading-relaxed text-muted-foreground">자동 리마인드입니다. 실제 공연·행사일 변경과 리마인드 중지는 프로젝트 상세의 과업·실제 일정에서 진행하세요.</p>}
         {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
-          {task ? <Button type="button" variant="ghost" onClick={remove} disabled={pending} className="text-destructive">업무 삭제</Button> : <span />}
+          {task && !autoReminder ? <Button type="button" variant="ghost" onClick={remove} disabled={pending} className="text-destructive">업무 삭제</Button> : <span />}
           <div className="flex gap-2"><Button type="button" variant="outline" onClick={onClose} disabled={pending}>취소</Button><Button type="submit" disabled={pending || !content.trim() || !projectId}>{pending ? "저장 중…" : "업무 저장"}</Button></div>
         </div>
       </form>

@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { AlertCircle, CheckCircle2, Loader2, Plus } from "lucide-react";
 import { COMPANY_NAMES } from "@/lib/companyFinance";
 import { isInternalQuoteFileName } from "@/lib/quotePolicy";
+import { ProjectScopeFields } from "@/components/projects/ProjectScopeFields";
 
 export function ProjectCreateButton() {
   const [open, setOpen] = useState(false);
@@ -105,7 +106,9 @@ export function ProjectCreateButton() {
             <div className="space-y-1">
               <Label>프로젝트명 *</Label>
               <Input name="name" required placeholder="예: 마늘축제" />
+              <p className="text-xs leading-relaxed text-muted-foreground">프로젝트명 다음에는 업무 범위와 할 일을 함께 등록해 주세요. 견적서만 먼저 저장해도 됩니다.</p>
             </div>
+            <ProjectScopeFields prefix="new-project" />
             <div className="space-y-1">
               <Label>클라이언트</Label>
               <Input name="client" placeholder="클라이언트명" />

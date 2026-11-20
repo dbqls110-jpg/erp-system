@@ -96,7 +96,8 @@ export function projectTaskCalendarEvents(tasks: readonly (ProjectTask & { proje
       : [{ date: task.nextCheckDate, label: "확인", suffix: "check" }, { date: task.dueDate, label: "마감", suffix: "due" }];
     return dates.flatMap(({ date, label, suffix }) => date && date >= start && date <= end ? [{
       id: `task:${task.id}:${suffix}`, taskId: task.id, projectId: task.projectId, date,
-      title: `${task.isDone ? "완료 · " : ""}${task.projectName} · ${task.content} ${label}`, type: "task", isDone: task.isDone,
+      title: task.id.startsWith("reminder-") && date === task.dueDate ? `${task.projectName} · 실제 공연·행사일` : `${task.isDone ? "완료 · " : ""}${task.projectName} · ${task.content} ${label}`,
+      type: "task", isDone: task.id.startsWith("reminder-") && date === task.dueDate ? false : task.isDone,
     }] : []);
   });
 }

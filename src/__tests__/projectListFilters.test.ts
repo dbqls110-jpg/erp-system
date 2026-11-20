@@ -4,14 +4,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const m = vi.hoisted(() => ({
   viewer: { id: "external", role: "partner", partnerId: "partner-1" as string | null, customerId: null },
-  one: vi.fn(), many: vi.fn(), guard: vi.fn(), edit: vi.fn(),
+  one: vi.fn(), many: vi.fn(), tasks: vi.fn(), guard: vi.fn(), edit: vi.fn(),
 }));
 vi.mock("next-auth", () => ({ getServerSession: async () => ({ user: m.viewer }) }));
 vi.mock("@/lib/auth", () => ({ authOptions: {} }));
 vi.mock("@/lib/calendarViewer", () => ({ getCalendarViewer: async () => m.viewer }));
 vi.mock("@/lib/permissions", () => ({ requireMenuAccess: m.guard, canEditMenu: m.edit }));
-vi.mock("@/lib/prisma", () => ({ prisma: { project: { findUnique: m.one, findMany: m.many } } }));
-vi.mock("next/navigation", () => ({ notFound: () => { throw Error("NOT_FOUND"); }, redirect: () => { throw Error("REDIRECT"); } }));
+vi.mock("@/lib/prisma", () => ({ prisma: { project: { findUnique: m.one, findMany: m.many }, checklistItem: { findMany: m.tasks } } }));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn(), push: vi.fn() }), notFound: () => { throw Error("NOT_FOUND"); }, redirect: () => { throw Error("REDIRECT"); } }));
 vi.mock("next/link", () => ({ default: ({ href, children }: { href: string; children: React.ReactNode }) => createElement("a", { href }, children) }));
 vi.mock("@/app/(app)/projects/ProjectFilter", () => ({ ProjectFilter: () => null }));
 vi.mock("@/app/(app)/projects/ProjectSearchFilters", () => ({ ProjectSearchFilters: () => null }));
@@ -21,11 +21,11 @@ import { EXTERNAL_PROJECT_SELECT } from "@/lib/projectVisibility";
 const record = {
   id: "project-1", name: "공개 프로젝트", status: "completed", progress: 0, deadline: "2026-11-21", announceDate: null,
   revenue: 999999999, cost: 888888888, memo: "PRIVATE_MEMO", client: "PRIVATE_CLIENT", company: "PRIVATE_COMPANY",
-  files: [{ name: "PRIVATE_QUOTE", url: "https://example.test/private" }],
+  files: [{ name: "PRIVATE_QUOTE", url: "https://example.test/private" }], checklistItems: [],
 };
 beforeEach(() => {
   vi.clearAllMocks(); m.viewer.partnerId = "partner-1"; m.viewer.role = "partner";
-  m.one.mockResolvedValue(record); m.many.mockResolvedValue([record]);
+  m.one.mockResolvedValue(record); m.many.mockResolvedValue([record]); m.tasks.mockResolvedValue([]);
 });
 function expectSafeQuery(query: { select: unknown; include?: unknown; where: unknown }) {
   expect(query.select).toEqual(EXTERNAL_PROJECT_SELECT);
@@ -40,6 +40,7 @@ describe("외부 프로젝트 최소 공개 정책", () => {
   it("목록에도 내부 회사·거래처·담당자·금액을 전달하지 않는다", async () => {
     expectSafeHtml(renderToStaticMarkup(await List({ searchParams: Promise.resolve({}) })));
     expectSafeQuery(m.many.mock.calls[0][0]); expect(m.edit).not.toHaveBeenCalled();
+    expect(m.tasks).not.toHaveBeenCalled();
   });
   it("기간·상태 필터를 조합해도 외부 연결 범위를 유지하고 회사 검색값은 무시한다", async () => {
     const html = renderToStaticMarkup(await List({ searchParams: Promise.resolve({ year: "2026", month: "11", company: "인포피아", status: "completed" }) }));
