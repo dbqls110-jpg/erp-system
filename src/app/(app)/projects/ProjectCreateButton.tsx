@@ -100,7 +100,7 @@ export function ProjectCreateButton() {
         setOpen(nextOpen);
         if (!nextOpen && !loading) resetDraft();
       }}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-md">
           <DialogHeader><DialogTitle>새 프로젝트</DialogTitle></DialogHeader>
           <form ref={formRef} onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-1">
