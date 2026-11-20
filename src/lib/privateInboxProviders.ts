@@ -34,7 +34,7 @@ export async function verifyNaverMailbox(email: string, password: string, folder
 
 type MailboxAccount = { provider: string; email: string; folder: string; encryptedCredential: string };
 export interface ImportedMail { providerMessageId: string; subject: string; senderName: string; senderEmail: string; body: string; receivedAt: Date }
-async function readGmail(account: MailboxAccount): Promise<ImportedMail[]> {
+async function readGmail(account: MailboxAccount, knownIds: ReadonlySet<string>): Promise<ImportedMail[]> {
   const oauth = mailboxOAuthClient();
   oauth.setCredentials({ refresh_token: decryptFromStorage(account.encryptedCredential) });
   const gmail = google.gmail({ version: "v1", auth: oauth });
@@ -45,7 +45,7 @@ async function readGmail(account: MailboxAccount): Promise<ImportedMail[]> {
   const response = await gmail.users.messages.list({ userId: "me", labelIds: [label.id], q: "newer_than:30d", maxResults: MAIL_IMPORT_LIMIT, includeSpamTrash: false }, { timeout: 12_000, retry: false, signal });
   const output: ImportedMail[] = [];
   // 최대 4개씩 요청. 제한 없는 병렬 다운로드와 전체 메일함 순회를 하지 않는다.
-  const ids = response.data.messages ?? [];
+  const ids = (response.data.messages ?? []).filter(row => row.id && !knownIds.has(row.id));
   for (let offset = 0; offset < ids.length; offset += 4) {
     const batch = await Promise.all(ids.slice(offset, offset + 4).map(async row => {
       if (!row.id) return null;
@@ -64,7 +64,7 @@ async function readGmail(account: MailboxAccount): Promise<ImportedMail[]> {
   }
   return output;
 }
-async function readNaver(account: MailboxAccount): Promise<ImportedMail[]> {
+async function readNaver(account: MailboxAccount, knownIds: ReadonlySet<string>): Promise<ImportedMail[]> {
   const client = naverClient(account.email, decryptFromStorage(account.encryptedCredential));
   client.on("error", () => {});
   const timer = setTimeout(() => client.close(), 50_000);
@@ -76,7 +76,7 @@ async function readNaver(account: MailboxAccount): Promise<ImportedMail[]> {
       if (!mailbox) throw Error("mailbox_missing");
       const since = new Date(Date.now() - 30 * 86400_000);
       const found = await client.search({ since }, { uid: true });
-      const ids = found ? found.sort((a, b) => b - a).slice(0, MAIL_IMPORT_LIMIT) : [];
+      const ids = found ? found.sort((a, b) => b - a).slice(0, MAIL_IMPORT_LIMIT).filter(uid => !knownIds.has(`${mailbox.uidValidity}:${uid}`)) : [];
       const output: ImportedMail[] = [];
       if (!ids.length) return output;
       const metadata = await client.fetchAll(ids, { uid: true, size: true, internalDate: true }, { uid: true });
@@ -97,8 +97,8 @@ async function readNaver(account: MailboxAccount): Promise<ImportedMail[]> {
     } finally { lock.release(); }
   } finally { clearTimeout(timer); client.close(); }
 }
-export async function readMailboxMessages(account: MailboxAccount): Promise<ImportedMail[]> {
-  if (account.provider === "gmail") return readGmail(account);
-  if (account.provider === "naver") return readNaver(account);
+export async function readMailboxMessages(account: MailboxAccount, knownIds: ReadonlySet<string> = new Set()): Promise<ImportedMail[]> {
+  if (account.provider === "gmail") return readGmail(account, knownIds);
+  if (account.provider === "naver") return readNaver(account, knownIds);
   throw Error("unsupported_mailbox");
 }

@@ -1,11 +1,10 @@
-import { randomUUID } from "node:crypto";
 import { prisma } from "@/lib/prisma";
 import { requireInquiryReviewer, getInquiryNotificationSnapshot } from "@/lib/inquiryNotifications";
 import { inquiryKey } from "@/lib/inquiryNotificationKeys";
 import { encryptForStorage } from "@/lib/googleClient";
-import { readMailboxMessages, verifyNaverMailbox } from "@/lib/privateInboxProviders";
+import { verifyNaverMailbox } from "@/lib/privateInboxProviders";
 import { parseFollowUpDate, parseMailboxFolder, parseNaverEmail, parseMailReadIds, type PrivateInboxView } from "@/lib/privateInboxPolicy";
-import { MailboxError, mailboxErrorCode } from "@/lib/mailboxErrors";
+import { syncMailboxForOwner } from "@/lib/privateMailboxSync";
 
 const mailboxSelect = { id: true, provider: true, email: true, folder: true, lastSyncedAt: true, lastErrorCode: true };
 
@@ -71,31 +70,7 @@ export async function disconnectMailbox(id: string) {
 export async function syncPrivateMailbox(id: string) {
   const user = await requireInquiryReviewer();
   if (!id || id.length > 100) throw Error("메일 연결을 확인해 주세요.");
-  const now = new Date(), leaseToken = randomUUID();
-  const claim = await prisma.inboxMailbox.updateMany({ where: { id, ownerId: user.id,
-    AND: [{ OR: [{ leaseUntil: null }, { leaseUntil: { lt: now } }] }, { OR: [{ lastSyncedAt: null }, { lastSyncedAt: { lt: new Date(now.getTime() - 60_000) } }] }] },
-    data: { leaseToken, leaseUntil: new Date(now.getTime() + 120_000) } });
-  if (claim.count !== 1) return;
-  try {
-    const account = await prisma.inboxMailbox.findFirst({ where: { id, ownerId: user.id, leaseToken } });
-    if (!account) return;
-    const messages = await readMailboxMessages(account);
-    await prisma.$transaction(async tx => {
-      // 조회 중 연결 해제·재연결·리스 만료가 일어나면 오래된 결과를 저장하지 않는다.
-      const current = await tx.inboxMailbox.updateMany({ where: { id, ownerId: user.id, leaseToken, encryptedCredential: account.encryptedCredential, folder: account.folder, leaseUntil: { gt: new Date() } },
-        data: { lastSyncedAt: new Date(), lastErrorCode: null, leaseToken: null, leaseUntil: null } });
-      if (current.count !== 1) return;
-      await tx.inboxMail.createMany({ data: messages.map(row => ({ ...row, mailboxId: id })), skipDuplicates: true });
-      const expiredWhere = { mailboxId: id, receivedAt: { lt: new Date(Date.now() - 30 * 86400_000) } };
-      const expired = await tx.inboxMail.findMany({ where: expiredWhere, select: { id: true } });
-      await tx.inboxFollowUp.deleteMany({ where: { ownerId: user.id, itemKey: { in: expired.map(row => `mail:${row.id}`) } } });
-      await tx.inboxMail.deleteMany({ where: expiredWhere });
-    });
-  } catch (error) {
-    const code = mailboxErrorCode(error);
-    await prisma.inboxMailbox.updateMany({ where: { id, ownerId: user.id, leaseToken }, data: { leaseToken: null, leaseUntil: null, lastSyncedAt: new Date(), lastErrorCode: code } });
-    throw new MailboxError(code);
-  }
+  return syncMailboxForOwner({ id, ownerId: user.id, trigger: "manual" });
 }
 
 export async function saveInboxFollowUp(input: { itemKey: unknown; dueAt: unknown; note: unknown; version: unknown }) {

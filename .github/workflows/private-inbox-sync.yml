@@ -1,0 +1,35 @@
+name: Private inbox automatic receiving
+on:
+  workflow_dispatch:
+  schedule:
+    # Five-minute cloud polling, offset from the busy start of the hour. GitHub can delay runs.
+    - cron: '2-57/5 * * * *'
+permissions: {}
+concurrency:
+  group: private-inbox-receiving
+  cancel-in-progress: false
+jobs:
+  receive:
+    if: vars.ERP_MAINTENANCE_ENABLED == 'true' && vars.PRIVATE_INBOX_SYNC_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Receive approved Gmail label and Naver inbox without a browser
+        env:
+          MAINTENANCE_SECRET: ${{ secrets.ERP_MAINTENANCE_SECRET }}
+        run: |
+          set -euo pipefail
+          if [ -z "$MAINTENANCE_SECRET" ]; then
+            echo "Maintenance credential is not configured."
+            exit 1
+          fi
+          result_file=$(mktemp)
+          trap 'rm -f "$result_file"' EXIT
+          status=$(printf 'Authorization: Bearer %s\n' "$MAINTENANCE_SECRET" | curl --silent --show-error --max-time 180 --output "$result_file" --write-out '%{http_code}' \
+            --request POST --header @- https://erp-system-lojo.onrender.com/api/agent/inbox/sync) || status=000
+          if [ "$status" != "200" ]; then
+            echo "Automatic mail receiving returned HTTP $status."
+            exit 1
+          fi
+          jq -e '.ok == true and ([.checked, .synced, .skipped, .failed] | all(.[]; type == "number"))' "$result_file" >/dev/null
+          jq -r '"Mailbox sync: checked=\(.checked), synced=\(.synced), skipped=\(.skipped), failed=\(.failed)"' "$result_file"
