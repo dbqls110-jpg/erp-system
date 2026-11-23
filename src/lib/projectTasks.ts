@@ -3,7 +3,8 @@ import { prisma } from "@/lib/prisma";
 import { requireEditAccess } from "@/lib/actionGuards";
 import { canAccessMenu } from "@/lib/permissions";
 import { isExternal, type Viewer } from "@/lib/calendarVisibility";
-import { TaskConflictError, TaskInputError, parseTaskId, parseTaskVersion, projectTaskCalendarEvents, type ProjectTask, type TaskDraft } from "@/lib/projectTaskPolicy";
+import { TaskConflictError, TaskInputError, parseTaskId, parseTaskVersion, projectTaskCalendarEvents, canRecheckTaskTomorrow, type ProjectTask, type TaskDraft } from "@/lib/projectTaskPolicy";
+import { currentKoreanDateKey } from "@/lib/dateFormat";
 
 export const PROJECT_TASK_SELECT = {
   id: true, projectId: true, content: true, isDone: true, completedAt: true, order: true,
@@ -21,7 +22,24 @@ export const INTERNAL_TASK_ASSIGNEE_WHERE = {
 } satisfies Prisma.UserWhereInput;
 
 export async function listTaskPeople() {
-  return prisma.user.findMany({ where: INTERNAL_TASK_ASSIGNEE_WHERE, select: { id: true, name: true }, orderBy: [{ name: "asc" }, { id: "asc" }] });
+  const people = await prisma.user.findMany({ where: INTERNAL_TASK_ASSIGNEE_WHERE, select: { id: true, name: true, email: true }, orderBy: [{ name: "asc" }, { id: "asc" }] });
+  const counts = new Map<string, number>();
+  for (const { name } of people) if (name) {
+    const key = name.toLowerCase();
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  return people.map(({ id, name, email }) => ({
+    id, name, label: !name || (counts.get(name.toLowerCase()) ?? 0) > 1 ? `${name ?? "이름 미등록"} (${email})` : name,
+  }));
+}
+
+export async function listProjectAttentionTasks(today: string, ownerId?: string) {
+  const rows = await prisma.checklistItem.findMany({
+    where: { isDone: false, project: { status: "active" }, ...(ownerId === undefined ? {} : { assigneeId: ownerId }),
+      OR: [{ nextCheckDate: { lte: today } }, { dueDate: { lte: today } }] },
+    select: { ...PROJECT_TASK_SELECT, project: { select: { name: true, status: true, assignee: true } } },
+  });
+  return rows.map(({ project, ...row }) => ({ ...projectTaskDto(row), projectName: project.name, projectStatus: project.status, projectAssignee: project.assignee }));
 }
 
 export async function listTaskCalendarEvents(viewer: Viewer, start: string, end: string) {
@@ -41,6 +59,19 @@ async function checkAssignee(tx: Prisma.TransactionClient, assigneeId: string | 
   if (assigneeId && !await tx.user.findFirst({ where: { ...INTERNAL_TASK_ASSIGNEE_WHERE, id: assigneeId }, select: { id: true } })) {
     throw new TaskInputError("활성 상태인 내부 직원을 담당자로 선택해 주세요.");
   }
+}
+export async function resolveProjectTaskAssignee(tx: Prisma.TransactionClient, { name, chosenId }: { name: string | null; chosenId: string | null }) {
+  if (chosenId) {
+    await checkAssignee(tx, chosenId);
+    return chosenId;
+  }
+  const label = name?.trim();
+  if (!label) return null;
+  const matches = await tx.user.findMany({
+    where: { ...INTERNAL_TASK_ASSIGNEE_WHERE, name: { equals: label, mode: "insensitive" } },
+    select: { id: true }, take: 2,
+  });
+  return matches.length === 1 ? matches[0].id : null;
 }
 async function syncTaskProgress(tx: Prisma.TransactionClient, projectId: string) {
   const [total, done] = await Promise.all([
@@ -116,6 +147,27 @@ export async function completeProjectTask(idInput: string, projectIdInput: strin
     } });
     if (changed.count !== 1) throw conflict();
     await syncTaskProgress(tx, projectId);
+    return projectTaskDto(await tx.checklistItem.findUniqueOrThrow({ where: { id }, select: PROJECT_TASK_SELECT }));
+  });
+}
+export async function recheckProjectTaskTomorrow(input: { id: string; projectId: string; version: number }) {
+  await requireEditAccess("projects");
+  const id = parseTaskId(input.id), projectId = parseTaskId(input.projectId), version = parseTaskVersion(input.version);
+  return prisma.$transaction(async tx => {
+    const project = await lockProject(tx, projectId);
+    const task = await tx.checklistItem.findUnique({ where: { id }, select: PROJECT_TASK_SELECT });
+    if (!task || task.projectId !== projectId) throw new TaskInputError("업무를 찾을 수 없습니다.");
+    if (task.version !== version) throw conflict();
+    const today = currentKoreanDateKey();
+    if (project.status !== "active" || !canRecheckTaskTomorrow(task, today)) {
+      throw new TaskInputError("지금 확인할 회신 대기 업무만 내일로 옮길 수 있습니다.");
+    }
+    const tomorrow = new Date(`${today}T00:00:00Z`);
+    tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
+    const changed = await tx.checklistItem.updateMany({ where: { id, projectId, version }, data: {
+      nextCheckDate: tomorrow.toISOString().slice(0, 10), version: { increment: 1 },
+    } });
+    if (changed.count !== 1) throw conflict();
     return projectTaskDto(await tx.checklistItem.findUniqueOrThrow({ where: { id }, select: PROJECT_TASK_SELECT }));
   });
 }

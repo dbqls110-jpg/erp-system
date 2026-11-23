@@ -1,7 +1,7 @@
-import { parseTaskDate, TaskInputError } from "./projectTaskPolicy";
+import { parseTaskDate, parseTaskId, TaskInputError } from "./projectTaskPolicy";
 
 export const EVENT_TYPES = { general: "일반 업무", performance: "공연", event: "행사" };
-export type ProjectWorkspaceDraft = { workScope: string | null; eventType: keyof typeof EVENT_TYPES; eventDate: string | null; initialTasks: string[] };
+export type ProjectWorkspaceDraft = { workScope: string | null; eventType: keyof typeof EVENT_TYPES; eventDate: string | null; initialTasks: string[]; initialAssigneeId: string | null };
 export function parseProjectWorkspace(input: unknown): ProjectWorkspaceDraft {
   if (!input || typeof input !== "object" || Array.isArray(input)) throw new TaskInputError("과업 입력을 확인해 주세요.");
   const value = input as Record<string, unknown>;
@@ -11,7 +11,8 @@ export function parseProjectWorkspace(input: unknown): ProjectWorkspaceDraft {
   if (typeof tasks !== "string" || tasks.length > 15_500) throw new TaskInputError("할 일은 한 줄에 하나씩 입력해 주세요.");
   const initialTasks = tasks.split(/\r?\n/).map(task => task.trim()).filter(Boolean);
   if (initialTasks.length > 50 || initialTasks.some(task => task.length > 300)) throw new TaskInputError("할 일은 50개까지, 한 줄에 300자 이내로 입력해 주세요.");
-  return { workScope: scope.trim() || null, eventType: type, eventDate: parseTaskDate(value.eventDate), initialTasks };
+  return { workScope: scope.trim() || null, eventType: type, eventDate: parseTaskDate(value.eventDate), initialTasks,
+    initialAssigneeId: value.initialAssigneeId == null || value.initialAssigneeId === "" ? null : parseTaskId(value.initialAssigneeId) };
 }
 export function eventReminder(type: string, date: string | null, registered: string): { date: string; content: string } | null {
   if (type === "general" || !date || date < registered) return null;

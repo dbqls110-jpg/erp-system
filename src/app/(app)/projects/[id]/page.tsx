@@ -152,7 +152,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
         </CardContent>
       </Card>
 
-      <ProjectScopePanel project={project} hasTasks={project.checklistItems.some(task => !task.id.startsWith("reminder-"))} canEdit={canEdit} />
+      <ProjectScopePanel project={project} hasTasks={project.checklistItems.some(task => !task.id.startsWith("reminder-"))} canEdit={canEdit} people={taskPeople} />
       {/* 매출 · 매입 건별 관리 */}
       <Card className="rounded-[12px] border border-border py-0 shadow-none">
         <CardHeader className="border-b border-[#f0f0f0] px-4 py-3.5 dark:border-border">
@@ -195,7 +195,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
           </div>
         </CardHeader>
         <CardContent className="px-4 py-4">
-          <ChecklistPanel projectId={project.id} projectName={project.name} projectStatus={project.status} items={project.checklistItems.map(projectTaskDto)} people={taskPeople} canEdit={canEdit} viewerId={viewer.id} />
+          <ChecklistPanel projectId={project.id} projectName={project.name} projectStatus={project.status} projectAssignee={project.assignee} items={project.checklistItems.map(projectTaskDto)} people={taskPeople} canEdit={canEdit} />
         </CardContent>
       </Card>
 

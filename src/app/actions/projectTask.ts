@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createProjectTask, editProjectTask, completeProjectTask, removeProjectTask, setProjectCompleted } from "@/lib/projectTasks";
+import { createProjectTask, editProjectTask, completeProjectTask, removeProjectTask, setProjectCompleted, recheckProjectTaskTomorrow } from "@/lib/projectTasks";
 import { parseTaskDraft, TaskConflictError, TaskInputError, type ProjectTask, type TaskResult } from "@/lib/projectTaskPolicy";
 import { saveProjectWorkspace } from "@/lib/projectWorkspace";
 
@@ -51,5 +51,12 @@ export async function deleteProjectTaskAction(input: { id: string; projectId: st
     const result = await removeProjectTask(input.id, input.projectId, input.version);
     revalidateTask(input.projectId);
     return result;
+  });
+}
+export async function recheckProjectTaskTomorrowAction(input: { id: string; projectId: string; version: number }): Promise<TaskResult<ProjectTask>> {
+  return mutation(async () => {
+    const task = await recheckProjectTaskTomorrow(input);
+    revalidateTask(task.projectId);
+    return task;
   });
 }

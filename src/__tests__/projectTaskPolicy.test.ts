@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseTaskDraft, parseTaskDate, nextProjectTask, todayProjectTasks, taskAttentionLabel, projectTaskCalendarEvents, type ProjectTask } from "@/lib/projectTaskPolicy";
+import { defaultTaskAssignee, parseTaskDraft, parseTaskDate, nextProjectTask, todayProjectTasks, taskAttentionLabel, projectTaskCalendarEvents, projectTaskPreview, type ProjectTask } from "@/lib/projectTaskPolicy";
 
 function task(overrides: Partial<ProjectTask> = {}): ProjectTask {
   return { id: "t1", projectId: "p1", content: "최종 시안 회신 확인", isDone: false, completedAt: null, order: 0,
@@ -7,6 +7,13 @@ function task(overrides: Partial<ProjectTask> = {}): ProjectTask {
     waitingOn: "고객", version: 0, ...overrides };
 }
 describe("프로젝트 할 일의 한 원본 · 오늘 · 캘린더", () => {
+  it("한 건 추가할 때도 입력자가 아닌 프로젝트 담당자를 기본 선택한다", () => {
+    const people = [{ id: "creator", name: "입력 직원" }, { id: "lead", name: "팀 담당" }];
+    expect(defaultTaskAssignee(people, " 팀 담당 ")).toBe("lead");
+    expect(defaultTaskAssignee(people, "찾을 수 없는 직원")).toBe("");
+    expect(defaultTaskAssignee([...people, { id: "another", name: "팀 담당" }], "팀 담당")).toBe("");
+    expect(defaultTaskAssignee(people)).toBe("");
+  });
   it("날짜 미정은 오늘 날짜로 채우지 않고 기본 데이터에 남긴다", () => {
     const parsed = parseTaskDraft({ projectId: "p1", content: "  시안 확인  ", taskStatus: "todo" });
     expect(parsed).toMatchObject({ content: "시안 확인", assigneeId: null, nextCheckDate: null, dueDate: null, waitingOn: null });
@@ -28,6 +35,18 @@ describe("프로젝트 할 일의 한 원본 · 오늘 · 캘린더", () => {
     const row = task({ nextCheckDate: "2026-11-20", dueDate: "2026-11-16" });
     expect(todayProjectTasks([row], "2026-11-17", "staff-a")).toEqual([row]);
     expect(taskAttentionLabel(row, "2026-11-17")).toBe("11/16 마감일 지남");
+  });
+  it("실제 마감 우선으로 정렬하고 대시보드만 5건으로 제한한다", () => {
+    const rows = [
+      task({ id: "check-old", nextCheckDate: "2026-11-01" }),
+      task({ id: "check-1" }), task({ id: "check-2" }), task({ id: "check-3" }),
+      task({ id: "due-today", dueDate: "2026-11-17", nextCheckDate: "2026-11-10" }),
+      task({ id: "overdue", dueDate: "2026-11-16", nextCheckDate: "2026-11-18" }),
+      task({ id: "other", assigneeId: "staff-b", dueDate: "2026-11-12" }),
+    ];
+    const ordered = todayProjectTasks(rows, "2026-11-17", "staff-a");
+    expect(ordered.map(t => t.id)).toEqual(["overdue", "due-today", "check-old", "check-1", "check-2", "check-3"]);
+    expect(projectTaskPreview(ordered)).toEqual({ total: 6, tasks: ordered.slice(0, 5) });
   });
   it("완료한 업무를 다음 할 일로 재노출하지 않는다", () => {
     const row = task({ id: "open", nextCheckDate: null });

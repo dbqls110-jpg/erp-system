@@ -9,10 +9,10 @@ import { getCalendarViewer } from "@/lib/calendarViewer";
 import { canViewLinkedProjects, projectWhereForViewer, EXTERNAL_PROJECT_SELECT, externalProjectDto } from "@/lib/projectVisibility";
 import { isExternal } from "@/lib/calendarVisibility";
 import { ExternalProjectList } from "@/components/projects/ExternalProjects";
-import { parseProjectFilters, projectFiltersWhere, type ProjectSearchParams, type ProjectListFilters } from "@/lib/projectFilters";
+import { parseProjectFilters, parseProjectWorkspaceView, projectFiltersWhere, type ProjectSearchParams, type ProjectListFilters } from "@/lib/projectFilters";
 import { koreanCalendarParts, currentKoreanDateKey } from "@/lib/dateFormat";
 import { ProjectSearchFilters } from "./ProjectSearchFilters";
-import { PROJECT_TASK_SELECT, listTaskPeople, projectTaskDto } from "@/lib/projectTasks";
+import { PROJECT_TASK_SELECT, listTaskPeople, projectTaskDto, listProjectAttentionTasks } from "@/lib/projectTasks";
 import { ProjectWorkspace } from "./ProjectWorkspace";
 
 export default async function ProjectsPage({ searchParams }: { searchParams: Promise<ProjectSearchParams> }) {
@@ -32,20 +32,19 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
   }
   const canEdit = await canEditMenu(session.user.id, "projects", session.user.role);
   const today = currentKoreanDateKey();
+  const view = parseProjectWorkspaceView(params.view);
   const [projects, attention, people] = await Promise.all([
     prisma.project.findMany({ where, select: {
       id: true, name: true, status: true, progress: true, company: true, client: true, deadline: true, assignee: true, workScope: true,
       checklistItems: { select: PROJECT_TASK_SELECT, orderBy: [{ order: "asc" }, { id: "asc" }] },
     }, orderBy: { createdAt: "desc" } }),
-    prisma.checklistItem.findMany({ where: {
-      isDone: false, project: { status: "active" }, OR: [{ nextCheckDate: { lte: today } }, { dueDate: { lte: today } }],
-    }, select: { ...PROJECT_TASK_SELECT, project: { select: { name: true, status: true } } } }),
+    listProjectAttentionTasks(today),
     canEdit ? listTaskPeople() : Promise.resolve([]),
   ]);
-  return <ProjectWorkspace projects={projects.map(project => {
+  return <ProjectWorkspace view={view} projects={projects.map(project => {
     const { checklistItems, ...summary } = project;
     return { ...summary, tasks: checklistItems.map(projectTaskDto) };
-  })} attentionTasks={attention.map(task => ({ ...projectTaskDto(task), projectName: task.project.name, projectStatus: task.project.status }))}
+  })} attentionTasks={attention}
     people={people} viewerId={session.user.id} today={today} canEdit={canEdit} isAdmin={session.user.role === "admin"}
-    filters={filters} filterControls={<ProjectSearchFilters filters={filters} />} createControl={canEdit ? <ProjectCreateButton /> : null} />;
+    filters={filters} filterControls={<ProjectSearchFilters filters={filters} view={view} />} createControl={canEdit ? <ProjectCreateButton people={people} /> : null} />;
 }

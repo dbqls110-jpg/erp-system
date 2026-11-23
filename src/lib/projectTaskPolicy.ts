@@ -6,13 +6,20 @@ export type ProjectTask = Omit<ChecklistItem, "createdAt" | "updatedAt" | "compl
   completedAt: string | null;
   assigneeName: string | null;
 };
-export type TaskPerson = { id: string; name: string | null };
-export type TaskProject = { id: string; name: string; status: string };
+export type TaskPerson = { id: string; name: string | null; label?: string };
+export type TaskProject = { id: string; name: string; status: string; assignee?: string | null };
 export type TaskDraft = Pick<ProjectTask, "projectId" | "content" | "assigneeId" | "nextCheckDate" | "dueDate" | "waitingOn"> & { taskStatus: OpenTaskStatus };
 export type TaskResult<T> = { ok: true; data: T } | { ok: false; message: string };
 
 export class TaskInputError extends Error {}
 export class TaskConflictError extends Error {}
+
+export function defaultTaskAssignee(people: readonly TaskPerson[], projectAssignee?: string | null): string {
+  const name = projectAssignee?.trim().toLowerCase();
+  if (!name) return "";
+  const matches = people.filter(person => person.name?.toLowerCase() === name);
+  return matches.length === 1 ? matches[0].id : "";
+}
 
 function objectInput(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new TaskInputError("업무 입력을 확인해 주세요.");
@@ -82,8 +89,39 @@ export function compareTasks(a: ProjectTask, b: ProjectTask): number {
 export function nextProjectTask(tasks: readonly ProjectTask[]): ProjectTask | null {
   return tasks.filter(task => !task.isDone).sort(compareTasks)[0] ?? null;
 }
-export function todayProjectTasks(tasks: readonly ProjectTask[], today: string, ownerId: string | null): ProjectTask[] {
-  return tasks.filter(task => !task.isDone && (ownerId === null || task.assigneeId === ownerId) && (taskAttention(task)?.date ?? "9999") <= today).sort(compareTasks);
+export const TODAY_TASK_GROUPS = [
+  { id: "overdue", label: "마감 지남" },
+  { id: "due", label: "오늘 마감" },
+  { id: "check", label: "오늘 확인" },
+] as const;
+
+export function todayTaskGroup(task: DatedTask, today: string): typeof TODAY_TASK_GROUPS[number]["id"] {
+  return task.dueDate && task.dueDate < today ? "overdue" : task.dueDate === today ? "due" : "check";
+}
+
+export function todayTaskLabel(task: DatedTask, today: string) {
+  const group = todayTaskGroup(task, today);
+  if (group === "check" && task.nextCheckDate && task.nextCheckDate < today) return "확인 지남";
+  return TODAY_TASK_GROUPS.find(entry => entry.id === group)?.label ?? "오늘 확인";
+}
+
+export function todayProjectTasks<T extends ProjectTask>(tasks: readonly T[], today: string, ownerId: string | null): T[] {
+  const priority = { overdue: 0, due: 1, check: 2 };
+  return tasks.filter(task => !task.isDone && (ownerId === null || task.assigneeId === ownerId) && (taskAttention(task)?.date ?? "9999") <= today)
+    .sort((a, b) => {
+      const aGroup = todayTaskGroup(a, today), bGroup = todayTaskGroup(b, today);
+      const aDate = aGroup === "check" ? a.nextCheckDate : a.dueDate;
+      const bDate = bGroup === "check" ? b.nextCheckDate : b.dueDate;
+      return priority[aGroup] - priority[bGroup] || (aDate ?? "").localeCompare(bDate ?? "") || a.order - b.order || a.id.localeCompare(b.id);
+    });
+}
+
+export function projectTaskPreview<T extends ProjectTask>(ordered: readonly T[]) {
+  return { total: ordered.length, tasks: ordered.slice(0, 5) };
+}
+
+export function canRecheckTaskTomorrow(task: Pick<ProjectTask, "isDone" | "taskStatus" | "nextCheckDate">, today: string) {
+  return !task.isDone && task.taskStatus === "waiting" && (!task.nextCheckDate || task.nextCheckDate <= today);
 }
 
 export type TaskCalendarEvent = {

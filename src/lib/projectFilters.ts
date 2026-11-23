@@ -1,7 +1,12 @@
 import type { Prisma } from "@prisma/client";
 import { COMPANY_NAMES, normalizeCompany, type CompanyName } from "@/lib/companyFinance";
 
-export type ProjectSearchParams = Partial<Record<"status" | "year" | "month" | "company", string | string[]>>;
+export type ProjectSearchParams = Partial<Record<"status" | "year" | "month" | "company" | "view", string | string[]>>;
+export type ProjectWorkspaceView = "projects" | "today" | "kanban";
+
+export function parseProjectWorkspaceView(value: unknown): ProjectWorkspaceView {
+  return value === "today" || value === "kanban" ? value : "projects";
+}
 export type ProjectStatusFilter = "all" | "active" | "completed" | "on_hold";
 type ProjectPeriod = { kind: "all" } | { kind: "year"; year: number } | { kind: "month"; year: number; month: number };
 export type ProjectListFilters = {
@@ -28,9 +33,10 @@ export function parseProjectFilters(params: ProjectSearchParams, currentYear: nu
   };
 }
 
-export function projectFiltersHref(filters: ProjectListFilters) {
+export function projectFiltersHref(filters: ProjectListFilters, view?: ProjectWorkspaceView) {
   const params = new URLSearchParams();
-  if (filters.status !== "all") params.set("status", filters.status);
+  if (view !== undefined || filters.status !== "all") params.set("status", filters.status);
+  if (view && view !== "projects") params.set("view", view);
   if (filters.company !== "all") params.set("company", filters.company);
   if (filters.period.kind !== "all") params.set("year", String(filters.period.year));
   if (filters.period.kind === "month") params.set("month", String(filters.period.month));

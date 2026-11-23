@@ -1,15 +1,16 @@
 import Form from "next/form";
 import Link from "next/link";
 import { COMPANY_NAMES } from "@/lib/companyFinance";
-import type { ProjectListFilters } from "@/lib/projectFilters";
+import type { ProjectListFilters, ProjectWorkspaceView } from "@/lib/projectFilters";
 
 const selectClass = "h-9 rounded-lg border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/50";
 
-export function ProjectSearchFilters({ filters, showCompany = true }: { filters: ProjectListFilters; showCompany?: boolean }) {
+export function ProjectSearchFilters({ filters, showCompany = true, view = "projects" }: { filters: ProjectListFilters; showCompany?: boolean; view?: ProjectWorkspaceView }) {
   const year = filters.period.kind === "all" ? "" : filters.period.year;
   const month = filters.period.kind === "month" ? filters.period.month : "all";
   return <Form action="/projects" prefetch={false} scroll={false} aria-label="프로젝트 조회 필터" className="space-y-3 rounded-xl border border-border bg-background p-4">
     <input type="hidden" name="status" value={filters.status} />
+    {view !== "projects" && <input type="hidden" name="view" value={view} />}
     <div className="flex flex-wrap items-end gap-3">
       {showCompany && <label className="flex flex-col gap-1.5 text-xs font-medium" htmlFor="project-filter-company">
         회사
@@ -31,7 +32,7 @@ export function ProjectSearchFilters({ filters, showCompany = true }: { filters:
         </select>
       </label>
       <button type="submit" className="h-9 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground hover:opacity-90">조회</button>
-      <Link href="/projects" prefetch={false} className="inline-flex h-9 items-center rounded-lg border border-border px-3 text-sm hover:bg-muted">초기화</Link>
+      <Link href={view === "kanban" ? "/projects?view=kanban" : "/projects"} prefetch={false} className="inline-flex h-9 items-center rounded-lg border border-border px-3 text-sm hover:bg-muted">초기화</Link>
     </div>
     <p className="text-xs text-muted-foreground">마감일 기준 · 마감일이 없으면 등록일 기준 · 연도를 비우고 월만 선택하면 올해로 조회합니다.</p>
   </Form>;

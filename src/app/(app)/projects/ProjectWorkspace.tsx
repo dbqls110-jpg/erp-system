@@ -12,9 +12,9 @@ import { ProjectCompletionButton } from "@/components/projects/ProjectCompletion
 import { ProjectTaskBoard } from "@/components/projects/ProjectTaskBoard";
 import { ProjectDeleteButton } from "./ProjectDeleteButton";
 import { getDisplayedProjectProgress } from "@/lib/projectProgress";
-import { projectFiltersHref, type ProjectListFilters } from "@/lib/projectFilters";
-import { nextProjectTask, taskAttention, taskAttentionLabel, todayProjectTasks, type ProjectTask, type TaskPerson } from "@/lib/projectTaskPolicy";
-import { completeProjectTaskAction } from "@/app/actions/projectTask";
+import { projectFiltersHref, type ProjectListFilters, type ProjectWorkspaceView } from "@/lib/projectFilters";
+import { canRecheckTaskTomorrow, nextProjectTask, taskAttention, taskAttentionLabel, todayProjectTasks, todayTaskGroup, todayTaskLabel, TODAY_TASK_GROUPS, type ProjectTask, type TaskPerson, type TaskProject } from "@/lib/projectTaskPolicy";
+import { completeProjectTaskAction, recheckProjectTaskTomorrowAction } from "@/app/actions/projectTask";
 import { useVisiblePolling } from "@/lib/useVisiblePolling";
 import { cn } from "@/lib/utils";
 import { sortProjects, PROJECT_SORT_LABELS, type ProjectSort } from "@/lib/projectSort";
@@ -23,27 +23,23 @@ export type WorkspaceProject = {
   id: string; name: string; status: string; progress: number; company: string | null; client: string | null;
   deadline: string | null; assignee: string | null; workScope?: string | null; tasks: ProjectTask[];
 };
-export type AttentionTask = ProjectTask & { projectName: string; projectStatus: string };
+export type AttentionTask = ProjectTask & { projectName: string; projectStatus: string; projectAssignee?: string | null };
 const statusLabels: Record<string, string> = { active: "진행 중", completed: "완료", on_hold: "보류", all: "전체" };
 
-export function ProjectWorkspace({ projects, attentionTasks, people, viewerId, today, canEdit, isAdmin, filters, filterControls, createControl }: {
+export function ProjectWorkspace({ projects, attentionTasks, people, viewerId, today, canEdit, isAdmin, filters, filterControls, createControl, view = "projects" }: {
   projects: WorkspaceProject[]; attentionTasks: AttentionTask[]; people: TaskPerson[]; viewerId: string; today: string;
-  canEdit: boolean; isAdmin: boolean; filters: ProjectListFilters; filterControls: ReactNode; createControl: ReactNode;
+  canEdit: boolean; isAdmin: boolean; filters: ProjectListFilters; filterControls: ReactNode; createControl: ReactNode; view?: ProjectWorkspaceView;
 }) {
   const router = useRouter();
   const [query, setQuery] = useState("");
-  const [view, setView] = useState<"projects" | "today" | "kanban">("projects");
   const [sort, setSort] = useState<ProjectSort>("recent");
   const [scope, setScope] = useState("mine");
-  const [showAllTasks, setShowAllTasks] = useState(false);
   const [editor, setEditor] = useState<TaskEditorState>({ kind: "closed" });
   const [pending, startTransition] = useTransition();
   useVisiblePolling(() => { if (editor.kind === "closed" && !pending) router.refresh(); }, 60_000, { immediate: false });
   const focused = todayProjectTasks(attentionTasks, today, scope === "mine" ? viewerId : null);
-  const visibleTasks = showAllTasks ? focused : focused.slice(0, 5);
-  const projectMap = new Map(projects.map(p => [p.id, { id: p.id, name: p.name, status: p.status }]));
-  const attentionProjectNames = new Map(attentionTasks.map(task => [task.id, task.projectName]));
-  for (const task of attentionTasks) if (!projectMap.has(task.projectId)) projectMap.set(task.projectId, { id: task.projectId, name: task.projectName, status: task.projectStatus });
+  const projectMap = new Map<string, TaskProject>(projects.map(p => [p.id, { id: p.id, name: p.name, status: p.status, assignee: p.assignee }]));
+  for (const task of attentionTasks) if (!projectMap.has(task.projectId)) projectMap.set(task.projectId, { id: task.projectId, name: task.projectName, status: task.projectStatus, assignee: task.projectAssignee });
   const options = [...projectMap.values()];
   const visibleProjects = sortProjects(projects.filter(p => `${p.name} ${p.company ?? ""} ${p.client ?? ""}`.toLocaleLowerCase("ko").includes(query.trim().toLocaleLowerCase("ko"))), sort);
   function create(projectId = "") { setEditor({ kind: "create", projectId, requestId: crypto.randomUUID() }); }
@@ -58,33 +54,55 @@ export function ProjectWorkspace({ projects, attentionTasks, people, viewerId, t
       } catch { toast.error("저장 상태를 확인하지 못했습니다. 새로고침 후 다시 확인해 주세요."); }
     });
   }
+  function recheck(task: ProjectTask) {
+    if (!canEdit || pending || !canRecheckTaskTomorrow(task, today)) return;
+    startTransition(async () => {
+      try {
+        const result = await recheckProjectTaskTomorrowAction({ id: task.id, projectId: task.projectId, version: task.version });
+        if (!result.ok) { toast.error(result.message); router.refresh(); return; }
+        toast.success("확인일을 내일로 옮겼습니다. 실제 마감일은 그대로입니다.");
+      } catch { toast.error("저장 상태를 확인하지 못했습니다. 새로고침 후 다시 확인해 주세요."); }
+    });
+  }
   return <div className="space-y-9 pb-4">
     <nav aria-label="프로젝트 보기" className="flex flex-wrap items-center gap-2 border-b border-border pb-3">
-      {([["projects", "프로젝트"], ["today", "오늘 할 일"], ["kanban", "칸반"]] as const).map(([value, label]) => <Button key={value} variant={view === value ? "default" : "ghost"} aria-pressed={view === value} onClick={() => setView(value)}>{label}{value === "today" && focused.length > 0 ? ` ${focused.length}` : ""}</Button>)}
+      {([["projects", "프로젝트"], ["today", "오늘 할 일"], ["kanban", "칸반"]] as const).map(([value, label]) => <Button key={value} variant={view === value ? "default" : "ghost"} aria-pressed={view === value} onClick={() => router.push(projectFiltersHref(filters, value), { scroll: false })}>{label}{value === "today" && focused.length > 0 ? ` ${focused.length}` : ""}</Button>)}
     </nav>
     {view === "today" && <section aria-labelledby="today-tasks-title" className="space-y-4" aria-busy={pending}>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 id="today-tasks-title" className="flex items-center gap-2.5 text-xl font-semibold tracking-tight sm:text-2xl">오늘 챙길 일 <span className="rounded-lg bg-deep-violet/10 px-2.5 py-0.5 text-base tabular-nums text-rich-plum dark:text-violet-200">{focused.length}</span></h2>
         <div className="flex gap-2">
           <label className="sr-only" htmlFor="task-scope">오늘 할 일 범위</label>
-          <select id="task-scope" value={scope} onChange={e => { setScope(e.target.value); setShowAllTasks(false); }} className="h-10 rounded-lg border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"><option value="mine">내 업무</option><option value="all">전체 직원</option></select>
+          <select id="task-scope" value={scope} onChange={e => setScope(e.target.value)} className="h-10 rounded-lg border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"><option value="mine">내 업무</option><option value="all">전체 직원</option></select>
           {canEdit && <Button onClick={() => create()} disabled={!options.length} className="gap-1.5 bg-deep-violet text-white hover:bg-rich-plum"><Plus size={16} /> 할 일 추가</Button>}
         </div>
       </div>
-      <div className="overflow-hidden rounded-xl border border-border">
-        {visibleTasks.length ? <ul className="divide-y divide-border">{visibleTasks.map(task => {
-          const overdue = (taskAttention(task)?.date ?? today) < today;
-          return <li key={task.id} className="flex min-h-20 items-center gap-3 px-4 py-3 sm:gap-4 sm:px-5">
-            <input type="checkbox" checked={false} onChange={() => complete(task)} disabled={!canEdit || pending} aria-label={`${task.content} 업무 완료`} className="size-5 shrink-0 accent-deep-violet focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring" />
-            <button type="button" onClick={() => edit(task)} disabled={!canEdit || pending} className="flex min-w-0 flex-1 items-center gap-3 rounded-md text-left outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-default">
-              <span className="min-w-0 flex-1"><span className="block break-words text-base font-semibold leading-relaxed">{task.content}</span><span className="mt-0.5 block text-sm leading-relaxed text-muted-foreground">{attentionProjectNames.get(task.id)} · {task.assigneeName ?? "담당자 없음"}</span></span>
-              <span className="max-w-[42%] shrink-0 text-right text-sm sm:max-w-none"><span className={cn("block font-medium", overdue && "text-destructive")}>{taskAttentionLabel(task, today)}</span>{task.taskStatus === "waiting" && <span className="mt-1 block text-xs text-muted-foreground">{task.waitingOn ? `${task.waitingOn} 답변 대기` : "회신 대기"}</span>}</span>
-              {canEdit && <ChevronRight size={18} aria-hidden="true" className="shrink-0 text-muted-foreground" />}
-            </button>
-          </li>;
-        })}</ul> : <div className="px-5 py-7"><p className="text-sm font-medium">{scope === "mine" ? "오늘 확인할 내 업무가 없습니다." : "오늘 확인할 업무가 없습니다."}</p><p className="mt-1 text-sm leading-relaxed text-muted-foreground">담당자와 확인일을 지정하면 이곳에 모입니다. 날짜 미정 업무는 프로젝트·칸반에서 확인하세요.</p></div>}
-        {focused.length > 5 && <button type="button" onClick={() => setShowAllTasks(v => !v)} className="w-full border-t border-border py-3 text-sm font-medium text-rich-plum hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring">{showAllTasks ? "접기" : `나머지 ${focused.length - 5}개 보기`}</button>}
-      </div>
+      {focused.length ? TODAY_TASK_GROUPS.map(group => {
+        const tasks = focused.filter(task => todayTaskGroup(task, today) === group.id);
+        if (!tasks.length) return null;
+        return <section key={group.id} aria-labelledby={`today-group-${group.id}`} className="rounded-xl border border-border">
+          <h3 id={`today-group-${group.id}`} className="flex items-center gap-2 border-b border-border px-4 py-2.5 text-base font-semibold sm:px-5">{group.label} <span className="rounded-md bg-muted px-1.5 text-sm tabular-nums text-muted-foreground">{tasks.length}</span></h3>
+          <ul className="divide-y divide-border">{tasks.map(task => (
+            <li key={task.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2 sm:flex-nowrap sm:px-5">
+              <label className="flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-md">
+                <input type="checkbox" checked={false} onChange={() => complete(task)} disabled={!canEdit || pending} aria-label={`${task.content} 업무 완료`} className="size-5 accent-deep-violet focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring" />
+              </label>
+              <button type="button" onClick={() => edit(task)} disabled={!canEdit || pending} className="flex min-h-11 min-w-0 flex-1 items-center gap-2 rounded-md text-left outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-default">
+                <span className="min-w-0 flex-1"><span className="block break-words text-sm font-semibold leading-relaxed sm:text-base">{task.content}</span><span className="block break-words text-sm leading-relaxed text-muted-foreground">{task.projectName} · {task.assigneeName ?? "담당자 없음"}</span>
+                  {(task.taskStatus === "waiting" || todayTaskLabel(task, today) === "확인 지남") && <span className="mt-0.5 block break-words text-xs text-muted-foreground">{[
+                    todayTaskLabel(task, today) === "확인 지남" ? "확인 지남" : "",
+                    task.taskStatus === "waiting" ? task.waitingOn ? `${task.waitingOn} 답변 대기` : "회신 대기" : "",
+                  ].filter(Boolean).join(" · ")}</span>}
+                </span>
+                {canEdit && <ChevronRight size={17} aria-hidden="true" className="shrink-0 text-muted-foreground" />}
+              </button>
+              {canEdit && canRecheckTaskTomorrow(task, today) && <div className="flex w-full justify-end sm:w-auto">
+                <Button variant="outline" disabled={pending} className="min-h-11 shrink-0" onClick={() => recheck(task)}>내일 다시 확인</Button>
+              </div>}
+            </li>
+          ))}</ul>
+        </section>;
+      }) : <div className="rounded-xl border border-border px-5 py-7"><p className="text-sm font-medium">{scope === "mine" ? "오늘 확인할 내 업무가 없습니다." : "오늘 확인할 업무가 없습니다."}</p><p className="mt-1 text-sm leading-relaxed text-muted-foreground">담당자와 마감일 또는 확인일을 지정하면 이곳에 모입니다. 날짜 미정 업무는 프로젝트·칸반에서 확인하세요.</p></div>}
     </section>}
     {view !== "today" && <section aria-labelledby="project-list-title" className="space-y-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -92,7 +110,7 @@ export function ProjectWorkspace({ projects, attentionTasks, people, viewerId, t
           <label className="sr-only" htmlFor="workspace-project-status">프로젝트 상태</label>
           <select id="workspace-project-status" value={filters.status} onChange={e => {
             const value = e.target.value;
-            if (value === "active" || value === "completed" || value === "on_hold" || value === "all") router.push(projectFiltersHref({ ...filters, status: value }), { scroll: false });
+            if (value === "active" || value === "completed" || value === "on_hold" || value === "all") router.push(projectFiltersHref({ ...filters, status: value }, view), { scroll: false });
           }} className="h-9 rounded-lg border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring">{Object.entries(statusLabels).map(([value, label]) => <option key={value} value={value}>{label}{filters.status === value ? ` ${projects.length}` : ""}</option>)}</select>
         </div><p className="text-sm leading-relaxed text-muted-foreground">프로젝트를 열면 견적서·파일·매출매입을 확인할 수 있습니다.</p></div>
         <div className="flex flex-wrap items-center gap-2"><label className="relative"><Search size={16} aria-hidden="true" className="absolute left-3 top-3 text-muted-foreground" /><span className="sr-only">프로젝트 검색</span><input value={query} onChange={e => setQuery(e.target.value)} placeholder="프로젝트 검색" className="h-10 w-52 max-w-full rounded-lg border border-input bg-background pl-9 pr-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring" /></label>{createControl}</div>
@@ -120,6 +138,6 @@ export function ProjectWorkspace({ projects, attentionTasks, people, viewerId, t
         </article>;
       })}</div> : <p className="rounded-xl border border-border px-5 py-10 text-sm text-muted-foreground">선택한 조건에 맞는 프로젝트가 없습니다. 검색어나 필터를 변경해 주세요.</p>)}
     </section>}
-    {editor.kind !== "closed" && <TaskEditor key={editor.kind === "create" ? editor.requestId : `${editor.task.id}-${editor.task.version}`} state={editor} projects={options} people={people} defaultAssigneeId={viewerId} onClose={() => setEditor({ kind: "closed" })} />}
+    {editor.kind !== "closed" && <TaskEditor key={editor.kind === "create" ? editor.requestId : `${editor.task.id}-${editor.task.version}`} state={editor} projects={options} people={people} onClose={() => setEditor({ kind: "closed" })} />}
   </div>;
 }

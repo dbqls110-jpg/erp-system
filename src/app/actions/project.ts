@@ -11,7 +11,7 @@ import { isInternalQuoteFileName } from "@/lib/quotePolicy";
 import { normalizeCompany } from "@/lib/companyFinance";
 import { upsertQuoteAmounts } from "@/lib/projectAmounts";
 import { randomUUID } from "node:crypto";
-import { createProjectTask, editProjectTask, completeProjectTask, removeProjectTask, PROJECT_TASK_SELECT } from "@/lib/projectTasks";
+import { createProjectTask, editProjectTask, completeProjectTask, removeProjectTask, PROJECT_TASK_SELECT, resolveProjectTaskAssignee } from "@/lib/projectTasks";
 import { parseTaskDraft } from "@/lib/projectTaskPolicy";
 import { parseProjectWorkspace } from "@/lib/projectReminderPolicy";
 import { appendInitialTasks, syncEventReminder } from "@/lib/projectWorkspace";
@@ -36,8 +36,8 @@ function parseOptionalCompany(rawValue: FormDataEntryValue | null): string | nul
 }
 
 export async function createProject(formData: FormData): Promise<CreateProjectResult> {
-  const session = await requireEditAccess("projects");
-  const { initialTasks, ...workspace } = parseProjectWorkspace(Object.fromEntries(formData));
+  await requireEditAccess("projects");
+  const { initialTasks, initialAssigneeId, ...workspace } = parseProjectWorkspace(Object.fromEntries(formData));
 
   const quoteFiles = formData.getAll("quoteFile").filter((entry): entry is File => entry instanceof File);
   const internalQuoteFiles = quoteFiles.filter((file) => isInternalQuoteFileName(file.name));
@@ -77,8 +77,10 @@ export async function createProject(formData: FormData): Promise<CreateProjectRe
       },
     });
 
-    await appendInitialTasks(tx, created.id, initialTasks, session.user.id);
-    if (created.eventDate) await syncEventReminder(tx, created, session.user.id, currentKoreanDateKey());
+    const assigneeId = initialTasks.length || created.eventDate
+      ? await resolveProjectTaskAssignee(tx, { name: created.assignee, chosenId: initialAssigneeId }) : null;
+    await appendInitialTasks(tx, created.id, initialTasks, assigneeId);
+    if (created.eventDate) await syncEventReminder(tx, created, assigneeId, currentKoreanDateKey());
     if (internalQuoteFile && quoteAnalysis) {
       await upsertQuoteAmounts(created.id, internalQuoteFile.name, quoteAnalysis, tx);
     }
@@ -108,8 +110,7 @@ export async function createProject(formData: FormData): Promise<CreateProjectRe
     }
   }
 
-  revalidatePath("/projects");
-  revalidatePath(`/projects/${project.id}`);
+  revalidateChecklist(project.id);
 
   return {
     projectId: project.id,
@@ -149,6 +150,7 @@ export async function updateProject(id: string, formData: FormData) {
   });
   revalidatePath(`/projects/${id}`);
   revalidatePath("/projects");
+  revalidatePath("/dashboard");
 }
 
 export async function deleteProject(id: string) {
@@ -156,6 +158,7 @@ export async function deleteProject(id: string) {
   if (session?.user?.role !== "admin") throw new Error("Unauthorized");
   await prisma.project.delete({ where: { id } });
   revalidatePath("/projects");
+  revalidatePath("/dashboard");
 }
 
 export async function addChecklistItem(projectId: string, content: string) {

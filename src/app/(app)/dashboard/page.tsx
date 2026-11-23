@@ -14,6 +14,10 @@ import { calculateBudgetMetrics } from "@/lib/financeMetrics";
 import { fixedExpenseMonthWhere, monthKey } from "@/lib/fixedExpenseMonths";
 import { getVenueWeekRange } from "@/lib/venueKpi";
 import { getHostRegisteredSpacesForWeek } from "@/lib/spaceDatabaseSync";
+import { currentKoreanDateKey } from "@/lib/dateFormat";
+import { listProjectAttentionTasks } from "@/lib/projectTasks";
+import { todayProjectTasks } from "@/lib/projectTaskPolicy";
+import { DashboardTodayTasks } from "@/components/projects/DashboardTodayTasks";
 
 export default async function DashboardPage() {
   const today = format(new Date(), "yyyy-MM-dd");
@@ -69,7 +73,8 @@ export default async function DashboardPage() {
 
   // 근태 쿼리 2개 → 1개로 통합 (today 포함 이번달 전체)
   const venueWeek = getVenueWeekRange(now);
-  const [monthlyAttendance, activeProjects, budget, expenses, upcomingEvents, leaveBalance, fixedExpenses, venueKpiRows] = await Promise.all([
+  const taskToday = currentKoreanDateKey();
+  const [monthlyAttendance, activeProjects, budget, expenses, upcomingEvents, leaveBalance, fixedExpenses, venueKpiRows, attentionTasks] = await Promise.all([
     prisma.attendance.findMany({
       where: { userId: viewer.id, date: { gte: monthStart, lte: today } },
       select: { date: true, clockIn: true, clockOut: true },
@@ -106,6 +111,7 @@ export default async function DashboardPage() {
     canSee("venues")
       ? getHostRegisteredSpacesForWeek(venueWeek.startDate, venueWeek.endDate).catch(() => null)
       : null,
+    canSee("projects") ? listProjectAttentionTasks(taskToday, viewer.id) : [],
   ]);
 
   const attendance = monthlyAttendance.find((r) => r.date === today) ?? null;
@@ -211,6 +217,8 @@ export default async function DashboardPage() {
           </Link>
         ))}
       </div>
+
+      {canSee("projects") && <DashboardTodayTasks tasks={todayProjectTasks(attentionTasks, taskToday, viewer.id)} today={taskToday} />}
 
       {upcomingEvents.length > 0 && (
         <Card className="rounded-[12px] border border-border py-0 shadow-none dark:bg-card">

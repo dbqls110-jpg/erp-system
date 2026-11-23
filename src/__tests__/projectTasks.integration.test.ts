@@ -8,14 +8,17 @@ vi.mock("@/lib/auth", () => ({ authOptions: {} }));
 vi.mock("@/lib/permissions", () => ({ canAccessMenu: m.access, requireMenuEdit: vi.fn() }));
 vi.mock("next/cache", () => ({ revalidatePath: m.revalidate }));
 import { prisma } from "@/lib/prisma";
-import { createProjectTask, editProjectTask, completeProjectTask, removeProjectTask, listTaskCalendarEvents, projectTaskDto, PROJECT_TASK_SELECT, setProjectCompleted } from "@/lib/projectTasks";
-import { saveProjectTaskAction } from "@/app/actions/projectTask";
+import { createProjectTask, editProjectTask, completeProjectTask, removeProjectTask, listProjectAttentionTasks, listTaskCalendarEvents, listTaskPeople, projectTaskDto, PROJECT_TASK_SELECT, setProjectCompleted } from "@/lib/projectTasks";
+import { saveProjectTaskAction, recheckProjectTaskTomorrowAction } from "@/app/actions/projectTask";
+import { createProject } from "@/app/actions/project";
 import { nextProjectTask, todayProjectTasks, type TaskDraft } from "@/lib/projectTaskPolicy";
 import { saveProjectWorkspace, reminderId } from "@/lib/projectWorkspace";
+import { currentKoreanDateKey } from "@/lib/dateFormat";
 
 const enabled = process.env.ERP_TASK_DB_TEST === "1";
 const prefix = `task-test-${randomUUID()}`;
 const projectId = `${prefix}-project`, ownerId = `${prefix}-staff`;
+const leadId = `${prefix}-lead`, leadName = `프로젝트 담당 ${prefix}`;
 const viewer = { id: ownerId, role: "member", active: true, partnerId: null, customerId: null, venueId: null };
 const draft: TaskDraft = { projectId, content: "시안 회신 확인", assigneeId: ownerId, taskStatus: "waiting", nextCheckDate: "2026-11-17", dueDate: "2026-11-20", waitingOn: "고객" };
 let ready = false;
@@ -27,13 +30,14 @@ describe.skipIf(!enabled)("할 일 실제 PostgreSQL 저장 · 한 원본 · 동
   beforeAll(async () => {
     assertFixture(); m.session.mockResolvedValue({ user: viewer }); m.access.mockResolvedValue(true);
     await prisma.user.create({ data: { id: ownerId, email: `${ownerId}@example.invalid`, name: "격리 테스트 직원", role: "member" } });
+    await prisma.user.create({ data: { id: leadId, email: `${leadId}@example.invalid`, name: leadName, role: "member" } });
     await prisma.project.create({ data: { id: projectId, name: "격리 업무 검증", revenue: 1_000_000, cost: 300_000, memo: "보존할 메모", amounts: { create: [{ kind: "revenue", amount: 1_000_000 }, { kind: "cost", amount: 300_000 }] } } });
     ready = true;
   });
   afterAll(async () => {
     if (ready) {
       await prisma.project.deleteMany({ where: { id: projectId } });
-      await prisma.user.deleteMany({ where: { id: ownerId } });
+      await prisma.user.deleteMany({ where: { id: { in: [ownerId, leadId] } } });
     }
     await prisma.$disconnect();
   });
@@ -64,13 +68,13 @@ describe.skipIf(!enabled)("할 일 실제 PostgreSQL 저장 · 한 원본 · 동
   });
   it("공연 일정·과업은 한 리마인드와 날짜 미정 할 일을 저장하고 재시도로 복제하지 않는다", async () => {
     const id = `${prefix}-reminder`;
-    await prisma.project.create({ data: { id, name: "리마인드 격리 검증" } });
+    await prisma.project.create({ data: { id, name: "리마인드 격리 검증", assignee: leadName } });
     try {
       await saveProjectWorkspace(id, { workScope: "무대 운영", eventType: "performance", eventDate: "2027-04-21", initialTasks: "장비 확인" }, 0);
       const tasks = await prisma.checklistItem.findMany({ where: { projectId: id }, select: PROJECT_TASK_SELECT });
       expect(tasks).toHaveLength(2);
-      expect(tasks.find(task => task.id === reminderId(id))).toMatchObject({ nextCheckDate: "2027-03-21", dueDate: "2027-04-21", assigneeId: ownerId });
-      expect(tasks.find(task => task.content === "장비 확인")).toMatchObject({ nextCheckDate: null, dueDate: null });
+      expect(tasks.find(task => task.id === reminderId(id))).toMatchObject({ nextCheckDate: "2027-03-21", dueDate: "2027-04-21", assigneeId: leadId });
+      expect(tasks.find(task => task.content === "장비 확인")).toMatchObject({ nextCheckDate: null, dueDate: null, assigneeId: leadId });
       await expect(saveProjectWorkspace(id, { initialTasks: "장비 확인" }, 0)).rejects.toThrow("다른 화면");
       const reminder = tasks.find(task => task.id === reminderId(id))!;
       await expect(editProjectTask(reminder.id, { ...draft, projectId: id, dueDate: "2027-05-01" }, reminder.version)).rejects.toThrow("실제 일정");
@@ -90,6 +94,59 @@ describe.skipIf(!enabled)("할 일 실제 PostgreSQL 저장 · 한 원본 · 동
       await saveProjectWorkspace(id, { workScope: "공연 취소", eventType: "general", eventDate: null }, 4);
       expect(await prisma.checklistItem.findUniqueOrThrow({ where: { id: reminder.id } })).toMatchObject({ isDone: true, dueDate: null });
     } finally { await prisma.project.delete({ where: { id } }); }
+  });
+  it("대리 등록한 프로젝트 과업과 알림은 프로젝트 담당자에게 간다", async () => {
+    const form = new FormData();
+    for (const [key, value] of Object.entries({ name: "새 행사 검증", assignee: leadName, initialTasks: "장비 예약", eventType: "event", eventDate: "2027-03-15" })) form.set(key, value);
+    const { projectId: id } = await createProject(form);
+    try {
+      const rows = await prisma.checklistItem.findMany({ where: { projectId: id } });
+      expect(rows).toHaveLength(2);
+      expect(rows.map(row => row.assigneeId)).toEqual([leadId, leadId]);
+    } finally { await prisma.project.delete({ where: { id } }); }
+  });
+  it("매칭이 없거나 동명이인이면 미배정이며, 명시적으로 고른 내부 직원만 배정된다", async () => {
+    const id = `${prefix}-unknown-owner`, twinId = `${prefix}-twin`;
+    await prisma.user.create({ data: { id: twinId, name: leadName, email: `${twinId}@example.invalid`, role: "member" }});
+    await prisma.project.create({ data: { id, name: "할당 검증", assignee: leadName } });
+    try {
+      await saveProjectWorkspace(id, { initialTasks: "동명이인" }, 0);
+      const matchingPeople = (await listTaskPeople()).filter(person => person.name === leadName);
+      expect(new Set(matchingPeople.map(person => person.label)).size).toBe(2);
+      await prisma.project.update({ where: { id }, data: { assignee: "찾을 수 없는 사람" } });
+      await saveProjectWorkspace(id, { initialTasks: "미등록 이름" }, 1);
+      await saveProjectWorkspace(id, { initialTasks: "선택한 담당자", initialAssigneeId: leadId }, 2);
+      const rows = await prisma.checklistItem.findMany({ where: { projectId: id }, orderBy: { order: "asc" } });
+      expect(rows.map(row => row.assigneeId)).toEqual([null, null, leadId]);
+      await prisma.user.update({ where: { id: twinId }, data: { active: false } });
+      await expect(saveProjectWorkspace(id, { initialTasks: "비활성 계정", initialAssigneeId: twinId }, 3)).rejects.toThrow("내부 직원");
+      expect(await prisma.checklistItem.count({ where: { projectId: id } })).toBe(3);
+    } finally { await prisma.project.delete({ where: { id } }); await prisma.user.delete({ where: { id: twinId } }); }
+  });
+  it("내일 다시 확인은 동시 호출에도 확인일만 변경하고 이미 임박한 실제 마감을 숨기지 않는다", async () => {
+    const today = currentKoreanDateKey(), tomorrow = new Date(`${today}T00:00:00Z`);
+    tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
+    const row = await createProjectTask({ ...draft, nextCheckDate: today, dueDate: today }, `${prefix}-recheck`);
+    const request = { id: row.id, projectId, version: row.version };
+    const results = await Promise.all([recheckProjectTaskTomorrowAction(request), recheckProjectTaskTomorrowAction(request)]);
+    expect(results.filter(result => result.ok)).toHaveLength(1);
+    const stored = projectTaskDto(await prisma.checklistItem.findUniqueOrThrow({ where: { id: row.id }, select: PROJECT_TASK_SELECT }));
+    expect(stored).toMatchObject({ nextCheckDate: tomorrow.toISOString().slice(0, 10), dueDate: today, isDone: false, taskStatus: "waiting", version: row.version + 1 });
+    expect(todayProjectTasks([stored], today, ownerId).map(task => task.id)).toEqual([row.id]);
+  });
+  it("같은 업무 원본으로 두 화면에 표시하고 확인만 필요한 업무는 내일로 옮긴다", async () => {
+    const today = currentKoreanDateKey();
+    const mine = await createProjectTask({ ...draft, nextCheckDate: today, dueDate: null }, `${prefix}-check-only`);
+    const theirs = await createProjectTask({ ...draft, assigneeId: leadId, nextCheckDate: today, dueDate: null }, `${prefix}-theirs`);
+    const done = await createProjectTask({ ...draft, nextCheckDate: today }, `${prefix}-done-hidden`);
+    await completeProjectTask(done.id, projectId, true, done.version);
+    const before = await listProjectAttentionTasks(today, ownerId);
+    expect(before.map(task => task.id)).toContain(mine.id);
+    expect(before.map(task => task.id)).not.toContain(theirs.id);
+    expect(before.map(task => task.id)).not.toContain(done.id);
+    expect((await listProjectAttentionTasks(today)).map(task => task.id)).toContain(theirs.id);
+    expect((await recheckProjectTaskTomorrowAction({ id: mine.id, projectId, version: mine.version })).ok).toBe(true);
+    expect((await listProjectAttentionTasks(today, ownerId)).map(task => task.id)).not.toContain(mine.id);
   });
   it("할 일 추가 후 진행률을 다시 계산하고 금액·파일을 건드리지 않는다", async () => {
     const id = `${prefix}-scope-progress`;
@@ -134,6 +191,7 @@ describe.skipIf(!enabled)("할 일 실제 PostgreSQL 저장 · 한 원본 · 동
     m.session.mockResolvedValue({ user: outsider });
     await expect(createProjectTask(draft, `${prefix}-forbidden`)).rejects.toThrow("외부 계정");
     await expect(setProjectCompleted(projectId, true, "active")).rejects.toThrow("외부 계정");
+    expect((await recheckProjectTaskTomorrowAction({ id: `${prefix}-recheck`, projectId, version: 1 })).ok).toBe(false);
     expect(await listTaskCalendarEvents(outsider, "2026-11-01", "2026-11-30")).toEqual([]);
     expect(await prisma.checklistItem.count({ where: { id: `${prefix}-forbidden` } })).toBe(0);
     m.session.mockResolvedValue({ user: viewer });

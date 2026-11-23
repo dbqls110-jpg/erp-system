@@ -6,8 +6,9 @@ import { Button } from "@/components/ui/button";
 import { ProjectScopeFields } from "./ProjectScopeFields";
 import { saveProjectWorkspaceAction } from "@/app/actions/projectTask";
 import { EVENT_TYPES } from "@/lib/projectReminderPolicy";
+import type { TaskPerson } from "@/lib/projectTaskPolicy";
 
-export function ProjectScopePanel({ project, hasTasks, canEdit }: { project: { id: string; workScope: string | null; eventType: string; eventDate: string | null; workspaceVersion: number }; hasTasks: boolean; canEdit: boolean }) {
+export function ProjectScopePanel({ project, hasTasks, canEdit, people }: { project: { id: string; workScope: string | null; eventType: string; eventDate: string | null; workspaceVersion: number }; hasTasks: boolean; canEdit: boolean; people: TaskPerson[] }) {
   const [editing, setEditing] = useState(false), [error, setError] = useState("");
   const [pending, startTransition] = useTransition();
   const router = useRouter();
@@ -26,6 +27,6 @@ export function ProjectScopePanel({ project, hasTasks, canEdit }: { project: { i
           toast.success("과업과 실제 일정을 저장했습니다."); setEditing(false); router.refresh();
         } catch { setError("저장 결과를 확인하지 못했습니다. 새로고침 후 다시 확인해 주세요."); }
       });
-    }}><ProjectScopeFields {...project} prefix={`scope-${project.id}`} />{error && <p role="alert" className="text-sm text-destructive">{error}</p>}<Button disabled={pending} type="submit">{pending ? "저장 중…" : "과업 저장"}</Button></form>}
+    }}><ProjectScopeFields {...project} prefix={`scope-${project.id}`} people={people} />{error && <p role="alert" className="text-sm text-destructive">{error}</p>}<Button disabled={pending} type="submit">{pending ? "저장 중…" : "과업 저장"}</Button></form>}
   </section>;
 }

@@ -11,8 +11,8 @@ import { taskAttentionLabel, type ProjectTask, type TaskPerson } from "@/lib/pro
 import { currentKoreanDateKey, formatKoreanShortDate } from "@/lib/dateFormat";
 import { cn } from "@/lib/utils";
 
-export function ChecklistPanel({ projectId, projectName, projectStatus, items, people, canEdit, viewerId }: {
-  projectId: string; projectName: string; projectStatus: string; items: ProjectTask[]; people: TaskPerson[]; canEdit: boolean; viewerId?: string;
+export function ChecklistPanel({ projectId, projectName, projectStatus, projectAssignee, items, people, canEdit }: {
+  projectId: string; projectName: string; projectStatus: string; projectAssignee: string | null; items: ProjectTask[]; people: TaskPerson[]; canEdit: boolean;
 }) {
   const router = useRouter();
   const [editor, setEditor] = useState<TaskEditorState>({ kind: "closed" });
@@ -37,6 +37,6 @@ export function ChecklistPanel({ projectId, projectName, projectStatus, items, p
     </li>)}</ul> : <p className="text-sm text-muted-foreground">등록한 할 일이 없습니다.</p>}
     {canEdit && <Button type="button" variant="outline" size="sm" onClick={() => setEditor({ kind: "create", projectId, requestId: crypto.randomUUID() })} className="gap-1.5"><Plus size={15} /> 할 일 추가</Button>}
     <p className="text-xs leading-relaxed text-muted-foreground">오늘 챙길 일과 같은 업무입니다. 확인일·마감일은 ERP 캘린더에도 표시되며, 업무 완료가 프로젝트·지급 완료를 바꾸지는 않습니다.</p>
-    {editor.kind !== "closed" && <TaskEditor key={editor.kind === "create" ? editor.requestId : `${editor.task.id}-${editor.task.version}`} state={editor} projects={[{ id: projectId, name: projectName, status: projectStatus }]} people={people} defaultAssigneeId={viewerId} onClose={() => setEditor({ kind: "closed" })} />}
+    {editor.kind !== "closed" && <TaskEditor key={editor.kind === "create" ? editor.requestId : `${editor.task.id}-${editor.task.version}`} state={editor} projects={[{ id: projectId, name: projectName, status: projectStatus, assignee: projectAssignee }]} people={people} onClose={() => setEditor({ kind: "closed" })} />}
   </div>;
 }

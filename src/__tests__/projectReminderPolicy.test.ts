@@ -29,7 +29,7 @@ describe("actual event reminder policy", () => {
     expect(events[1]).toMatchObject({ date: "2027-04-21", title: "4월 공연 · 실제 공연·행사일", isDone: false });
   });
   it("keeps unknown dates null, permits quote-only work and rejects invalid input", () => {
-    expect(parseProjectWorkspace({})).toEqual({ workScope: null, eventType: "general", eventDate: null, initialTasks: [] });
+    expect(parseProjectWorkspace({})).toEqual({ workScope: null, eventType: "general", eventDate: null, initialTasks: [], initialAssigneeId: null });
     expect(parseProjectWorkspace({ workScope: "  인쇄  ", initialTasks: "시안 확인\n\n인쇄 발주" }).initialTasks).toEqual(["시안 확인", "인쇄 발주"]);
     for (const input of [{ eventType: "fake" }, { eventDate: "2026-02-30" }, { workScope: "x".repeat(1001) }, { initialTasks: Array(52).fill("할 일").join("\n") }]) expect(() => parseProjectWorkspace(input)).toThrow();
   });

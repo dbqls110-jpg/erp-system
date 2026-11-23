@@ -9,20 +9,21 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { saveProjectTaskAction, deleteProjectTaskAction } from "@/app/actions/projectTask";
-import { TASK_STATUS_LABELS, type OpenTaskStatus, type ProjectTask, type TaskPerson, type TaskProject } from "@/lib/projectTaskPolicy";
+import { defaultTaskAssignee, TASK_STATUS_LABELS, type OpenTaskStatus, type ProjectTask, type TaskPerson, type TaskProject } from "@/lib/projectTaskPolicy";
 
 const selectClass = "h-10 w-full rounded-lg border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring";
 export type TaskEditorState = { kind: "closed" } | { kind: "create"; projectId: string; requestId: string } | { kind: "edit"; task: ProjectTask };
 
-export function TaskEditor({ state, projects, people, defaultAssigneeId, onClose }: {
-  state: Exclude<TaskEditorState, { kind: "closed" }>; projects: TaskProject[]; people: TaskPerson[]; defaultAssigneeId?: string; onClose: () => void;
+export function TaskEditor({ state, projects, people, onClose }: {
+  state: Exclude<TaskEditorState, { kind: "closed" }>; projects: TaskProject[]; people: TaskPerson[]; onClose: () => void;
 }) {
   const router = useRouter();
   const task = state.kind === "edit" ? state.task : null;
   const autoReminder = task?.id.startsWith("reminder-") ?? false;
   const [projectId, setProjectId] = useState(task?.projectId ?? (state.kind === "create" ? state.projectId : ""));
   const [content, setContent] = useState(task?.content ?? "");
-  const [assigneeId, setAssigneeId] = useState(task ? task.assigneeId ?? "" : people.some(p => p.id === defaultAssigneeId) ? defaultAssigneeId ?? "" : "");
+  const [chosenAssigneeId, setChosenAssigneeId] = useState<string | null>(task ? task.assigneeId ?? "" : null);
+  const assigneeId = chosenAssigneeId ?? defaultTaskAssignee(people, projects.find(project => project.id === projectId)?.assignee);
   const [status, setStatus] = useState<OpenTaskStatus>(task?.taskStatus === "waiting" ? "waiting" : task?.taskStatus === "in_progress" ? "in_progress" : "todo");
   const [nextCheckDate, setNextCheckDate] = useState(task?.nextCheckDate ?? "");
   const [dueDate, setDueDate] = useState(task?.dueDate ?? "");
@@ -58,7 +59,7 @@ export function TaskEditor({ state, projects, people, defaultAssigneeId, onClose
       </DialogHeader>
       <form onSubmit={save} className="space-y-4">
         <div className="space-y-1.5"><Label htmlFor="task-project">프로젝트</Label>
-          <select id="task-project" value={projectId} onChange={e => setProjectId(e.target.value)} required disabled={pending || Boolean(task)} className={selectClass}>
+          <select id="task-project" value={projectId} onChange={e => { setProjectId(e.target.value); setChosenAssigneeId(null); }} required disabled={pending || Boolean(task)} className={selectClass}>
             <option value="">프로젝트 선택</option>{projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
         </div>
@@ -67,10 +68,10 @@ export function TaskEditor({ state, projects, people, defaultAssigneeId, onClose
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="space-y-1.5"><Label htmlFor="task-assignee">담당자</Label>
-            <select id="task-assignee" value={assigneeId} onChange={e => setAssigneeId(e.target.value)} disabled={pending} className={selectClass}>
+            <select id="task-assignee" value={assigneeId} onChange={e => setChosenAssigneeId(e.target.value)} disabled={pending} className={selectClass}>
               <option value="">미지정</option>
               {task?.assigneeId && !people.some(p => p.id === task.assigneeId) && <option value={task.assigneeId} disabled>{task.assigneeName ?? "기존 담당자"} (다시 지정 필요)</option>}
-              {people.map(p => <option key={p.id} value={p.id}>{p.name ?? "이름 미등록"}</option>)}
+              {people.map(p => <option key={p.id} value={p.id}>{p.label ?? p.name ?? "이름 미등록"}</option>)}
             </select>
           </div>
           <div className="space-y-1.5"><Label htmlFor="task-status">상태</Label>
