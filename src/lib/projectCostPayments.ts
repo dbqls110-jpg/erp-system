@@ -17,7 +17,7 @@ export type CostPaymentItem = Pick<ProjectAmount, "amount"> & {
 export interface CostPaymentInput {
   id: string;
   amount: number;
-  paidDate: string;
+  paidDate: string | null;
   memo: string;
   settle: boolean;
 }
@@ -27,7 +27,7 @@ export function parseCostPayment(input: CostPaymentInput) {
   if (typeof input.id !== "string" || !/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,99}$/.test(input.id)) throw new Error("지급 기록 ID가 올바르지 않습니다.");
   if (!Number.isSafeInteger(input.amount) || input.amount <= 0) throw new Error("지급액은 0보다 큰 원 단위 정수로 입력해 주세요.");
   const date = parseRevenueDates({ paidDate: input.paidDate }).paidDate;
-  if (!date) throw new Error("실제 지급일을 입력해 주세요.");
+  if (!date && input.paidDate !== null) throw new Error("실제 지급일을 입력하거나 지급일 미정을 선택해 주세요.");
   if (typeof input.memo !== "string" || input.memo.length > 2000) throw new Error("지급 메모는 2,000자 이내로 입력해 주세요.");
   if (typeof input.settle !== "boolean") throw new Error("정산 완료 여부를 확인해 주세요.");
   return { id: input.id, amount: input.amount, paidDate: date, memo: input.memo.trim() || null, settle: input.settle };

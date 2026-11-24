@@ -31,6 +31,7 @@ import { RevenueDateFields } from "@/components/RevenueDateFields";
 import { resolveRevenueDate, revenueDatesFromForm, type RevenueDates } from "@/lib/revenueDates";
 import { totalCostPayments, type CostPayment } from "@/lib/projectCostPayments";
 import { CostPayments } from "@/components/projects/CostPayments";
+import { quoteItemsFromJson } from "@/lib/quoteItems";
 
 interface ProjectAmount extends Partial<RevenueDates> {
   id: string;
@@ -39,6 +40,7 @@ interface ProjectAmount extends Partial<RevenueDates> {
   label: string | null;
   memo: string | null;
   sourceFileName: string | null;
+  quoteItems?: unknown;
   costSettled?: boolean;
   payments?: CostPayment[];
 }
@@ -350,12 +352,40 @@ function AmountSection({
                   </div>
                 )}
               </div>
+              {kind === "cost" && <QuoteItems value={amount.quoteItems} />}
               {kind === "cost" && <CostPayments projectId={projectId} item={amount} canManage={canManageCostPayments} />}
             </article>
           ))}
         </div>
       )}
     </section>
+  );
+}
+
+function QuoteItems({ value }: { value: unknown }) {
+  const items = quoteItemsFromJson(value);
+  if (!items.length) return null;
+  return (
+    <details className="mt-3 rounded-md border px-3 py-2 text-xs">
+      <summary className="cursor-pointer font-medium">견적 품목 {items.length}개 보기</summary>
+      <div className="mt-2 overflow-x-auto">
+        <table className="w-full border-collapse text-left">
+          <thead><tr className="border-b text-muted-foreground">
+            <th scope="col" className="py-1 pr-3">품목</th>
+            <th scope="col" className="whitespace-nowrap px-2 text-right">수량</th>
+            <th scope="col" className="whitespace-nowrap px-2 text-right">단가</th>
+            <th scope="col" className="whitespace-nowrap pl-2 text-right">금액</th>
+          </tr></thead>
+          <tbody>{items.map((item, index) => <tr key={index} className="border-b last:border-0">
+            <th scope="row" className="py-1.5 pr-3 font-normal">{item.name}</th>
+            <td className="whitespace-nowrap px-2 text-right tabular-nums">{item.quantity.toLocaleString("ko-KR")}</td>
+            <td className="whitespace-nowrap px-2 text-right tabular-nums">{formatAmount(item.unitPrice)}</td>
+            <td className="whitespace-nowrap pl-2 text-right tabular-nums">{formatAmount(item.amount)}</td>
+          </tr>)}</tbody>
+        </table>
+      </div>
+      <p className="mt-2 text-muted-foreground">품목은 견적서 원문 기준입니다. 매입 합계에는 카드 상단 금액만 한 번 반영됩니다.</p>
+    </details>
   );
 }
 

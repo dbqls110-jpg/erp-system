@@ -1,5 +1,8 @@
 import { PDFParse } from "pdf-parse";
 import * as XLSX from "xlsx";
+import { getProjectQuoteKind } from "@/lib/quotePolicy";
+import { parseDirectionalQuote } from "@/lib/directionalQuote";
+import type { QuoteItem } from "@/lib/quoteItems";
 
 /** 금액 추출 결과의 신뢰도. 자동 입력 후에도 사용자가 확인할 수 있게 화면에 표시한다. */
 export type QuoteConfidence = "high" | "medium" | "low" | "none";
@@ -11,6 +14,7 @@ export interface QuoteAnalysis {
   source: "pdf-text" | "text" | "spreadsheet" | "unsupported" | "empty";
   note: string;
   matchedLabels: string[];
+  items?: QuoteItem[];
 }
 
 const MAX_PARSE_BYTES = 10 * 1024 * 1024;
@@ -445,6 +449,11 @@ export async function analyzeQuoteFile(file: File): Promise<QuoteAnalysis> {
       note: "분석할 파일은 10MB 이하만 지원합니다. 원본은 첨부할 수 있지만 금액을 직접 입력해 주세요.",
       matchedLabels: [],
     };
+  }
+
+  const kind = getProjectQuoteKind(file.name);
+  if (kind === "revenue" || kind === "cost") {
+    return parseDirectionalQuote(file, kind, isPdfFile(file) ? "pdf-text" : isSpreadsheetFile(file) ? "spreadsheet" : "text");
   }
 
   if (isTextFile(file)) {

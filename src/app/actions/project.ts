@@ -5,9 +5,9 @@ import { authOptions } from "@/lib/auth";
 import { requireEditAccess } from "@/lib/actionGuards";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
-import { uploadProjectFiles } from "@/app/actions/projectFile";
+import { uploadProjectFiles, type ProjectFileUploadResult } from "@/app/actions/projectFile";
 import { analyzeQuoteFile, type QuoteAnalysis } from "@/lib/quoteParser";
-import { isInternalQuoteFileName } from "@/lib/quotePolicy";
+import { firstInternalQuote, getProjectQuoteKind } from "@/lib/quotePolicy";
 import { normalizeCompany } from "@/lib/companyFinance";
 import { upsertQuoteAmounts } from "@/lib/projectAmounts";
 import { randomUUID } from "node:crypto";
@@ -27,6 +27,7 @@ export interface CreateProjectResult {
   uploadedFileNames: string[];
   failedFileNames: string[];
   materialOnlyFileNames: string[];
+  directionalQuotes: ProjectFileUploadResult["directionalQuotes"];
 }
 
 function parseOptionalCompany(rawValue: FormDataEntryValue | null): string | null {
@@ -40,8 +41,8 @@ export async function createProject(formData: FormData): Promise<CreateProjectRe
   const { initialTasks, initialAssigneeId, ...workspace } = parseProjectWorkspace(Object.fromEntries(formData));
 
   const quoteFiles = formData.getAll("quoteFile").filter((entry): entry is File => entry instanceof File);
-  const internalQuoteFiles = quoteFiles.filter((file) => isInternalQuoteFileName(file.name));
-  const internalQuoteFile = internalQuoteFiles[0] ?? null;
+  const internalQuoteFile = firstInternalQuote(quoteFiles);
+  const internalQuoteFiles = quoteFiles.filter(file => getProjectQuoteKind(file.name) === "internal");
   let quoteAnalysis: QuoteAnalysis | null = null;
   if (internalQuoteFile) {
     try {
@@ -92,6 +93,7 @@ export async function createProject(formData: FormData): Promise<CreateProjectRe
   let uploadedFileNames: string[] = [];
   let failedFileNames: string[] = [];
   let materialOnlyFileNames: string[] = [];
+  let directionalQuotes: ProjectFileUploadResult["directionalQuotes"] = [];
   if (quoteFiles.length > 0) {
     try {
       const uploadForm = new FormData();
@@ -100,6 +102,7 @@ export async function createProject(formData: FormData): Promise<CreateProjectRe
       uploadedFileNames = uploadResult.uploadedFileNames;
       failedFileNames = uploadResult.failedFiles.map((file) => file.name);
       materialOnlyFileNames = uploadResult.materialOnlyFileNames;
+      directionalQuotes = uploadResult.directionalQuotes ?? [];
       fileUploaded = uploadedFileNames.length > 0;
       if (failedFileNames.length > 0) {
         warning = `다음 파일 저장에 실패했습니다: ${uploadResult.failedFiles.map(({ name, reason }) => `${name} (${reason})`).join(", ")}`;
@@ -118,10 +121,11 @@ export async function createProject(formData: FormData): Promise<CreateProjectRe
     fileUploaded,
     warning,
     internalQuoteFileName: internalQuoteFile?.name ?? null,
-    internalQuoteFileCount: internalQuoteFiles.length,
+    internalQuoteFileCount: internalQuoteFile ? internalQuoteFiles.length : 0,
     uploadedFileNames,
     failedFileNames,
     materialOnlyFileNames,
+    directionalQuotes,
   };
 }
 

@@ -345,6 +345,8 @@ model ProjectAmount {
 
   /// 견적서에서 자동으로 만들어진 건이면 그 파일. 사람이 넣은 건이면 비어 있다.
   sourceFileName String?
+  quoteContentSha256 String?
+  quoteItems Json?
 
   invoiceDate         String? // YYYY-MM-DD, 매출 계산서 발행일
   paidDate            String? // YYYY-MM-DD, 실제 입금일 (최우선 집계 기준)
@@ -365,7 +367,7 @@ model ProjectCostPayment {
   projectAmountId String
   projectAmount ProjectAmount @relation(fields: [projectAmountId], references: [id], onDelete: Restrict)
   amount Float
-  paidDate String
+  paidDate String? // 확인된 지급도 실제 일자를 모르면 미정으로 유지
   memo String?
   createdById String
   updatedById String
@@ -411,6 +413,7 @@ model ProjectUploadRecovery {
   applyQuote     Boolean @default(false)
   quoteRevenue   Float?
   quoteCost      Float?
+  quoteItems     Json?
   amountsApplied Boolean @default(false)
   attempts       Int @default(0)
   leaseToken     String?

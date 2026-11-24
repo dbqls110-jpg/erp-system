@@ -96,6 +96,7 @@ export async function updateProjectAmount(
     }
 
     if (existing.payments?.length && data.kind !== "cost") throw new Error("지급 기록이 있는 매입은 매출로 바꿀 수 없습니다.");
+    if (existing.quoteContentSha256 && existing.kind !== data.kind) throw new Error("연결된 견적서의 매출·매입 구분은 변경할 수 없습니다.");
     const updated = await tx.projectAmount.update({ where: { id: amountId }, data });
     await recalculateProjectTotals(projectId, tx);
     return updated;

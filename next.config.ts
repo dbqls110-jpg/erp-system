@@ -42,7 +42,7 @@ const nextConfig: NextConfig = {
   },
   // Google Drive와 PDF 파서는 서버에서만 실행한다. 브라우저 번들에 포함되면
   // PDF worker와 Node 전용 의존성이 함께 내려가므로 외부 패키지로 둔다.
-  serverExternalPackages: ["googleapis", "pdf-parse", "imapflow", "mailparser"],
+  serverExternalPackages: ["googleapis", "pdf-parse", "pdfjs-dist", "imapflow", "mailparser"],
   // 견적서 원본 첨부(최대 50MB)를 Server Action이 받을 수 있게 한다.
   experimental: {
     serverActions: { bodySizeLimit: "50mb" },

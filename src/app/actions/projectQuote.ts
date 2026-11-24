@@ -6,20 +6,22 @@ import { prisma } from "@/lib/prisma";
 import { requireEditAccess } from "@/lib/actionGuards";
 import { downloadProjectQuote } from "@/lib/googleDrive";
 import { analyzeQuoteFile } from "@/lib/quoteParser";
-import { isInternalQuoteFileName } from "@/lib/quotePolicy";
+import { getProjectQuoteKind } from "@/lib/quotePolicy";
 import { upsertQuoteAmounts } from "@/lib/projectAmounts";
 import { revalidatePath } from "next/cache";
 
 async function currentQuote(fileId: string, projectId: string, db: Prisma.TransactionClient | typeof prisma = prisma) {
   const file = await db.projectFile.findUnique({ where: { id: fileId } });
-  if (!file || file.projectId !== projectId || !isInternalQuoteFileName(file.name)) throw new Error("해당 프로젝트의 내부용 견적서를 선택해 주세요.");
+  if (!file || file.projectId !== projectId || !getProjectQuoteKind(file.name)) throw new Error("해당 프로젝트의 매출·매입·내부용 견적서를 선택해 주세요.");
   const latest = await db.projectFile.findFirst({ where: { projectId, name: file.name }, orderBy: [{ createdAt: "desc" }, { id: "desc" }], select: { id: true } });
   if (latest?.id !== file.id) throw new Error("같은 이름의 최신 견적서로 재분석해 주세요.");
   return file;
 }
 
 async function amountSnapshot(projectId: string, name: string, db: Prisma.TransactionClient | typeof prisma = prisma) {
-  const rows = await db.projectAmount.findMany({ where: { projectId, sourceFileName: name, label: "견적서" },
+  const kind = getProjectQuoteKind(name);
+  const rows = await db.projectAmount.findMany({ where: { projectId, sourceFileName: name,
+    ...(kind === "revenue" || kind === "cost" ? { kind } : { label: "견적서" }) },
     select: { id: true, kind: true, amount: true, updatedAt: true }, orderBy: { id: "asc" } });
   const digest = createHash("sha256").update(JSON.stringify(rows)).digest("hex");
   const sum = (kind: string) => { const matches = rows.filter(row => row.kind === kind); return matches.length ? matches.reduce((total, row) => total + row.amount, 0) : null; };
@@ -50,10 +52,16 @@ export async function applyProjectQuote(fileId: string, projectId: string, fileD
   await prisma.$transaction(async tx => {
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${projectId}))`;
     await currentQuote(fileId, projectId, tx);
-    await tx.$queryRaw`SELECT id FROM project_amounts WHERE "projectId" = ${projectId} AND "sourceFileName" = ${file.name} AND label = '견적서' FOR UPDATE`;
+    await tx.$queryRaw`SELECT id FROM project_amounts WHERE "projectId" = ${projectId} AND "sourceFileName" = ${file.name} FOR UPDATE`;
     const before = await amountSnapshot(projectId, file.name, tx);
     if (before.digest !== amountsDigest) throw new Error("금액이 다른 작업에서 변경됐습니다. 미리보기를 다시 확인해 주세요.");
-    await upsertQuoteAmounts(projectId, file.name, parsed.analysis, tx);
+    const kind = getProjectQuoteKind(file.name);
+    const applied = kind === "revenue" || kind === "cost"
+      ? await upsertQuoteAmounts(projectId, file.name, parsed.analysis, tx, parsed.fileDigest)
+      : await upsertQuoteAmounts(projectId, file.name, parsed.analysis, tx);
+    if (!applied && (kind === "revenue" || kind === "cost")) {
+      throw new Error(kind === "revenue" ? "다른 매출 견적서가 이미 반영되어 있습니다." : "같은 원본이 다른 매입 견적서에 이미 반영되어 있습니다.");
+    }
   }, { maxWait: 10_000, timeout: 30_000 });
   for (const path of [`/projects/${projectId}`, "/projects", "/projects/stats", "/company-finance", "/finance"]) revalidatePath(path);
   return { applied: true };

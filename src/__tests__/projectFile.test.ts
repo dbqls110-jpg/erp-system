@@ -12,7 +12,6 @@ const {
   uploadFileToDrive,
   deleteFileFromDrive,
   deleteQuoteAmounts,
-  isInternalQuoteFileName,
   analyzeQuoteFile,
   beginProjectUpload, finishProjectUpload, markProjectUploadPending,
   revalidatePath,
@@ -28,7 +27,6 @@ const {
   uploadFileToDrive: vi.fn(),
   deleteFileFromDrive: vi.fn(),
   deleteQuoteAmounts: vi.fn(),
-  isInternalQuoteFileName: vi.fn(() => false),
   analyzeQuoteFile: vi.fn(),
   beginProjectUpload: vi.fn(), finishProjectUpload: vi.fn(), markProjectUploadPending: vi.fn(),
   revalidatePath: vi.fn(),
@@ -50,7 +48,6 @@ vi.mock("@/lib/prisma", () => ({
 vi.mock("@/lib/googleDrive", () => ({ uploadFileToDrive, deleteFileFromDrive }));
 vi.mock("next/cache", () => ({ revalidatePath }));
 vi.mock("@/lib/quoteParser", () => ({ analyzeQuoteFile }));
-vi.mock("@/lib/quotePolicy", () => ({ isInternalQuoteFileName }));
 vi.mock("@/lib/projectAmounts", () => ({ upsertQuoteAmounts, deleteQuoteAmounts }));
 vi.mock("@/lib/projectUploadRecovery", () => ({ beginProjectUpload, finishProjectUpload, markProjectUploadPending, recoverProjectUploads: vi.fn() }));
 
@@ -79,8 +76,6 @@ beforeEach(() => {
   uploadFileToDrive.mockReset();
   deleteFileFromDrive.mockReset();
   deleteQuoteAmounts.mockReset();
-  isInternalQuoteFileName.mockReset();
-  isInternalQuoteFileName.mockReturnValue(false);
   revalidatePath.mockReset();
   requireEditAccess.mockResolvedValue({ user: { id: "user-1", role: "admin" } });
   projectFindUnique.mockResolvedValue({
@@ -109,7 +104,6 @@ describe("프로젝트 파일 액션", () => {
   });
 
   it("마지막 내부용 견적서를 삭제하면 연결된 금액도 지운다", async () => {
-    isInternalQuoteFileName.mockReturnValue(true);
     projectFileFindUnique.mockResolvedValue({
       id: "file-1",
       projectId: "project-1",
@@ -133,7 +127,6 @@ describe("프로젝트 파일 액션", () => {
   });
 
   it("같은 이름의 내부용 견적서가 남아 있으면 연결된 금액을 보존한다", async () => {
-    isInternalQuoteFileName.mockReturnValue(true);
     projectFileFindUnique.mockResolvedValue({
       id: "file-1",
       projectId: "project-1",
@@ -154,7 +147,6 @@ describe("프로젝트 파일 액션", () => {
   });
 
   it("내부용 견적서 재업로드는 파일과 금액을 같은 트랜잭션에서 반영한다", async () => {
-    isInternalQuoteFileName.mockReturnValue(true);
     const analysis = { revenue: 2244000, cost: 1384328, confidence: "high", source: "spreadsheet", note: "검증", matchedLabels: [] };
     analyzeQuoteFile.mockResolvedValue(analysis);
     finishProjectUpload.mockResolvedValue({ amountsApplied: true });
@@ -171,7 +163,6 @@ describe("프로젝트 파일 액션", () => {
   });
 
   it("금액 저장이 실패하면 업로드 성공으로 보고하지 않는다", async () => {
-    isInternalQuoteFileName.mockReturnValue(true);
     analyzeQuoteFile.mockResolvedValue({ revenue: 100, cost: 50, confidence: "high" });
     uploadFileToDrive.mockResolvedValue({ driveFileId: "new-drive", driveUrl: "https://drive.test/file", category: "quote" });
     finishProjectUpload.mockRejectedValue(new Error("금액 저장 실패"));
@@ -186,7 +177,6 @@ describe("프로젝트 파일 액션", () => {
   });
 
   it("판독 불가인 새 파일은 기존 금액을 지우지 않는다", async () => {
-    isInternalQuoteFileName.mockReturnValue(true);
     analyzeQuoteFile.mockResolvedValue({ revenue: null, cost: null, confidence: "none" });
     uploadFileToDrive.mockResolvedValue({ driveFileId: "new-drive", driveUrl: "https://drive.test/file", category: "quote" });
     const form = new FormData();
@@ -195,5 +185,26 @@ describe("프로젝트 파일 액션", () => {
     expect(result.failedFiles).toEqual([]);
     expect(result.quoteAmountsApplied).toBe(false);
     expect(upsertQuoteAmounts).not.toHaveBeenCalled();
+  });
+
+  it("매출 1장과 매입 2장을 각각 분석하고 내부용 합본은 자료로만 저장한다", async () => {
+    analyzeQuoteFile.mockImplementation(async (file: File) => ({
+      revenue: file.name.includes("매출") ? 1_000_000 : null,
+      cost: file.name.includes("매입") ? 200_000 : null,
+      confidence: "high", note: "합계 확인",
+    }));
+    uploadFileToDrive.mockResolvedValue({ driveFileId: "drive", driveUrl: "https://drive.test/file", category: "quote" });
+    finishProjectUpload.mockResolvedValue({ amountsApplied: true });
+    const form = new FormData();
+    for (const name of ["행사 매출.xlsx", "장비 매입.xlsx", "설치 매입.xlsx", "내부용.xlsx"]) {
+      form.append("file", new Blob(["workbook"]), name);
+    }
+    const result = await uploadProjectFiles("project-1", form);
+    expect(result.directionalQuotes.map(quote => [quote.name, quote.applied])).toEqual([
+      ["행사 매출.xlsx", true], ["장비 매입.xlsx", true], ["설치 매입.xlsx", true],
+    ]);
+    expect(result.materialOnlyFileNames).toEqual(["내부용.xlsx"]);
+    expect(analyzeQuoteFile).toHaveBeenCalledTimes(3);
+    expect(beginProjectUpload.mock.calls[3][1]).toBeNull();
   });
 });

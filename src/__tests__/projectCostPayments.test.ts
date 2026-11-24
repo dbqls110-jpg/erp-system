@@ -29,6 +29,13 @@ describe("지급 입력 검증", () => {
   it.each([0, -1, 0.1, NaN, Infinity, Number.MAX_SAFE_INTEGER + 1])("잘못된 금액을 거부한다: %s", amount => {
     expect(() => parseCostPayment({ ...payment, amount })).toThrow();
   });
+  it("지급이 확인되고 실제 지급일만 미정이면 날짜 없이 저장한다", () => {
+    const result = parseCostPayment({ id: "reconciled", amount: 469_000, paidDate: null, memo: "", settle: true });
+    expect(result).toMatchObject({ paidDate: null, amount: 469_000, settle: true });
+    const metrics = costPaymentMetrics({ amount: 469_000, costSettled: true, payments: [result] });
+    expect(metrics).toMatchObject({ paid: 469_000, remaining: 0, status: "정산 완료" });
+  });
+
   it.each(["", "2026-02-30", "11/03/2026", "2026-11-03T00:00:00Z"])("잘못된 지급일을 거부한다: %s", paidDate => {
     expect(() => parseCostPayment({ ...payment, paidDate })).toThrow();
   });

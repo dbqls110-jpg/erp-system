@@ -12,7 +12,7 @@ import type { QuoteAnalysis } from "@/lib/quoteParser";
 import { toast } from "sonner";
 import { AlertCircle, CheckCircle2, Loader2, Plus } from "lucide-react";
 import { COMPANY_NAMES } from "@/lib/companyFinance";
-import { isInternalQuoteFileName } from "@/lib/quotePolicy";
+import { firstInternalQuote, getProjectQuoteKind } from "@/lib/quotePolicy";
 import { ProjectScopeFields } from "@/components/projects/ProjectScopeFields";
 import type { TaskPerson } from "@/lib/projectTaskPolicy";
 
@@ -36,16 +36,18 @@ export function ProjectCreateButton({ people = [] }: { people?: TaskPerson[] }) 
 
   const handleQuoteFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files ?? []);
-    const internalFiles = files.filter((file) => isInternalQuoteFileName(file.name));
+    const internalFile = firstInternalQuote(files);
+    const internalFiles = internalFile ? files.filter(file => getProjectQuoteKind(file.name) === "internal") : [];
     setQuoteAnalysis(null);
     setQuoteFileNames(files.map((file) => file.name));
     setInternalQuoteFileCount(internalFiles.length);
     if (files.length === 0) return;
 
-    if (internalFiles.length === 0) {
+    if (!files.some(file => getProjectQuoteKind(file.name))) {
       toast.info("자료용으로 저장합니다 (금액 미반영).");
       return;
     }
+    if (!internalFile) return; // 각 매출·매입 파일은 원본 저장과 함께 분석한다.
 
     if (internalFiles.length > 1) {
       toast.info(`내부용 견적서 ${internalFiles.length}개가 선택되어 첫 번째 파일로 금액을 계산합니다.`);
@@ -54,7 +56,7 @@ export function ProjectCreateButton({ people = [] }: { people?: TaskPerson[] }) 
     setAnalyzing(true);
     try {
       const formData = new FormData();
-      formData.set("file", internalFiles[0]);
+      formData.set("file", internalFile);
       const analysis = await analyzeQuote(formData);
       setQuoteAnalysis(analysis);
       if (analysis.source === "unsupported" || analysis.confidence === "none") {
@@ -74,7 +76,8 @@ export function ProjectCreateButton({ people = [] }: { people?: TaskPerson[] }) 
     setLoading(true);
     try {
       const result = await createProject(new FormData(e.currentTarget));
-      const amountWasExtracted = Boolean(result.quoteAnalysis && (result.quoteAnalysis.revenue !== null || result.quoteAnalysis.cost !== null));
+      const amountWasExtracted = result.directionalQuotes.some(quote => quote.applied)
+        || Boolean(result.quoteAnalysis && (result.quoteAnalysis.revenue !== null || result.quoteAnalysis.cost !== null));
       toast.success(amountWasExtracted ? "견적서 금액을 반영해 프로젝트가 생성됐습니다." : result.fileUploaded ? "프로젝트와 견적서가 생성됐습니다." : "프로젝트가 생성됐습니다.");
       if (result.materialOnlyFileNames.length > 0) {
         toast.info(`자료용으로 저장했습니다 (금액 미반영): ${result.materialOnlyFileNames.join(", ")}`);
@@ -83,6 +86,8 @@ export function ProjectCreateButton({ people = [] }: { people?: TaskPerson[] }) 
         toast.info(`내부용 견적서 ${result.internalQuoteFileCount}개 중 첫 번째 파일로 금액을 반영했습니다.`);
       }
       if (result.warning) toast.warning(result.warning);
+      const quotesNotApplied = result.directionalQuotes.filter(quote => !quote.applied);
+      if (quotesNotApplied.length) toast.info(quotesNotApplied.map(quote => `${quote.name}: ${quote.note}`).join("\n"));
       setOpen(false);
       resetDraft();
     } catch {
@@ -147,11 +152,11 @@ export function ProjectCreateButton({ people = [] }: { people?: TaskPerson[] }) 
                 disabled={loading || analyzing}
                 className="cursor-pointer"
               />
-              <p className="text-xs text-muted-foreground">여러 파일을 선택할 수 있습니다. 파일명에 내부용이 있는 첫 번째 견적서만 금액을 분석해 매출·매입 목록에 추가하고, 나머지는 자료용으로 저장합니다. HWP/HWPX는 원본만 저장합니다.</p>
+              <p className="text-xs text-muted-foreground">파일명에 매출 또는 매입을 적어 주세요. 매출 견적은 한 장, 매입 견적은 여러 장의 합계가 반영됩니다. 같은 이름은 수정본으로 봅니다. 매출·매입 표시 없이 내부용 견적서만 고르면 첫 번째 파일을 분석합니다.</p>
               {quoteFileNames.length > 0 && (
                 <p className="text-xs text-muted-foreground break-all">선택 파일: {quoteFileNames.join(", ")}</p>
               )}
-              {quoteFileNames.length > 0 && internalQuoteFileCount === 0 && (
+              {quoteFileNames.length > 0 && !quoteFileNames.some(name => getProjectQuoteKind(name)) && (
                 <p className="text-xs text-amber-700">자료용으로 저장합니다 (금액 미반영).</p>
               )}
               {internalQuoteFileCount > 1 && (
@@ -167,7 +172,7 @@ export function ProjectCreateButton({ people = [] }: { people?: TaskPerson[] }) 
                   <div className="flex items-start gap-1.5">
                     {quoteAnalysis.confidence === "none" ? <AlertCircle size={14} className="mt-0.5 shrink-0 text-amber-600" /> : <CheckCircle2 size={14} className="mt-0.5 shrink-0 text-emerald-600" />}
                     <div className="space-y-1">
-                      <p className="font-medium">{quoteFileNames.find(isInternalQuoteFileName) || "견적서"} 분석 결과</p>
+                      <p className="font-medium">{quoteFileNames.find(name => getProjectQuoteKind(name) === "internal") || "견적서"} 분석 결과</p>
                       <p className="text-muted-foreground">{quoteAnalysis.note}</p>
                     </div>
                   </div>

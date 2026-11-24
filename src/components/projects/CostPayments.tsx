@@ -15,7 +15,8 @@ type Item = CostPaymentItem & { id: string; label: string | null };
 
 export function CostPayments({ projectId, item, canManage }: { projectId: string; item: Item; canManage: boolean }) {
   const metrics = costPaymentMetrics(item);
-  const latestPaidDate = (item.payments ?? []).reduce((latest, payment) => payment.paidDate > latest ? payment.paidDate : latest, "");
+  const latestPaidDate = (item.payments ?? []).reduce((latest, payment) => payment.paidDate && payment.paidDate > latest ? payment.paidDate : latest, "");
+  const hasUnknownDate = item.payments?.some(payment => payment.paidDate === null);
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
   return <div className="mt-3 space-y-2 border-t pt-3">
@@ -25,11 +26,12 @@ export function CostPayments({ projectId, item, canManage }: { projectId: string
     </div>
     {item.costSettled && metrics.difference !== 0 && <p className="text-xs text-muted-foreground">예정 대비 {metrics.difference > 0 ? "초과 지급" : "절감"} {money(Math.abs(metrics.difference))}</p>}
     {latestPaidDate && <p className="text-xs text-muted-foreground">최근 지급일 {latestPaidDate}</p>}
+    {hasUnknownDate && <p className="text-xs text-muted-foreground">지급일 미정 기록 있음</p>}
     {canManage && <div className="flex flex-wrap items-center gap-3">
       <PayTodayCheckbox projectId={projectId} item={item} pending={pending} startTransition={startTransition} />
       <Button type="button" size="sm" variant="outline" disabled={pending} onClick={() => setOpen(true)}>지급 기록 / 정산</Button>
     </div>}
-    {!canManage && item.payments?.map(payment => <p className="text-xs text-muted-foreground" key={payment.id}>{payment.paidDate} · {money(payment.amount)}{payment.memo ? ` · ${payment.memo}` : ""}</p>)}
+    {!canManage && item.payments?.map(payment => <p className="text-xs text-muted-foreground" key={payment.id}>{payment.paidDate ?? "지급일 미정"} · {money(payment.amount)}{payment.memo ? ` · ${payment.memo}` : ""}</p>)}
     <Dialog open={open} onOpenChange={value => { if (!pending) setOpen(value); }}>
       {open && <PaymentEditor projectId={projectId} item={item} close={() => setOpen(false)} pending={pending} startTransition={startTransition} />}
     </Dialog>
@@ -61,6 +63,7 @@ function PaymentEditor({ projectId, item, close, pending, startTransition }: { p
   const [paymentId, setPaymentId] = useState(() => crypto.randomUUID());
   const [amount, setAmount] = useState("");
   const [memo, setMemo] = useState("");
+  const [unknownDate, setUnknownDate] = useState(false);
   const [settle, setSettle] = useState(Boolean(item.costSettled));
   const [deleteTarget, setDeleteTarget] = useState<CostPayment | null>(null);
   const metrics = costPaymentMetrics(item);
@@ -73,8 +76,9 @@ function PaymentEditor({ projectId, item, close, pending, startTransition }: { p
   }
   function edit(payment: CostPayment) {
     setEditing(payment); setPaymentId(payment.id); setAmount(String(payment.amount)); setMemo(payment.memo ?? ""); setDeleteTarget(null);
+    setUnknownDate(payment.paidDate === null);
   }
-  function reset() { setEditing(null); setPaymentId(crypto.randomUUID()); setAmount(""); setMemo(""); }
+  function reset() { setEditing(null); setPaymentId(crypto.randomUUID()); setAmount(""); setMemo(""); setUnknownDate(false); }
   return <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-lg" showCloseButton={!pending}>
     <DialogHeader>
       <DialogTitle>{item.label ?? "매입"} · 지급 기록</DialogTitle>
@@ -91,7 +95,7 @@ function PaymentEditor({ projectId, item, close, pending, startTransition }: { p
     </div>
     <div className="space-y-2">
       {(item.payments ?? []).map(payment => <div key={payment.id} className="rounded-lg border p-3 text-sm">
-        <p>{payment.paidDate} · <strong>{money(payment.amount)}</strong></p>
+        <p>{payment.paidDate ?? "지급일 미정"} · <strong>{money(payment.amount)}</strong></p>
         {payment.memo && <p className="whitespace-pre-wrap break-words text-xs text-muted-foreground">{payment.memo}</p>}
         <div className="mt-2 flex gap-2">
           <Button size="sm" variant="outline" onClick={() => edit(payment)} disabled={pending}>수정</Button>
@@ -101,21 +105,23 @@ function PaymentEditor({ projectId, item, close, pending, startTransition }: { p
       {!item.payments?.length && <p className="text-sm text-muted-foreground">아직 지급 기록이 없습니다. 기존 예정 매입을 지급 완료로 간주하지 않습니다.</p>}
     </div>
     {deleteTarget && <div role="alert" className="space-y-2 rounded-lg border border-destructive p-3 text-sm">
-      <p>{deleteTarget.paidDate} · {money(deleteTarget.amount)} 지급 기록을 삭제할까요? 삭제하면 정산 완료가 해제됩니다.</p>
+      <p>{deleteTarget.paidDate ?? "지급일 미정"} · {money(deleteTarget.amount)} 지급 기록을 삭제할까요? 삭제하면 정산 완료가 해제됩니다.</p>
       <Button variant="destructive" size="sm" disabled={pending} onClick={() => run(() => deleteProjectCostPayment(projectId, item.id, deleteTarget.id), "지급 기록을 삭제했습니다.")}>삭제 확인</Button>
       <Button variant="outline" size="sm" disabled={pending} onClick={() => setDeleteTarget(null)}>취소</Button>
     </div>}
     <form className="space-y-3 border-t pt-3" onSubmit={event => {
       event.preventDefault();
-      const paidDate = new FormData(event.currentTarget).get("paidDate");
-      if (typeof paidDate !== "string" || !paidDate) { toast.error("실제 지급일을 입력해 주세요."); return; }
+      const dateField = new FormData(event.currentTarget).get("paidDate");
+      if (!unknownDate && (typeof dateField !== "string" || !dateField)) { toast.error("실제 지급일을 입력해 주세요."); return; }
+      const paidDate = unknownDate ? null : String(dateField);
       run(() => saveProjectCostPayment(projectId, item.id, { id: paymentId, amount: Number(amount), paidDate, memo, settle }), "지급 기록을 저장했습니다.");
     }}>
       <p className="text-sm font-medium">{editing ? "지급 기록 수정" : "직접 입력 (부분 지급·다른 날짜)"}</p>
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1"><Label htmlFor="cost-payment-amount">실제 지급액 (원)</Label><Input id="cost-payment-amount" type="number" min="1" step="1" required value={amount} onChange={e => setAmount(e.target.value)} disabled={pending} /></div>
-        <div className="space-y-1"><Label htmlFor="cost-payment-date">실제 지급일</Label><Input key={paymentId} id="cost-payment-date" name="paidDate" type="date" required min="1900-01-01" max="2200-12-31" defaultValue={editing?.paidDate ?? ""} disabled={pending} /></div>
+        <div className="space-y-1"><Label htmlFor="cost-payment-date">실제 지급일</Label><Input key={paymentId} id="cost-payment-date" name="paidDate" type="date" required={!unknownDate} min="1900-01-01" max="2200-12-31" defaultValue={editing?.paidDate ?? ""} disabled={pending || unknownDate} /></div>
       </div>
+      <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={unknownDate} disabled={pending} onChange={event => setUnknownDate(event.target.checked)} />지급은 확인했지만 실제 지급일은 미정</label>
       <Label htmlFor="cost-payment-memo">지급 메모</Label><Input id="cost-payment-memo" maxLength={2000} value={memo} onChange={e => setMemo(e.target.value)} disabled={pending} />
       <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={settle} disabled={pending} onChange={e => setSettle(e.target.checked)} />위에 직접 입력한 금액으로 최종 정산 (추가 지급 없음)</label>
       <p className="text-xs text-muted-foreground">정산 완료 시 예정액과 차이가 있어도 미지급 잔액은 0원입니다. 초과 지급도 기록할 수 있습니다.</p>

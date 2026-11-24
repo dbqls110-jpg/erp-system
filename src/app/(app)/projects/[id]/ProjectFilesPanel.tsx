@@ -4,7 +4,7 @@ import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { uploadProjectFiles, deleteProjectFile, retryProjectUploads } from "@/app/actions/projectFile";
 import { previewProjectQuote, applyProjectQuote } from "@/app/actions/projectQuote";
-import { isInternalQuoteFileName } from "@/lib/quotePolicy";
+import { getProjectQuoteKind } from "@/lib/quotePolicy";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Upload, Trash2, ExternalLink, FileText, Loader2, AlertCircle, RefreshCw } from "lucide-react";
@@ -97,9 +97,13 @@ export function ProjectFilesPanel({ projectId, files, canEdit, appliedQuoteFileN
         }
         if (result.quoteAnalysis?.source === "unsupported" || result.quoteAnalysis?.confidence === "none") {
           toast.info(result.quoteAnalysis.note);
-        } else if (result.quoteAmountsApplied) {
+        } else if (result.quoteAnalysis && result.quoteAmountsApplied) {
           toast.success("내부용 견적서 금액을 프로젝트에 반영했습니다.");
         }
+        const appliedQuotes = result.directionalQuotes.filter(quote => quote.applied);
+        if (appliedQuotes.length) toast.success(`매출·매입 견적서 ${appliedQuotes.length}건의 금액을 반영했습니다.`);
+        const quoteWarnings = result.directionalQuotes.filter(quote => !quote.applied || quote.note.includes("원본에서 확인"));
+        if (quoteWarnings.length) toast.info(quoteWarnings.map(quote => `${quote.name}: ${quote.note}`).join("\n"));
         if (result.failedFiles.length > 0) {
           setFailedFiles(result.failedFiles);
           toast.error(`업로드 실패: ${result.failedFiles.map(({ name, reason }) => `${name} (${reason})`).join(", ")}`);
@@ -156,7 +160,7 @@ export function ProjectFilesPanel({ projectId, files, canEdit, appliedQuoteFileN
                   )}
                   {formatBytes(file.size)}
                 </p>
-                {isInternalQuoteFileName(file.name) && !appliedQuoteFileNames.includes(file.name) && (
+                {getProjectQuoteKind(file.name) && !appliedQuoteFileNames.includes(file.name) && (
                   <p role="status" className="mt-1 text-xs text-amber-700">금액 미반영 · 금액 재분석으로 원본을 확인해 주세요.</p>
                 )}
               </div>
@@ -171,7 +175,7 @@ export function ProjectFilesPanel({ projectId, files, canEdit, appliedQuoteFileN
               </a>
               {canEdit && (
                 <>
-                {isInternalQuoteFileName(file.name) && <button type="button" onClick={() => handleQuotePreview(file)} disabled={isPending}
+                {getProjectQuoteKind(file.name) && <button type="button" onClick={() => handleQuotePreview(file)} disabled={isPending}
                   title="견적서 금액 재분석" aria-label={`${file.name} 금액 재분석`}
                   className="shrink-0 rounded px-1 text-xs text-muted-foreground hover:text-primary disabled:opacity-50">
                   <span className="inline-flex items-center gap-1"><RefreshCw size={15} /> 재분석</span>

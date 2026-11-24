@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { uploadFileToDrive, deleteFileFromDrive } from "@/lib/googleDrive";
 import { revalidatePath } from "next/cache";
 import { analyzeQuoteFile, type QuoteAnalysis } from "@/lib/quoteParser";
-import { isInternalQuoteFileName } from "@/lib/quotePolicy";
+import { firstInternalQuote, getProjectQuoteKind } from "@/lib/quotePolicy";
 import { deleteQuoteAmounts } from "@/lib/projectAmounts";
 import { beginProjectUpload, finishProjectUpload, markProjectUploadPending, recoverProjectUploads } from "@/lib/projectUploadRecovery";
 import { createHash } from "node:crypto";
@@ -21,6 +21,7 @@ export interface ProjectFileUploadResult {
   failedFiles: Array<{ name: string; reason: string }>;
   pendingRecoveryNames: string[];
   materialOnlyFileNames: string[];
+  directionalQuotes: Array<{ name: string; applied: boolean; note: string }>;
 }
 
 function analysisFailure(): QuoteAnalysis {
@@ -52,8 +53,8 @@ export async function uploadProjectFiles(projectId: string, formData: FormData):
   const project = await prisma.project.findUnique({ where: { id: projectId } });
   if (!project) throw new Error("프로젝트를 찾을 수 없습니다.");
 
-  const internalFiles = files.filter((file) => isInternalQuoteFileName(file.name));
-  const internalQuoteFile = internalFiles[0] ?? null;
+  const internalQuoteFile = firstInternalQuote(files);
+  const internalFiles = files.filter(file => getProjectQuoteKind(file.name) === "internal");
   let quoteAnalysis: QuoteAnalysis | null = null;
   if (internalQuoteFile) {
     try {
@@ -67,6 +68,8 @@ export async function uploadProjectFiles(projectId: string, formData: FormData):
   const failedFiles: Array<{ name: string; reason: string }> = [];
   let quoteAmountsApplied = false;
   const pendingRecoveryNames: string[] = [];
+  const materialOnlyFileNames: string[] = [];
+  const directionalQuotes: ProjectFileUploadResult["directionalQuotes"] = [];
 
   for (const file of files) {
     let recoveryId: string | null = null;
@@ -74,10 +77,13 @@ export async function uploadProjectFiles(projectId: string, formData: FormData):
       if (file.size === 0) throw new Error("빈 파일");
       if (file.size > MAX_FILE_SIZE) throw new Error("50MB 초과");
 
+      const kind = getProjectQuoteKind(file.name);
+      const directional = kind === "revenue" || kind === "cost";
+      const analysis = directional ? await analyzeQuoteFile(file).catch(analysisFailure) : file === internalQuoteFile ? quoteAnalysis : null;
       const buffer = Buffer.from(await file.arrayBuffer());
       const task = await beginProjectUpload({ projectId, createdById: session.user.id, name: file.name,
         mimeType: file.type || "application/octet-stream", size: file.size,
-        contentSha256: createHash("sha256").update(buffer).digest("hex") }, file === internalQuoteFile ? quoteAnalysis : null);
+        contentSha256: createHash("sha256").update(buffer).digest("hex") }, analysis);
       recoveryId = task.id;
       const { driveFileId, driveUrl, category } = await uploadFileToDrive(
         { buffer, name: file.name, mimeType: file.type || "application/octet-stream", size: file.size, recoveryKey: task.id },
@@ -86,6 +92,12 @@ export async function uploadProjectFiles(projectId: string, formData: FormData):
 
       const saved = await finishProjectUpload(task.id, { driveFileId, driveUrl, category });
       if (saved.amountsApplied) quoteAmountsApplied = true;
+      if (directional && analysis) {
+        directionalQuotes.push({ name: file.name, applied: saved.amountsApplied,
+          note: saved.amountsApplied || analysis.confidence === "none" ? analysis.note
+            : kind === "revenue" ? "다른 매출 견적서가 이미 반영되어 있거나 같은 이름의 최신본이 있습니다."
+              : "같은 원본이 이미 반영되어 있거나 같은 이름의 최신본이 있습니다." });
+      } else if (!kind || (kind === "internal" && !internalQuoteFile)) materialOnlyFileNames.push(file.name);
       uploadedFileNames.push(file.name);
     } catch (error) {
       if (recoveryId) { await markProjectUploadPending(recoveryId); pendingRecoveryNames.push(file.name); }
@@ -105,12 +117,13 @@ export async function uploadProjectFiles(projectId: string, formData: FormData):
   return {
     quoteAnalysis,
     internalQuoteFileName: internalQuoteFile?.name ?? null,
-    internalQuoteFileCount: internalFiles.length,
+    internalQuoteFileCount: internalQuoteFile ? internalFiles.length : 0,
     quoteAmountsApplied,
     uploadedFileNames,
     failedFiles,
     pendingRecoveryNames,
-    materialOnlyFileNames: uploadedFileNames.filter((file) => !isInternalQuoteFileName(file)),
+    materialOnlyFileNames,
+    directionalQuotes,
   };
 }
 
@@ -148,7 +161,7 @@ export async function deleteProjectFile(fileId: string, projectId: string) {
     const current = await tx.projectFile.findUnique({ where: { id: fileId } });
     if (!current) return; // A simultaneous request already removed it.
     await tx.projectFile.delete({ where: { id: fileId } });
-    if (isInternalQuoteFileName(file.name)) {
+    if (getProjectQuoteKind(file.name)) {
       const remainingQuote = await tx.projectFile.findFirst({ where: { projectId, name: file.name }, select: { id: true } });
       if (!remainingQuote) await deleteQuoteAmounts(projectId, file.name, tx);
     }

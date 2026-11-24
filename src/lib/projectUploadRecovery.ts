@@ -4,6 +4,8 @@ import { findProjectUploadInDrive } from "@/lib/googleDrive";
 import { categorizeFileName } from "@/lib/fileCategory";
 import { upsertQuoteAmounts } from "@/lib/projectAmounts";
 import type { QuoteAnalysis } from "@/lib/quoteParser";
+import { getProjectQuoteKind } from "@/lib/quotePolicy";
+import { quoteItemsFromJson } from "@/lib/quoteItems";
 
 const LEASE_MS = 5 * 60_000;
 
@@ -12,6 +14,7 @@ export async function beginProjectUpload(input: { projectId: string; createdById
     ...input, id: randomUUID(), leaseUntil: new Date(Date.now() + LEASE_MS),
     applyQuote: !!analysis && analysis.confidence !== "none" && (analysis.revenue !== null || analysis.cost !== null),
     quoteRevenue: analysis?.revenue ?? null, quoteCost: analysis?.cost ?? null,
+    ...(analysis?.items?.length ? { quoteItems: analysis.items.map(item => ({ ...item })) } : {}),
   } });
 }
 
@@ -31,8 +34,18 @@ export async function finishProjectUpload(id: string, drive: { driveFileId: stri
     const newer = task.applyQuote ? await tx.projectFile.findFirst({ where: {
       projectId: task.projectId, name: task.name, createdAt: { gt: task.createdAt },
     }, select: { id: true } }) : null;
-    const amountsApplied = task.applyQuote && !newer;
-    if (amountsApplied) await upsertQuoteAmounts(task.projectId, task.name, { revenue: task.quoteRevenue, cost: task.quoteCost }, tx);
+    const kind = getProjectQuoteKind(task.name);
+    const directed = kind === "revenue" || kind === "cost";
+    let amountsApplied = task.applyQuote && !newer;
+    if (amountsApplied) {
+      const amounts = { revenue: task.quoteRevenue, cost: task.quoteCost };
+      if (directed) {
+        amountsApplied = Boolean(await upsertQuoteAmounts(task.projectId, task.name,
+          { ...amounts, items: quoteItemsFromJson(task.quoteItems) }, tx, task.contentSha256));
+      } else {
+        await upsertQuoteAmounts(task.projectId, task.name, amounts, tx);
+      }
+    }
     await tx.projectUploadRecovery.update({ where: { id }, data: {
       status: "completed", ...drive, fileId: file.id, amountsApplied,
       leaseToken: null, leaseUntil: null, lastError: newer ? "NEWER_QUOTE_PRESERVED" : null,

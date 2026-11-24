@@ -1,6 +1,8 @@
 import type { Prisma } from "@prisma/client";
 import type { QuoteAnalysis } from "@/lib/quoteParser";
 import { prisma } from "@/lib/prisma";
+import { getProjectQuoteKind } from "@/lib/quotePolicy";
+import { quoteItemsFromJson } from "@/lib/quoteItems";
 
 export type ProjectAmountKind = "revenue" | "cost";
 
@@ -40,9 +42,35 @@ export async function recalculateProjectTotals(
 export async function upsertQuoteAmounts(
   projectId: string,
   sourceFileName: string,
-  analysis: Pick<QuoteAnalysis, "revenue" | "cost">,
+  analysis: Pick<QuoteAnalysis, "revenue" | "cost" | "items">,
   db: ProjectAmountDb = prisma,
+  quoteContentSha256?: string,
 ) {
+  const namedKind = getProjectQuoteKind(sourceFileName);
+  if (namedKind === "revenue" || namedKind === "cost") {
+    const amount = analysis[namedKind];
+    if (amount === null || !Number.isSafeInteger(amount) || amount <= 0 || !quoteContentSha256) return null;
+    const existing = await db.projectAmount.findFirst({
+      where: { projectId, kind: namedKind, sourceFileName },
+      orderBy: { createdAt: "asc" },
+      select: { id: true, quoteContentSha256: true },
+    });
+    // Serialize both upload and reanalysis with the caller's project lock.
+    const competing = await db.projectAmount.findFirst({ where: {
+      projectId, kind: namedKind, sourceFileName: { not: sourceFileName },
+      ...(namedKind === "cost" ? { quoteContentSha256 } : {}),
+    }, select: { id: true } });
+    if (competing) return null;
+    const items = namedKind === "cost" ? quoteItemsFromJson(analysis.items) : [];
+    const data = { amount, quoteContentSha256, ...(items.length || existing?.quoteContentSha256 !== quoteContentSha256
+      ? { quoteItems: items.map(item => ({ ...item })) } : {}) };
+    if (existing) {
+      await db.projectAmount.update({ where: { id: existing.id }, data });
+    } else {
+      await db.projectAmount.create({ data: { projectId, kind: namedKind, label: "견적서", sourceFileName, ...data } });
+    }
+    return recalculateProjectTotals(projectId, db);
+  }
   const values: Array<{ kind: ProjectAmountKind; amount: number | null }> = [
     { kind: "revenue", amount: analysis.revenue },
     { kind: "cost", amount: analysis.cost },
@@ -86,8 +114,11 @@ export async function deleteQuoteAmounts(
   sourceFileName: string,
   db: ProjectAmountDb = prisma,
 ) {
+  const kind = getProjectQuoteKind(sourceFileName);
   const deleted = await db.projectAmount.deleteMany({
-    where: { projectId, sourceFileName, label: "견적서", payments: { none: {} } },
+    where: { projectId, sourceFileName,
+      ...(kind === "revenue" || kind === "cost" ? { kind } : { label: "견적서" }),
+      payments: { none: {} } },
   });
 
   return deleted.count > 0 ? recalculateProjectTotals(projectId, db) : null;
